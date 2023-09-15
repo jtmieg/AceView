@@ -1,3 +1,4 @@
+
 /*
  * authors: Danielle and Jean Thierry-Mieg, NCBI, 
  * March 2012
@@ -677,14 +678,14 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
   Array aa, daa ;
   int nn = 0, gene = 0, geneId = 0, run = 0, affy = 0, compare = 0, nLine = 0, cover, count, wild ;
   int geneOld = 0, geneTrue = 0 ;
-  float index = 0, seqs, tags, kb, nReads, nReadsOk, nerr, a2g, partial, orphan, badTopo, multi, multi2, genotype ;
-  const char *ccp ; char *cp ;
+  float index = 0, seqs, tags, kb, nReads, nReadsOk, nerr, a2g, partial, orphan, badTopo, multi, multi2 ;
+  const char *ccp ;
   DC *dc = 0 ;  
   DDC *ddc = 0 ;
   RC *rc = 0 ;
   GC *gc = 0 ;
   BOOL isOut, isRun, isAli, isGene, isGeneId, isIntron, isCompare, badSnp = FALSE ;
-  Stack buf = stackHandleCreate (1000,h) ;
+  /*   Stack buf = stackHandleCreate (1000,h) ; */
   DICT *markerSelectDict = 0 ;
   DICT *markerRejectDict = 0 ;
   BOOL wantDaa = gx->export && !gx->subsample && strchr (gx->export, 'v') ? TRUE : FALSE ;
@@ -738,31 +739,11 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 	continue ;
       if (! metaData && gx->isSNP)
 	{
+	  /*  new format, september 2023 : parse a tsf file exported from TSNP_DB script/snp3.tcsh */
+	  float f = -10 ;
 	  if (! ccp || *ccp == '#')
 	    continue ;
- 
-	  stackClear (buf) ;
-	  pushText (buf, ccp) ;
-	  catText (buf, ":") ;
-	  cp = aceInWord (ai) ;
-	  catText (buf, cp) ;
-	  catText (buf, ":") ;
-	  cp = aceInWord (ai) ;
-	  if (cp && cp[1]=='>')cp[1]='2' ;
-	  catText (buf, cp) ;
-	  catText (buf, ":") ;
-	  cp = aceInWord (ai) ; if (cp) catText (buf, cp) ; /* snipnet1 */
-	  catText (buf, ":") ;
-	  cp = aceInWord (ai) ; if (cp) catText (buf, cp) ; /* snipnet2 */
-
-	  if (0 && markerSelectDict ) printf("OK %s found in dict\n",stackText(buf,0)) ;
-	  dictAdd (gx->geneDict, stackText(buf,0), &gene) ;
-
-	  if (markerSelectDict && ! dictFind(markerSelectDict, stackText(buf,0), 0))
-	    continue ;
-	  if (markerRejectDict && dictFind(markerRejectDict, stackText(buf,0), 0))
-	    continue ;
-
+	  dictAdd (gx->geneDict, ccp, &gene) ;
 	  gc = arrayp (gx->genes, gene, GC) ; /* make room */
 	  isGene = TRUE ; isOut = FALSE ;
 	  
@@ -776,32 +757,24 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 	    isRun = TRUE ;
 	  else
 	    continue ;
-	  if (! aceInFloat (ai, &genotype))
+
+	  ccp = aceInWord (ai) ; /* format, trash */
+
+	  if (! aceInFloat (ai, &f))
 	    continue ;
-
-	  ccp = aceInWord (ai) ; /* frequency */
-
 	  cover = count = 0 ;
 	  aceInInt (ai, &cover) ;
 	  aceInInt (ai, &count) ;
 	  aceInInt (ai, &wild) ;
-          if (cover < count + wild) cover = count + wild ;
-	  if (0) count = genotype * cover / 2 ; /* quantize the counts */
+          if (cover < count + wild) 
+	    cover = count + wild ;
           
 	  if (1)  /* dromadaire 2016_11_24 */
 	    {
-	      if (genotype < .4) { wild += count ; count = 0 ; }
-	      if (genotype > 1.8) { count += wild ; wild = 0 ; }
-	    }
-	  if (0)
-	    { /* check that both strands are covered at at leas minCover/2 */
-	      int mp = 0, mm = 0, wp = 0, wm = 0 ;
-	      aceInInt (ai, &mp) ;
-	      aceInInt (ai, &wp) ;
-	      aceInInt (ai, &mm) ;
-	      aceInInt (ai, &wm) ;
-	      if (2 * (mp + wp) < 10 || 2 * (mm + wm) < 10)
-		continue ;
+	      if (f < .4) 
+		{ f = 0 ; wild += count ; count = 0 ; }
+	      if (f > .9) 
+		{ f = 1 ; count += wild ; wild = 0 ; }
 	    }
 	  if (cover >= 20)
 	    {
@@ -810,7 +783,7 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 	      rc->hasData = TRUE ;
 	      aa = rc->aa ;
 	      if (! aa)
-		aa = rc->aa = arrayHandleCreate (gx->snpEval || gx->snpCompare ? 5 : 50000, DC, gx->h) ;
+		aa = rc->aa = arrayHandleCreate (50000, DC, gx->h) ;
 	      
 	      /* register */
 	      
@@ -853,10 +826,11 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 		  dc = arrayp (aa, gene, DC) ;
 		  dc->seqs = count ;
 		  dc->tags = cover ;
-		  dc->kb = genotype ; /* 2016_02_10 was genotype */
+		  dc->kb = count ; /* 2016_02_10 was genotype */
 		  index = 0 + 20.0 * ((float)count)/((float)cover +.0001) ; 
 		  dc->indexMin = dc->indexMax = dc->index = index + 1000 ;
 		  gc->tags++ ; /* to insure the SNP is exported */
+		  gc->isGood = TRUE ;
 		}
 	    }
 	  continue ;
@@ -8425,7 +8399,7 @@ static void gxBigGenesDo (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL is
 static void gxBigGenes (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL isAce)
 {
   if (isAce)
-    aceOutf (ao, "-D High_genes\n") ;
+    aceOutf (ao, "-D High_genes %s\n", target) ;
   gxBigGenesDo (ao, gx, rc, target, isAce, FALSE) ;
   if (isAce && gx->hasCapture && rc->capturedBigGenes)
     gxBigGenesDo (ao, gx, rc, target, isAce, TRUE) ;
@@ -8766,12 +8740,14 @@ static void gxExportTableHeader  (GX *gx, ACEOUT ao, int type)
 		  for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
 		    {
 		      aceOut (ao, "\t") ;
-		      if (rc->bigGenes) gxBigGenes (ao, gx, rc, 0, FALSE) ;
+		      if (rc->bigGenes) 
+			gxBigGenes (ao, gx, rc, 0, FALSE) ;
 		      
 		      if (ao2)
 			{
 			  aceOut (ao2, "\t") ;
-			  if (rc->bigGenes) gxBigGenes (ao, gx, rc, 0, FALSE) ;
+			  if (rc->bigGenes) 
+			    gxBigGenes (ao, gx, rc, 0, FALSE) ;
 			}
 		    }
 		}
@@ -10844,11 +10820,11 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
   PC *pc ;
   GC *gc ;
   const char *species =  gx->htmlSpecies ? gx->htmlSpecies : "species" ;
-  BOOL isPm = (isPm0 == 2 ? 1 : 0) ;
+  BOOL isPm = (isPm0 == 2 ? TRUE : FALSE) ;
 
   if (isPm == FALSE || !h || !ao)
     {
-      if (h) ac_free (h) ;
+      if (h) { ac_free (h) ; h = 0 ; ao = 0 ; }
       h = ac_new_handle () ; 
       compareWhat = vtxtHandleCreate (h) ;
       fprintf (stderr, "=== compare %s fdr=%.2f thr=%d\n"
@@ -13867,7 +13843,6 @@ static BOOL gxOneSamplePairing (ACEOUT ao, GX *gx, int iCompare, COMPARE *compar
       aceOutDate (ao, "###", gx->title) ;
       aceOutf (ao, "## Pairs of runs, probably coming from the same individual, are listed\n") ;
       aceOutf (ao, "## The comparison is based on the correlation of substitution SNPs seen as high in at least 2 runs\n") ;
-      aceOutf (ao, "## Only pairs with differential correlation above 20 are listed\n") ;
       aceOutf (ao, "# Run 1\tRun 2\tDifferential correlation\tNumber of SNPs\tTitle 1\tTitle 2\n") ;
 
 
@@ -14805,7 +14780,7 @@ static void usage (char *message)
 	    "//   -snpCompare\n"
 	    "//      Reexport all SNPs in -deepSNP file, differential for any pair of runs\n"
 	    "//      declared in a compare object with tag Apply SNP\n"
-	    "//   -snpMinWhoScore int [default 20\n"
+	    "//   -snpMinWhoScore int [default 20]\n"
 	    "//      min score dispalyed in who_is_who.cluster table\n"
 	    "//   -snpCorrelation file_name\n"
 	    "//   -snpCovariance file_name\n"

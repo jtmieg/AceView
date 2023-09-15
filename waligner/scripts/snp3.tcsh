@@ -29,6 +29,33 @@ EOF
 endif
   
 
+if ($phase == G) then
+# export all well covered counts c>=20
+  set pp=$MAGIC
+if (1) then
+  bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
+    select -o tmp/TSNP_DB/$zone/snp3.$pp.cmw20.txt v,r,c,m,w from v in ?Variant, r in v->BRS_counts , c in r[1] where c >=20 , m in r[2], w in r[3]
+    quit
+EOF
+endif
+# select variants, well contrated both in runs S* and C*
+  cat tmp/TSNP_DB/$zone/snp3.direct.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMaxC>80 && fMinC<10 && fMaxS>80 && fMinS<10)print old;fMaxC=0;fMinC=100;fMaxS=0;fMinS=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;r=substr($2,1,1);f=100*m/c;if (r=="C"){if(f>fMaxC)fMaxC=f;if(f<fMinC)fMinC=f;}if (r=="S"){if(f>fMaxS)fMaxS=f;if(f<fMinS)fMinS=f;}}' >  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_list
+# get all their data
+  cat tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_list ZZZZZ tmp/TSNP_DB/$zone/snp3.direct.cmw20.txt | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1){v=$1;r=$2;c=$3;m=$4;w=$5;f=100*m/c;printf("%s\t%s\tfi3\t%.2f\t%d\t%d\t%d\n",v,r,f,c,m,w);}}' >  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good.tsf
+  cat   tmp/TSNP_DB/$zone/snp3.direct.cmw20.good.tsf | gawk -F '\t' '{v=$1;r=$2;f=$4;if (v!= old){printf("\nVariant %s\n",v);old=v;} if(f>80)printf("mm %s\n",r);else if(f>40)printf("wm %s\n",r);if(f<10)printf("ww %s\n",r);}END{printf("\n");}' > tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_type.ace
+
+  bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
+    pparse  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_type.ace
+    save
+    quit
+EOF
+
+  goto done
+endif
+
+
+
+
 if ($phase == p) then
   set pp=SnpA2R2 
   bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
@@ -241,7 +268,7 @@ done:
 
   
   foreach zone (`cat tmp/SNP_ZONE/ZoneList `)
-    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh dc $zone"
+    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh G $zone"
   end
  qusage 1
 

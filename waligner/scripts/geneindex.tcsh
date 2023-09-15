@@ -1327,24 +1327,11 @@ if ($phase == g4 || $phase == g4sp || $phase == gsnp4 ||  $phase == ma4  || $pha
   set targetSNP=$targetBeau
   set selectSNP=""
   if ($phase == snp4) then
-    if (! -e tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz) then
-      echo "missing file tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz, please =run please run phase s21"
+    if (! -e tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz) then
+      echo "missing file tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz, please =run please run phase SNV"
       exit 1
     endif 
-    if (0 && ! -e tmp/SNP_DB/$MAGIC.snp.sorted.homozygous.gz) then
-      echo "missing file tmp/SNP_DB/$MAGIC.snp.sorted.homozygous.gz, please =run please run phase s21"
-      exit 1
-    endif 
-    if (0 && -d tmp/SNPH && ! -e tmp/SNPH/$MAGIC.s14.snp.differential) then
-      cat  tmp/SNPH/*/$MAGIC.snp.sorted.differential >> tmp/SNPH/$MAGIC.s14.snp.differential
-      touch  tmp/SNPH/$MAGIC.s14.snp.filtered
-      set n=`cat tmp/SNPH/$MAGIC.s14.snp.differential | wc -l`
-      if ($n < 10) \rm tmp/SNPH/$MAGIC.s14.snp.differential
-    endif
-    if (-e tmp/SNPH/$MAGIC.s14.snp.differential) set myace=tmp/SNPH/$MAGIC.s14.snp.differential
-    set myace=tmp/SNP_DB/$MAGIC.snp.sorted.homozygous.gz
-    set myace=tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz
-   if (0 && -e tmp/SNPH/$MAGIC.s14.snp.differential.2016_02) set myace=tmp/SNPH/$MAGIC.s14.snp.differential.2016_02
+    set myace=tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz
     set targetSNP=$target.$SNPCHROM
     if ($SNPCHROM == "" ) set targetSNP=$target
     set mNam=""
@@ -3508,8 +3495,8 @@ popd
 cat tmp/GENEINDEX/DD.EBI.GENE.u.ace | gawk '{gsub(/\"/,"",$2);}/^Gene/{g=$2;ok=0;if(g=="FBgn0002938")ok=1;next;}/^Run_U/{r=$2;if(ok==1)z1[r]=$4;next;}/^Anti/{r=$2;if(ok==1)z2[r]=$4;next;}END{for(r in z2);if(z2[r]>0)printf("%s\t%d\t%d\n",r,z1[r],z2[r]);}'
 
 ## counting SNPs in 2 runs
-gunzip -c tmp/SNP_DB/Who.characteristic_substitutions.snp.gz | grep Rhs4005 > toto80                                  
-gunzip -c tmp/SNP_DB/Who.characteristic_substitutions.snp.gz | grep F2_MCS-015 >> toto80                                  
+gunzip -c tmp/SNP_DB/Who.characteristic.snp.gz | grep Rhs4005 > toto80                                  
+gunzip -c tmp/SNP_DB/Who.characteristic.snp.gz | grep F2_MCS-015 >> toto80                                  
 
 
 cat toto81 | gawk -F '\t' '/A>G/{next;}{k++;if(k%1)next;}/>/{x=$8;if($7<.4)x=0;if($7>1.8)x=100;if($9<10)next;if(x<=4)x=0;else if(x>=98)x=200;else x=100;}{if($6 != old6)f2++;old6=$6;}{s=$1 $2 $3;ss[s]++;z[s,f2]=1+x/100;}END{for(s in ss) {x = 0+z[s,1] ; y = 0+z[s,2] ; if(x*y==0 || x*y == 100 || x == 20 || y == 20 )continue;uu[x-1,y-1]++ ; X += x ; X2 += x*x ; Y += y ; Y2 += y * y ; XY += x*y ;N++; if(x*y==60 || x*y==9)print s,x,y; }printf("%d\t%d\t%d\n%d\t%d\t%d\n%d\t%d\t%d\n\n",uu[0,0],uu[0,1],uu[0,2],uu[1,0],uu[1,1],uu[1,2],uu[2,0],uu[2,1],uu[2,2]);x = X2/N - X*X/(N*N);y=Y2/N - Y*Y/(N*N);w=XY/N - X*Y/(N*N);printf("\nCorrel %.2f\n",100*w/sqrt(x*y));print X,Y,X2,Y2,x,y,w;}' | tail -20

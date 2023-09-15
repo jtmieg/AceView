@@ -106,6 +106,7 @@ typedef struct tsnpCallerTable {
   const char *select ;
   const char *remap2genome ;
   const char *remap2genes ;
+  BOOL countTypes ;
   BOOL force ;
  
   int minSnpCover, minSnpCount ;
@@ -6013,7 +6014,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "//      Remap the genome variants into transcript coordinates\n"
 	   "//      --force : remap all variants, default: remmap on those lacking the GeneBox tag\n"
 	   "//   --db_translate --db ACEDB : translate the mRNA variants (or genome variants remapped to mRNAs) if they map to a protein coding exon\n"
-	   "//   --db_count -i count_file --db ACEDB  : scan the input file and adjust in the ACEDB database the variant->population and ->strand counts\n"
+	   "//   --db_count_types  --db ACEDB  : count per run the number of SNP passing the cover/count/frquency thresholds of each type sub/indels/transition ...\n"
 	   "// GENE FUSION\n"
 	   "//   --target_class : target class (KT_RefSeq ET_av...) [default ET_av]\n"
 	   "//   --min_GF integer : [default 5]  filter geneFusionFile on min support \n" 
@@ -6134,6 +6135,7 @@ int main (int argc, const char **argv)
   getCmdLineOption (&argc, argv, "--filter", &(tsnp.filter)) ;
   getCmdLineOption (&argc, argv, "--db_remap2genome", &tsnp.remap2genome) ;
   getCmdLineOption (&argc, argv, "--db_remap2genes", &tsnp.remap2genes) ;
+  tsnp.countTypes = getCmdLineBool (&argc, argv, "--db_count_types") ;
   tsnp.force = getCmdLineBool (&argc, argv, "--force") ;
 
   tsnp.makeWords = getCmdLineBool (&argc, argv, "--makeWords") ;

@@ -91,6 +91,7 @@ typedef struct clipAlignStruct {
   BOOL roche ; /* favor deletions */
   BOOL pacbio ; /* favor deletions */
   BOOL nanopore ; /* favor deletions */
+  BOOL ultima; /* favor deletions */
   BOOL fastQ ; /* probe file is in fastQ format */
   BOOL A2G, G2A, T2C, C2T, A2C, C2A, T2G, G2T, G2C, C2G, A2T, T2A, X2X ;  /* search for intense RNA-editing by aligning in 3 letter code */
   int probeQquality ; /* ignore, if fastq format, right clip until a letter of given quality is reached */
@@ -10671,6 +10672,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "//          fine tunes the cost of the mismatches and of the oo in a rather complex way\n" 
 	   "// -pacbio :  expects long reads with a rather high error rate \n"
 	   "// -nanopore :  expects very long reads with a rather very high error rate \n"
+	   "// -ultima :  expects short reads with a very low error rate \n"
 	   "// -hit fileName : hits file, possibly .gz, output of previous search, to be postprocessed\n"
 	   
 	   "// -o fileName : output file name, equivalent to redirecting stdout\n"
@@ -11068,6 +11070,7 @@ int main (int argc, const char **argv)
   p.solid  = getCmdLineBool (&argc, argv, "-solid") ;
   p.roche = getCmdLineBool (&argc, argv, "-roche") ;
   p.pacbio  = getCmdLineBool (&argc, argv, "-pacbio") ;
+  p.ultima  = getCmdLineBool (&argc, argv, "-ultima") ;
   p.nanopore = getCmdLineBool (&argc, argv, "-nanopore") ;
 
   p.solid |= getCmdLineBool (&argc, argv, "-solidC") ;
@@ -11147,6 +11150,8 @@ int main (int argc, const char **argv)
     { p.errCost =  4; p.seedShift = 2 ;  p.seedLength = 14 ; }
   if (p.pacbio)
     p.errCost =  4;
+  if (0 && p.ultima)
+    p.errCost =  8;
   getCmdLineInt (&argc, argv, "-errCost", &p.errCost) ;
 
   getCmdLineInt (&argc, argv, "-seedShift", &p.seedShift) ;

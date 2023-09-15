@@ -2032,6 +2032,213 @@ static void qcMainResults2 (QC *qc, RC *rc)
   AC_HANDLE h = ac_new_handle () ;
   AC_TABLE  tt ;
   const char *ccp ;
+  TT *ti, tts[] = {
+    { "Spacer", "", 0, 0, 0} ,  
+    { "TITLE", "Title", 10, 0, 0} ,
+    { "Compute", "% Mb aligned on any target before clipping\t% length aligned on average before clipping", 54, 0, 0} , 
+    { "Compute", "% length aligned after clipping adaptors and barcodes", 55, 0, 0 } ,
+    { "Compute", "% Reads aligned on any target", 56, 0, 0 } ,
+
+     {  0, 0, 0, 0, 0}
+  } ; 
+
+  const char *caption =
+    "Alignment statistics"
+    ;
+  if (rc == (void *) 1)
+    return  qcChapterCaption (qc, tts, caption) ;
+
+
+  for (ti = tts ; ti->tag ; ti++)
+    {
+      if (rc == 0)
+	{
+	  aceOutf (qc->ao, "\t%s", ti->title) ;
+	}
+       else if (! strcmp (ti->tag, "TITLE"))
+	{
+	  const char *ccp = ac_tag_printable (rc->run, "Title", 0) ;
+	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
+	  continue ;
+	}
+      else if (! strcmp (ti->tag, "Compute"))
+	{
+	  int ir ;
+	  float z, zb, zc ;
+
+	  switch (ti->col)
+	    {
+	    case 54:
+	      ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+ 	      z = zb = zc = 0 ;
+ 	      for (ir = 0 ; tt && ir < tt->rows ; ir++)
+ 		{
+ 		  ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+ 		  if (! strcasecmp (ccp, "any"))
+ 		    {
+ 		      z = ac_table_float (tt, ir, 3, 0) ;
+ 		      zb = ac_table_float (tt, ir, 5, 0) ;
+ 		      zc = ac_table_float (tt, ir, 7, 0) ;
+ 		    }
+ 		} 
+
+	      aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned on any target before clipping */
+	      {
+		float z1 = rc->var[T_kb], z2 = 0 ;
+		AC_TABLE tt2 = ac_tag_table (rc->ali, "Unaligned", h) ;
+		z2 = tt2 ? ac_table_float (tt2, 0, 4,0) : 0 ; /* kb Unaligned */
+		aceOutf (qc->ao, "\t%.2f ", 100*zb/(z1 - z2)) ;  /* % length aligned on average before clipping */
+	      }
+	   
+	      ac_free (tt) ;
+	      break ;
+
+	    case 55:   /*  Average clipped length */
+	      {
+		int ir ;
+		float z = -1, zClipped = -1 ;
+		AC_TABLE tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+		
+		for (ir = 0 ; tt &&  ir < tt->rows; ir++)
+		  {
+		    if (! strcasecmp (ac_table_printable (tt, ir, 0, ""), "any"))
+		      {
+			z =  ac_table_float (tt, ir, 7, -1) ; 
+			zClipped = ac_table_float (tt, ir, 11, -1) ;
+			break ;
+		      }
+		  }
+		aceOutf (qc->ao, "\t") ;
+		if (z > -1)
+		  {
+		    aceOutPercent (qc->ao, 100.00 * z/zClipped) ;
+		  } 
+		
+		ac_free (tt) ;
+	      }
+	      break ;
+
+	    case 56:
+	      ccp = EMPTY ; 
+	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+ 	      z = zb = zc = 0 ;
+ 	      for (ir = 0 ; tt && ir < tt->rows ; ir++)
+ 		{
+ 		  ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+ 		  if (! strcasecmp (ccp, "any"))
+ 		    {
+ 		      z = ac_table_float (tt, ir, 3, 0) ;
+ 		    }
+ 		} 
+
+	      aceOutf (qc->ao, "\t%.2f", rc->var[T_Read] ? 100 *z / rc->var[T_Read] : 0) ;
+	      ac_free (tt) ;
+	      break ;
+	    }
+	}
+      else  /* 110: accessible length */
+	qcShowTag (qc, rc, ti) ;
+    }
+  ac_free (h) ;
+  return;
+}  /* qcMainResults2 */
+
+/*************************************************************************************/
+
+static void qcMainResults3 (QC *qc, RC *rc)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  AC_TABLE  tt ;
+  TT *ti, tts[] = {
+    { "Spacer", "", 0, 0, 0} ,  /* Quality features */
+    { "TITLE", "Title", 10, 0, 0} ,
+
+    { "Compute", "% fragments on strand plus of genes", 90, 0, 0} ,  /* copied from qcGeneExpression */
+    { "Compute", "Mismatches per kb aligned", 100, 0, 0} , /* copied from qcMismatchTypes */
+    { "Accessible_length_8kb", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+    { "Accessible_length_5kb", "Well covered transcript length (nt), max 4kb, measured on transcripts longer than 5kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+
+    {  0, 0, 0, 0, 0}
+  } ; 
+
+  const char *caption =
+    "Quality features: strandedness, base quality, 3' bias"
+    ;
+  if (rc == (void *) 1)
+    return  qcChapterCaption (qc, tts, caption) ;
+
+
+  for (ti = tts ; ti->tag ; ti++)
+    {
+      if (rc == 0)
+	{
+	  aceOutf (qc->ao, "\t%s", ti->title) ;
+	}
+       else if (! strcmp (ti->tag, "TITLE"))
+	{
+	  const char *ccp = ac_tag_printable (rc->run, "Title", 0) ;
+	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
+	  continue ;
+	}
+      else if (! strcmp (ti->tag, "Compute"))
+	{
+	  int ir ;
+	  float z, z1 ;
+	  char buf[64] ;
+
+	  switch (ti->col)
+	    {
+
+	    case 90:  /* Observed strandedness */
+	      tt = ac_tag_table (rc->run, "Observed_strandedness_in_ns_mapping", h) ; 
+	      z = 50 ;
+	      if (tt)
+		for (ir = 0 ; ir < tt->rows ; ir++)
+		  {
+		    z1 = ac_table_float (tt, 0,1,50) ;
+		    if ((z-50)*(z-50) < (z1-50)*(z1-50))
+		      z = z1 ;
+		  }
+	      aceOutf (qc->ao, "\t%.2f", z) ;
+	      ac_free (tt) ;
+	      break ;
+	    case 100:	
+	      tt = ac_tag_table (rc->ali, "Error_profile", h) ;	
+	      z = z1 = 0 ; buf[0] = 0 ;
+	      for (ir = 0 ; tt &&  ir < tt->rows ; ir++)
+		{
+		  if (ir == 0)
+		    {
+		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
+		      z1 = ac_table_float (tt, ir, 3, 0) ;
+		    }
+		  else if (strcmp (buf, ac_table_printable (tt, ir, 0, "xxx")))
+		    {
+		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
+		      z1 +=  ac_table_float (tt, ir, 3, 0) ;
+		    }
+		  if (!strcasecmp ("Any", ac_table_printable (tt, ir, 1, "xxx")))
+		    z += ac_table_float (tt, ir, 2, 0) ;
+		}
+	      aceOutf (qc->ao, "\t%.5f", z1 > 0 ? z / (1000 * z1) : 0) ;
+	      ac_free (tt) ;
+	      break ;
+	    }
+	}
+      else  /* 110: accessible length 8k/5k */
+	qcShowTag (qc, rc, ti) ;
+    }
+  ac_free (h) ;
+  return;
+}  /* qcMainResults3 */
+
+/*************************************************************************************/
+
+static void qcMainResults4 (QC *qc, RC *rc)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  AC_TABLE  tt ;
+  const char *ccp ;
   float zz ;
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,  
@@ -2245,213 +2452,6 @@ static void qcMainResults2 (QC *qc, RC *rc)
 	    }
 	}
       else  /* 110: accessible length */
-	qcShowTag (qc, rc, ti) ;
-    }
-  ac_free (h) ;
-  return;
-}  /* qcMainResults2 */
-
-/*************************************************************************************/
-
-static void qcMainResults_h (QC *qc, RC *rc)
-{
-  AC_HANDLE h = ac_new_handle () ;
-  AC_TABLE  tt ;
-  const char *ccp ;
-  TT *ti, tts[] = {
-    { "Spacer", "", 0, 0, 0} ,  
-    { "TITLE", "Title", 10, 0, 0} ,
-    { "Compute", "% Mb aligned on any target before clipping\t% length aligned on average before clipping", 54, 0, 0} , 
-    { "Compute", "% length aligned after clipping adaptors and barcodes", 55, 0, 0 } ,
-    { "Compute", "% Reads aligned on any target", 56, 0, 0 } ,
-
-     {  0, 0, 0, 0, 0}
-  } ; 
-
-  const char *caption =
-    "Alignment statistics"
-    ;
-  if (rc == (void *) 1)
-    return  qcChapterCaption (qc, tts, caption) ;
-
-
-  for (ti = tts ; ti->tag ; ti++)
-    {
-      if (rc == 0)
-	{
-	  aceOutf (qc->ao, "\t%s", ti->title) ;
-	}
-       else if (! strcmp (ti->tag, "TITLE"))
-	{
-	  const char *ccp = ac_tag_printable (rc->run, "Title", 0) ;
-	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
-	  continue ;
-	}
-      else if (! strcmp (ti->tag, "Compute"))
-	{
-	  int ir ;
-	  float z, zb, zc ;
-
-	  switch (ti->col)
-	    {
-	    case 54:
-	      ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
- 	      z = zb = zc = 0 ;
- 	      for (ir = 0 ; tt && ir < tt->rows ; ir++)
- 		{
- 		  ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
- 		  if (! strcasecmp (ccp, "any"))
- 		    {
- 		      z = ac_table_float (tt, ir, 3, 0) ;
- 		      zb = ac_table_float (tt, ir, 5, 0) ;
- 		      zc = ac_table_float (tt, ir, 7, 0) ;
- 		    }
- 		} 
-
-	      aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned on any target before clipping */
-	      {
-		float z1 = rc->var[T_kb], z2 = 0 ;
-		AC_TABLE tt2 = ac_tag_table (rc->ali, "Unaligned", h) ;
-		z2 = tt2 ? ac_table_float (tt2, 0, 4,0) : 0 ; /* kb Unaligned */
-		aceOutf (qc->ao, "\t%.2f ", 100*zb/(z1 - z2)) ;  /* % length aligned on average before clipping */
-	      }
-	   
-	      ac_free (tt) ;
-	      break ;
-
-	    case 55:   /*  Average clipped length */
-	      {
-		int ir ;
-		float z = -1, zClipped = -1 ;
-		AC_TABLE tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
-		
-		for (ir = 0 ; tt &&  ir < tt->rows; ir++)
-		  {
-		    if (! strcasecmp (ac_table_printable (tt, ir, 0, ""), "any"))
-		      {
-			z =  ac_table_float (tt, ir, 7, -1) ; 
-			zClipped = ac_table_float (tt, ir, 11, -1) ;
-			break ;
-		      }
-		  }
-		aceOutf (qc->ao, "\t") ;
-		if (z > -1)
-		  {
-		    aceOutPercent (qc->ao, 100.00 * z/zClipped) ;
-		  } 
-		
-		ac_free (tt) ;
-	      }
-	      break ;
-
-	    case 56:
-	      ccp = EMPTY ; 
-	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
- 	      z = zb = zc = 0 ;
- 	      for (ir = 0 ; tt && ir < tt->rows ; ir++)
- 		{
- 		  ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
- 		  if (! strcasecmp (ccp, "any"))
- 		    {
- 		      z = ac_table_float (tt, ir, 3, 0) ;
- 		    }
- 		} 
-
-	      aceOutf (qc->ao, "\t%.2f", rc->var[T_Read] ? 100 *z / rc->var[T_Read] : 0) ;
-	      ac_free (tt) ;
-	      break ;
-	    }
-	}
-      else  /* 110: accessible length */
-	qcShowTag (qc, rc, ti) ;
-    }
-  ac_free (h) ;
-  return;
-}  /* qcMainResults_h */
-
-/*************************************************************************************/
-
-static void qcMainResults4 (QC *qc, RC *rc)
-{
-  AC_HANDLE h = ac_new_handle () ;
-  AC_TABLE  tt ;
-  TT *ti, tts[] = {
-    { "Spacer", "", 0, 0, 0} ,  /* Quality features */
-    { "TITLE", "Title", 10, 0, 0} ,
-
-    { "Compute", "% fragments on strand plus of genes", 90, 0, 0} ,  /* copied from qcGeneExpression */
-    { "Compute", "Mismatches per kb aligned", 100, 0, 0} , /* copied from qcMismatchTypes */
-    { "Accessible_length", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
-    { "Accessible_length_5k", "Well covered transcript length (nt), max 4kb, measured on transcripts longer than 5kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
-
-    {  0, 0, 0, 0, 0}
-  } ; 
-
-  const char *caption =
-    "Quality features: strandedness, base quality, 3' bias"
-    ;
-  if (rc == (void *) 1)
-    return  qcChapterCaption (qc, tts, caption) ;
-
-
-  for (ti = tts ; ti->tag ; ti++)
-    {
-      if (rc == 0)
-	{
-	  aceOutf (qc->ao, "\t%s", ti->title) ;
-	}
-       else if (! strcmp (ti->tag, "TITLE"))
-	{
-	  const char *ccp = ac_tag_printable (rc->run, "Title", 0) ;
-	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
-	  continue ;
-	}
-      else if (! strcmp (ti->tag, "Compute"))
-	{
-	  int ir ;
-	  float z, z1 ;
-	  char buf[64] ;
-
-	  switch (ti->col)
-	    {
-
-	    case 90:  /* Observed strandedness */
-	      tt = ac_tag_table (rc->run, "Observed_strandedness_in_ns_mapping", h) ; 
-	      z = 50 ;
-	      if (tt)
-		for (ir = 0 ; ir < tt->rows ; ir++)
-		  {
-		    z1 = ac_table_float (tt, 0,1,50) ;
-		    if ((z-50)*(z-50) < (z1-50)*(z1-50))
-		      z = z1 ;
-		  }
-	      aceOutf (qc->ao, "\t%.2f", z) ;
-	      ac_free (tt) ;
-	      break ;
-	    case 100:	
-	      tt = ac_tag_table (rc->ali, "Error_profile", h) ;	
-	      z = z1 = 0 ; buf[0] = 0 ;
-	      for (ir = 0 ; tt &&  ir < tt->rows ; ir++)
-		{
-		  if (ir == 0)
-		    {
-		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
-		      z1 = ac_table_float (tt, ir, 3, 0) ;
-		    }
-		  else if (strcmp (buf, ac_table_printable (tt, ir, 0, "xxx")))
-		    {
-		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
-		      z1 +=  ac_table_float (tt, ir, 3, 0) ;
-		    }
-		  if (!strcasecmp ("Any", ac_table_printable (tt, ir, 1, "xxx")))
-		    z += ac_table_float (tt, ir, 2, 0) ;
-		}
-	      aceOutf (qc->ao, "\t%.5f", z1 > 0 ? z / (1000 * z1) : 0) ;
-	      ac_free (tt) ;
-	      break ;
-	    }
-	}
-      else  /* 110: accessible length 8k/5k */
 	qcShowTag (qc, rc, ti) ;
     }
   ac_free (h) ;
@@ -3674,11 +3674,11 @@ static void qcBloom (QC *qc, RC *rc)
 	      const char *ccp = ac_table_printable (tt, ir, 0, 0) ;
 	      if (ccp && ! strcasecmp (tag, ccp))
 		{
-		  float z0, z3 ;
-		  z0 = ac_table_float (tt, ir, 2, -1) ;
-		  z3 = ac_table_float (tt, ir, 5, -1) ;
-		  if (z0 >= 0)
-		    z = 1000000.0 * z3 / z0 ;
+		  float z2, z5 ;
+		  z2 = ac_table_float (tt, ir, 2, -1) ;
+		  z5 = ac_table_float (tt, ir, 5, -1) ;
+		  if (z2 >= 0)
+		    z = 1000000.0 * z5 / z2 ;
 		}
 	    }
 	  if (z >= 0)
@@ -5340,8 +5340,8 @@ static void qc3pBias (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
-    { "Accessible_length", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, imited by the 3' bias in poly-A selected experiments", 0, 0, 0},    { "Accessible_length", "Number of well expressed transcripts longer than 8kb", 1, 0, 0} ,
-    { "Accessible_length", "Average coverage cumulated over these transcripts", 3, 0, 0} ,
+    { "Accessible_length_8kb", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, imited by the 3' bias in poly-A selected experiments", 0, 0, 0},    { "Accessible_length", "Number of well expressed transcripts longer than 8kb", 1, 0, 0} ,
+    { "Accessible_length_8kb", "Average coverage cumulated over these transcripts", 3, 0, 0} ,
     {  0, 0, 0, 0, 0}
   }; 
   const char *caption =
@@ -5498,6 +5498,7 @@ static void qcIntergenic2 (QC *qc, RC *rc)
 }  /* qcIntergenic2 */
 
 /*************************************************************************************/
+#ifdef JUNK
 
 static void qcDrosoZhenXia (QC *qc, RC *rc)
 {
@@ -5734,28 +5735,28 @@ static void qcDrosoZhenXia (QC *qc, RC *rc)
    ac_free (h) ;
    return;
 }  /* qcDrosoZhenXia */
+#endif /* JUNK */
 
 /*************************************************************************************/
 
-static const char *allMethods = "0Nh4RH75UWv9zKt8TPbCifmpAdMsr3DgIXESV" ;
+static const char *allMethods = "S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
 static MM methods [] = {
-  {'0', &qcSortingTitles} ,
-  {'N', &qcMainResults1} ,
-  {'h', &qcMainResults_h} ,
+  {'S', &qcSortingTitles} ,
+  {'1', &qcMainResults1} ,
+  {'2', &qcMainResults2} ,
+  {'3', &qcMainResults3} ,
   {'4', &qcMainResults4} ,
-  {'R', &qcMainResults2} ,
   {'H', &qcHighGenes} ,
-  {'7', &qcGeneExpression1} ,
+  {'E', &qcGeneExpression1} ,
   {'5', &qcMainResults5} ,
-  {'a', &qcAli } ,   /* now included in R */ 
   {'U', &qcIntergenic2} ,
   {'W', &qcMappingPerCentTarget} ,
-  {'v', &qcHighVirusBacteria} ,
+  {'V', &qcHighVirusBacteria} ,
   {'9', &qcPairPercent } ,
   {'z', &qcInsertSize} ,
   {'K', &qcSnpCoding } ,
-  {'t', &qcBloom} ,  /* adaptors  telomeres polyA */
-  {'8', &qcReadFate1 } ,
+  {'B', &qcBloom} ,  /* adaptors  telomeres polyA */
+  {'F', &qcReadFate1 } ,
 
   {'T', &qcTitles} ,
   {'P', &qcProtocol } ,
@@ -5775,16 +5776,17 @@ static MM methods [] = {
 
   {'s', &qcSnpTypes } ,
   {'r', &qcSnpRejectedTypes } ,
-  {'3', &qc3pBias} ,
+  {'7', &qc3pBias} ,
   {'D', &qcInterGenic} ,
   {'g', &qcGeneExpression2} ,
   {'I', &qcCandidateIntrons} ,
   {'X', &qcSexTissueSignatures} ,
-  {'Z', &qcDrosoZhenXia} ,
-  {'E', &qcExternalFiles} ,
-  {'S', &qcSLs} ,
-  {'V', &qcCapture} ,
+  /* {'_', &qcDrosoZhenXia} , */
+  {'8', &qcExternalFiles} ,
+  {'L', &qcSLs} ,
+  {'v', &qcCapture} ,
   {'o', &qcOther} ,
+  {'a', &qcAli } ,   /* now included in R */ 
 { 0, 0 }
 } ;
 
@@ -5999,29 +6001,38 @@ static void usage (char *message)
 	    "//   -TT  : limit the stats to the (run dependent) targeted genes\n"
 	    "//   -export [TPbafpmg...] : only export some groups of columns, in the requested order\n"
 	    "//      default: if -export is not specified, export all columns in default order\n"
-	    "//            E: main Results1\n"
+	    "//            S:  Sorting titles\n"
+	    "//            1:  Alignments read counts\n"
+	    "//            2:  Alignments percentages\n"
+	    "//            3:  Alignments per strand in genes\n"
+	    "//            4:  Alignments statistics in Megabases\n"
 	    "//            H:  High genes\n"
-	    "//            R: main Results2\n"
-	    "//            3: main Results3\n"
+	    "//            E:  GeneExpression\n"
+	    "//            5:  main Results5\n"
+	    "//            U:  Intergenic2\n"
+	    "//            W:  MappingPerTarget\n"
+	    "//            V:  High Virus and bacteria\n"
+	    "//            9:  Pair percent\n"
+	    "//            z:  Insert size\n"
+	    "//            K:  SNP coding\n"
+	    "//            B:  Adators, telomeres, poly-A motifs\n"
+	    "//            F:  ReadFate\n" 
 	    "//            T:  Titles\n"
 	    "//            P:  Protocol\n"
 	    "//            b:  BeforeAli\n"
-	    "//            t:  Telomeric/poly-A motifs\n"
 	    "//            C: CPU and RAM usage\n"
 	    "//            i: Micro-RNA\n"
+	    "//            f:  ReadFate2\n" 
 	    "//            a:  Ali\n"
-	    "//            f:  ReadFate\n" 
-	    "//            m:  MappingPerTarget\n"
 	    "//            p:  Pair\n" 
 	    "//            A:  Average aligned length\n"
 	    "//            d : strandedness\n"
 	    "//            M: Mismatch types\n"
-	    "//            K:  SNP coding\n"
 	    "//            s:  SNP types\n"
 	    "//            r:  Rejected SNP types\n"
-	    "//            3: 3p bias\n"
+	    "//            7: 3p bias\n"
+	    "//            g: Gene expression 2\n"
 	    "//            D:  Intergenic\n"
-	    "//            g:  GeneExpression\n"
 	    "//            I:  Candidate introns\n"
 	    "//            S:  SL1-12\n"
 	    "//            X:  Sex and tissue signatures\n"

@@ -119,7 +119,7 @@ setenv minCoveron 10
 ## 4,10,20 seem to be good thresholds for the ILM HiSeq in 2011
 
 setenv minSnpCount 4
-setenv minSnpCover 10
+setenv minSnpCover 20
 setenv minSnpFrequency 18
 
 setenv snpDropMultiplicity 0

@@ -142,6 +142,11 @@
                      SRR  ?SRR XREF Run @Title     // a run may have several SRR id, or none,    
                      SRX  ?SRX XREF Run @T     // a run may have several SRR id, or none,    
                      SRP  ?SRP XREF Run @T     // a run may have several SRP id, or none,  
+      FDA FDA_id UNIQUE ?Text
+          FDA_SRR UNIQUE Text
+          FDA_frag UNIQUE Float
+          FDA_read UNIQUE Float
+          FDA_MB UNIQUW Float
       Doublon_of ?Run XREF Doublon_of  
       Corona  OldSampleID UNIQUE ?Text
               NewSampleID UNIQUE ?Text
@@ -251,6 +256,7 @@
                                  PacBio UNIQUE Text
                                  Oxford_nanopore  UNIQUE Text
                                  Nanopore  UNIQUE Text
+                                 Ultima UNIQUE Text
                                  Capillary   UNIQUE Text
                                  Complete_genomics  UNIQUE Text
                   Flowcell_lane_index UNIQUE Text                   //   goes to Library
@@ -335,10 +341,10 @@
                       Known_introns ?Target UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text 
                       Candidate_introns  ?Target UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text  UNIQUE Float UNIQUE Text UNIQUE Float
                       Accessible_length UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
-                      Accessible_length_8k UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
-                      Accessible_length_5k UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
-                      Accessible_length_5k_captured UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
-                      Accessible_length_8k_captured UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
+                      Accessible_length_8kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
+                      Accessible_length_5kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
+                      Accessible_length_5kb_captured UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
+                      Accessible_length_8kb_captured UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       SLs Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text   // SL1-12 <int> support <int> position as seen in the Run
       Sponge Wiggles Wiggle_U    UNIQUE Float UNIQUE Text  // Mb in the unique wiggle
                      Wiggle_nU   UNIQUE Float UNIQUE Text  // Mb in the non-unique wiggle

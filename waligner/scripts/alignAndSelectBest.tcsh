@@ -74,6 +74,10 @@ foreach run2 (`cat $mytmp/MetaDB/$MAGIC/RunPacBioList`)
   if ($run == $run2) set isLong="-pacbio"
 end
 
+foreach run2 (`cat $mytmp/MetaDB/$MAGIC/RunUltimaList`)
+  if ($run == $run2) set isLong="-ultima"
+end
+
 set dna2dnaFormat=fastc
 if ($iiSolid == 1) set dna2dnaFormat=csfastc
 
@@ -285,10 +289,10 @@ set forceRightClip=`cat $mytmp/MetaDB/$MAGIC/runs.ace | gawk '{gsub(/\"/,"",$0);
 set adaptor1=""
 set adaptor2=""
 
-set adaptor1=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($5 != "NULL") m=$5;if ($3 != "NULL") m=$3;}}END{gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
-set adaptor2=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($6 != "NULL") m=$6;if ($4 != "NULL") m=$4;}}END{gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
+set adaptor1=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($5 != "NULL") m=$5;if ($3 != "NULL") m=$3;}}END{m=substr(m,1,30);gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
+set adaptor2=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($6 != "NULL") m=$6;if ($4 != "NULL") m=$4;}}END{m=substr(m,1,30);gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
 
-set entryAdaptor1=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($7 != "NULL") m=$5;}}END{gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
+set entryAdaptor1=`cat $mytmp/MetaDB/$MAGIC/run2machine2adaptors.txt | gawk -F '\t' 'BEGIN{m="NULL";}{gsub(/\"/,"",$1);if($1 == run){if ($7 != "NULL") m=$5;}}END{m=substr(m,1,30);gsub(/\"/,"",m);gsub("Text:","",m);print m;}' run=$run`
 
   echo "# adaptor1=$adaptor1"
   echo "# adaptor2=$adaptor2"

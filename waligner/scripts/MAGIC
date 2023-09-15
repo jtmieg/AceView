@@ -537,7 +537,7 @@ cat <<EOF > _x.awk
   if (ix > 0) ph = ph " wait d5  "
   if (tsnp > 0) ph = ph "wait tsnp1b wait tsnp2a " ;
   if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c wait  tsnp3" ;  ## make words, count words , collate word counts
-  if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13 wait s14 "   
+  if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (tsnp > 0) ph = ph "wait tsnp10 " ;
   if (snp > 0) ph = ph "wait snp10 " ;
   if (iv > 0) ph = ph " wait d6 wait d7 wait d8 " ;
@@ -807,6 +807,8 @@ bin/tacembly MetaDB << EOF > MetaDB/makelists.log
   list -a -f MetaDB/$MAGIC/RunNanopore.list
   query find project IS $MAGIC ; > Run  ; PacBio
   list -a -f MetaDB/$MAGIC/RunPacBio.list
+  query find project IS $MAGIC ; > Run  ; Ultima
+  list -a -f MetaDB/$MAGIC/RunUltima.list
   // query find run ! paired_end && file:1 == "*/1" && file:1 == "*/2"
   // edit paired_end 
   query find run Is_run AND  NOT single_end AND NOT paired_end AND project == $MAGIC && (file:1 == "*/1" && file:1 == "*/2")
@@ -839,8 +841,12 @@ bin/tacembly MetaDB << EOF > MetaDB/makelists.log
   bql -a -o MetaDB/$MAGIC/RunListSorted1 select r,s from r in @, s in r->sorting_title order_by 2
   query find project IS $MAGIC ; > Run  ; CLASS Runs && sorting_title_2
   bql -a -o MetaDB/$MAGIC/RunListSorted2 select r,s from r in @, s in r->sorting_title_2 order_by 2
+  query find project IS $MAGIC ; > Run  ; CLASS Runs && ! sorting_title 
+  bql -a -o MetaDB/$MAGIC/RunListSorted3 select r,r from r in @
   query find project IS $MAGIC ; > Run  ; Union_of && sorting_title
   bql -a -o MetaDB/$MAGIC/GroupListSorted1 select r,s from r in @, s in r->sorting_title order_by 2
+  query find project IS $MAGIC ; > Run  ; Union_of && !sorting_title
+  bql -a -o MetaDB/$MAGIC/GroupListSorted3 select r,r from r in @
   query find project IS $MAGIC ; > Run  ; Union_of && sorting_title_2
   bql -a -o MetaDB/$MAGIC/GroupListSorted2 select r,s from r in @, s in r->sorting_title_2 order_by 2
   query find project IS $MAGIC ; > Run
@@ -854,7 +860,9 @@ EOF
 
 ## clean up the bql output
 cat   MetaDB/$MAGIC/RunListSorted1 | gawk '{gsub(/\"/,"",$0);print $1;}' > MetaDB/$MAGIC/RunListSorted
+cat   MetaDB/$MAGIC/RunListSorted3 | gawk '{gsub(/\"/,"",$0);print $1;}' >> MetaDB/$MAGIC/RunListSorted
 cat   MetaDB/$MAGIC/GroupListSorted1 | gawk '{gsub(/\"/,"",$0);print $1;}' > MetaDB/$MAGIC/GroupListSorted
+cat   MetaDB/$MAGIC/GroupListSorted3 | gawk '{gsub(/\"/,"",$0);print $1;}' >> MetaDB/$MAGIC/GroupListSorted
 
 cat  MetaDB/$MAGIC/gtitle.pretxt | gawk -F '\t' '{printf("%s",$1);for (i=2;i<=NF;i++){j = index($i,"\"");printf("\t%s",substr($i,j));}printf("\n");}' >    MetaDB/$MAGIC/gtitle.txt
 
@@ -866,7 +874,7 @@ cat  MetaDB/$MAGIC/gtitle.pretxt | gawk -F '\t' '{printf("%s",$1);for (i=2;i<=NF
 touch MetaDB/$MAGIC/g2r MetaDB/$MAGIC/r2sublib 
 
 ## clean up the lists (acedb exports "" around the names)
-foreach ff (Run Runs RunNoCount Group GroupDeDuo GroupSnp  GroupAdditive GroupSnpAdditive GroupWiggle GroupW_stranded  GroupW_new_exon GroupGene_element_index RunRna RunNonStranded RunForward RunReverse RunSolid RunNanopore RunPacBio RunSingleIndividual RunPaired RunSnp RunSmallRna RunPrivate RunPublic RunSequin RunWiggle GroupVariance GroupIntron RunsIntron GroupTransloc UcscWiggle RunHasSubLib RunSublibrary_of RunWithKnownAdaptors)
+foreach ff (Run Runs RunNoCount Group GroupDeDuo GroupSnp  GroupAdditive GroupSnpAdditive GroupWiggle GroupW_stranded  GroupW_new_exon GroupGene_element_index RunRna RunNonStranded RunForward RunReverse RunSolid RunNanopore RunPacBio RunUltima RunSingleIndividual RunPaired RunSnp RunSmallRna RunPrivate RunPublic RunSequin RunWiggle GroupVariance GroupIntron RunsIntron GroupTransloc UcscWiggle RunHasSubLib RunSublibrary_of RunWithKnownAdaptors)
 # create even the empty lists, because most scrits/* use constructs like
 # cat XxxList, is XxxList is missing, there would be an error and since we execute  tcsh -e, the whole script would fail
   touch  MetaDB/$MAGIC/$ff.list 
@@ -1237,7 +1245,6 @@ if ($phase == snp10) goto phaseSnp10
 if ($phase == s10) goto phases10
 if ($phase == s12) goto phases12
 if ($phase == s13) goto phases13
-if ($phase == s14) goto phases14
 if ($phase == s15) goto phases15
 
 if ($phase == s20) goto phases20
@@ -1587,7 +1594,6 @@ echo "s20:   Collate and translate the SNPs in tmp/SNP_DB"
 echo "s21:   Report the SNP into RESULTS/SNV/, including the run metadata and the translations"
 
 echo "s13:   Find the SNP differential between runs"
-echo "s14:   Prediction analysis via selected SNPs"
 echo "s3:    Prepare an edited reference sequence for SNP confirmation"
 echo "s4:    Confirm the SNPs by realigning on the edited target"
 echo "s5:    Collate the confirmed counts in s590"
@@ -4947,6 +4953,9 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   endif
 end
 
+goto phaseLoop
+
+# GGG is an analysis of 2020 for Josh Sherry to look for evolution in bacterial strains
 scripts/submit wait
  
 phaseTSnp2g2:
@@ -4966,7 +4975,8 @@ cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.before.tsf   | sed -e 's/ciiiii/i
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.after.tsf    | sed -e 's/ciiiii/iiiiii/' | grep -v monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.notRejected.after -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.centered.tsf | sed -e 's/ciiiii/iiiiii/' | grep -v monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.notRejected.centered -s anyRun
 
-cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.before.tsf   | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.before -s anyRun
+cat tmp/TSN
+P_DB/zoner.*/tsnp2g.any.rejected.before.tsf   | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.before -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.after.tsf    | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.after -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.centered.tsf | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.centered -s anyRun
 
@@ -5285,7 +5295,7 @@ foreach zone ($zones1 $zones2)
       \rm tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new
     else
       \cp tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new tmp/SNP_LIST/$zone/$MAGIC.SnpRunList
-      \rm tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new  tmp/SNP_LIST/$zone/$MAGIC.Variant.list tmp/SNP/$MAGIC.$zone.* tmp/SNPH/$MAGIC.* tmp/SNPH/$zone/$MAGIC.* tmp/SNP_DB/$MAGIC.* tmp/SNP_DB/$zone/$MAGIC.*  tmp/SNP_DB/$zone/snp.*.done
+      \rm tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new  tmp/SNP_LIST/$zone/$MAGIC.Variant.list tmp/SNP/$MAGIC.$zone.*  tmp/SNP_DB/$MAGIC.* tmp/SNP_DB/$zone/$MAGIC.*  tmp/SNP_DB/$zone/snp.*.done
     endif
 
     touch tmp/SNP_LIST/$zone/$MAGIC.Variant.list
@@ -5761,21 +5771,38 @@ goto phaseLoop
 # cat ~/NBE/tmp/SNPH/*/NBE.snp.sorted.filtered.filtered | gawk '{if($6=="Ghs3987"&& $7==1)g1[$1 $2 $3]=2;if($6=="Ghs3988" && $7==1 && g1[$1 $2 $3]==1)print}' | head
 
 ###############################################################################################
-## s14: Prediction analysis via selected SNPs
+## snp4: Who_is_who
 
-phases14: 
 phasesnp4:
 echo "phase s14: Prediction using the SNPs"
 
+foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
+  if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf) continue
+  scripts/submit tmp/TSNP_DB/$zone/s21 "scripts/snp3.tcsh G $zone"
+end
 
-touch tmp/SNPH/_s13
+scripts/submit wait
+
+if (! -d tmp/GENEINDEX) mkdir tmp/GENEINDEX
+
+cat  tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf | gzip > tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz
+wc  tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf 
+ls -ls tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz
+
+scripts/geneindex.tcsh snp4
+
+echo "phase snp4 done"
+goto phaseLoop
+
+touch tmp/SNPH/_snp4
 cat MetaDB/$MAGIC/compares.ace | gawk '{gsub(/\"/,"",$0);}/^Compare/{r1=$2;}/^SNP/{printf("%s\n",r1);}' > tmp/SNPH/_s13
-set n=`cat tmp/SNPH/_s13 | wc -l`
-if (0 && $n == 0) then
+set n=`cat tmp/SNPH/_snp4 | wc -l`
+if ($n == 0) then
   echo "To make class predictions using SNPs, please add the tag Compare_SNP to some runs of project $MAGIC"
   goto phaseLoop
 endif
-#cat  tmp/SNPH/_s13
+cat  tmp/SNPH/_snp4
+
 
 scripts/geneindex.tcsh snp4 
 
@@ -6085,24 +6112,26 @@ set nRuns=`cat MetaDB/$MAGIC/RunsList | wc | gawk '{print $1}'`
 
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   # echo "#########... $zone"
-  if (! -d tmp/SNP_DB/$zone || -e tmp/SNP_DB/$zone/$MAGIC.characteristic_snp.txt) continue
-  scripts/submit tmp/SNP_DB/$zone/s21 "scripts/s21.select_characteristic_snps.tcsh $zone $nRuns $Strategy"
+  if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf) continue
+#  scripts/submit tmp/SNP_DB/$zone/s21 "scripts/s21.select_characteristic_snps.tcsh $zone $nRuns $Strategy"
+  scripts/submit tmp/TSNP_DB/$zone/s21 "scripts/snp3.tcsh G $zone"
 end
 
 scripts/submit wait
-gunzip -c tmp/SNP_DB/*/$MAGIC.characteristic_substitutions.snp.gz > tmp/SNP_DB/$MAGIC.characteristic_substitutions.pre_snp
+  cat tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf > tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf 
+gunzip -c tmp/SNP_DB/*/$MAGIC.characteristic.snp.gz > tmp/SNP_DB/$MAGIC.characteristic.pre_snp
 cat tmp/SNPH/zone*/$MAGIC.snp.sorted.homozygous | gzip > tmp/SNP_DB/$MAGIC.snp.sorted.homozygous.gz
 
 # filter against the 'filtered' snps 
 if ($Strategy != RNA_seq) then
   cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | cut -f 2,3,5 | sort -u >  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list
-  cat  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list ZZZZZ  tmp/SNP_DB/$MAGIC.characteristic_substitutions.pre_snp | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{z=$1 ":c." $2 $3 ;}{if(zz<1){ok[z]=1;next;}}{if(ok[z]==1)print}' | gzip  > tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz 
+  cat  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list ZZZZZ  tmp/SNP_DB/$MAGIC.characteristic.pre_snp | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{z=$1 ":c." $2 $3 ;}{if(zz<1){ok[z]=1;next;}}{if(ok[z]==1)print}' | gzip  > tmp/SNP_DB/$MAGIC.characteristic.snp.gz 
 else
   # 2020_02_14 j'elimine ces 2 lignes que ne marchent pas, je vois [pas a quoi elles servent
   # cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | cut -f 10 | sort -u >  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list
-  # cat  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list ZZZZZ  tmp/SNP_DB/$MAGIC.characteristic_substitutions.pre_snp | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}}{z=$1 ":c." $2 $3 ;}{if(ok[z]==1)print}' | gzip  > tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz 
-  cat  tmp/SNP_DB/$MAGIC.characteristic_substitutions.pre_snp  | gzip  > tmp/SNP_DB/$MAGIC.characteristic_substitutions.snp.gz 
-  \rm  tmp/SNP_DB/$MAGIC.characteristic_substitutions.pre_snp 
+  # cat  tmp/SNP_DB/$MAGIC.filtered_mRNA_snps.list ZZZZZ  tmp/SNP_DB/$MAGIC.characteristic.pre_snp | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}}{z=$1 ":c." $2 $3 ;}{if(ok[z]==1)print}' | gzip  > tmp/SNP_DB/$MAGIC.characteristic.snp.gz 
+  cat  tmp/SNP_DB/$MAGIC.characteristic.pre_snp  | gzip  > tmp/SNP_DB/$MAGIC.characteristic.snp.gz 
+  \rm  tmp/SNP_DB/$MAGIC.characteristic.pre_snp 
 endif
 
 goto phaseLoop
@@ -8067,7 +8096,7 @@ goto phaseLoop
 
 phasec7:
 phaseqc:
-echo -n "phase c7: Export a general quality control table called RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.runs.txt"
+echo -n "phase c7: Export a general quality control table called RESULTS/Mapping/$MAGIC.QC.runs.txt"
 date 
 if (! -d RESULTS/Mapping) mkdir RESULTS/Mapping
 
@@ -8124,7 +8153,7 @@ echo "pparse MetaDB/$MAGIC/stranding.ace" | bin/tacembly MetaDB -no_prompt
     bin/qcsummary -db MetaDB -project $MAGIC -runType 1  -o RESULTS/Mapping/$MAGIC.sublibs
   endif
   if ($n > 1) then
-    bin/table_histo -i RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.sublibs.txt > RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.sublibs.histo.txt
+    bin/table_histo -i RESULTS/Mapping/$MAGIC.sublibs.QC.txt > RESULTS/Mapping/$MAGIC.sublibs.QC.histo.txt
   endif
 
   set n=`cat MetaDB/$MAGIC/RunsList | wc -l`
@@ -8133,7 +8162,7 @@ echo "pparse MetaDB/$MAGIC/stranding.ace" | bin/tacembly MetaDB -no_prompt
     bin/qcsummary -db MetaDB -project $MAGIC -runType 2 -TT -o RESULTS/Mapping/$MAGIC.runs.captured
   endif
   if ($n > 1) then
-    bin/table_histo -i RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.runs.txt > RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.runs.histo.txt
+    bin/table_histo -i RESULTS/Mapping/$MAGIC.runs.QC.txt > RESULTS/Mapping/$MAGIC.runs.QC.histo.txt
   endif
 
   set n=`cat MetaDB/$MAGIC/GroupList | wc -l`
@@ -8142,7 +8171,7 @@ echo "pparse MetaDB/$MAGIC/stranding.ace" | bin/tacembly MetaDB -no_prompt
     bin/qcsummary -db MetaDB -project $MAGIC  -runType 3 -TT -o RESULTS/Mapping/$MAGIC.groups.captured
   endif
   if ($n > 1) then
-    bin/table_histo -i RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.groups.txt > RESULTS/Mapping/$MAGIC.Data_Summary_and_QC.groups.histo.txt
+    bin/table_histo -i RESULTS/Mapping/$MAGIC.groups.QC.txt > RESULTS/Mapping/$MAGIC.groups.QC.histo.txt
   endif
 
   bin/qcsummary -db MetaDB -export Tt  -project $MAGIC -o  RESULTS/Mapping/$MAGIC.telomere
