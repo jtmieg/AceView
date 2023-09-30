@@ -1,4 +1,3 @@
-
 /*
  * authors: Danielle and Jean Thierry-Mieg, NCBI, 
  * March 2012
@@ -40,6 +39,7 @@ typedef struct pcStruct {
 typedef struct rwStruct { int run ; double alpha, beta1, beta2 ; } RW ;  /* Run-Weighted struct,  used to construct iterated groups */
 typedef struct endpointStruct { int run1, run2, run3, run4 ; }  ENDPOINT ;
 typedef struct compareStruct { 
+  AC_HANDLE h ;
   int compare ; 
   KEYSET runs ; 
   KEYSET predicts ; 
@@ -56,6 +56,7 @@ typedef struct compareStruct {
   float fdr[3] ; int fdrThreshold[3] ; 
   int nVirtualStrata ; /* number of virtual strata actually generated */
   int forceIbest ;
+  Array pp[3] ;
 } COMPARE ;
 
 typedef struct rcStruct { 
@@ -219,6 +220,7 @@ typedef struct gxStruct {
   const char *isLowTitle[3] ;
   Array degHistos ;
   Array baddyBatchies ; /* raise the threshold for genes coming in the random strata */
+  Array baddyBatchiesAll ; /* register all random strata values, so we can later subtract the average before we compute the FDR histograms */
   Array baddyBatchiesMax ; /* raise the threshold for genes coming in the random strata */
   Array gza ; /* used to sort the exported index tables */
   Array compares ; /* classe compare: protocol classe for titration etc */
@@ -234,17 +236,20 @@ typedef struct gxStruct {
 static int pcOrder (const void *a, const void *b) ;
 static Array gxAllRunsCosineUsingGenesRun1Run2 (GX *gx, int run1, int run2, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, Array sp, Array sm, AC_HANDLE h) ;
 static BOOL gxRunsCosineUsingGenes (GX *gx, KEYSET genes, Associator assPlus, Associator assMinus, Array sp, Array sm, int run1, int run2, double *alphap, int *nnp, int lowAll, BOOL isDiff) ;
-static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, float *fdr1, float *fdr2,int run1, int run2, BOOL histo, int pass0) ;
+static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus,int run1, int run2, BOOL histo, int pass0) ;
 static void gxExportSignatures (GX *gx, int run1, int run2, int run3, int run4, int pass) ;
 static Array gxTrueFalse_AUC_MCC (GX *gx, Array rws, int runa, int runb, int runa1, int runb1, int pass) 
   ;
-static int gxDghRegisterHisto (GX *gx, int run1, int run2, int iVV, int nRun1, int nRun2, Array pp, AC_HANDLE h) ;
-static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int isPm, float *fdr, int *fdrThresholdp) ;
-static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int run2, KEYSET vA, KEYSET vB, float *fdr, int fdrThreshold,  int isPm) ;
+static int gxDghInitializeBaddyBatchies (GX *gx, AC_HANDLE h) ;
+static void gxDghRegisterScore (GX *gx, int iVV, PC *pc) ;
+static void gxDghRegisterHisto (GX *gx, int run1, int run2, int nRun1, int nRun2, Array pp) ;
+static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int isPm) ;
+static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int run2, KEYSET vA, KEYSET vB, int isPm) ;
 static void gxGroupCumul (GX *gx, RC *rc, int myGene) ;
 static BOOL gxSnpEvaluate (GX *gx, int gene, const char *snpName) ;
 static void gxExportTableHeader  (GX *gx, ACEOUT ao, int type) ;
 static float gxScoreOneGeneHisto (GX *gx, int gene, int run1, int run2, float *pValue) ;
+static void gxDghShiftHisto (GX *gx, Array pp, int isPm) ;
 static void gxDoRegisterComparedGenes (GX *gx, int gene, int iCmp, int iRun, int jRun, float iIndex, float jIndex, float diffScore, float pValue) ; 
 static BOOL gxMakeComparativeHistos (GX *gx, int gene
 				       , int run1, int run2, KEYSET vA, KEYSET vB
@@ -911,12 +916,12 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 	    }
 	  if (!strcasecmp (ccp, "Who_is_who"))
 	    { 
+	      up->who_is_who = TRUE ;
+	      gx->who_is_who = TRUE ;
+	      gx->samplePairing = up->samplePairing = TRUE ;
 	      if ( gx->isSNP)
 		{
 		  up->compareSNP = TRUE ;
-		  up->who_is_who = TRUE ;
-		  gx->who_is_who = TRUE ;
-		  gx->samplePairing = up->samplePairing = TRUE ;
 		}
 	      continue ;
 	    }
@@ -2007,7 +2012,7 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 	  if (isRun)
 	    {
 	      RC *rc = arrayp (gx->runs, run, RC) ;
-	      rc->private = 1 ;
+	      rc->private = 2 ;
 	    }
 	  continue ;
 	}
@@ -2585,7 +2590,8 @@ static void gxGlobalCounts (GX *gx)
       /* 2 passes :: first count how many kb are in genes with a geneId, then flag the big genes */
       for (pass = 0, kb = 0 ; pass < 2 ; pass++)
 	{
-	  for (n = 0, gene = 1, dc = arrayp (aa, gene, DC), gc = arrayp (gx->genes, gene, GC), t = t2 = tE = z = z2 = zE = zbig = nGeneWithGeneId = 0 ; gene < arrayMax (aa) ; gene++, gc++, dc++) 
+	  t = t2 = tE = z = z2 = zE = zbig = nGeneWithGeneId = 0 ;
+	  for (n = 0, gene = 1, dc = arrayp (aa, gene, DC), gc = arrayp (gx->genes, gene, GC) ; gene < arrayMax (aa) ; gene++, gc++, dc++) 
 	    {
 	      if (gc->geneGroup)
 		continue ;
@@ -3341,6 +3347,7 @@ static float gxComputeOneIndex (int run, int gene, GX *gx, DC *dc, int *isLowp)
 	  if (tt < 0) tt = 0 ; 
 	  damper = 5 ;
 	  if (1) damper = 3 ; /* SEQC2 test 2021_09_03 */
+	  damper = 4 ; /* 2023_09_21, so if tt=0 log((tt+sqrt(damper +tt^2)/2)=log(1)=0 */
 	}
 
       if(gx->isMA) damper = 9 ; /* because we count a local coverage, not a number of reads */
@@ -3356,10 +3363,11 @@ static float gxComputeOneIndex (int run, int gene, GX *gx, DC *dc, int *isLowp)
 	index -= gx->malus ;
       if (! rc->zeroIndex)
 	{
-	  if (gx->isMA)
-	    ln =  gx->isMA ;
-	  z = 1.0E12/ ((ln - lf > lf ? ln - lf : lf) * abp) ; z *= average_tag_ln ;
-	  rc->zeroIndex = (log(damper/2.0) + log(z))/logDeux ; 
+	  /* mieg 2023_09_21: rc->zero cannot depend on the particular gene 
+	   * i choose 2kb
+	   */
+	  z = 1.0E12/ (2000 * abp) ; z *= average_tag_ln ; 
+	  rc->zeroIndex = (log(sqrt(damper)/2.0) + log(z))/logDeux ; 
 	}
       if (0 && !strcmp (dictName(gx->geneDict,gene),"Lgals3"))
 	{
@@ -5605,6 +5613,7 @@ static float gxPairScore (GX *gx, int *iComparep, int run1, int run2, int gene, 
     }
   else
     {
+      messcrash ("bad call to gxPairScore") ;
       if (0)
 	{
 	  if (sign == 1)
@@ -5637,6 +5646,7 @@ static float gxScoreHistos (GX *gx, int gene, RC *rc1, RC *rc2, int run1, int ru
   int i, iMin ;
   int debug = 0 ;
   int raBest1 = 0, raBest2 = 0, rbBest1 = 0, rbBest2 = 0 ; 
+  BOOL killScore = FALSE ;
   double  aBest1 = 0, aBest2 = 0, bBest1 = 0, bBest2 = 0, av1 = 0, av2 = 0, av1s[2], av2s[2], 
     sx0 = 0, sy0 = 0, sx, sy, sx1, sy1, mx, my, dza, dzb, 
     x, y, dx, dy, ixa, iya, ixn, iyn, jxa, jya, jxn, jyn ;
@@ -5896,14 +5906,14 @@ static float gxScoreHistos (GX *gx, int gene, RC *rc1, RC *rc2, int run1, int ru
     jjj = 0 ;
   else
     jjj = 1 ;
-
+  /* TOTOTOTO */
   if (
       (sens[0] == 1 && av2s[jjj] < 10 * threshold) || /* a is left of b */
       (sens[0] == 2 && av1s[jjj] < 10 * threshold)    /* b is left of a */
       )
-    score = score + 0 ;
+   killScore = TRUE ;  /* mieg 2023_09_25 kill the score if the high peak is below the threshold */
 
-  if (sens[0] == sens[1])
+  if (! killScore && sens[0] == sens[1])
     {
       score = scores[jjj] ;
       bonus = boni[jjj] ;
@@ -6041,15 +6051,25 @@ static float gxScoreHistos (GX *gx, int gene, RC *rc1, RC *rc2, int run1, int ru
   if (ch2 > 30) ch2 = 30 ;
   if (ch2 < 0) ch2 = 0 ;
   ch2 = 0 ; /* dromadaire, this boost may be a false good idea 2014_06_08 */
-  gc->score = (score + ch2  < 200  ? score + ch2 : 200) ;
-  gc->score1 = (aBest1 + ch2/2 < 100 ? aBest1 + ch2/2 : 100) ;
-  gc->score2 = (bBest1 + ch2/2 < 100 ? bBest1 + ch2/2 : 100) ;
+
+  if (killScore)
+    {
+      gc->score = 0 ;
+      gc->score1 = 0 ;
+      gc->score2 = 0 ;
+    }
+  else
+    {
+      gc->score = (score + ch2  < 200  ? score + ch2 : 200) ;
+      gc->score1 = (aBest1 + ch2/2 < 100 ? aBest1 + ch2/2 : 100) ;
+      gc->score2 = (bBest1 + ch2/2 < 100 ? bBest1 + ch2/2 : 100) ;
+    }
   gc->ratioa = raBest1 ;
   gc->ratiob = rbBest1 ;
   gc->bonus = bonus ;
   gc->ix1 = ix1 ; gc->ix2 = ix2 ;
   gc->iy1 = iy1 ; gc->iy2 = iy2 ;
-
+  
   gc->av1 = av1 ; gc->av2 = av2 ;  gc->isLow1 = 0 ;  gc->isLow2 = 0 ;
   gc->za1 = a1 ; gc->za2 = a2 ;  
   gc->zb1 = b1 ; gc->zb2 = b2 ;
@@ -6234,60 +6254,35 @@ static float gxScoreOneGeneHisto (GX *gx, int gene, int run1, int run2, float *p
 
 /*************************************************************************************/
 /* filter on minimal delta and sig */
-static void gxRuns2geneFilter (GX *gx, Array pp, int run1, int run2, float minFoldChange) 
+static void gxRuns2geneFilter (GX *gx, PC *pc, float minFoldChange) 
 {
   GC *gc ;
-  PC *pc ;
-  int ipp ;
 
-  arraySort (pp, pcSigOrder) ;
-  for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
-    {
-      pc->ok = 0 ;
-      if (gx->genePlusFileName)
-	{ 
-	  if (pc->dIndex >= minFoldChange) 
-	    pc->ok = 1 ; 
-	  continue ;
-	}
-
-      gc = arrayp (gx->genes, pc->gene, GC)  ;
-      if (! gc || (gc->length > 1 && gc->length < 150))   /* short genes fluctuate too much to be predictive */
-	continue ;
-
-      if (0 && 
-	  ! strcmp (dictName(gx->geneDict, pc->gene), "KIAA1244") &&
-	  strstr (dictName(gx->runDict, run1), "HR")
-	  )
-	{
-	  PC *pc2 ;
-	  int i ;
-	  
-	  invokeDebugger () ;
-	  fprintf (stderr, "KIAA1244 %s %s pass=%d ok=%d index1=%.1f dindex=%.1f overlap=%.1f sig=%.1f d2dw=%.1f dan=%.1f\n"
-		   , dictName(gx->geneDict, pc->gene)
-		   , dictName(gx->runDict, run1)
-		   , 0, pc->ok, pc->index1, pc->dIndex, pc->overlap, pc->sig, pc->d2dw, pc->danielle
-		   ) ;
-	  for (i = 0, pc2 = arrp (pp, 0, PC) ; i < arrayMax (pp) && i < 10 ; i++, pc2++)
-	    fprintf (stderr, "## %d\t%s Favorable_NB_178 pass=%d ok=%d index1=%.1f dindex=%.1f overlap=%.1f sig=%.1f d2dw=%.1f dan=%.1f\n"
-		     , i
-		     , dictName (gx->geneDict, pc2->gene)
-		     , 0, pc2->ok, pc2->index1, pc2->dIndex, pc2->overlap, pc2->sig, pc2->d2dw, pc2->danielle
-		     ) ;
-	}
-      
-      if (pc->dIndex > minFoldChange && pc->index1 >= 3 && (pc->overlap > .5 || pc->d2dw > .5 || pc->sig > .5)) 
+  pc->ok = 0 ;
+  if (gx->genePlusFileName)
+    { 
+      if (pc->dIndex >= minFoldChange) 
 	pc->ok = 1 ; 
-    } 
+      return ;
+    }
+  
+  /* short genes fluctuate too much to be predictive */
+  gc = arrayp (gx->genes, pc->gene, GC)  ;
+  if (! gc || (gc->length > 1 && gc->length < 150)) 
+    return ;
+  
+  if (pc->dIndex > minFoldChange && pc->index1 >= 3 && 
+      (pc->overlap > .5 || pc->d2dw > .5 || pc->sig > .5)) 
+    pc->ok = 1 ; 
 } /* gxRuns2geneFilter */
 
 /*************************************************************************************/
 /* extract the 'nks' most significant genes */
-static void gxRuns2geneGetBest (GX *gx, COMPARE *compare, Array pp, KEYSET genePlus, KEYSET moreGenePlus, int run1, int fdrThreshold)
+static void gxRuns2geneGetBest (GX *gx, COMPARE *compare, Array pp, KEYSET genePlus, KEYSET moreGenePlus, int run1, int isPm)
 {
   int ipp, nks, passSig ;
   int geneMax = arrayMax (gx->genes) ;
+  int fdrThreshold = compare->fdrThreshold[isPm] ;
   PC *pc ;
   int nMin = 10 ;
   int nMax = gx->maxGenePlus ;
@@ -6790,10 +6785,9 @@ static BOOL gxMakeComparativeHistos (GX *gx, int gene
 /* select genes above a given differential and export them 
  * optionally count the FDR on a set of virtual randomizedly stratified control classes
  */
-static Array gxDoCompare_to (GX *gx, int pass, COMPARE *compare
+static Array gxDoCompare_to (GX *gx, COMPARE *compare
 			     , int run1, int run2, KEYSET vA, KEYSET vB
 			     , int minIndex, KEYSET genePlus, KEYSET moreGenePlus
-			     , float *fdr
 			     , int isVirtual, int isPm
 			     , AC_HANDLE hFDR   /* handle for FDR survives for the whole compare_and-control */
 			     )
@@ -6807,8 +6801,7 @@ static Array gxDoCompare_to (GX *gx, int pass, COMPARE *compare
   RC reserveRc1, reserveRc2 ;
   Array aa1, aa2, pp = 0 ;
   double ix1, ix2, dIndex, dvar0 ;
-  float minFoldChange = gx->minFoldChange ; 
-
+  float minFoldChange ;
 
   if (isVirtual)
     {
@@ -6838,280 +6831,265 @@ static Array gxDoCompare_to (GX *gx, int pass, COMPARE *compare
       gxGroupCumul (gx, rc2, 0) ; 
     }
 
-  if (1)
+  rc1 = arrayp (gx->runs, run1, RC) ;
+  aa1 = rc1->aa ;
+  
+  rc2 = arrayp (gx->runs, run2, RC) ;
+  aa2 = rc2->aa ;
+  
+  ipp = 0 ;
+  pp = arrayHandleCreate (10000, PC, h) ;
+  aaMax = arrayMax (aa1) ; 
+  if (aaMax > arrayMax (aa2))
+    aaMax = arrayMax (aa2) ;
+	  
+  minFoldChange = gx->minFoldChange ;
+  if (minFoldChange < 1)
     {
-      rc1 = arrayp (gx->runs, run1, RC) ;
-      aa1 = rc1->aa ;
-
-      rc2 = arrayp (gx->runs, run2, RC) ;
-      aa2 = rc2->aa ;
+      float u1, u2 ;
+      u1 = rc1->runs ? keySetMax (rc1->runs) : 0 ; 
+      u2 = rc2->runs ? keySetMax (rc2->runs) : 0 ; 
+      if (u1 < 4 || u2 < 4)
+	minFoldChange = 1.0 ;
+      else if (u1 + u2 < 8 &&	minFoldChange < 1 &&
+	       minFoldChange < 1.5 - 1.1 * (u1+u2)/8.0
+	       )
+	minFoldChange = 1.5 - 1.1 * (u1+u2)/8.0 ;  /* interpolate down to .4 at or over 50 */
+    }
+  
+  for (gene = 1, dc1 = arrayp (aa1, 1, DC), dc2 = arrayp (aa2, 1, DC) ; gene < aaMax ; gene++, dc1++, dc2++) 
+    {
+      gc = arrayp (gx->genes, gene, GC)  ;
       
-      if (aa1 && aa2)
-	{
-	  if (0 && ! isVirtual)
-	    fprintf (stderr, "Comparing %s to %s\n" , dictName (gx->runDict, run1), dictName (gx->runDict, run2)) ;
-	  ipp = 0 ;
-	  pp = arrayHandleCreate (10000, PC, h) ;
-	  aaMax = arrayMax (aa1) ; 
-	  if (aaMax > arrayMax (aa2))
-	    aaMax = arrayMax (aa2) ;
-	  
-	  minFoldChange = gx->minFoldChange ;
-	  if (minFoldChange < 1)
-	    {
-	      float u1, u2 ;
-	      u1 = rc1->runs ? keySetMax (rc1->runs) : 0 ; 
-	      u2 = rc2->runs ? keySetMax (rc2->runs) : 0 ; 
-	      if (u1 < 4 || u2 < 4)
-		minFoldChange = 1.0 ;
-	      else if (u1 + u2 < 8 &&	minFoldChange < 1 &&
-		       minFoldChange < 1.5 - 1.1 * (u1+u2)/8.0
-		       )
-		minFoldChange = 1.5 - 1.1 * (u1+u2)/8.0 ;  /* interpolate down to .4 at or over 50 */
-	    }
-
-	  for (gene = 1, dc1 = arrayp (aa1, 1, DC), dc2 = arrayp (aa2, 1, DC) ; gene < aaMax ; gene++, dc1++, dc2++) 
-	    {
-	      gc = arrayp (gx->genes, gene, GC)  ;
-
-	      if (gx->targeted && ! gc->targeted)
-		continue ;
-	      if (0)
-		if (gx->captured && ! gc->captured)
-		  continue ;
-	      if (gx->isINTRON && !gc->tags && ! gc->intronRefSeq && ! gc->intronAv)
-		continue ;
-
-	      if (! gc || (gc->length > 0 && gc->length < 150))   /* short genes fluctuate too much to be predictive */
-		continue ;
-	      if (0 && gc->geneGroup) /* 2019_05_30 */
-		continue ;
-
-	      ix1 = dc1->index + rc1->fineTune - 1000 ; if (! gx->isSNP && ix1 < minIndex) ix1 = minIndex ;
-	      ix2 = dc2->index + rc2->fineTune - 1000 ; if (! gx->isSNP && ix2 < minIndex) ix2 = minIndex ;
-	      dIndex = ix1 - ix2 ;
-	      if (dc1->isLow)    /* 2014_06_04 22h54 */
-		continue ;
-	      /*
-		if (1 && ! strcasecmp (dictName (gx->geneDict, gene), "UKv4_A_23_P2258"))
-		invokeDebugger () ;
-		if (0 && ! strcasecmp (dictName (gx->geneDict, gene), "NBPF8.2.voAug10-unspliced"))
-		invokeDebugger () ;
-		if (!strcmp (dictName(gx->geneDict, gene), "EEF2K.aAug10:4206:A2G:GATGCTaGGTGCG:GATGCTgGGTGCG") && ! strcmp (dictName(gx->runDict, run1), "Unfavorable_NB_91"))
-		invokeDebugger () ;
-	      */
-
-	      if (ix1 <= 0 || dIndex < minFoldChange)
-		continue ;
-
-	      if (! strncasecmp (dictName (gx->geneDict, gene), "ERCC-", 5))
-		continue ;
-	      if (! strncasecmp (dictName (gx->geneDict, gene), "ERCC_vector", 11))
-		continue ;
-
-	      if (pass == 99)
-		{
-		  if (run1 < run2 && ! keySetFind (gx->userGivenGenePlus, gene,0))
-		    continue ;
-		  if (run1 > run2 && ! keySetFind (gx->userGivenGeneMinus, gene,0))
-		    continue ;
-		}
-
-	      gc = arrp (gx->genes, gene, GC) ;
-
-	      pc = arrayp (pp, ipp++, PC) ;
-	      pc->gene = gene ;
-	      pc->index1 = ix1 ; pc->index2 = ix2 ; pc->dIndex = dIndex ;
-	      pc->dvar = pc->d2dw = pc->sig = pc->overlap = pc->danielle = 0 ;
-
+      if (gx->targeted && ! gc->targeted)
+	continue ;
+      if (0)
+	if (gx->captured && ! gc->captured)
+	  continue ;
+      if (gx->isINTRON && !gc->tags && ! gc->intronRefSeq && ! gc->intronAv)
+	continue ;
+      
+      if (! gc || (gc->length > 0 && gc->length < 150))   /* short genes fluctuate too much to be predictive */
+	continue ;
+      if (0 && gc->geneGroup) /* 2019_05_30 */
+	continue ;
+      
+      ix1 = dc1->index + rc1->fineTune - 1000 ; if (! gx->isSNP && ix1 < minIndex) ix1 = minIndex ;
+      ix2 = dc2->index + rc2->fineTune - 1000 ; if (! gx->isSNP && ix2 < minIndex) ix2 = minIndex ;
+      dIndex = ix1 - ix2 ;
+      if (dc1->isLow)    /* 2014_06_04 22h54 */
+	continue ;
+      /*
+	if (1 && ! strcasecmp (dictName (gx->geneDict, gene), "UKv4_A_23_P2258"))
+	invokeDebugger () ;
+	if (0 && ! strcasecmp (dictName (gx->geneDict, gene), "NBPF8.2.voAug10-unspliced"))
+	invokeDebugger () ;
+	if (!strcmp (dictName(gx->geneDict, gene), "EEF2K.aAug10:4206:A2G:GATGCTaGGTGCG:GATGCTgGGTGCG") && ! strcmp (dictName(gx->runDict, run1), "Unfavorable_NB_91"))
+	invokeDebugger () ;
+      */
+      
+      if (ix1 <= 0 || dIndex < minFoldChange)
+	continue ;
+      
+      if (! strncasecmp (dictName (gx->geneDict, gene), "ERCC-", 5))
+	continue ;
+      if (! strncasecmp (dictName (gx->geneDict, gene), "ERCC_vector", 11))
+	continue ;
+      
+      gc = arrp (gx->genes, gene, GC) ;
+      
+      pc = arrayp (pp, ipp++, PC) ;
+      pc->gene = gene ;
+      pc->index1 = ix1 ; pc->index2 = ix2 ; pc->dIndex = dIndex ;
+      pc->dvar = pc->d2dw = pc->sig = pc->overlap = pc->danielle = 0 ;
+      
 #ifdef JUNK
-	      if (0) /* divariance */
-		{
-		  pc->var1 = dc1->divariance ;  pc->var2 = dc2->divariance ; 
-	      
-		  if (                    /* dc->N is the number of significant values used to compute the divariance */
-		      (                  
-		       dc2->N > 0 && 
-		       (rc1->nRuns < 40 || rc2->nRuns < 40) &&
-		       dc1->indexMin < dc2->indexMax
-		       ) ||
-		      (1 * rc1->nRuns > 4 * dc1->N)
-		      ) ;
-		  else
-		    {
-		      if (dc2->N)
-			{
-			  if (pc->var1 < 0 && pc->var2 >= 0) pc->dvar = 2 * pc->var2 ;
-			  else if (pc->var1 >= 0 && pc->var2 < 0) pc->dvar = 2 * pc->var1 ;
-			  else if (pc->var1 < 0 && pc->var2 < 0) pc->dvar = 0 ;
-			  else
-			    pc->dvar = pc->var1 + pc->var2 ; /* sqrt (pc->var1 * pc->var1 + pc->var2 * pc->var2) */
-			  
-			  pc->d2dw = rc1->nRuns - dc1->N ;
-			  if (0 && dc1->indexMin > dc2->indexMax) /* disfavor crossing histograms */
-			    pc->d2dw += 10000 ;
-			}
-		      else
-			pc->dvar = pc->var1 ;
-		    }
-		}
-#endif
-	      if (1)  /* 2012_08_13: Danielle's new method based on the union and intersection of the histograms of expression */
-		{
-		  /* for a given gene, loop on all patients and compute the hitogram in the plus minus groups
-		   * norm the histo by dividing by the number of runs in each group
-		   * measure the surface of the union and intersect histo = histo of max/min of the 2 values
-		   * sig = 1 - intersect/union will vary between 1: disconnected histo and zero identical histos
-		   */
-		  int i, nRun1 = 0, nRun2 = 0 ;
-		  double z, s0, s1, *a0p, *a1p, mx0, mx1, Gini = 0 ;
-		  float ch2 = 0 ;
-		  double hh0s[256], hh1s[256] ;
-		  /*  int danRegion0 = 20, danRegion1 = 70, danRegion2 = 80, danRegion3 = 120 ; */
-		  double threshold = 0 ;
-
-		  gxMakeComparativeHistos (gx, gene, run1, run2, vA, vB, hh0s, hh1s
-					   , &ch2, &nRun1, &nRun2, 0, 0, 0
-					   , &threshold, &Gini, 0, isVirtual
-					   ) ;
-		
-		  /* find the max in the co &pValuentinuous part */
-		  for (s0 = s1 = 0, mx0 = mx1 = 0, i = 1, a0p = hh0s, a1p = hh1s ; i < 256 ; a0p++, a1p++, i++)
-		    {
-		      if (*a0p > mx0) mx0 = *a0p ;
-		      if (*a1p > mx1) mx1 = *a1p ;
-
-		      if (*a0p < *a1p) 
-			{ s0 += *a0p ; s1 += *a1p ; }
-		      else
-			{ s0 += *a1p ; s1 += *a0p ; }
-		    }
-		  z = 1 - s0/s1 ; /* old overlap method */
-		  pc->overlap = z ;
-		  if (gx->geneSelectionMethod >= 7)     /* 2012_09_8 */
-		    {
-		      int sense ;
-
-		      pc->danielle = gxScoreHistos (gx, gene, rc1, rc2, run1, run2, hh0s, hh1s, ch2, isVirtual, threshold, &sense) ;
-		      if (compare->nVirtualStrata && ! isVirtual)
-			{
-			  float x = 0, y = 0 ;
-			  if (gx->baddyBatchies && gene < arrayMax (gx->baddyBatchies))
-			    {		
-			      x = arr (gx->baddyBatchiesMax, gene, float) ;
-			      y = arr (gx->baddyBatchies, gene, float)/(compare->nVirtualStrata) ;
-			      if (x < 150) x = y ;
-			      else if (x < 180)
-				x = (x * (x - 150) + y * (180 - x))/30 ;
-			    }
-			  gc->score -= x ;  pc->danielle -= x ;
-			}
-		      /* check we are not backwards: this happenned as a side effect of undef index -1000 2014_01_31 */
-		      if (0 && pc->danielle > 10)
-			fprintf(stderr,"score %.1f sense %d in gxScoreHistos, gene\t%s\t groups\t%s\t%s\n"
-				, pc->danielle, sense
-				, dictName (gx->geneDict, gene)
-				, dictName (gx->runDict, run1)
-				, dictName (gx->runDict, run2)
-				) ;
-		      if (0 && pc->danielle > 0 && sense != 2)
-			{
-			  fprintf(stderr, "backwards score %.1f sense %d in gxScoreHistos, gene\t%s\t groups\t%s\t%s\n"
-				  , pc->danielle
-				  , sense
-				  , dictName (gx->geneDict, gene)
-				  , dictName (gx->runDict, run1)
-				  , dictName (gx->runDict, run2)
-				  ) ; 
-			  }
-		      if (pc->danielle > 0 && sense != 2)
-			  pc->danielle = 0 ;
-		      if (gx->geneSelectionMethod == 8)
-			pc->danielle = 2 * Gini ; /* Gini == 100 is a perfect score */
-
-		    }
-		  else if (0)
-		    gxScoreByOverlap() ;
-
-		  pc->geneid = gc->geneId ;
-		  if (0 && ! strcasecmp (dictName (gx->geneDict, gene), "UKv4_A_23_P2258"))
-		    invokeDebugger () ;
-		}     
-	    }
+      if (0) /* divariance */
+	{
+	  pc->var1 = dc1->divariance ;  pc->var2 = dc2->divariance ; 
 	  
-	  if (! ipp)
-	    goto done ;
-	  /* compute the median of all divariances */
-	  arraySort (pp, pcDvarOrder) ;
-	  pc = arrayp (pp, (arrayMax (pp)/2), PC) ;
-	  dvar0 = pc->dvar ? .66 * pc->dvar : 1.0 ;
-
-	  if (0)
-	    { /* compute the median of all non zero divariances */
-	      for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) && pc->dvar <= 0 ; ipp++, pc++) ;
-	      if (ipp < arrayMax (pp)/2)
+	  if (                    /* dc->N is the number of significant values used to compute the divariance */
+	      (                  
+	       dc2->N > 0 && 
+	       (rc1->nRuns < 40 || rc2->nRuns < 40) &&
+	       dc1->indexMin < dc2->indexMax
+				 ) ||
+	      (1 * rc1->nRuns > 4 * dc1->N)
+				  ) ;
+	  else
+	    {
+	      if (dc2->N)
 		{
-		  pc = arrayp (pp, (arrayMax (pp) + ipp)/2, PC) ;
-		  dvar0 = pc->dvar ? .66 * pc->dvar : 1.0 ;
+		  if (pc->var1 < 0 && pc->var2 >= 0) pc->dvar = 2 * pc->var2 ;
+		  else if (pc->var1 >= 0 && pc->var2 < 0) pc->dvar = 2 * pc->var1 ;
+		  else if (pc->var1 < 0 && pc->var2 < 0) pc->dvar = 0 ;
+		  else
+		    pc->dvar = pc->var1 + pc->var2 ; /* sqrt (pc->var1 * pc->var1 + pc->var2 * pc->var2) */
+		  
+		  pc->d2dw = rc1->nRuns - dc1->N ;
+		  if (0 && dc1->indexMin > dc2->indexMax) /* disfavor crossing histograms */
+		    pc->d2dw += 10000 ;
 		}
 	      else
-		dvar0 = 1 ;
-	    }
-	  /* damp the variance by adding the median and recompute the significativity */
-	  if (gx->geneSelectionMethod < 7)
-	    for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
-	      {
-		double z = 0 ;
-		int nr = arrayMax (vA) ; /* nb of runs in this group */
-		
-		/* each missing value contributes a 3*dvar0/nr */
-		if (pc->d2dw >= 10000) { z = dvar0 ; pc->d2dw -= 10000 ; }
-		z += dvar0 * ( 1 + 1 * 3 * pc->d2dw/nr) + (pc->dvar ? pc->dvar : dvar0) ;
-		
-		z = z > 0 ? pc->dIndex/z : 0 ;
-		
-		pc->d2dw = z ;
-	      }
-	  
-	  for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
-	    {
-	      switch (gx->geneSelectionMethod)
-		{
-		case 1: pc->sig = pc->d2dw ; break ;
-		case 2: pc->sig = 1 ; break ;
-		case 3: pc->sig = pc->overlap ; break ;
-		case 4: pc->sig = pc->d2dw + pc->overlap - .1 ; break ;
-		case 5: pc->sig = pc->danielle ; break ;
-		case 7: pc->sig = pc->danielle ; break ;
-		case 8: pc->sig = pc->danielle ;  break ; /* use the Gini coefficient */
-		}
-	    }
-	  gxRuns2geneFilter (gx, pp, run1, run2, minFoldChange) ;
-	  if (pass == 0 &&   /* pass > 0 indicates iterations from within gxIterate */
-	      isPm < 2 &&
-	      ! rc1->private && ! rc2->private)
-	    {
-	      int nRun1 = rc1 && rc1->runs ? arrayMax (rc1->runs) : 0 ;
-	      int nRun2 = rc2 && rc2->runs ? arrayMax (rc2->runs) : 0 ;
-	      if (0) fprintf (stderr, "=== gxDghRegisterHisto V=%d %s %s\n"
-			      , isVirtual
-			      , dictName (gx->runDict, run1)
-			      , dictName (gx->runDict, run2)
-			      ) ;
-	      gxDghRegisterHisto (gx, run1, run2, isVirtual, nRun1, nRun2, pp, hFDR) ;
-	    }
-	  if ( ! isVirtual)
-	    {  
-	      int fdrThreshold = 50 ;
-
-	      gxDghExportHistos (gx, compare, run1, run2, isPm, fdr, &fdrThreshold) ;
-
-	      if (pass == 0 && isPm >= 1) /* otherwise we would mix things up */
-		gxExportDiffGenes (gx, compare, pp, run1, run2, vA, vB, fdr, fdrThreshold, isPm) ;
-	      gxRuns2geneGetBest (gx, compare, pp, genePlus, moreGenePlus, run1, fdrThreshold) ;
+		pc->dvar = pc->var1 ;
 	    }
 	}
+#endif
+      if (1)  /* 2012_08_13: Danielle's new method based on the union and intersection of the histograms of expression */
+	{
+	  /* for a given gene, loop on all patients and compute the hitogram in the plus minus groups
+	   * norm the histo by dividing by the number of runs in each group
+	   * measure the surface of the union and intersect histo = histo of max/min of the 2 values
+	   * sig = 1 - intersect/union will vary between 1: disconnected histo and zero identical histos
+	   */
+	  int i, nRun1 = 0, nRun2 = 0 ;
+	  double z, s0, s1, *a0p, *a1p, mx0, mx1, Gini = 0 ;
+	  float ch2 = 0 ;
+	  double hh0s[256], hh1s[256] ;
+	  /*  int danRegion0 = 20, danRegion1 = 70, danRegion2 = 80, danRegion3 = 120 ; */
+	  double threshold = 0 ;
+	  
+	  gxMakeComparativeHistos (gx, gene, run1, run2, vA, vB, hh0s, hh1s
+				   , &ch2, &nRun1, &nRun2, 0, 0, 0
+				   , &threshold, &Gini, 0, isVirtual
+				   ) ;
+	  
+	  /* find the max in the co &pValuentinuous part */
+	  for (s0 = s1 = 0, mx0 = mx1 = 0, i = 1, a0p = hh0s, a1p = hh1s ; i < 256 ; a0p++, a1p++, i++)
+	    {
+	      if (*a0p > mx0) mx0 = *a0p ;
+	      if (*a1p > mx1) mx1 = *a1p ;
+	      
+	      if (*a0p < *a1p) 
+		{ s0 += *a0p ; s1 += *a1p ; }
+	      else
+		{ s0 += *a1p ; s1 += *a0p ; }
+	    }
+	  z = 1 - s0/s1 ; /* old overlap method */
+	  pc->overlap = z ;
+	  if (gx->geneSelectionMethod >= 7)     /* 2012_09_8 */
+	    {
+	      int sense ;
+	      
+	      pc->danielle = gxScoreHistos (gx, gene, rc1, rc2, run1, run2, hh0s, hh1s, ch2, isVirtual, threshold, &sense) ;
+	      if (compare->nVirtualStrata && ! isVirtual)
+		{
+		  float x = 0, y = 0 ;
+		  if (gx->baddyBatchies && gene < arrayMax (gx->baddyBatchies))
+		    {		
+		      x = arr (gx->baddyBatchiesMax, gene, float) ;
+		      y = arr (gx->baddyBatchies, gene, float)/(compare->nVirtualStrata) ;
+		      if (x < 150) x = y ;
+		      else if (x < 180)
+			x = (x * (x - 150) + y * (180 - x))/30 ;
+		    }
+		  gc->score -= x ;  pc->danielle -= x ;
+		}
+	      /* check we are not backwards: this happenned as a side effect of undef index -1000 2014_01_31 */
+	      if (0 && pc->danielle > 10)
+		fprintf(stderr,"score %.1f sense %d in gxScoreHistos, gene\t%s\t groups\t%s\t%s\n"
+			, pc->danielle, sense
+			, dictName (gx->geneDict, gene)
+			, dictName (gx->runDict, run1)
+			, dictName (gx->runDict, run2)
+			) ;
+	      if (0 && pc->danielle > 0 && sense != 2)
+		{
+		  fprintf(stderr, "backwards score %.1f sense %d in gxScoreHistos, gene\t%s\t groups\t%s\t%s\n"
+			  , pc->danielle
+			  , sense
+			  , dictName (gx->geneDict, gene)
+			  , dictName (gx->runDict, run1)
+			  , dictName (gx->runDict, run2)
+			  ) ; 
+		}
+	      if (pc->danielle > 0 && sense != 2)
+		pc->danielle = 0 ;
+	      if (gx->geneSelectionMethod == 8)
+		pc->danielle = 2 * Gini ; /* Gini == 100 is a perfect score */
+	      
+	    }
+	  else if (0)
+	    gxScoreByOverlap() ;
+	  
+	  pc->geneid = gc->geneId ;
+	  if (0 && ! strcasecmp (dictName (gx->geneDict, gene), "UKv4_A_23_P2258"))
+	    invokeDebugger () ;
+	}     
     }
+  
+  if (! ipp)
+    goto done ;
+  /* compute the median of all divariances */
+  arraySort (pp, pcDvarOrder) ;
+  pc = arrayp (pp, (arrayMax (pp)/2), PC) ;
+  dvar0 = pc->dvar ? .66 * pc->dvar : 1.0 ;
+  
+  if (0)
+    { /* compute the median of all non zero divariances */
+      for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) && pc->dvar <= 0 ; ipp++, pc++) ;
+      if (ipp < arrayMax (pp)/2)
+	{
+	  pc = arrayp (pp, (arrayMax (pp) + ipp)/2, PC) ;
+	  dvar0 = pc->dvar ? .66 * pc->dvar : 1.0 ;
+	}
+      else
+	dvar0 = 1 ;
+    }
+  /* damp the variance by adding the median and recompute the significativity */
+  if (gx->geneSelectionMethod < 7)
+    for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
+      {
+	double z = 0 ;
+	int nr = arrayMax (vA) ; /* nb of runs in this group */
+	
+	/* each missing value contributes a 3*dvar0/nr */
+	if (pc->d2dw >= 10000) { z = dvar0 ; pc->d2dw -= 10000 ; }
+	z += dvar0 * ( 1 + 1 * 3 * pc->d2dw/nr) + (pc->dvar ? pc->dvar : dvar0) ;
+	
+	z = z > 0 ? pc->dIndex/z : 0 ;
+	
+	pc->d2dw = z ;
+      }
+  
+  for (ipp = 0, pc = arrp (pp, 0, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
+    {
+      switch (gx->geneSelectionMethod)
+	{
+	case 1: pc->sig = pc->d2dw ; break ;
+	case 2: pc->sig = 1 ; break ;
+	case 3: pc->sig = pc->overlap ; break ;
+	case 4: pc->sig = pc->d2dw + pc->overlap - .1 ; break ;
+	case 5: pc->sig = pc->danielle ; break ;
+	case 7: pc->sig = pc->danielle ; break ;
+	case 8: pc->sig = pc->danielle ;  break ; /* use the Gini coefficient */
+	}
+      
+      gxRuns2geneFilter (gx, pc, minFoldChange) ;
+      if (pc->ok)
+	gxDghRegisterScore (gx, isPm ? isPm - 1 : isVirtual - 1 + 2, pc) ;
+    }
+  
+  if (isPm)
+    {  
+      int nRun1 = rc1 && rc1->runs ? arrayMax (rc1->runs) : 0 ;
+      int nRun2 = rc2 && rc2->runs ? arrayMax (rc2->runs) : 0 ;
+      
+      gxDghShiftHisto (gx, pp, isPm) ;
+      arraySort (pp, pcSigOrder) ;
+
+      gxDghRegisterHisto (gx, run1, run2, nRun1, nRun2, pp) ;
+
+      gxDghExportHistos (gx, compare, run1, run2, isPm) ;
+      compare->pp[ipp] = arrayHandleCopy (pp, compare->h) ; /* pp->sig is the shifted score */
+
+      if (! compare->private)
+	{
+	  gxExportDiffGenes (gx, compare, pp, run1, run2, vA, vB, isPm) ;
+	  gxRuns2geneGetBest (gx, compare, pp, genePlus, moreGenePlus, run1, isPm) ;
+	}
+    }
+
  done:    
   if (isVirtual)
     {
@@ -7124,7 +7102,7 @@ static Array gxDoCompare_to (GX *gx, int pass, COMPARE *compare
 				       , run1, dictName (gx->runDict, run1)
 				       , rc1->run, dictName (gx->runDict, rc1->run)
 				       ) ;
-
+      
       rc2 = arrp (gx->runs, run2, RC) ;
       arrayDestroy (rc2->aa) ;
       arrayDestroy (rc2->daa) ;
@@ -7135,17 +7113,17 @@ static Array gxDoCompare_to (GX *gx, int pass, COMPARE *compare
 				       , rc2->run, dictName (gx->runDict, rc2->run)
 				       ) ;
     }
-
+  
   ac_free (h) ;
   return pp ;  
 } /* gxDoCompare_to */
- 
+
 /*************************************************************************************/
 /*************************************************************************************/
 typedef struct dghStruct { KEY run1, run2 ; int iVV, nRun1, nRun2 ; double histo[201] ;} DGH ;
 
 /*************************************************************************************/
-
+#ifdef JUNK
 static int dghOrder (const void *a, const void *b)
 {
   const DGH *up = (const DGH *)a, *vp = (const DGH *)b ;
@@ -7158,84 +7136,178 @@ static int dghOrder (const void *a, const void *b)
 
   return 0 ;
 } /* dghOrder */
+#endif
 
 /*************************************************************************************/
 /*
   baddybatchy array, sum up the score of each gene seemingly significant in the virtual strata iVV > 0
 */
-static int gxDghRegisterHisto (GX *gx, int run1, int run2, int iVV, int nRun1, int nRun2, Array pp, AC_HANDLE h)
+static int gxDghInitializeBaddyBatchies (GX *gx, AC_HANDLE h)
 {
-  int i, ipp, n,nn = 0, jj = arrayMax (gx->degHistos) ;
-  DGH *dgh = arrayp (gx->degHistos, jj, DGH) ;
-  double *hh ;
-  PC *pc ;
   Array bb = gx->baddyBatchies ;
+  Array bbAll = gx->baddyBatchiesAll ;
   Array bbMax = gx->baddyBatchiesMax ;
+  int nVV = 2 + NVIRTUALSTRATA ; /* desired number of virtual strata */ 
 
   if (!bb)
-    bb = gx->baddyBatchies = arrayHandleCreate (arrayMax (gx->genes), float, gx->h) ;
-  if (iVV == 1)
-    bb = gx->baddyBatchies = arrayReCreate (bb, arrayMax (gx->genes), float) ;
-  if (!bbMax)
-    bbMax = gx->baddyBatchiesMax = arrayHandleCreate (arrayMax (gx->genes), float, gx->h) ;
-  if (iVV == 1)
-    bbMax = gx->baddyBatchiesMax = arrayReCreate (bbMax, arrayMax (gx->genes), float) ;
-  
-  if (iVV && run1 > run2) { int run0 = run1 ; run1 = run2 ; run2 = run0 ; }
-  dgh->run1 = run1 ;
-  dgh->run2 = run2 ;
-  dgh->nRun1 = nRun1 ;
-  dgh->nRun2 = nRun2 ;
-  dgh->iVV = iVV ;
-  hh = dgh->histo ;
-
-  for (n = 0, i = 200 ; i >= 0 ; i--)
-    hh[i] = 0 ;
-
-  /* compute the histogram of gene index rounding by int value */
-  for (ipp = 0, pc = arrayp (pp, ipp, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
     {
-      if (pc->ok < 1) continue ;
+      bb = gx->baddyBatchies = arrayHandleCreate (arrayMax (gx->genes), float, gx->h) ;
+      bbAll = gx->baddyBatchiesAll = arrayHandleCreate (nVV * arrayMax (gx->genes), float, gx->h) ;
+      bbMax = gx->baddyBatchiesMax = arrayHandleCreate (arrayMax (gx->genes), float, gx->h) ;
+    }
+  else
+    {
+      bb = gx->baddyBatchies = arrayReCreate (bb, arrayMax (gx->genes), float) ;
+      bbAll = gx->baddyBatchiesAll = arrayReCreate (bbAll, nVV * arrayMax (gx->genes), float) ;
+      bbMax = gx->baddyBatchiesMax = arrayReCreate (bbMax, arrayMax (gx->genes), float) ;
+    }
+  return 0 ;
+} /* gxDghInitializeBaddyBatchies */
 
-      if (iVV)
-	{
-	  array (bb, pc->gene, float) += pc->sig ;
-	  if ( pc->sig > array (bbMax, pc->gene, float))
-	    array (bbMax, pc->gene, float)  = pc->sig ;
-	}
-      n = pc->sig + .49 ;
-      if (0 && (pc->sig > 140 || (iVV == 0 && ipp < 10)))
-	fprintf (stderr, "--- V=%d s=%.1f %s\n", iVV, pc->sig, dictName(gx->geneDict, pc->gene)) ;
-      if (n > 200) n = 200 ;
-      if (n > 0)
-	{ 
-	  hh[n]++ ;
-	  nn++ ;
-	}
+/*************************************************************************************/
+/* iVV = 0 : signal  run1 > run2,  
+ * iVV = 1 : signal  run1 < run2,  
+ * iVV >= 2 : random strata
+ */
+static void gxDghRegisterScore (GX *gx, int iVV, PC *pc)
+{
+  Array bb = gx->baddyBatchies ;
+  Array bbAll = gx->baddyBatchiesAll ;
+  Array bbMax = gx->baddyBatchiesMax ;
+  int nVV = NVIRTUALSTRATA + 2 ; /* desired number of virtual strata */ 
+
+  if (!bbAll)
+    messcrash ("Bad call to gxDghRegisterScore") ;
+
+  array (bbAll, nVV * pc->gene + iVV, float) = pc->sig ;
+  if (iVV >= 2)
+    {
+      array (bb, pc->gene, float) += pc->sig ;
+      if ( pc->sig > array (bbMax, pc->gene, float))
+	array (bbMax, pc->gene, float)  = pc->sig ;
     }
 
-  return nn ;
+  return ;
+} /* gxDghRegisterScore */
+
+/******************************************/
+/* for each gene and each random strata, remove the gene noise value 
+ * then recompute the signal and the noise histos
+ */
+static void gxDghShiftHisto (GX *gx, Array pp, int isPm)
+{
+  PC *pc ;
+  Array bb = gx->baddyBatchies ;
+  Array bbAll = gx->baddyBatchiesAll ;
+  int ipp, iVV, nVV = 2 + NVIRTUALSTRATA ; /* desired number of virtual strata */ 
+
+  pc = arrayp (pp, 0, PC) ;
+
+  for (ipp = 0, pc = arrayp (pp, ipp, PC) ; ipp < arrayMax (pp) ; ipp++, pc++)
+    {
+      float z, shift ;
+
+      if (pc->ok < 1) continue ;
+      shift = array (bb, pc->gene, float)/nVV ;
+      if (0) shift = 0 ;
+      z = pc->sig ;
+      z -= shift ;
+      if (z < 0) z = 0 ;
+      pc->sig = z ;
+
+      for (iVV = 0 ; iVV < nVV ; iVV++)
+	if (
+	    (isPm == 1 && iVV != 1)  || 
+	    (isPm ==2 && iVV == 1)
+	    )
+	  {
+	    z = array (bbAll, nVV * pc->gene + iVV, float) ;
+	    z -= shift ;
+	    if (z < 0) z = 0 ;
+	    array (bbAll, nVV * pc->gene + iVV, float) = z ;
+	  }
+    }
+
+  return ;
+} /* gxDghShiftHisto */
+
+/*************************************************************************************/
+static void gxDghRegisterHisto (GX *gx, int run1, int run2, int nRun1, int nRun2, Array pp)
+{
+  Array bbAll = gx->baddyBatchiesAll ;
+  int nVV = 2 + NVIRTUALSTRATA ; /* desired number of virtual strata */ 
+
+  if (!bbAll)
+    messcrash ("Bad call to gxDghRegisterHisto") ;
+
+  for (int iVV = 0 ; iVV < nVV ; iVV++)
+    {
+      int jj = arrayMax (gx->degHistos) ;
+      DGH *dgh = arrayp (gx->degHistos, jj, DGH) ;
+      int ippMax = arrayMax (pp) ;
+
+      if (iVV < 2 || run1 < run2)
+	{
+	  dgh->run1 = run1 ;
+	  dgh->run2 = run2 ;
+	  dgh->nRun1 = nRun1 ;
+	  dgh->nRun2 = nRun2 ;
+	}
+      else
+	{
+	  dgh->run1 = run2 ;
+	  dgh->run2 = run1 ;
+	  dgh->nRun1 = nRun2 ;
+	  dgh->nRun2 = nRun1 ;
+	}
+      
+      dgh->iVV = iVV ;
+      double *hh = dgh->histo ;
+
+      for (int i = 0 ; i < 200 ; i++)
+	hh[i] = 0 ;
+
+      /* compute the histogram of gene index rounding by int value */
+      for (int ipp = 0 ; ipp < ippMax ; ipp++)
+	{
+	  PC *pc = arrayp (pp, ipp, PC) ;
+	  if (pc->ok < 1) continue ;
+	  
+	  float z = array (bbAll, nVV * pc->gene + iVV, float) ;
+	  int n = z  + .49 ;
+	  if (n > 200) n = 200 ;
+	  if (n > 0)
+	    hh[n]++ ;
+	}
+    }
+  return ;
 } /* gxDghRegisterHisto */
 
 /******************************************/
 /* adjust the FDR threhshold */
-static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int isPm, float *fdr, int *fdrThresholdp)
+static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int isPm)
 {
   AC_HANDLE h = ac_new_handle () ;
   Array degHistos = arrayHandleCreate (arrayMax(gx->degHistos)+1, DGH, h) ;
   static ACEOUT ao = 0 ;
-  DGH *dgh, *dgh1, *dghX ;
+  DGH *dgh ;
   int i, ii, iiMax, jj, nn ;
   int  nRun1 = 0, nRun2 = 0 ;
   int  nCRun1 = 0, nCRun2 = 0 ;
   BOOL hasControls = FALSE ;
-  double zn, GAUSS ;
-  double aE[201] ;
-  double aE0[201] ; /* before smoothing */
-  double aX[201] ;
+  double z, zn, GAUSS ;
+  double cE[201] ;   /* smoothed experiment cumul */
+  double aE[201] ;   /* smoothed experiment */
+  static double aExp1[201] ;   /* copy of smoothed experiment 1 */
+  double cE0[201] ;  /* cumul before smoothing */
+  static double cX[201] ;   /* smoothed average resampling cumul */
+  static double aX[201] ;   /* smoothed average resampling */
+  static double aX0[201] ;  /* before smoothing */
+  float fdr[201] ;
   static int myDEG[3] ;
   static int myDEG185[3] ;
-  static float myFdr[3], myFdrThreshold [3] ;
+  float *myFdr = compare->fdr ;
+  int *myFdrThreshold = compare->fdrThreshold ;
   /* keep both orientation */ 
   compare->nVirtualStrata = 0 ;
   if (arrayMax(gx->degHistos) < 1)
@@ -7245,41 +7317,29 @@ static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int
       /* copy */
       for (ii = jj = 0, dgh = arrp (gx->degHistos, ii, DGH) ; ii < arrayMax (gx->degHistos) ; ii++, dgh++)
 	if ((dgh->run1 == run1 && dgh->run2 == run2) ||
-	    (dgh->iVV && dgh->run1 == run2 && dgh->run2 == run1)
+	    (dgh->iVV >= 2 && dgh->run1 == run2 && dgh->run2 == run1)
 	    )     /* keep happy few */
 	  {
-	    dgh1 = arrayp (degHistos, jj++, DGH) ;
+	    DGH *dgh1 = arrayp (degHistos, jj++, DGH) ;
 	    *dgh1 = *dgh ;
 	    
-	    if (dgh->iVV)
+	    if (dgh->iVV >= 2)
 	      {
 		compare->nVirtualStrata++ ;
 		hasControls = TRUE ;
-		if (dgh->run1 == run1)
-		  {
-		    nCRun1 = dgh->nRun1 ;
-		    nCRun2 = dgh->nRun2 ;
-		  }
-		else
-		  {
-		    nCRun1 = dgh->nRun2 ;
-		    nCRun2 = dgh->nRun1 ;
-		  }
-	      }
-	    if (dgh->run1 == run2)
-	      {
-		dgh1->run1 = run1 ;
-		dgh1->run2 = run2 ;	    
-		dgh1->nRun1 = dgh1->nRun2 ;	    
-		dgh1->nRun2 = dgh1->nRun1 ;	    
+		nCRun1 = dgh->nRun1 ;
+		nCRun2 = dgh->nRun2 ;
 	      }
 	  }
     }
   
-  if (isPm == 0)
+  if (isPm == 1)
     {  /* memorize the value of the 3 passes minus/plus/minus */
-      memset (myFdr, 0, sizeof (myFdr)) ;
-      memset (myFdrThreshold, 0, sizeof (myFdrThreshold)) ;
+      for (int i = 0 ; i < 3 ; i++)
+	{
+	  myFdr[i] = 0 ;
+	  myFdrThreshold[i] = 0 ;
+	}
     }
   
   if (1)
@@ -7317,50 +7377,56 @@ static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int
 	       , dictName (gx->compareDict, compare->compare)
 	       ) ;
     }
-  arraySort (degHistos, dghOrder) ; 
-  memset (aE0, 0, sizeof (aE0)) ;
 
-  /* pessimistic average of all virtual strata */
+  /* cE  smoothed experiment cumul 
+   * aE  smoothed experiment 
+   * cE0 cumul before smoothing 
+   * cX  smoothed average resampling cumul 
+   * aX  smoothed average resampling 
+   * aX0 before smoothing 
+   */
+
   iiMax = arrayMax (degHistos) ;
-  for (ii = 0 ; ii < iiMax ; ii++)
+
+  memset (fdr, 0, sizeof (fdr)) ;
+  memset (cE, 0, sizeof (cE)) ;
+  memset (aE, 0, sizeof (aE)) ;
+  memset (cE0, 0, sizeof (cE0)) ;
+  if (isPm == 1)
+    {
+      memset (cX, 0, sizeof (cX)) ;
+      memset (aX, 0, sizeof (aX)) ;
+      memset (aX0, 0, sizeof (aX0)) ;
+    }
+
+  for (nn = ii = 0 ; ii < iiMax ; ii++)
     {
       dgh = arrp (degHistos, ii, DGH)  ;
-      if (dgh->iVV == 0 && dgh->run1 == run1 &&  dgh->run2 == run2)
+
+      if (dgh->iVV == isPm - 1)   /* cumul of the experiment */
 	{
-	  dghX =  arrayp (degHistos, arrayMax (degHistos), DGH)  ; 
-	  dgh = arrp (degHistos, ii, DGH)  ; /* may have been reallocated */
-	  dghX->run1 = dgh->run1 ;
-	  dghX->run2 = dgh->run2 ;
-	  dghX->iVV = -1 ;
 	  for (zn = 0, i = 200 ; i >= 0 ; i--)
 	    {
-	      dghX->histo[i] = 0 ;
-	      zn += dgh->histo[i] ;
-	      aE0[i] = zn ;
+	      z = dgh->histo[i] ;
+	      zn += z ;
+	      cE0[i] = zn ;     
 	    }
-	  for (nn = jj = 0 ;  jj < iiMax ; jj++)
-	    {
-	      dgh1 = arrp (degHistos, jj, DGH)  ; /* may have been reallocated */
-	      if (dgh1->iVV > 0)
-		{
-		  nn++ ;
-		  for (i = 0 ; i <= 200 ; i++)
-		    dghX->histo[i] += dgh1->histo[i] ;
-		}
-	    }
-	  if (nn)
-	    for (i = 0 ; i <= 200 ; i++)
-	      {
-		/* pessimistic average of all virtual strata 
-		* n = dghX->histo[i] + nn - 1 ;
-		* dghX->histo[i]
-		*/
-		dghX->histo[i] /= nn ;
-	      }
+	}
+
+      if (isPm == 1 && dgh->iVV >= 2)       /* sum of the resampling */
+	{
+	  nn++ ;
+	  for (i = 0 ; i <= 200 ; i++)
+	    aX0[i] += dgh->histo[i] ;
 	}
     }
 
-  arraySort (degHistos, dghOrder) ;
+  if (isPm == 1 && nn)   /* average the resampling */
+    {
+      for (i = 0 ; i <= 200 ; i++)
+	aX0[i] /= nn ;
+    }
+
   /* smooth , this multiplies by GAUSS all values, without changing the integral */
   GAUSS = 64 ;
   if (GAUSS == 64)
@@ -7370,6 +7436,12 @@ static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int
 	memset (xx, 0, sizeof(xx)) ;
 	
 	dgh = arrp (degHistos, ii, DGH)  ;
+
+	if (isPm == 1 && dgh->iVV == 1)
+	  continue ;
+	if (isPm == 2 && dgh->iVV != 1)
+	  continue ;
+
 	for (i = 0 ; i <= 200 ; i++)
 	  xx[i+5] = dgh->histo[i] ;
 	for (i = 0 ; i <= 200 ; i++)
@@ -7381,289 +7453,321 @@ static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int
 	dgh->histo[199] +=  7 * xx[199+5] ;
 	dgh->histo[2]   +=  1 * xx[2+5] ;
 	dgh->histo[198] +=  1 * xx[198+5] ;
+	for (i = 0 ; i <= 200 ; i++)
+	  dgh->histo[i] /= 64.0 ;
       }
+
+  for (nn = ii = 0 ; ii < iiMax ; ii++)
+    {
+      dgh = arrp (degHistos, ii, DGH)  ;
+
+      if (dgh->iVV == isPm - 1)   /* smoothed experiment */
+	{
+	  for (zn = 0, i = 200 ; i >= 0 ; i--)
+	    {
+	      z = dgh->histo[i] ;
+	      zn += z ;
+	      cE[i] = zn ;    /* smoothed cumul */
+	      aE[i] = z ;     /* smoothed values */
+	    }
+	}
+
+      if (isPm == 1 && dgh->iVV >= 2)       /* smoothed sum of the resampling */
+	{
+	  nn++ ;
+	  for (i = 0 ; i <= 200 ; i++)
+	    aX[i] += dgh->histo[i] ;
+	}
+    }
+
+  if (isPm == 1)
+    {
+      for (i = 0 ; i <= 200 ; i++)
+	aExp1[i] = aE[i] ;
+
+      /* average the smoothed resampling */
+      for (i = 0 ; i <= 200 ; i++)
+	aX[i] /= nn ;
+      /* cumul the smoothed resampling */
+      for (zn = 0, i = 200 ; i >= 0 ; i--)
+	{
+	  z = aX[i] ;
+	  zn += z ;
+	  cX[i] = zn ;
+	}
+    }
+
+
   /* export */
   /* export the coordinates */ 
   if (isPm == 1)
     {
-      if (0)
-	{
-	  aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-	  aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	  aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	  aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	}
       aceOutf (ao, "# Compare\tGene over expressed in\trelative to\tNumber of sample in 1st group\tNumber of samples in 2nd group\tDEG_score") ;
       for (i = 0 ; i <= 200 ; i++)
 	aceOutf (ao, "\t%d", i) ;
       aceOut (ao, "\n") ;
     }
 
-  for (ii = 0 ; ii < arrayMax (degHistos) ; ii++)
+  /* export the basics */
+  if (ao && isPm)
     {
-      dgh = arrp (degHistos, ii, DGH)  ;
-      dgh1 = dgh + 1 ;
-      if (dgh1->run1 == dgh->run1 &&  dgh1->run2 == dgh->run2 && dgh1->iVV == 0 && dgh->iVV == -1)
-	{
-	  int iBest ;
-	  double best, z, v, w, vw, cumulE = 0, cumulX = 0 ;
+      double best = 0 ; 
+      int iBest = 200 ;
 
-	  /* compute the signal and the control cumuls */
-	  for (i = 200 ; i>= 0 ; i--)
-	    {
-	      cumulE +=  dgh1->histo[i]/GAUSS ;
-	      cumulX +=  dgh->histo[i]/GAUSS ;
-	      aE[i] = cumulE ;
-	      aX[i] = cumulX ;
-	    }	  
-
-	  if (ao)
-	    {
-	      /* export the cumul of the experiment */
-	      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	      aceOutf (ao, "\tCumul of differential objects at or above DEG_score") ;
-	      for (i = 0 ; i <= 200 ; i++)
-		aceOutf (ao, "\t%.2f", i,aE0[i]) ;
-	      aceOut (ao, "\n") ;
-	      
-	      /* export the smoothed control */
-	      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nCRun1, nCRun2) ;
-	      aceOutf (ao, "\tSmoothed controls") ;
-	      for (i = 0 ; i <= 200 ; i++)
-		aceOutf (ao, "\t%.2f", aX[i]) ;
-	      aceOut (ao, "\n") ;
-	      
-	      /* export the smoothed cumul of the experiment */
-	      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	      aceOutf (ao, "\tSmoothed exp cumul") ;
-	      for (i = 0 ; i <= 200 ; i++)
-		aceOutf (ao, "\t%.2f", aE[i]) ;
-	      aceOut (ao, "\n") ;
-	      
-	      /* export the FDR */
-	      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	      aceOutf (ao, "\tFDR") ;
-	    }
-	  for (i = 0 ; i <= 200 ; i++)
-	    {
-	      v = aE[i] ;
-	      w = aX[i] ;
-	      z = 0 ;
-	      if (v == 0) ;
-	      else if (w == 0 && (i == 0 || 1/v < z)) z = 1/v ;
-	      else if (w > 0) z = w/v ;
-	      if (z > 1) z = 1 ;
-	      if (ao)
-		{
-		  if (z > .3 && aX[i] < 5)
-		    aceOutf (ao, "\t") ;
-		  else
-		    aceOutf (ao, "\t%.3g", z) ;
-		}
-	      if (! hasControls) z = -.01 ;
-	      fdr[i] = z ;
-	    }
-
-	  /* export the TDR */
-	  best = 0 ; iBest = 200 ;
-	  if (ao)
-	    {
-	      aceOutf (ao, "\n%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	      aceOutf (ao, "\tTheta") ;
-	    }
-	  for (iBest = 200, i = 1 ; i <= 200 ; i++)
-	    {
-	      v = aE[i] ; 
-	      w = aX[i] ; vw = v - w ; if (vw < 0) vw = 0 ;
-	      if (vw <= 0) z = 0 ;
-	      else if (w < .1) z = 10*vw ;
-	      else z = vw/w ;
-	      if (! hasControls) z = 1 ;
-	      if (ao) 
-		aceOutf (ao, "\t%.1f", z) ;
-	      if (z > best && fdr[i] < .7 && (i > 40 || fdr[i] < .1))
-		{ best = z ; iBest = i ; if (fdr[i] < .001) break ; }
-	    }
-	  /* move up again untill the local noise reaches 20% of the local signal */
-	  for (i = iBest ; i>0 ; i--)
-	    if (
-		(fdr[i] > .045 && (fdr[i] > .4 || 100 * dgh->histo[i] >   20 * dgh1->histo[i])) ||
-		100 * dgh->histo[i] >   30 * dgh1->histo[i]
-		)
-	      break ;
-	  /* but if we already have over 10% FDR move up again and increase the number of genes until the FDR moves up by another 10% */
-	  if (fdr[iBest]> 0.2)
-	    {
-	      for (i = iBest ; i>0 ; i--)
-		{
-		  if (100 * dgh->histo[i] >  30 * dgh1->histo[i])
-		    break ;
-		  if (fdr[i] > fdr[iBest] + 0.10 || 2*fdr[i] > 3*fdr[iBest])
-		    break ;
-		}
-	      i++ ;
-	    }
-	  /* look for another higher minimum */
-	  iBest = i < 200 ? i : 200 ;
-	  if (iBest > 80)
-	    {
-	      float z = fdr[iBest] ;
-	      for (i = iBest ; z < .5 && i>100 ; i--)
-		{
-		  if (i < 150 && 100 * dgh->histo[i] >   60 * dgh1->histo[i])
-		    break ;
-		  if (i < 100 && 100 * dgh->histo[i] >   30 * dgh1->histo[i])
-		    break ;
-		  if (fdr[i] < z)
-		    { iBest = i ; z = fdr[i] ; }
-		}
-	      i = iBest ;
-	    }
-	  /* move right a little */
-	  iBest = i ;
-	  if (fdr[iBest] > .05)
-	    {
-	      float z, z0 = fdr[iBest] ;
-	      for (i = iBest ; i < 180 && i < iBest + 20 ; i++)
-		{
-		  z = fdr[i] ;
-		  if (z <= .05)
-		    { iBest = i ; break ; }
-		  if (z < .9 * z0)
-		    { iBest = i ; z0 = z ; }
-		}
-	      i = iBest ;
-	    }
- 	  /* move right a little */
-	  if (fdr[i] > .05)
-	    { 
-	      if (i < 150) i += 5 ; 
-	      else if (i < 160) i += 4 ; 
-	      else if (i < 170) i += 3 ; 
-	      else if (i < 180) i += 2 ;
-	      else if (i < 195) i++ ;
-	    }
-          if (! aE0[iBest]) /* no gene */
-	    i = 200 ;
-
-	  if (! hasControls) i = 180 ;
-	  iBest = i ;
-
-	  if (compare->forceIbest)
-	    iBest = compare->forceIbest ;
-
-	  myFdr [isPm] = fdr[iBest] ;
-	  myFdrThreshold[isPm] = iBest ;
-	  
-	  if (isPm &&  myFdr [isPm - 1] > 0 &&
-	      myFdr [isPm] > myFdr [isPm - 1] &&
-	      myFdrThreshold[isPm] <  myFdrThreshold[isPm - 1]
-	      )
-	    {
-	      for (i = myFdrThreshold[isPm] ; i < myFdrThreshold[isPm - 1] ; i++)
-		if (fdr[i] <= myFdr [isPm - 1])
-		  break ;
-	      iBest = i ;
-	      myFdr [isPm] = fdr[iBest] ;
-	      myFdrThreshold[isPm] = iBest ;
-	    }
-
-	  if (ao)
-	    {
-	      aceOutf (ao, "\n%s", dictName (gx->compareDict, compare->compare)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-	      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-	      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-	    }
-	  if (aE0[0] == 0)
-	    { iBest = 0 ; fdr[0] = 0 ; } 
-	  *fdrThresholdp = iBest ;
-	  myDEG[isPm] = aE0[iBest] ;
-	  myDEG185[isPm] = aE0[185] ;
-	  
-	  if (1)
-	    {
-	      float f =  100*fdr[iBest] ;
-	      if (iBest == 200)
-		{
-		  myDEG[isPm] = 0 ;
-		  myDEG185[isPm] = 0 ;
-		  f = 0 ;
-		}
-	      if (ao)
-		aceOutf (ao, "\tSelected threshold\t%d\tDEG\t%d\t%%FDR\t%.3g\tDEG185\t%d\n", iBest, myDEG[isPm], f, myDEG185[isPm]) ;	  
-	    }
-	}
-      if (! ao || dgh->iVV > 0)
-	continue ;
+      /* export the smoothed cumul of the experiment */
       aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-      aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
       aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
-
-      if (dgh->iVV  == -1)
-	aceOutf (ao, "\tAverage of the %d randomized resamplings", compare->nVirtualStrata) ;
-      else if (dgh->iVV  == 0)
-	aceOutf (ao, "\tExperiment") ;
+      aceOutf (ao, "\tSmoothed cumul of experiment") ;
       for (i = 0 ; i <= 200 ; i++)
-	aceOutf (ao, "\t%.2f", dgh->histo[i]/GAUSS) ;
+	aceOutf (ao, "\t%.2f", cE[i]) ;
       aceOut (ao, "\n") ;
-    }
-
-  if (ao &&  isPm == 2)
-    {
-      if (hasControls)
+      
+      /* export the smoothed control */
+      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+      if (isPm == 1)
 	{
-	  for (ii = 0 ; ii < arrayMax (degHistos) ; ii++)
-	    {
-	      dgh = arrp (degHistos, ii, DGH)  ;
-	      if (dgh->iVV > 0)
-		{
-		  aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
-		  aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run1)) ;
-		  aceOutf (ao, "\t%s", dictName (gx->runDict, dgh->run2)) ;
-		  aceOutf (ao, "\t%d\t%d", nCRun1, nCRun2) ;
-		  
-		  aceOutf (ao, "\tResampling %d", dgh->iVV) ;
-		  for (i = 0 ; i <= 200 ; i++)
-		    aceOutf (ao, "\t%.2f", dgh->histo[i]/GAUSS) ;
-		  aceOut (ao, "\n") ;
-		}
-	    }
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+	  aceOutf (ao, "\t%d\t%d", nCRun1, nCRun2) ;
+	  aceOutf (ao, "\tSmoothed cumul of controls") ;
 	}
       else
 	{
-	  for (ii = 0 ; ii < 2 *  NVIRTUALSTRATA ; ii++)
-	    aceOutf (ao, "no test %d\n", ii) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+	  aceOutf (ao, "\t%d\t%d", nCRun2, nCRun1) ;
+	  aceOutf (ao, "\tSmoothed cumul of controls") ;
+	}
+      for (i = 0 ; i <= 200 ; i++)
+	aceOutf (ao, "\t%.2f", cX[i]) ;
+      aceOut (ao, "\n") ;
+      
+      /* export the FDR */
+      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
+      aceOutf (ao, "\tFDR") ;
+
+      for (i = 0 ; i <= 200 ; i++)
+	{
+	  int v = cE[i] ;
+	  double z, w = cX[i] ;
+	  if (v == 0) v = 1 ;
+	  z = w/v ;
+	  if (z > 1) z = 1 ;
+	  if (ao)
+	    aceOutf (ao, "\t%.2g", z) ;
+	  
+	  if (! hasControls) z = -.01 ;
+	  fdr[i] = z ;
+	}
+      aceOutf (ao, "\n") ;
+
+      /* sex genes and other genuine baddies with very high randomized score 
+       * are deduced from the FDR histo by shiftHisto 
+       */
+      /* export the TDR */
+
+      if (ao)
+	{
+	  aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+	  aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
+	  aceOutf (ao, "\tTheta") ;
+	}
+      for (iBest = 200, i = 1 ; i <= 200 ; i++)
+	{ 
+	  int v = cE[i] ; 
+	  int w = cX[i] ; 
+	  int vw = v - w ; 
+
+	  if (vw < 0) vw = 0 ;
+	  if (vw <= 0) z = 0 ;
+	  else if (w < .1) z = 10*vw ;
+	  else z = vw/w ;
+	  if (! hasControls) z = 1 ;
+	  if (ao) 
+	    aceOutf (ao, "\t%.1f", z) ;
+	  if (z > best && fdr[i] < .7 && (i > 40 || fdr[i] < .1))
+	    { best = z ; iBest = i ; if (fdr[i] < .001) break ; }
+	}
+      aceOut (ao, "\n") ;
+      /* move up again untill the local noise reaches 20% of the local signal */
+      for (i = iBest ; i>0 ; i--)
+	if (
+	    (fdr[i] > .045 && (fdr[i] > .4 || 100 * cX[i] >   20 * cE[i])) ||
+	    100 * cX[i] >   30 * cE[i]
+	    )
+	  break ;
+      iBest = i ;
+      /* but if we already have over 10% FDR move up again and increase the number of genes until the FDR moves up by another 10% */
+      if (fdr[iBest]> 0.2)
+	{
+	  for (i = iBest ; i>0 ; i--)
+	    {
+	      if (100 * cX[i] >  30 * cE[i])
+		break ;
+	      if (fdr[i] > fdr[iBest] + 0.10 || 2*fdr[i] > 3*fdr[iBest])
+		break ;
+	    }
+	  i++ ;
+	}
+      /* look for another higher minimum */
+      iBest = i < 200 ? i : 200 ;
+      if (iBest > 80)
+	{
+	  float z = fdr[iBest] ;
+	  for (i = iBest ; z < .5 && i>100 ; i--)
+	    {
+	      if (i < 150 && 100 * cX[i] >   60 * cE[i])
+		break ;
+	      if (i < 100 && 100 * cX[i] >   30 * cE[i])
+		break ;
+	      if (fdr[i] < z)
+		{ iBest = i ; z = fdr[i] ; }
+	    }
+	  i = iBest ;
+	}
+      /* move right a little */
+      iBest = i ;
+      if (fdr[iBest] > .05)
+	{
+	  float z, z0 = fdr[iBest] ;
+	  for (i = iBest ; i < 180 && i < iBest + 20 ; i++)
+	    {
+	      z = fdr[i] ;
+	      if (z <= .05)
+		{ iBest = i ; break ; }
+	      if (z < z0)
+		{ iBest = i ; z0 = z ; }
+	    }
+	  i = iBest ;
+	}
+      /* move right a little */
+      if (fdr[i] > .05)
+	{ 
+	  if (i < 150) i += 5 ; 
+	  else if (i < 160) i += 4 ; 
+	  else if (i < 170) i += 3 ; 
+	  else if (i < 180) i += 2 ;
+	  else if (i < 195) i++ ;
+	}
+      if (! cE[iBest]) /* no gene */
+	i = 200 ;
+      
+      if (! hasControls) i = 180 ;
+      iBest = i ;
+      
+      if (compare->forceIbest)
+	iBest = compare->forceIbest ;
+      
+      myFdr [isPm] = fdr[iBest] ;
+      myFdrThreshold[isPm] = iBest ;
+      
+      if (isPm == 2 &&  myFdr [isPm - 1] > 0 &&
+	  myFdr [isPm] > myFdr [isPm - 1] &&
+	  myFdrThreshold[isPm] <  myFdrThreshold[isPm - 1]
+	  )
+	{
+	  for (i = myFdrThreshold[isPm] ; i < myFdrThreshold[isPm - 1] ; i++)
+	    if (fdr[i] <= myFdr [isPm - 1])
+	      break ;
+	  iBest = i ;
+	  myFdr [isPm] = fdr[iBest] ;
+	  myFdrThreshold[isPm] = iBest ;
+	}
+      
+      if (ao)
+	{
+	  aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+	  aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+	  aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
+	}
+      if (cE[0] == 0)
+	{ iBest = 0 ; fdr[0] = 0 ; } 
+      myFdr[isPm] = fdr[iBest] ;
+      myFdrThreshold [isPm] = iBest ;
+      myDEG[isPm] = cE0[iBest] ;
+      myDEG185[isPm] = iBest < 185 ? cE0[185] : cE0[iBest] ;
+      
+      if (1)
+	{
+	  float f =  100*fdr[iBest] ;
+	  if (iBest == 200)
+	    {
+	      myDEG[isPm] = 0 ;
+	      myDEG185[isPm] = 0 ;
+	      f = 0 ;
+	    }
+	  if (ao)
+	    aceOutf (ao, "\tSelected threshold\t%d\tDEG\t%d\t%%FDR\t%.3g\tDEG185\t%d\n", iBest, myDEG[isPm], f, myDEG185[isPm]) ;	  
+	}
+    }
+
+  if (ao && isPm == 2)
+    {
+      /* export the smoothed experiments */
+      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+      aceOutf (ao, "\t%d\t%d", nRun2, nRun1) ;
+      aceOutf (ao, "\tSmoothed experiment >") ;
+      for (i = 0 ; i <= 200 ; i++)
+	aceOutf (ao, "\t%.2f", aExp1[i]) ;
+      aceOut (ao, "\n") ;
+
+      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
+      aceOutf (ao, "\tSmoothed experiment <") ;
+      for (i = 0 ; i <= 200 ; i++)
+	aceOutf (ao, "\t%.2f", aE[i]) ;
+      aceOut (ao, "\n") ;
+    }
+
+  if (hasControls && ao && isPm == 2) /* export the smoothed controls */
+    {      
+      /* export the average of the controls */
+      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+      aceOutf (ao, "\t%d\t%d", nRun1, nRun2) ;
+      aceOutf (ao, "\tAverage of the %d randomized resamplings", compare->nVirtualStrata) ;
+      for (i = 0 ; i <= 200 ; i++)
+	aceOutf (ao, "\t%.2f", aX[i]) ;
+      aceOut (ao, "\n") ;
+
+      for (ii = 0 ; ii < arrayMax (degHistos) ; ii++)
+	{
+	  dgh = arrp (degHistos, ii, DGH)  ;
+	  if (dgh->iVV >= 2)
+	    {
+	      aceOutf (ao, "%s", dictName (gx->compareDict, compare->compare)) ;
+	      aceOutf (ao, "\t%s", dictName (gx->runDict, run2)) ;
+	      aceOutf (ao, "\t%s", dictName (gx->runDict, run1)) ;
+	      aceOutf (ao, "\t%d\t%d", nCRun2, nCRun1) ;
+	      
+	      aceOutf (ao, "\tResampling %d", dgh->iVV - 1) ;
+	      for (i = 0 ; i <= 200 ; i++)
+		aceOutf (ao, "\t%.2f", dgh->histo[i]/GAUSS) ;
+	      aceOut (ao, "\n") ;
+	    }
 	}
     }
 
  done:
- if (1)
+
+ if (isPm)
     {	
-      int iC = 0 ;
-      COMPARE *cmp ;
-      
-      gxPairScoreRegister (gx, compare->compare, run1, run2, 0, 0, 0) ;
-      gxPairScore (gx, &iC, run1, run2, 0, 0) ;
-      cmp = arrayp (gx->compares, iC, COMPARE) ;
-      cmp->fdr[isPm] = myFdr[isPm] ;
-      cmp->fdrThreshold[isPm] = myFdrThreshold[isPm] ;
+      COMPARE *cmp = compare ;
+      if (! cmp->h)
+	cmp->h = ac_new_handle () ;
       cmp->nDEG[isPm] = myDEG[isPm] ;
       cmp->nDEG185[isPm] = myDEG185[isPm] ;
     }
@@ -7679,12 +7783,12 @@ static void gxDghExportHistos (GX *gx, COMPARE *compare, int run1, int run2, int
 /*************************************************************************************/
 /*************************************************************************************/
 /* select genes above a given differential and export them 
- * in virtual case, run1 == run2 == 0, but vA and vB are gievn in extension
+ * in virtual case, run1 == run2 == 0, but vA and vB are given in extension
  */
-static BOOL gxCompareOrControl (GX *gx, int pass, COMPARE *compare, int run1, int run2
+static BOOL gxCompareOrControl (GX *gx, COMPARE *compare, int run1, int run2
 				, KEYSET vA, KEYSET vB, KEYSET genePlus, KEYSET geneMinus
 				, KEYSET moreGenePlus, KEYSET moreGeneMinus
-				, int minIndex,  float *fdr1, float *fdr2
+				, int minIndex
 				, int isVirtual, AC_HANDLE h0)
 {
   /* select the characteristic genes */
@@ -7719,21 +7823,21 @@ static BOOL gxCompareOrControl (GX *gx, int pass, COMPARE *compare, int run1, in
     geneMinus = keySetReCreate (geneMinus) ;
   if (moreGeneMinus)
     moreGeneMinus = keySetReCreate (moreGeneMinus) ;
-  gxDoCompare_to (gx, pass, compare, run2, run1, vB, vA, minIndex, geneMinus, moreGeneMinus, fdr2, isVirtual, 0, h0) ; /* pm */
-
-  if (genePlus)
-    genePlus = keySetReCreate (genePlus) ;
-  if (moreGenePlus)
-    moreGenePlus = keySetReCreate (moreGenePlus) ;
-  gxDoCompare_to (gx, pass, compare, run1, run2, vA, vB, minIndex, genePlus, moreGenePlus, fdr1, isVirtual, 1, h0) ; /* pp */
+  gxDoCompare_to (gx, compare, run2, run1, vB, vA, minIndex, geneMinus, moreGeneMinus, isVirtual, 0, h0) ; /* virtual */
 
   if (! isVirtual)
     {
+      if (genePlus)
+	genePlus = keySetReCreate (genePlus) ;
+      if (moreGenePlus)
+	moreGenePlus = keySetReCreate (moreGenePlus) ;
+      gxDoCompare_to (gx, compare, run1, run2, vA, vB, minIndex, genePlus, moreGenePlus, 0, 1, h0) ; /* pp */
+
       if (geneMinus)
 	geneMinus = keySetReCreate (geneMinus) ;
       if (moreGeneMinus)
 	moreGeneMinus = keySetReCreate (moreGeneMinus) ;
-      gxDoCompare_to (gx, pass, compare, run2, run1, vB, vA, minIndex, geneMinus, moreGeneMinus, fdr2, isVirtual, 2, h0) ; /* pm */
+      gxDoCompare_to (gx, compare, run2, run1, vB, vA, minIndex, geneMinus, moreGeneMinus, 0, 2, h0) ; /* pm */
     }
   ac_free (h) ;
   return TRUE ;
@@ -7916,7 +8020,7 @@ static BOOL gxMakeVirtualGroups (GX *gx, int run1, int run2, KEYSET vA, KEYSET v
 /* select genes above a given differential and export them 
  * optionally count the FDR on a set of virtual randomizedly stratified control classes
  */
-static BOOL gxCompareAndControl (GX *gx, int pass, COMPARE *compare, int run1, int run2, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, float *fdr1, float *fdr2)
+static BOOL gxCompareAndControl (GX *gx, COMPARE *compare, int run1, int run2, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus)
 {
   AC_HANDLE h = ac_new_handle () ;
   int nVV = NVIRTUALSTRATA ; /* desired number of virtual strata */ 
@@ -7928,8 +8032,7 @@ static BOOL gxCompareAndControl (GX *gx, int pass, COMPARE *compare, int run1, i
   compare->nVirtualStrata = 0 ;
   arrayDestroy (gx->baddyBatchies) ;
   arrayDestroy (gx->baddyBatchiesMax) ;
-  if (pass == 0 && ! rc1->private && ! rc2->private &&
-      ! rc1->addCounts && ! rc2->addCounts   /* an addCount group is atomic like a run, it makes no sense to shuffle its runs */
+  if (! rc1->addCounts && ! rc2->addCounts   /* an addCount group is atomic like a run, it makes no sense to shuffle its runs */
       )
     {
       KEYSET vA, vB ; /* virtual groups */
@@ -7938,6 +8041,7 @@ static BOOL gxCompareAndControl (GX *gx, int pass, COMPARE *compare, int run1, i
       vB = keySetHandleCreate (h) ;
       int iVV ;
       
+      gxDghInitializeBaddyBatchies (gx, h) ;
       for (iVV = 0 ; iVV < nVV ; iVV++)
 	{
 	  vA = keySetReCreate (vA) ;
@@ -7945,7 +8049,7 @@ static BOOL gxCompareAndControl (GX *gx, int pass, COMPARE *compare, int run1, i
 	  if (gxMakeVirtualGroups (gx, run1, run2, vA, vB, iVV))
 	    {
 	      compare->nVirtualStrata++ ;
-	      gxCompareOrControl (gx, pass, compare, run1, run2, vA, vB, 0, 0, 0, 0, minIndex, 0, 0, iVV+1, h) ;
+	      gxCompareOrControl (gx, compare, run1, run2, vA, vB, 0, 0, 0, 0, minIndex, iVV+1, h) ;
 	    }	
 	  else
 	    break ;
@@ -7960,7 +8064,7 @@ static BOOL gxCompareAndControl (GX *gx, int pass, COMPARE *compare, int run1, i
    */
   rc1 = arrayp (gx->runs, run1, RC) ;
   rc2 = arrayp (gx->runs, run2, RC) ;
-  ok = gxCompareOrControl (gx, pass, compare, run1, run2, rc1->runs, rc2->runs, genePlus, geneMinus, moreGenePlus, moreGeneMinus, minIndex, fdr1, fdr2, 0, h) ;
+  ok = gxCompareOrControl (gx, compare, run1, run2, rc1->runs, rc2->runs, genePlus, geneMinus, moreGenePlus, moreGeneMinus, minIndex, 0, h) ;
 
   ac_free (h) ;
   return ok ;
@@ -8117,49 +8221,15 @@ static int keySetMerge (KEYSET ks1, KEYSET ks2, Associator assPlus, Associator a
 
 /*************************************************************************************/
 
-static BOOL gxCreateExtremeGroups (GX *gx, Array rws, int run1, int run2, AC_HANDLE h)
-{
-  RC *rc1 = arrayp (gx->runs, run1, RC) ;
-  RC *rc2 = arrayp (gx->runs, run2, RC) ;
-  int i, j, nn = arrayMax (rws), max1, max2 ;
-  RW *rw ;
-  KEYSET ks1 = keySetHandleCreate (h) ;
-  KEYSET ks2 = keySetHandleCreate (h) ;
-  BOOL localIter = gx->localIteration ;  /* iterate only inside the group */
-
-  max1 = nn/5 ;
-  if (localIter && rc1->runs && max1 > keySetMax (rc1->runs)/2)
-    max1 = keySetMax (rc1->runs)/2 ;
-  for (i = j = 0, rw = arrp (rws, i, RW) ; j < max1 && i < nn/2 ; i++, rw++)
-    if (! localIter || ! rc1->runs || keySetFind (rc1->runs, rw->run, 0))
-      keySet (ks1, j++) = rw->run ;
-  
-  max2 = nn/5.0 ;
-  if (localIter && rc2->runs && max2 > keySetMax (rc2->runs)/2)
-    max2 = keySetMax (rc2->runs)/2 ;
-
-  for (i = nn - 1, j = 0, rw = arrp (rws, i, RW) ;  j < max2 && i > nn/2 ; i--, rw--)
-    if (! localIter || ! rc2->runs || keySetFind (rc2->runs, rw->run, 0))
-      keySet (ks2, j++) = rw->run ;
-
-  rc1->runs = ks1 ;
-  rc2->runs = ks2 ;
-
-  return TRUE ;
-} /* gxCreateExtremeGroups  */
-
-/*************************************************************************************/
-
-static BOOL gxRuns2Genes (GX *gx, COMPARE *compare, int run1, int run2, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, float *fdr1, float *fdr2, int pass)
+static BOOL gxRuns2Genes (GX *gx, COMPARE *compare, int run1, int run2, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus)
 {
   RC *rc1 = arrayp (gx->runs, run1, RC) ;
   RC *rc2 = arrayp (gx->runs, run2, RC) ;
   BOOL ok = FALSE ;
 
-  fprintf (stderr, ".......Runs2Genes A :: %s %s  pass=%d compare=%s\n"
+  fprintf (stderr, ".......Runs2Genes A :: %s %s  compare=%s\n"
 	   , dictName (gx->runDict, run1)
 	   , dictName (gx->runDict, run2)
-	   , pass
 	   , dictName (gx->compareDict, compare->compare)
 	   ) ;
   {
@@ -8170,49 +8240,13 @@ static BOOL gxRuns2Genes (GX *gx, COMPARE *compare, int run1, int run2, KEYSET g
 
   if (! rc1->aa || ! rc2->aa) 
     return FALSE ;
+  if (rc1->private || rc2->private)
+    return FALSE ;
 
-  ok = gxCompareAndControl (gx, pass, compare, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2) ;
+  ok = gxCompareAndControl (gx, compare, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus) ;
 
   return ok ;
 } /* gxRuns2Genes */
-
-/*************************************************************************************/
-
-static void gxIterate (GX *gx, COMPARE *compare, int run1, int run2, RC* rc1, RC *rc2, Array rws, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus,  int pass)
-{
-  AC_HANDLE h = ac_new_handle() ;
-  KEYSET  ks1 = rc1->runs ;
-  KEYSET  ks2 = rc2->runs ;
-  KEYSET sp = 0, sm = 0 ;
-  Array rws2 ;
-  float fdr1[201], fdr2[201] ;
-
-  gxCreateExtremeGroups (gx, rws, run1, run2, h) ;  /* construct the groups and fills the index */
-
-  memset (fdr1, 0, sizeof(fdr1)) ;
-  memset (fdr2, 0, sizeof(fdr2)) ;
-  gxRuns2Genes (gx, compare, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, pass+1) ;
-  /* genePLus and geneMinus are sorted by importance */
-  /* order the runs */
-  sp = arrayReCreate (sp, keySetMax (genePlus), SCAL) ;
-  sm = arrayReCreate (sm, keySetMax (geneMinus), SCAL) ;
-  rws2 = gxAllRunsCosineUsingGenesRun1Run2 (gx, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, sp, sm, h) ; /* rw: {run,alpha} */
-  
-  if (rws2 &&  arrayMax (rws2)) 
-    {
-      gxTrueFalse_AUC_MCC (gx, rws2, run1, run2, 0, 0,  pass + 1) ;
-      gxExportSignatures (gx, run1, run2, 0, 0, pass+1) ;
-      gxExportComparison (gx, compare, rws2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, run1, run2, FALSE, pass+1) ;
-      gxExportComparison (gx, compare, rws2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, run1, run2, TRUE, pass+1) ;
-    }
-  if (0 && pass == 0)
-    gxIterate (gx, compare, run1, run2, rc1, rc2, rws2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, pass + 1) ;
-
-  /* restore the original groups AFTER export, because we need to recompute the histos on the iterated groups */
-  rc1->runs = ks1 ; 
-  rc2->runs = ks2 ; 
-  ac_free (h) ;
-} /* gxIterate */
 
 /*************************************************************************************/
 /* select genes above a given differential and export them */
@@ -8225,7 +8259,6 @@ static int gxCompare_to (GX *gx)
   KEYSET genePlus = 0, geneMinus = 0 ;
   KEYSET moreGenePlus = 0, moreGeneMinus = 0 ;
   Array sp, sm ;
-  float fdr1[201], fdr2[201] ;
 
   {
     int mx ;
@@ -8245,62 +8278,49 @@ static int gxCompare_to (GX *gx)
 
   for (iCompare = 1 ; gx->compares && iCompare < arrayMax(gx->compares) ; iCompare++)
     {
-      int pass ;
       COMPARE *compare = arrayp (gx->compares, iCompare, COMPARE) ;
       if (! compare->runs || keySetMax (compare->runs) != 2)
 	continue ;
       if (gx->isINTRON && ! compare->compareINTRON)
-	 continue ;
-       if (gx->isSNP && ! compare->compareSNP)
-	 continue ;
-
-      for (pass = 0 ; pass < 1 ; pass++)
-	{
-	  run1 = keySet (compare->runs, pass) ;
-	  run2 = keySet (compare->runs, 1 - pass) ;
+	continue ;
+      if (gx->isSNP && ! compare->compareSNP)
+	continue ;
+      /* TOTOTOTO */
+       run1 = keySet (compare->runs, 0) ;
+       run2 = keySet (compare->runs, 1) ;
 	  
-	  /*   for (run1 = 1 ; run1 <  arrayMax (gx->runs) ; run1++) 
-	       
-	  for (ii = 0 ; ii < keySetMax (rc1->compare_to) ; ii++)
-	  run2 = keySet (rc1->compare_to, ii) ;
-	  */
-
-	  rc1 = arrayp (gx->runs, run1, RC) ;
-	  if (! rc1->aa || rc1->groupLevel < 0) continue ;
-	  rc2 = arrayp (gx->runs, run2, RC) ;
-	  if (! rc2->aa || rc2->groupLevel < 0) continue ;
-	  
-	  if (gxRuns2Genes (gx, compare, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, 0))
-	    {
-	      /* genePlus and geneMinus are sorted by importance */
-	      /* order the runs */
-	      sp = arrayReCreate (sp, keySetMax (genePlus), SCAL) ;
-	      sm = arrayReCreate (sm, keySetMax (geneMinus), SCAL) ;
-
-	      /* all histos should be registered probably in sp, sm, passed to cosines in case we use digital == 3, and passed to export comparison, so we do not recompute them 
-		double hh0s[256], hh1s[256] ;
-		gxMakeComparativeHistos (gx, gene, run1, run2, rc1->runs, rc2->runs, hh0s, hh1s
-		, 0, &nRun0, &nRun1, 0, 0, 0
-		, 0
+       rc1 = arrayp (gx->runs, run1, RC) ;
+       if (! rc1->aa || rc1->groupLevel < 0) continue ;
+       rc2 = arrayp (gx->runs, run2, RC) ;
+       if (! rc2->aa || rc2->groupLevel < 0) continue ;
+       
+       if (gxRuns2Genes (gx, compare, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus))
+	 {
+	   /* genePlus and geneMinus are sorted by importance */
+	   /* order the runs */
+	   sp = arrayReCreate (sp, keySetMax (genePlus), SCAL) ;
+	   sm = arrayReCreate (sm, keySetMax (geneMinus), SCAL) ;
+	   
+	   /* all histos should be registered probably in sp, sm, passed to cosines in case we use digital == 3, and passed to export comparison, so we do not recompute them 
+	      double hh0s[256], hh1s[256] ;
+	      gxMakeComparativeHistos (gx, gene, run1, run2, rc1->runs, rc2->runs, hh0s, hh1s
+	      , 0, &nRun0, &nRun1, 0, 0, 0
+	      , 0
 	      , &Gini,  &pValue
 				   , FALSE
-		  ) ;
-	  */
-	      rws = gxAllRunsCosineUsingGenesRun1Run2 (gx, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, sp, sm, h) ; /* rw: {run,alpha} */
-	      if (! rws || ! arrayMax (rws)) 
-		continue ;
-	      gxTrueFalse_AUC_MCC (gx, rws, run1, run2, 0, 0, 0) ; /* computes the AUC, Gini, pValue and in each run sets rc->alpha, beta1, beta2 */
-	      gxExportSignatures (gx, run1, run2, 0, 0, 0) ;      /* exports in a single file for all compare, the functions alpha, beta1, beta2  */
-	      if (1)  /* beta coeff 2014_11_13 : gives the alpha classification of all runs showing if the signature works on training, if applicable also scores the predicts->compare */
-		{
-		  gxExportComparison (gx, compare, rws, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, run1, run2, FALSE, 0) ; /* beta: alpha, beta1,beta2 plots, contrib of each gene to alpha */
-		  gxExportComparison (gx, compare, rws, genePlus, geneMinus, moreGenePlus, moreGeneMinus, fdr1, fdr2, run1, run2, TRUE, 0) ;  /* histo: histos of all genes used in the signatures */
-		}
-	      if (0 && /* this is a bad idea, we overtrain and by now it would probably mix up exportDiffGenes which is expecting consecutive calls with apss == 0 */
-		  gx->iterate && ! rc1->private && ! rc2->private)
-		gxIterate (gx, compare, run1, run2, rc1, rc2, rws, genePlus, geneMinus, moreGenePlus, moreGeneMinus, 0) ;
-	    }
-	}
+				   ) ;
+	   */
+	   rws = gxAllRunsCosineUsingGenesRun1Run2 (gx, run1, run2, genePlus, geneMinus, moreGenePlus, moreGeneMinus, sp, sm, h) ; /* rw: {run,alpha} */
+	   if (! rws || ! arrayMax (rws)) 
+	     continue ;
+	   gxTrueFalse_AUC_MCC (gx, rws, run1, run2, 0, 0, 0) ; /* computes the AUC, Gini, pValue and in each run sets rc->alpha, beta1, beta2 */
+	   gxExportSignatures (gx, run1, run2, 0, 0, 0) ;      /* exports in a single file for all compare, the functions alpha, beta1, beta2  */
+	   if (1)  /* beta coeff 2014_11_13 : gives the alpha classification of all runs showing if the signature works on training, if applicable also scores the predicts->compare */
+	     {
+	       gxExportComparison (gx, compare, rws, genePlus, geneMinus, moreGenePlus, moreGeneMinus, run1, run2, FALSE, 0) ; /* beta: alpha, beta1,beta2 plots, contrib of each gene to alpha */
+	       gxExportComparison (gx, compare, rws, genePlus, geneMinus, moreGenePlus, moreGeneMinus, run1, run2, TRUE, 0) ;  /* histo: histos of all genes used in the signatures */
+	     }
+	 }
     }
     
   gxExportSignatures (gx, 0, 0, 0, 0, -2) ; /* close the signature file */
@@ -9489,8 +9509,7 @@ static int gxExportGeneAceFileSummary (GX *gx, int type)
 	  aa = rc->aa ;
 	  if (!aa)
 	    continue ;
-	  if (rc->private == 2)
-	    continue ;
+
 	  aceOutf (ao, "Ali%s \"%s\"\n", subsamp, dictName (gx->runDict, run)) ;
 	  aceOutf (ao, "Zero_index %s %.1f\nLow_index  %s %.1f\nCross_over_index  %s %.1f\nGenes_touched  %s %d\nGenes_with_index %s  %d\nGenes_with_index_over_10 %s  %d\nGenes_with_index_over_12  %s %d\nGenes_with_index_over_15 %s  %d\nGenes_with_index_over_18  %s %d\n"
 		   , target2 , rc->zeroIndex
@@ -10210,7 +10229,7 @@ static void gxShowGeneHisto (ACEOUT ao, GX* gx, double *hh, int nRun)
 
 /*************************************************************************************/
 /* The run are sorted in rows by their alpha coefficient and export for each run the index of the most characteristic genes */
-static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, float *fdr1, float *fdr2, int run1, int run2, BOOL histo, int pass0)
+static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET genePlus, KEYSET geneMinus, KEYSET moreGenePlus, KEYSET moreGeneMinus, int run1, int run2, BOOL histo, int pass0)
 {
   AC_HANDLE h = ac_new_handle () ; 
   ACEOUT ao = 0 ;
@@ -10536,8 +10555,8 @@ static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET geneP
 
       for (jj = jpp = 0 ; genePM && jj < keySetMax (genePM) ; jj++)
 	{
-	  double hh0s[256], hh1s[256], fdr, oldfdr = 9999999 ; /*  threshold = 0, pValue = 1 ; */
-	  int nRun0 = 0, nRun1 = 0, iScore ;
+	  double hh0s[256], hh1s[256] ;
+	  int nRun0 = 0, nRun1 = 0 ;
 	  RC *rc1 = arrp (gx->runs, run1, RC) ;
 	  RC *rc2 = arrp (gx->runs, run2, RC) ;
 	  GC *gc2 ;
@@ -10566,10 +10585,7 @@ static int gxExportComparison (GX *gx, COMPARE *compare, Array rws, KEYSET geneP
 				   , &Gini,  &pValue
 				   , FALSE
 				   ) ;
-	  iScore = gc->score ;
-	  fdr = (pass0 == 1 && iScore >= 0 && iScore <= 200) ? (genePass == 0 ? fdr2[iScore] : fdr1[iScore]) : -1 ;
-	  if (fdr > oldfdr) fdr = oldfdr ; 
-	  oldfdr = fdr ;
+
 	  aceOutf (ao, "\n%s\t%s\t%s\t%d", species,  dictName (gx->compareDict, compare->compare), vtxtPtr (compareWhat), ++jpp) ;
 	  aceOutf (ao, "\t%s", noX__ (dictName (gx->geneDict, gene), !gx->isINTRON)) ;
 	  {
@@ -10811,16 +10827,15 @@ static int gxShowAllHistos (GX *gx)
 /*************************************************************************************/
 /*************************************************************************************/
 /* Export the info on all diff genes */
-static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int run2, KEYSET vA, KEYSET vB, float *fdr, int fdrThreshold, int isPm0)
+static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int run2, KEYSET vA, KEYSET vB, int isPm)
 {
   static AC_HANDLE h = 0 ;
   static ACEOUT ao = 0 ;
   static vTXT compareWhat = 0 ;
-  int i, ipp, jpp, gene, pass, nDEG = 0, nDEG185 = 0 ;
+  int i, ipp, jpp, gene, pass ;
   PC *pc ;
   GC *gc ;
   const char *species =  gx->htmlSpecies ? gx->htmlSpecies : "species" ;
-  BOOL isPm = (isPm0 == 2 ? TRUE : FALSE) ;
 
   if (isPm == FALSE || !h || !ao)
     {
@@ -10829,10 +10844,10 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
       compareWhat = vtxtHandleCreate (h) ;
       fprintf (stderr, "=== compare %s fdr=%.2f thr=%d\n"
 	       , dictName (gx->compareDict, compare->compare)
-	       , fdr[fdrThreshold]
-	       , fdrThreshold
+	       , compare->fdr[isPm]
+	       , compare->fdrThreshold[isPm]
 	       ) ;
-      if (! compare->private)
+      if (1)
 	{
 	  ao = aceOutCreate (gx->outFileName
 			     , hprintf (h, ".%s.compare.txt"
@@ -10843,7 +10858,7 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
 	  aceOutDate (ao, "###", gx->title) ;
 	  aceOutf (ao, "## Parameters:  Minimal score selected by optimizing the FDR on %d randomized trials, %% FDR = %.2f at threshold = %d. %s  %s R= %.2f"
 		   ,  compare->nVirtualStrata 
-		   , 100 * fdr[fdrThreshold] , fdrThreshold 
+		   , 100 * compare->fdr[isPm] , compare->fdrThreshold[isPm] 
 		   , gx->normalize ? "The area of each histogram is normalized to 100" : "The area of each histogram represents the actual number of samples"
 		   , gx->geneSelectionMethod == 7 ? "" : messprintf ("geneSelectionMethod=%d",  gx->geneSelectionMethod)
 		   , gx->ratio_bound
@@ -10879,7 +10894,7 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
   else
     aceOutf (ao, "\n## Parameters:  Minimal score selected by optimizing the FDR on %d randomized trials, %% FDR = %.2f at threshold = %d"
 	     ,  compare->nVirtualStrata 
-	     , 100 * fdr[fdrThreshold] , fdrThreshold 
+	     , 100 * compare->fdr[isPm] , compare->fdrThreshold[isPm] 
 	     ) ;
 
     
@@ -10893,8 +10908,8 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
   
   for (ipp = jpp = 0 ; ipp < arrayMax (pp) ; ipp++)
     {
-      double Gini = 0, hh0s[256], hh1s[256], threshold = 0, pValue = 1, fdr1, oldfdr = 9999999 ;
-      int nRun0 = 0, nRun1 = 0, iScore ;
+      double Gini = 0, hh0s[256], hh1s[256], pValue = 1 ;
+      int nRun0 = 0, nRun1 = 0 ;
       pc = arrp (pp, ipp, PC) ;
       if (pc->ok < 1) continue ;
       gene = pc->gene ;
@@ -10907,23 +10922,14 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
 		  
       if (! gene) 
 	continue ;
-      gxMakeComparativeHistos (gx, gene, run1, run2, vA, vB, hh0s, hh1s
-			       , 0, &nRun0, &nRun1, 0, 0, 0
-			       , &threshold, &Gini, &pValue, FALSE
-			       ) ;
-      iScore = gc->score + .49 ;
-      
-      if (gc->score <= fdrThreshold) continue ;
-      nDEG++ ;
-      if (gc->score >= 185)
-	nDEG185++ ;
-      fdr1 = (iScore >= 0 && iScore <= 200) ? fdr[iScore] : -1 ;
-      if (fdr1 > oldfdr) fdr1 = oldfdr ; 
-      oldfdr = fdr1 ;
+
+      float score = pc->sig ;
+      if (! pc->ok || score <= compare->fdrThreshold[isPm]) 
+	continue ;
      
       if (1 && ! strcmp (dictName (gx->geneDict, gene), "22__36651046_36653128"))
 	fprintf (stderr, "%s %s %s %g\n", dictName (gx->geneDict, gene), dictName (gx->runDict, run1), dictName (gx->runDict, run2), gc->score) ;
-      gxPairScoreRegister (gx, compare->compare, run1, run2, gene, gc->score, pValue) ;
+      gxPairScoreRegister (gx, compare->compare, run1, run2, gene, score, pValue) ;
       
       for (pass = 0 ; pass < 2 ; pass++)
 	{
@@ -10938,28 +10944,17 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
 	    }
 	  if (ao)
 	    {
-	      float x = 0, y = 0 ;   /* Average score in the  NVIRTUALSTRATA random resamplings */ 
-	      if (compare->nVirtualStrata && 
-		  gx->baddyBatchies && gene < arrayMax (gx->baddyBatchies))
-		{
-		  x = arr (gx->baddyBatchiesMax, gene, float) ;
-		  y = arr (gx->baddyBatchies, gene, float)/(compare->nVirtualStrata) ;
-		  if (x < 150) x = y ;
-		  else if (x < 180)
-		    x = (x * (x - 150) + y * (180 - x))/30 ;
-		}
-	      aceOutf (ao, "\t%.2f\t%.2f", x, gc->score) ;
-	    }
-	  if (ao)
-	    {
 	      int s =  gc->score ;
 	      float x = 0 ; 
 	      
+	      /* Average score in the  NVIRTUALSTRATA random resamplings */ 
+	      aceOutf (ao, "\t%.2f\t%.2f", -10, pc->sig) ;
+
 	      if (s > 200) s = 200 ;
 	      if (s < -200) s = -200 ;
 
 	      if (s > 0 && s <= 200) 
-		x = 100 * fdr[s] ;
+		x = 100 * compare->fdr[isPm] ;   /* fdr[s] ;  TOTOTOTO */
 	      if (x < 1) 
 		aceOutf (ao, "\t< 1") ;
 	      else
@@ -11043,21 +11038,10 @@ static int gxExportDiffGenes (GX *gx, COMPARE *compare, Array pp, int run1, int 
   if (ao)
     aceOutf (ao, "\n\n\n\n") ;
   
-  if (isPm)
+  if (isPm == 2)
     {
       ac_free (h) ;
       h = 0 ; ao = 0 ; 
-    }
-  if (1)
-    {	
-      int iC = 0 ;
-      COMPARE *cmp ;
-      
-      gxPairScoreRegister (gx, compare->compare, run1, run2, 0, 0, 0) ;
-      gxPairScore (gx, &iC, run1, run2, 0, 0) ;
-      cmp = arrayp (gx->compares, iC, COMPARE) ;
-      cmp->nDEG[isPm0] = nDEG ;
-      cmp->nDEG185[isPm0] = nDEG185 ;
     }
 
   return 0 ;
@@ -12564,9 +12548,9 @@ static void gxOneExpressionProfile (GX *gx, int iCompare, int pass
 	    int iC = 0 ;
 	    int run1 = keySet (compare->runs, irun) ;
 	    int run2 = keySet (compare->runs, jrun) ;
-	    COMPARE *cmp ;
+	    COMPARE *cmp = compare ;
 
-	    gxPairScore (gx, &iC, run1, run2, 0, 0) ;
+	    /*	    gxPairScore (gx, &iC, run1, run2, 0, 0) ; */
 	    if (iC)
 	      {
 		int dr = (run1 > run2 ? 0 : 1) ;
@@ -12592,16 +12576,13 @@ static void gxOneExpressionProfile (GX *gx, int iCompare, int pass
     {
       for (irun = 0 ; irun < rMax - 1 ; irun++)
 	{
-	  int iC = 0 ;
 	  int run1 = keySet (compare->runs, irun) ;
 	  int run2 = keySet (compare->runs, irun + 1) ;
-	  COMPARE *cmp ;
-
-	  gxPairScore (gx, &iC, run1, run2, 0, 0) ;
-	  if (iC)
+	  /* 	  gxPairScore (gx, &iC, run1, run2, 0, 0) ; */
+	  if (1)
 	    {
 	      int dr = (run1 > run2 ? 0 : 1) ;
-	      cmp = arrp (gx->compares, iC, COMPARE) ;
+	      COMPARE *cmp = compare ;
 	      aceOutf (ao, "\t%d DEG >= 185, %d DEG > 0, %.2f %% FDR at threshold %d"
 		       , cmp->nDEG185[2 - dr]
 		       , cmp->nDEG[2 - dr]
@@ -12763,8 +12744,11 @@ static void gxOneExpressionProfile (GX *gx, int iCompare, int pass
 		int iC = 0 ;
 		int run1 = keySet (compare->runs, irun) ;
 		int run2 = keySet (compare->runs, jrun) ;
-		float z = gxPairScore (gx, &iC, run1, run2, gt->gene, 0) ;
 		COMPARE *cmp = iC > 0 ? arrp (gx->compares, iC, COMPARE) : 0 ;
+		int isPm = run1 < run2 ? 1 : 2 ;
+		Array scores = cmp ? cmp->pp[isPm] : 0 ;
+		/* float z = cmp ? cmp->gxPairScore (gx, &iC, run1, run2, gt->gene, 0) ; */
+		float z = scores ? array (scores, gt->gene, float) : 0 ;
 		int typ = 2 ;
  
 		gt->sigShape[nS] = '~' ;
@@ -13510,7 +13494,7 @@ static void gxExpressionProfile (GX *gx, int pass)
 	       int v ;
 	       int vMax = 1 ; /* Danielle 2019_05_30 only wants all profiles (v==0) and no longer diff_profiles (v==1) or top_diff (v==2) */
 	       for (v = 0 ; v < vMax ; v++)
-		 {
+		 {               /* pass , showPvalue, wantGeneGroup */
 		   gxOneExpressionProfile (gx, iCompare, v, TRUE, FALSE) ;
 		   gxOneExpressionProfile (gx, iCompare, v, FALSE, FALSE) ;
 		   if (gx->maxGeneGroupLevel)
@@ -13735,7 +13719,7 @@ static BOOL gxOneSamplePairing (ACEOUT ao, GX *gx, int iCompare, COMPARE *compar
   /* for each run compare->runs */
 
 
-  if (gx->isSNP) 
+  if (compare->who_is_who)
     {
       ii = arrayMax (runs1) * arrayMax (runs2) ;
       hh = arrayHandleCreate (ii, float, h) ;
@@ -13790,7 +13774,7 @@ static BOOL gxOneSamplePairing (ACEOUT ao, GX *gx, int iCompare, COMPARE *compar
 	}
       /* sort an export the twin and the 5 best */
       if (1) arraySort (runs2, csOrder) ;
-      if (! gx->isSNP) 
+      if (ao && ! compare->who_is_who)
 	{
 	  aceOutf (ao, "%s\t%s", dictName (gx->runDict, cs1->run), rc1->title ? stackText (gx->info, rc1->title) : "") ;
 	  
@@ -13814,7 +13798,7 @@ static BOOL gxOneSamplePairing (ACEOUT ao, GX *gx, int iCompare, COMPARE *compar
 	      aceOut (ao, pass == 2 ? "\n" : "\t") ;	  
 	    }
 	}
-      else
+      else if (aa)
 	{
 	  for (irun2 = 0, cs2 = arrayp (runs2, irun2, CS)  ; irun2 < arrayMax (runs2) ; cs2++, irun2++)
 	    if ( cs1->run && cs2->run && cs1->run < cs2->run &&  - cs2->weight/10000.0 > -230 && cs2->nn > 0)
@@ -13830,7 +13814,7 @@ static BOOL gxOneSamplePairing (ACEOUT ao, GX *gx, int iCompare, COMPARE *compar
 	}
     }
   
-  if (gx->isSNP)
+  if (compare->who_is_who)
     {
       /* rescale the SNP score to 0 100
        * the median is often at delta = -30
@@ -13900,8 +13884,14 @@ static void gxSamplePairing (GX *gx)
 	 continue ;
        if (gx->isSNP && ! compare->compareSNP)
 	 continue ;
+       if (0 && !gx->isSNP && compare->compareSNP)
+	 continue ;
 
-      if (! gx->isSNP && compare->samplePairing && compare->runs && keySetMax(compare->runs))
+      if (compare->who_is_who && compare->runs && keySetMax(compare->runs))
+	 {
+	   gxOneSamplePairing (0, gx, iCompare, compare, FALSE) ;
+	 }
+      else if (! gx->isSNP && compare->samplePairing && compare->runs && keySetMax(compare->runs))
 	 {
 	   AC_HANDLE h = ac_new_handle () ;
 	   ACEOUT ao = aceOutCreate (gx->outFileName, messprintf(".%s.sample_pairing.txt", dictName (gx->compareDict, iCompare)), FALSE, h) ;
@@ -13920,12 +13910,6 @@ static void gxSamplePairing (GX *gx)
 	   gxOneSamplePairing (0, gx, iCompare, compare, FALSE) ;
 
 	   ac_free (h) ;
-	 }
-      if (gx->isSNP && compare->who_is_who && compare->runs && keySetMax(compare->runs))
-	 {
-
-	   gxOneSamplePairing (0, gx, iCompare, compare, FALSE) ;
-
 	 }
      }
 } /* gxSamplePairing */
@@ -15246,7 +15230,7 @@ int main (int argx, const char **argv)
 	  
 	  if (gx.showAllHistos)
 	    gxShowAllHistos (&gx) ; /* will register */
-	  if (gx.isSNP && gx.who_is_who)  /* 2019_05_05 remove other outputs */
+	  if ((1 || gx.isSNP) && gx.who_is_who)  /* 2019_05_05 remove other outputs */
 	    gxSamplePairing (&gx) ;
 	  gxExportComparedGenes (&gx) ;
 	}

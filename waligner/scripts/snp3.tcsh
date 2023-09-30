@@ -34,27 +34,42 @@ if ($phase == G) then
   set pp=$MAGIC
 if (1) then
   bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
-    select -o tmp/TSNP_DB/$zone/snp3.$pp.cmw20.txt v,r,c,m,w from v in ?Variant, r in v->BRS_counts , c in r[1] where c >=20 , m in r[2], w in r[3]
+    read-models
+    parse MetaDB/$MAGIC/runs.ace
+    save
+    select -o tmp/TSNP_DB/$zone/snp3.$pp.cmw20.txt v,r,c,m,w from v in ?Variant, r in v->BRS_counts where r->project == "$MAGIC" , c in r[1] where c >=20 , m in r[2], w in r[3]
     quit
 EOF
 endif
 # select variants, well contrated both in runs S* and C*
-  cat tmp/TSNP_DB/$zone/snp3.direct.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMaxC>80 && fMinC<10 && fMaxS>80 && fMinS<10)print old;fMaxC=0;fMinC=100;fMaxS=0;fMinS=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;r=substr($2,1,1);f=100*m/c;if (r=="C"){if(f>fMaxC)fMaxC=f;if(f<fMinC)fMinC=f;}if (r=="S"){if(f>fMaxS)fMaxS=f;if(f<fMinS)fMinS=f;}}' >  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_list
+if ($MAGIC == NASAZZZ) then
+  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMaxC>80 && fMinC<10 && fMaxS>80 && fMinS<10)print old;fMaxC=0;fMinC=100;fMaxS=0;fMinS=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;r=substr($2,1,1);f=100*m/c;if (r=="C"){if(f>fMaxC)fMaxC=f;if(f<fMinC)fMinC=f;}if (r=="S"){if(f>fMaxS)fMaxS=f;if(f<fMinS)fMinS=f;}}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
 # get all their data
-  cat tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_list ZZZZZ tmp/TSNP_DB/$zone/snp3.direct.cmw20.txt | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1){v=$1;r=$2;c=$3;m=$4;w=$5;f=100*m/c;printf("%s\t%s\tfi3\t%.2f\t%d\t%d\t%d\n",v,r,f,c,m,w);}}' >  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good.tsf
-  cat   tmp/TSNP_DB/$zone/snp3.direct.cmw20.good.tsf | gawk -F '\t' '{v=$1;r=$2;f=$4;if (v!= old){printf("\nVariant %s\n",v);old=v;} if(f>80)printf("mm %s\n",r);else if(f>40)printf("wm %s\n",r);if(f<10)printf("ww %s\n",r);}END{printf("\n");}' > tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_type.ace
+  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list ZZZZZ tmp/TSNP_DB/$zone/snp3.direct.cmw20.txt | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1){v=$1;r=$2;c=$3;m=$4;w=$5;f=100*m/c;printf("%s\t%s\tfi3\t%.2f\t%d\t%d\t%d\n",v,r,f,c,m,w);}}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf
+  cat   tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf | gawk -F '\t' '{v=$1;r=$2;f=$4;if (v!= old){printf("\nVariant %s\n",v);old=v;} if(f>80)printf("mm %s\n",r);else if(f>40)printf("wm %s\n",r);if(f<10)printf("ww %s\n",r);}END{printf("\n");}' > tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_type.ace
 
   bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
-    pparse  tmp/TSNP_DB/$zone/snp3.direct.cmw20.good_type.ace
+    pparse  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_type.ace
     save
     quit
 EOF
 
+else
+  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>45 && fMin<5)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
+if ($MAGIC == NASA && -e tmp/TSNP_DB/$zone/snp3.Nano.cmw20.txt) then
+   cat tmp/TSNP_DB/$zone/snp3.Nano.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>40 && fMin<10)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >>  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
+endif
+
+endif
+# get all their data
+  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list ZZZZZ tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1){v=$1;r=$2;c=$3;m=$4;w=$5;f=100*m/c;printf("%s\t%s\tfi3\t%.2f\t%d\t%d\t%d\n",v,r,f,c,m,w);}}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf
+
+endif
+
   goto done
 endif
 
-
-
+  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>80 && fMin<10)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
 
 if ($phase == p) then
   set pp=SnpA2R2 
@@ -268,7 +283,7 @@ done:
 
   
   foreach zone (`cat tmp/SNP_ZONE/ZoneList `)
-    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh G $zone"
+    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh R $zone"
   end
  qusage 1
 
@@ -403,4 +418,5 @@ set ff=RESULTS/SNV/SnpA2R2.Wtrue.3.groups.SNP_summary.aug16.txt
 
 cat $ff | gawk -F '\t' '/^#/{print}' | transpose | grep -n etected
 cat $ff | gawk -F '\t' '/^#/{next;}{print $32}' | tags | grep A2
+
 

@@ -1560,7 +1560,7 @@ echo -n "##\t" > $toto
 cat  $toto1.*.DEG_FDR_selection.txt | head -1 | cut -f 2 | gawk '{printf("%s\t",$1);}' >> $toto
 echo " file=$toto" >> $toto
 echo >> $toto
-echo "# Compare\tGenes overexpressed in\trelative to\tNumber of runs in first group\tNumber of runs in second group\tMagic DEG score threshold (0 to 200)\tNumber of DEGs before noise substraction\t% FDR" >> $toto
+echo "# Compare\tGenes overexpressed in\trelative to\tNumber of runs in first group\tNumber of runs in second group\tMagic DEG score threshold (0 to 200)\tNumber of DEGs after noise substraction\t% FDR" >> $toto
 
 echo "cat   $toto1.*.DEG_FDR_selection.txt "
 cat   $toto1.*.DEG_FDR_selection.txt | gawk -F '\t' '{if ($6 == "Selected threshold")print}' | sort | cut -f 1,2,3,4,5,7,9,11 >> $toto

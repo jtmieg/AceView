@@ -432,8 +432,8 @@ end
 ######################################################
 # supplementary information not from .fasta and not from .gtf
 
-if (-e TARGET/GENES/$species.av.split_mrnas.txt && ! -e tmp/METADATA/av.split_mrnas.gene2length.ace6) then
-  cat  TARGET/GENES/$species.av.split_mrnas.txt | gzip > tmp/METADATA/av.split_mrnas.gz
+if (-e TARGET/GENES/av.split_mrnas.gz && ! -e tmp/METADATA/av.split_mrnas.gene2length.aceZZZ) then
+  cp  TARGET/GENES/av.split_mrnas.gz  tmp/METADATA/av.split_mrnas.gz
 # find their length
   cat TARGET/GENES/av.genes2length.ace | gawk '/^Gene/{gsub(/\"/,"",$2);g=$2;}/^Length/{x=$2+0;if(x>0)printf("%s\t%d\n",g,x);}' > _tln
   echo ZZZZZ >> _tln
@@ -443,9 +443,6 @@ if (-e TARGET/GENES/$species.av.split_mrnas.txt && ! -e tmp/METADATA/av.split_mr
 endif
 
 ######################################################
-
-NoNewGTF:
-
 ######################################################
 #### analyse the telomeric motifs in the targets
 

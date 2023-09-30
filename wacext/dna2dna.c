@@ -55,6 +55,7 @@ typedef struct sxStruct {
   BOOL gzi, gzo, doCount, getTm, appendByPrefix, keepName , keepName1 , keepName2, keepNameBam, isGff3, gffTAIR ;
   BOOL fastc_paired_end, gffBacteria ;
   BOOL noNameCheck ;
+  BOOL makeFastaUnique ;
   unsigned char **entryAdaptor ;
   unsigned char **inPhaseEntryAdaptor ;
   int dnaLn ; /* length of current dna */
@@ -4681,6 +4682,48 @@ static void dna2dnaRun (SX *sx)
 
 /*************************************************************************************/
 /*************************************************************************************/
+/* hack: inputa fasta file with repeated id/dna entries, clean it */
+static void makeFastaUnique (SX *sx)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  DICT *dict = dictHandleCreate (100000,h) ;
+  ACEIN ai = sx->ai ;
+  ACEOUT ao = sx->ao ;
+  int state = 0 ;
+  int nIn = 0, nOut = 0 ;
+
+  while (aceInCard (ai))
+    {
+      const char *cp = aceInWord (ai) ;
+      if (cp)
+	switch (state)
+	  {
+	  case 0:
+	    if (cp[0] != '>')
+	      continue ;
+	    nIn++ ;
+	    if(dictAdd (dict, cp+1, 0))
+	      {
+		state = 1 ;
+		nOut++ ;
+		aceOut (ao, cp) ;
+		aceOut (ao, "\n") ;
+	      }
+	    break ;
+	  case 1:
+	    state = 0 ;
+	    aceOut (ao, cp) ;
+	    aceOut (ao, "\n") ;
+	    break ;
+	  }
+    }
+  ac_free (h) ;
+  fprintf (stderr, "#makeFastaUnique parsed %d ids and exported %d, %.2f%%\n", nIn, nOut, 100.0*nOut/(nIn+.001)) ; 
+  return ;
+} /* makeFastaUnique */
+
+/*************************************************************************************/
+/*************************************************************************************/
 /* quality file provides default quality values in -o FASTQ mode */
 
 static void  sxParseQualityFile (SX *sx)
@@ -5034,6 +5077,11 @@ static void usage (char *message)
 	    "//     Notice that if you export a chromosome on a single fasta line, although this is\n"
 	    "//     semantically correct, most programs will crash (buffer size exceeded) when reading it\n"
 	    "//     this is why the default is chosen large, but not infinite\n"
+	    "//   -makeFastaUnique: hack to analyze Ultimal BAM files\n"
+	    "//     BamDeal bam2fasta takes a bam and exorts identifier + sequence in fasta format\n"
+	    "//     but the same identifier and DNA maybe exported several times\n"
+	    "//     This option exports a clean fasta file, with each identifier presnt only once\n"
+	    "//     We used this hack in septembre 2023 to clean our first NASA Ultima runs\n"
 	    "//\n"
 	    "// Letter/quality profiles\n"
 	    "//   [-qualityPlot] : plot the profile of the fastq qualities rather than the letter profile\n"
@@ -5269,6 +5317,7 @@ int main (int argc, const char **argv)
   sx.gffTAIR = getCmdLineBool (&argc, argv, "-gffTAIR") ;
   getCmdLineOption (&argc, argv, "-gtfGenome", &sx.gtfGenomeFastaFileName) ;
   getCmdLineOption (&argc, argv, "-gffgenome", &sx.gtfGenomeFastaFileName) ;
+  sx.makeFastaUnique = getCmdLineBool (&argc, argv, "-makeFastaUnique") ;
 
   getCmdLineOption (&argc, argv, "-fastqSelect", &sx.fastqSelect) ;
   sx.letterNN = -9999999 ;
@@ -5547,6 +5596,12 @@ int main (int argc, const char **argv)
 
   if (! sx.gtfFileName && ! sx.inFileName && ! sx.inFileName1)
     sx.ai = aceInCreate (0, sx.gzi, h) ;
+
+  if (sx.makeFastaUnique)
+    {
+      sx.ao = aceOutCreate (sx.outFileName, ".unique.fasta", sx.gzo, h) ;
+      makeFastaUnique (&sx) ;
+    }
 
   if (sx.makeTestGenome)
     {

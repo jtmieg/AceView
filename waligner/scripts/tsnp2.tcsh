@@ -43,8 +43,8 @@ date
   set toto=tmp/TSNP_DB/$zone/$MAGIC.tsnp2a._r
     echo ' ' > $toto.ace
   echo "read-models" > $toto
-  echo "query find variant" >> $toto
-  echo "kill"  >> $toto
+  echo "query find variant BRS_counts" >> $toto
+  echo "edit -D BRS_counts" >> $toto
   echo "pparse $toto.ace" >> $toto
   if (-e DanLi/DanLi.$zone.ace)  echo "pparse DanLi/DanLi.$zone.ace" >> $toto 
   echo "pparse MetaDB/$MAGIC/runs.ace" >> $toto
@@ -123,6 +123,7 @@ if (-e  tmp/TSNP_DB/$zone/av.parse.done) then
      echo "pparse $toto.ace" |  bin/tacembly tmp/TSNP_DB/$zone -noprompt
      touch tmp/TSNP_DB/$zone/$MAGIC.$phase.done
   endif
+  goto done1
   exit 0
 endif
 
@@ -157,7 +158,7 @@ date
 
   bin/tace tmp/TSNP_DB/$zone <  $toto
 
-  if (! -e tmp/TSNP_DB/$zone/av.parse.done) then
+  if (! -e tmp/TSNP_DB/$zone/av.parse.doneZZZ) then
     tace tmp/TSNP_DB/$zone <<EOF
       find mrna
       spush
@@ -198,6 +199,7 @@ EOF
   echo -n " remap and translate "
 date
 
+done1:
   set remap2g=remap2genes
   if ($Strategy == RNA_seq) then
     set remap2g=remap2genome

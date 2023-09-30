@@ -307,7 +307,7 @@ else
   endif
 endif
 if ("$entryAdaptor1" != "" && "$entryAdaptor1" != "NULL") then
-  set v1="$v1 -entryAdaptor $adaptor1"
+  set v1="$v1 -entryAdaptor $entryAdaptor1"
 endif
 
 if ("$adaptor2" != "" && "$adaptor2" != "NULL") then

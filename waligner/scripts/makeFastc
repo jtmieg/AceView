@@ -83,6 +83,7 @@ date
 
 set keepName=""
 if ($MAGIC == PacBio) set keepName="-keepName"
+set keepName="-keepName"
 phase1:
 
 if ($4 == "") then
@@ -199,6 +200,9 @@ phase2:
 
 echo "phase2 prepare the tc files"
 
+set uu="-u"
+if ($format == raw) set uu=""
+
 if ($isSolid > 0) set SS=T
 if (! -d $tmp/tc) mkdir $tmp/tc
 if (! -e $tmp/c2.tc.done) then 
@@ -209,15 +213,15 @@ if (! -e $tmp/c2.tc.done) then
 
           if ($prefixLength == 3) then
             if (!  -e  $tmp/tc/$a$t$g.tc) then
-              echo "cat $tmp/raw/ff.*$a$t$g.raw | sort |  bin/dna2dna  $keepName  -I raw -UMI $UMI -O tc -o $tmp/tc/$a$t$g"
-                    cat $tmp/raw/ff.*$a$t$g.raw | sort |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g
+              echo "cat $tmp/raw/ff.*$a$t$g.raw | sort $uu |  bin/dna2dna  $keepName  -I raw -UMI $UMI -O tc -o $tmp/tc/$a$t$g"
+                    cat $tmp/raw/ff.*$a$t$g.raw | sort $uu |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g
             endif
           else
   
             foreach c (A T G C)
               if (! -e  $tmp/tc/$a$t$g$c.tc) then
-                echo "cat $tmp/raw/ff.*$a$t$g$c.raw | sort |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g$c"
-                      cat $tmp/raw/ff.*$a$t$g$c.raw | sort |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g$c
+                echo "cat $tmp/raw/ff.*$a$t$g$c.raw | sort $uu |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g$c"
+                      cat $tmp/raw/ff.*$a$t$g$c.raw | sort $uu |  bin/dna2dna  $keepName -I raw -UMI $UMI  -O tc -o $tmp/tc/$a$t$g$c
               endif
             end
 
