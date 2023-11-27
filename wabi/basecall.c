@@ -15,12 +15,6 @@
  */
 
 /* @(#)basecall.c	1.15 5/23/97 */
-
-
-#define ARRAY_CHECK
-#define MALLOC_CHECK
-
-
 #include "acedb.h"
 #include "acembly.h"
 #include "basecall.h"

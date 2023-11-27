@@ -31,12 +31,6 @@
  */
 
 /* $Id: trace.c,v 1.29 2017/10/02 19:49:25 mieg Exp $ */
-
-
-#define ARRAY_CHECK  
-#define MALLOC_CHECK
-
-
 #include "acedb.h"
 #include "acembly.h"
 #include "freeout.h"

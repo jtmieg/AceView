@@ -1305,7 +1305,7 @@ static void  umiBridgeSupport (const UMI *umi, SEG *seg, Array hits, AC_HANDLE h
 	 {
 	   BitSet ebs = umi->externalBitSet ;
 	   int x ;
-	   int xMax = bitSetMax (ebs) ;
+	   int xMax = bitSetCount (ebs) ;
 	   for (x = seg->a1 ; x <= seg->a2 && x < xMax ; x++)
 	     if (bit (ebs, x))
 	       { isExternal = seg->isExternal = TRUE ; break ; }

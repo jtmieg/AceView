@@ -122,6 +122,7 @@ typedef struct tsnpCallerTable {
   DICT *snpTypeDict ;
   DICT *geneDict ;
   DICT *runDict ;
+  DICT *runStatDict ;
   DICT *targetDict ;
   DICT *chromDict ;
   DICT *target_classDict ;
@@ -136,6 +137,7 @@ typedef struct tsnpCallerTable {
 
   BOOL mergeCounts ;
   BOOL dbReport ;
+  BOOL dbSnpProfile ;
   BOOL dbTranslate ;
   BOOL dbGGG ;
   BOOL dropMonomodal ;
@@ -192,6 +194,8 @@ typedef struct runStruct {
   int *types ;
   int *typesR ;
   int *typesC ;
+  KEYSET r2g ; /* list of groups g of which r is a member */
+  KEYSET g2r ; /* list of runs in this group */
 } RC ;
 
 static BOOL tsnpGetMonomodal (TSNP *tsnp, AC_OBJ Snp);
@@ -2385,6 +2389,227 @@ static void tsnpMergeCounts (TSNP *tsnp)
     }
 } /* tsnpMergeCounts */
   
+/*************************************************************************************/
+/*************************************************************************************/
+typedef struct snpRunCounts { KEY run ; int m, c ;} RMC ;
+
+static int rmcOrder (const void *va, const void *vb)
+{
+  const RMC *up = va ;
+  const RMC *vp = vb ;
+  int n = up->run - vp->run ;
+  return n ;
+} /* rmcOrder */
+
+/*************************************************************************************/
+
+static int tsnpDbRun2groups (TSNP *tsnp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  DICT *runDict = dictHandleCreate (200, tsnp->h) ;
+  AC_DB db = tsnp->db ;
+  Array runs = tsnp->runs ;
+  const char *errors = 0 ;
+  char *qq = hprintf (h, "Find Project \"%s\" ; >run", tsnp->project) ;
+  AC_TABLE tbl = ac_bql_table (db, qq, 0, 0, &errors, h) ;
+  int ir, irMax = tbl ? tbl->rows : 0 ;
+
+  tsnp->runStatDict = runDict ;
+  for (ir = 0 ; ir < irMax ; ir++) 
+    dictAdd (runDict, ac_table_printable (tbl, ir, 0, "NULL"), 0) ;
+
+  if (! tsnp->runs)
+    runs = tsnp->runs = arrayHandleCreate (256, RC, tsnp->h) ;
+  for (ir = 0 ; ir < irMax ; ir++) 
+    {
+      AC_HANDLE h1 = ac_new_handle () ;
+      AC_OBJ Run = ac_table_obj (tbl, ir, 0, h1) ;
+      int run ;
+      if (dictFind (runDict, ac_name(Run), &run))
+	{
+	  AC_TABLE tbl2 = ac_obj_bql_table (Run, ">>Group", 0, &errors, h1) ;
+	  int jrMax = tbl2 ? tbl2->rows : 0 ;
+      
+	  if (jrMax)
+	    {
+	      RC *rc = arrayp (runs, run, RC) ;
+	      KEYSET r2g = rc->r2g ;
+	  
+	      if (! r2g)
+		r2g = rc->r2g = keySetHandleCreate (tsnp->h) ;
+	      for (int g = 0, k =0, jr = 0 ; jr < jrMax ; jr++)
+		if (dictFind (runDict, ac_table_printable (tbl2, jr, 0, 0), &g))
+		  keySet (r2g, k++) = g ;
+	    }
+	}
+      ac_free (h1) ;
+    }
+  
+  ac_free (h) ;
+  return dictMax (runDict) ;
+} /* tsnpDbRun2groups */
+
+/* export a tsf file per run and group counting supprted snps */
+static void tsnpDbSnpProfile (TSNP *tsnp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  AC_DB db = tsnp->db ;
+  AC_ITER iter ;
+  AC_OBJ Snp = 0 ;
+  Array rmcs = arrayHandleCreate (300, RMC, h) ;
+  Array stats = arrayHandleCreate (1000000, int, h) ;
+  DICT *runDict = tsnp->runStatDict ;
+  DICT *dict = dictHandleCreate (10000, h) ;
+  int minSnpCover = tsnp->minSnpCover ;
+  int minSnpCount = tsnp->minSnpCount ;
+  int minSnpFrequency = tsnp->minSnpFrequency ;
+  char *allSubs = "A>G_T>C_G>A_C>T_A>T_T>A_G>C_C>G_A>C_T>G_G>T_C>A" ;
+
+  tsnp->varTypeDict = tsnpMakeVarTypeDict (h) ;
+
+  if (tsnp->select)
+    iter = ac_query_iter (db, TRUE, hprintf (h, "find variant IS  \"%s\" ", tsnp->select), 0, h) ;
+  else
+    iter = ac_query_iter (db, TRUE, "Find Variant typ && BRS_counts && ! monomodal", 0, h) ;
+
+  while (ac_free (Snp), Snp = ac_iter_obj (iter))
+    {
+      AC_TABLE tbl = ac_tag_table (Snp, "BRS_counts", h) ;
+      int irmc = 0, ir, irMax = tbl ? tbl->rows : 0 ;
+      RMC *rmc ;  
+      char typ2[256] ;
+      const char *typ = ac_tag_printable (Snp, "Typ", 0) ;
+      int i, k, p = 0 ;
+
+      if (! typ)
+	continue ;
+      
+      if (typ[1]== '>')
+	{ 
+	  char *cp = strstr (allSubs, typ) ;
+	  p = 29 ; memcpy (typ2+3, typ, 3) ; typ2[6] = 0 ; 
+	  if (cp) { p = (cp - allSubs) ; p = 10 + p/4 ; }
+	}
+      else
+	{
+	  k = strlen (typ) ; 
+	  if (k > 6) k = 6 ; 
+	  k -= 3 ;
+	  if (k <= 0)
+	    continue ;
+	  
+	  if (! strncmp (typ, "Del", 3))
+	    { 
+	      p = 20 + 10*k + 3 ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+i] = '-' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+k+i] = typ[i+3] ;
+	      typ2[3+2*k] = 0 ;
+	    }
+	  else if (! strncmp (typ, "Ins", 3))
+	    { 
+	      p = 20 + 10*k + 1 ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+i] = '+' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+k+i] = typ[i+3] ;
+	      typ2[3+2*k] = 0 ;
+	    }
+	  else if (! strncmp (typ, "Dim", 3))
+	    { 
+	      p = 20 + 10*k + 4 ;
+	      typ2[3] = '*' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+1+i] = '-' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+1+k+i] = typ[i+3] ;
+	      typ2[3+2*k+1] = 0 ;
+	    }
+	  else if (! strncmp (typ, "Dup", 3))
+	    { 
+	      p = 20 + 10*k + 2 ;
+	      typ2[3] = '*' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+1+i] = '+' ;
+	      for (i = 0 ; i < k ; i++)
+		typ2[3+1+k+i] = typ[i+3] ;
+	      typ2[3+2*k+1] = 0 ;
+	    }
+	}
+      typ2[0] = '0' + p/10 ; 
+      typ2[1] = '0' + p%10 ; 
+      typ2[2] = '_' ;
+      for (char *cp = typ2 ; *cp ; cp++)
+	*cp = ace_lower (*cp) ;
+      
+      for (ir = 0 ; ir < irMax ; ir++)
+	{
+	  const char *runNam = ac_table_printable (tbl, ir, 0, 0) ;
+	  int run = 0 ;
+	  if (dictFind (runDict, runNam, &run))
+	    {
+	      int c = ac_table_int (tbl, ir, 1, 0) ;
+	      int m = ac_table_int (tbl, ir, 2, 0) ;
+	      RC *rc = arrayp (tsnp->runs, run, RC) ;
+	      KEYSET r2g = rc->r2g ;
+	      int igMax = r2g ? keySetMax (r2g) : 0 ;
+	      rmc = arrayp (rmcs, irmc++, RMC) ;
+	      rmc->run = run ;
+	      rmc->c = c ;
+	      rmc->m = m ;
+	      for (int ig = 0 ; ig < igMax ; ig++)
+		{
+		  rmc = arrayp (rmcs, irmc++, RMC) ;
+		  rmc->run = keySet (r2g, ig) ;
+		  rmc->c = c ;
+		  rmc->m = m ;
+		}
+	    }
+	}	    
+      arraySort (rmcs, rmcOrder) ;
+      for (int i = 0 ; i < irmc ; i++)
+	{
+	  int c = 0, m = 0 ;
+	  RMC *rmc = arrp (rmcs, i, RMC) ;
+	  KEY run = rmc->run ;
+
+	  for ( ; i < irmc && rmc->run == run ; i++, rmc++)
+	    { c += rmc->c ; m += rmc->m ; }
+	  if (c >= minSnpCover && m >= minSnpCount && 100*m >= minSnpFrequency * c)
+	    {
+	      int *kp, k = 0 ;
+	      char buf[256] ;
+	      snprintf (buf, 255, "%05d_%s", run, typ2) ;
+	      dictAdd (dict, buf, &k) ;
+	      kp = arrayp (stats, k, int) ;
+	      (*kp)++ ;
+	    }
+	}
+    }
+
+  /* export in tsf format */
+  if (arrayMax (stats))
+    {
+      ACEOUT ao = tsnp->outFileName ? aceOutCreate (tsnp->outFileName, ".snp_profile.tsf", tsnp->gzo, h) : 0 ;
+      int run = 0, kMax = arrayMax (stats) ;
+      for (int k = 1 ; k < kMax ; k++)
+	{
+	  int nn = array (stats, k, int) ;
+	  if (nn)
+	    {
+	      const char *ccp = dictName (dict, k) ;
+	      sscanf (ccp, "%d_", &run) ;
+	      while (*ccp != '_') ccp++ ;
+	      aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp+1, nn) ; 
+	    }
+	}
+    }
+  
+  ac_free (h) ;
+  return ;
+} /* tsnpDbSnpProfile */
+
 /*************************************************************************************/
 /*************************************************************************************/
 /* slide deletions and insertions, speclial treat for position 76 */
@@ -6157,6 +6382,7 @@ int main (int argc, const char **argv)
 
   tsnp.mergeCounts = getCmdLineBool (&argc, argv, "--merge") ;
   tsnp.dbReport = getCmdLineBool (&argc, argv, "--db_report") ;
+  tsnp.dbSnpProfile = getCmdLineBool (&argc, argv, "--db_snp_profile") ;
   tsnp.dbTranslate = getCmdLineBool (&argc, argv, "--db_translate") ;
   tsnp.dbGGG = getCmdLineBool (&argc, argv, "--db_GGG") ;
   tsnp.dropMonomodal = getCmdLineBool (&argc, argv, "--dropMonomodal") ;
@@ -6256,6 +6482,21 @@ int main (int argc, const char **argv)
       if (1) tsnpDbTranslate (&tsnp) ;
       if (0) tsnpCodingModif (&tsnp) ; /* probably obsolete */
       if (0) tsnpExportProfile (&tsnp) ; /* export tsf file for this section */
+    }
+  if (tsnp.dbSnpProfile)
+    {
+      if (! tsnp.db)
+	{
+	  fprintf (stderr, "-db_snp_profile requires -db SnpMetaDataDB, sorry, try -help\n") ;
+	  exit (1) ;
+	}
+      if (! tsnp.project)
+	{
+	  fprintf (stderr, "-db_snp_profile requires -project $MAGIC, sorry, try -help\n") ;
+	  exit (1) ;
+	}
+      if (tsnpDbRun2groups (&tsnp))
+	tsnpDbSnpProfile (&tsnp) ;
     }
   wego_flush () ;
 

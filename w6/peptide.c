@@ -563,8 +563,9 @@ Array peptideTranslate(KEY key, BOOL CDS_only)
   /* N.B. we could issue a warning if it doesn't but perhaps this is         */
   /* overkill.                                                               */
 
-    if (cc == '*')
-      --arrayMax(pep) ;
+      if (0 &&           /* 2023_11-15 : export the stop */
+	  cc == '*') 
+	--arrayMax(pep) ;
     }
 
  done:

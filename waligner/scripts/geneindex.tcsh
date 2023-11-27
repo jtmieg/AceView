@@ -1000,7 +1000,7 @@ if (1) then
    if (1 && $MAGIC == CL1) set CAPT=A1R3
    if ($MAGIC == CL2) set CAPT=A1
    if ($MAGIC == CL3) set CAPT=A1
-   if ($phase == ii4) set CAPT=A1
+   if ($phase == ii4zzzz) set CAPT=A1
    if (0) then
      set CAPT=A1A2I3R1R2   # A2R2 ... see TARGET/GENES/$capture.av.gene_list  
      set CAPT=A1A2I2I3R1R2   # A2R2 ... see TARGET/GENES/$capture.av.gene_list  

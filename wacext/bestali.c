@@ -27,11 +27,6 @@
  *  mieg@ncbi.nlm.nih.gov
  */
 
-/*
-#define MALLOC_CHECK   
-#define ARRAY_CHECK   
-*/
-
 #include "ac.h"
 #include "acedb.h"
 #include "bitset.h"

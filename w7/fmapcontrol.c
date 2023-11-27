@@ -27,9 +27,6 @@
  */
 
 /* $Id: fmapcontrol.c,v 1.77 2019/09/26 20:38:10 mieg Exp $ */
-
-/* #define ARRAY_CHECK */
-
 #include "fmap_.h"
 #include "bitset.h"
 #include "chrono.h"

@@ -11,14 +11,6 @@
  *   We select pairs of overlapping hence incompatible introns
  *   there are four types; same donor, same accptor, citroen, pinching
  */
-
-/*
-  #define MALLOC_CHECK  
-  #define ARRAY_CHECK      
-*/
-
-
-
 #include <acedb.h>
 #include <ac.h>
 
@@ -26,10 +18,12 @@
 typedef struct gxStruct {
   AC_HANDLE h ; 
   AC_DB db ; 
-  const char *outFileName, *inFileName, *project ; 
+  const char *outFileName, *inFileName ;
+  const char *project ; 
   BOOL gzo, gzi ;
   
   BOOL hasAltIntron ;
+  Array runs ;
   Array histos ;
   Array introns ;
   Array pairs ;
@@ -54,43 +48,286 @@ typedef struct pairStruct {
   Array aa ;
 } PAIR ;
 
+typedef struct runStruct {
+  int run ; /* self, needed after we sort the table */
+  KEYSET r2g ; /* list of groups g of which r is a member */
+  KEYSET g2r ; /* list of runs in this group */
+} RC ;
+
 /*************************************************************************************/
 /*************************************************************************************/
 
-static void gxGetRuns (GX *gx)
+static int gxGetRuns (GX *gx)
 {
-  DICT *dict = gx->runDict ;
-  const char **cpp, *cp[] =
+  AC_HANDLE h = ac_new_handle () ;
+  DICT *runDict ;
+  AC_DB db = gx->db ;
+  Array runs = gx->runs ;
+  const char *errors = 0 ;
+  char *qq = hprintf (h, "Find Project \"%s\" ; >run", gx->project) ;
+  AC_TABLE tbl = ac_bql_table (db, qq, 0, 0, &errors, h) ;
+  int ir, irMax = tbl ? tbl->rows : 0 ;
+
+  gx->runDict = runDict = dictHandleCreate (200, gx->h) ;	
+  for (ir = 0 ; ir < irMax ; ir++) 
+    dictAdd (runDict, ac_table_printable (tbl, ir, 0, "NULL"), 0) ;
+
+  if (! gx->runs)
+    runs = gx->runs = arrayHandleCreate (256, RC, gx->h) ;
+  for (ir = 0 ; ir < irMax ; ir++) 
     {
-      "Sample_A_33sC8" ,
-      "Sample_E_31sC8" ,
-      "Sample_C_31sC8" ,
-      "Sample_D_31sC8" ,
-      "Sample_B_31sC8" ,
+      AC_OBJ Run = ac_table_obj (tbl, ir, 0, 0) ;
+      int run ;
+      if (dictFind (runDict, ac_name(Run), &run))
+	{
+	  AC_TABLE tbl2 = ac_obj_bql_table (Run, ">>Group", 0, &errors, h) ;
+	  int jrMax = tbl2 ? tbl2->rows : 0 ;
+      
+	  if (jrMax)
+	    {
+	      RC *rc = arrayp (runs, run, RC) ;
+	      KEYSET r2g = rc->r2g ;
+	  
+	      if (! r2g)
+		r2g = rc->r2g = keySetHandleCreate (gx->h) ;
+	      for (int g = 0, k =0, jr = 0 ; jr < jrMax ; jr++)
+		if (dictFind (runDict, ac_table_printable (tbl2, jr, 0, 0), &g))
+		  keySet (r2g, k++) = g ;
+	    }
+	}
+    }
 
-      "Sample_A-UHR_13_4sA1-9lR3",
-      "Sample_B-Male_10_2sA1-8lR3",
-      "Sample_CL1-Brain_6_2sC1-4lC2",
-      "Sample_CL2-Breast_6_2sC1-4lC2",
-      "Sample_CL3-Cervix_6_2sC1-4lC2",
-      "Sample_CL4-Liver_6_2sC1-4lC2",
-      "Sample_CL5-Lipo_6_2sC1-4lC2",
-      "Sample_CL6-Blym_6_2sC1-4lC2",
-      "Sample_CL7-Tlym_6_2sC1-4lC2",
-      "Sample_CL8-Macr_6_2sC1-4lC2",
-      "Sample_CL9-Skin_6_2sC1-4lC2",
-      "Sample_CL10-Testis_6_2sC1-4lC2",
-      "F3_any_225",
-      "NB",
-      0
-    } ;
+  fprintf (stderr, "# Found %d runs in project %s\n"
+	   , dictMax (runDict) 
+	   , gx->project
+	   ) ;
 
-  for (cpp = cp ; *cpp ; cpp++)
-    dictAdd (dict, *cpp, 0) ;
-
-  fprintf (stderr, "# Found %d runs\n", dictMax (dict)) ;
-  return ;
+  ac_free (h) ;
+  return dictMax (runDict) ;
 } /* gxGetRuns */
+
+/*************************************************************************************/
+typedef struct ddStruct {int run, n, runCumul ; int intron ; } DD ;
+
+static int ddRunOrder (const void *a, const void *b)
+{
+  const DD *up = a ;
+  const DD *vp = b ;
+  int n = up->run - vp->run ; if (n) return n ;
+  n = up->intron - vp->intron ; if (n) return n ;
+  n = up->n - vp->n ; if (n) return -n ;
+  return 0 ;
+} /* ddRunOrder */
+
+static int ddIntronOrder (const void *a, const void *b)
+{
+  const DD *up = a ;
+  const DD *vp = b ;
+  int n = up->intron - vp->intron ; if (n) return n ;
+  n = up->run - vp->run ; if (n) return n ;
+  n = up->n - vp->n ; if (n) return -n ;
+  return 0 ;
+} /* ddIntronOrder */
+
+/********************************************/
+/************************ EXPORT ********************************/
+
+static void gxShowAcceptors (ACEOUT ao, AC_OBJ obj, AC_TABLE introns, Array aa, DICT *runDict)
+{         
+
+  int iaMax = arrayMax (aa) ;
+  for (int ia = 0 ; ia < iaMax ; ia++)
+    {
+      DD *up = arrp (aa, ia, DD) ;
+      if (up->run)
+	{
+	  const char *ccpI = ac_table_printable (introns, up->intron - 1, 0, 0) ;
+	  if (ao)
+	    aceOutf (ao, "%s___%s\t%s\tiit\t%d\t%d\t%.2f\n", ac_name(obj), ccpI, dictName (runDict, up->run), up->n, up->runCumul, 100.0 *up->n/up->runCumul) ;
+	  else
+	    fprintf (stderr, "%s___%s\t%s\t%d\t%d\t%.2f\n", ac_name(obj), ccpI, dictName (runDict, up->run), up->n, up->runCumul, 100.0 *up->n/up->runCumul) ;
+	}
+    }
+  if (! ao)
+    fprintf(stderr, "\n\n") ;
+} /* gxShowAcceptors */
+
+/********************************************/
+
+static int gxGetAcceptors (GX *gx)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  DICT *runDict = gx->runDict ;
+  const char *errors = 0 ;
+  AC_ITER iter ;
+  AC_OBJ obj = 0 ;
+  AC_HANDLE h2 = 0;
+  int nn = 0 ;
+  int nnn = 0 ;
+  int minIntronCount = 20 ;
+  int minRunCount = 20 ;
+  char *qq = "select run,n from intron in @, run in intron->de_duo, n in run[1]" ; 
+  Array aa = arrayHandleCreate (100, DD, h) ;
+  DD *dd ;
+  KEYSET runsOk = keySetHandleCreate (h) ;
+  KEYSET nrOk = keySetHandleCreate (h) ;
+  ACEOUT ao = aceOutCreate (gx->outFileName, ".differential_acceptors.tsf", gx->gzo, h) ;
+
+  /*  iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && IS *37832378; >A ", h) ; */
+  iter = ac_dbquery_iter (gx->db, "Find Intron de_duo; >A ", h) ;
+  while (ac_free (h2), ac_free (obj),  nn < 300000 && (obj = ac_iter_obj (iter)))
+    {
+      h2 = ac_new_handle () ;
+      AC_TABLE introns = ac_tag_table (obj , "Intron", h2) ;
+      int iiMax = introns ? introns->rows : 0 ;
+      int iaMax = 0 ;
+      int nRunOk = 0 ;
+      int nIntronOk = 0 ;
+
+      if (iiMax < 2)
+	continue ;
+      aa = arrayReCreate (aa, 100, DD) ;
+      for (int ii = 0 ; ii < iiMax ; ii++)
+	{
+	  AC_OBJ Intron = ac_table_obj (introns, ii, 0, h2) ;
+	  AC_TABLE duo = ac_obj_bql_table (Intron , qq, 0, &errors, h2) ;
+	  int irMax = duo ? duo->rows : 0 ;
+	  for (int ir = 0 ; ir < irMax ; ir++)
+	    {
+	      int run = 0 ;
+	      if (dictFind (runDict, ac_table_printable (duo, ir, 0, "toto"), &run))
+		{
+		  int n = ac_table_int (duo, ir, 1, 0) ;
+		  if (n)
+		    {
+		      dd = arrayp (aa, iaMax++, DD) ;
+		      dd->run = run ; dd->intron = ii + 1 ; dd->n = n ; dd->runCumul = 0 ; 
+		    }
+		}
+	    }
+	}
+
+      arraySort (aa, ddRunOrder) ;
+      nRunOk = 0 ;
+      for (int ia = 0 ; ia < iaMax ; ia++)
+	{
+	  int ka = ia, ja, nr = 0 ;
+	  DD *vp, *up = arrp (aa, ia, DD) ;
+	  int run = up->run ;
+	  if (run)
+	    {
+	      for (vp = up, ja = ia ; ja < iaMax && vp->run == run  ; ja++, vp++)
+		nr += vp->n ;
+	      ka = ja - 1 ;
+	      for (vp = up, ja = ia ; ja < iaMax && vp->run == run  ; ja++, vp++)
+		if (nr < minRunCount)
+		  vp->run = vp->intron = vp->n = 0 ; /* eliminate */
+		else
+		  vp->runCumul = nr ;
+	      if (nr >= minRunCount)
+		{
+		  keySet (runsOk, nRunOk) = run ;
+		  keySet (nrOk, nRunOk) = nr ;
+		  nRunOk++ ;
+		}
+	    }
+	  ia = ka ;
+	}
+
+
+      /* add a zero count for all interesting values*/
+      for (int ii = 0 ; ii < iiMax ; ii++)
+	for (int k = 0 ; k < nRunOk ; k++)
+	  {
+	    int run = keySet (runsOk, k) ;
+	    dd = arrayp (aa, iaMax++, DD) ;
+	    dd->run = run ; dd->intron = ii + 1 ; dd->n = 0 ; dd->runCumul = keySet(nrOk, k) ; 
+	  }
+      /* remove these fake values in favor of actual values */
+      arraySort (aa, ddRunOrder) ;
+      for (int ia = 0 ; ia < iaMax ; ia++)
+	{
+	  int ka = ia, ja ;
+	  DD *vp, *up = arrp (aa, ia, DD) ;
+	  int run = up->run ;
+	  int intron = up->intron ;
+	  if (run)
+	    {
+	      for (vp = up+1, ja = ia+1 ; ja < iaMax && vp->run == run && vp->intron == intron ; ja++, vp++)
+		vp->run = vp->intron = vp->n = 0 ; /* eliminate */
+	      ka = ja - 1 ;
+	    }
+	  ia = ka ;
+	}
+      /* check for intron support */
+      arraySort (aa, ddIntronOrder) ;
+      for (int ia = 0 ; ia < iaMax ; ia++)
+	{
+	  int ka = ia, ja, nr = 0 ;
+	  DD *vp, *up = arrp (aa, ia, DD) ;
+	  int intron = up->intron ;
+	  if (intron)
+	    {
+	      for (vp = up, ja = ia ; ja < iaMax && vp->intron == intron ; ja++, vp++)
+		nr += vp->n ;
+	      ka = ja - 1 ;
+	      if (nr < minIntronCount)
+		for (vp = up, ja = ia ; ja < iaMax && vp->intron == intron  ; ja++, vp++)
+		  vp->run = vp->intron = vp->n = 0 ; /* eliminate */
+	    }
+	  ia = ka ;
+	}
+
+      if (0)
+	{
+	  arraySort (aa, ddIntronOrder) ;
+	  gxShowAcceptors (0, obj, introns, aa, runDict) ;
+	}
+      /* check for ratio variability */
+      arraySort (aa, ddIntronOrder) ;
+      for (int ia = 0 ; ia < iaMax ; ia++)
+	{
+	  int ka = ia, ja ;
+	  DD *vp, *up = arrp (aa, ia, DD) ;
+	  int intron = up->intron ;
+	  float rMin = 99999, rMax = -9999 ;
+	  if (intron)
+	    {
+	      for (vp = up, ja = ia ; ja < iaMax && vp->intron == intron ; ja++, vp++)
+		{
+		  float ratio = vp->n ; ratio /= vp->runCumul ;
+		  if (ratio > rMax) rMax = ratio ;
+		  if (ratio < rMin) rMin = ratio ;
+		}
+	      ka = ja - 1 ;
+	      if (rMax < rMin + .20)
+		{ /* eliminate */
+		  for (vp = up, ja = ia ; ja < iaMax && vp->intron == intron ; ja++, vp++)
+		    vp->run = vp->intron = vp->n = 0 ; /* eliminate */
+		}
+	      else
+		nIntronOk++ ;
+	    }
+	  ia = ka ;
+	}
+      if (nRunOk >= 4 && nIntronOk > 1)
+	nn += nIntronOk ;
+
+      arraySort (aa, ddIntronOrder) ;
+      if (nIntronOk && nnn++ < 3)
+	gxShowAcceptors (0, obj, introns, aa, runDict) ;
+      if (nIntronOk)
+	gxShowAcceptors (ao, obj, introns, aa, runDict) ;
+    }
+
+  fprintf (stderr, "# Found %d differential acceptors in project %s\n"
+	   , nn
+	   , gx->project
+	   ) ;
+
+  ac_free (h) ;
+  return nn ;
+} /* getAcceptors */
 
 /*************************************************************************************/
 
@@ -468,11 +705,13 @@ int main (int argc, const char **argv)
   AC_HANDLE h = ac_new_handle () ;
   const char *dbName = 0 ;
   const char *errors = 0 ;
+  char commandBuf [4000] ;
 
   freeinit () ; 
   messErrorInit (argv[0]) ;
 
   memset (&gx, 0, sizeof (GX)) ;
+  memset (commandBuf, 0, sizeof (commandBuf)) ;
   gx.h = h ;
 
   if (argc == 1)
@@ -486,8 +725,20 @@ int main (int argc, const char **argv)
 
   /* optional arguments */
   getCmdLineOption (&argc, argv, "-db", &dbName) ;
+  getCmdLineOption (&argc, argv, "--db", &dbName) ;
   getCmdLineOption (&argc, argv, "-o", &(gx.outFileName)) ;
   getCmdLineOption (&argc, argv, "-p", &(gx.project)) ;
+  getCmdLineOption (&argc, argv, "--project", &(gx.project)) ;
+
+  if (argc != 1)
+    {
+      int ix ;
+      char *cp ;
+      for (ix = 0, cp = commandBuf ;  ix < argc && cp + strlen (argv[ix]) + 1 < commandBuf + 3900 ; cp += strlen (cp), ix++)
+	sprintf(cp, "%s ", argv[ix]) ;
+      fprintf (stderr, "unknown argument, sorry\n") ;
+      usage (commandBuf) ;
+    }
 
   fprintf (stderr, "Start %s\n", timeShowNow ()) ;
 
@@ -499,12 +750,19 @@ int main (int argc, const char **argv)
     }
   else
     usage ("-db dbName missing, dbName should eb an existing INTRON_DB database") ;
+  
+  if (! gx.project)
+    usage ("Missing argument --project") ;
 
   gxInit (&gx) ;
 
   if (1)
     {
       gxGetRuns (&gx) ;
+      gxGetAcceptors (&gx) ;
+    }
+  if (0)
+    {
       gxGetIntrons (&gx) ;
       gxAltIntrons (&gx) ;
       gxAltIntronsExport (&gx) ;

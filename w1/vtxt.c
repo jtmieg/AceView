@@ -1058,7 +1058,7 @@ vTXT vtxtTokenSort (vTXT txt0, char *splitOn, AC_HANDLE h0)
       char buf[nn+1] ;
       strncpy (buf, cp, nn) ; buf[nn] = 0 ;
       vTXT txt = vtxtHandleCreate (h0) ;
-      char *cq, *cr ;
+      char *cq ; /* , *cr ; */
       while (cp)
 	{
 	  for (i = k = 0, cq = cp ; *cq ; i++, cq++)

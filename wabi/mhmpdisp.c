@@ -14,12 +14,6 @@
  * Created: July 15 2002 (mieg)
  *-------------------------------------------------------------------
  */
-
-/*
-#define ARRAY_CHECK
-#define MALLOC_CHECK
-*/
-
 #include "acedb.h"
 #include "bump.h"
 

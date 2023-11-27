@@ -16,12 +16,6 @@
  */
 
 /* %W% %G% */
-
-/*
-  #define ARRAY_CHECK
-  #define MALLOC_CHECK
-*/
-
 #define CHRONO   amounts to 1 minute/ 2 hours for whole chromo 1 worm
 
 #define MINI_LEU2MET 180  /* bp, was 90 until 2006_05_12 */ 
@@ -11288,7 +11282,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 	      /* peptide */
 	      if (orf->cds > 0)
 		{
-		  int j, nn = 0 ;
+		  int j, k, nn = 0 ;
 		  char *cp, *cq ;
 		  Array mdna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
 		  
@@ -11296,13 +11290,20 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		  nn = orf->cds ;
 		  if (orf->start < 0)
 		    j += 3 ;
-		  if (0 && orf->downStop > 0) 
-		    nn += 3 ;  /* do not export the stop */
+		  if (1 && orf->downStop > 0) 
+		    nn += 3 ;  /* 2023_11_15 DO export, was DO NOT export the stop */
 		  pep = arrayCreate (nn/3 + 4, char) ;
 		  array(pep, nn/3, char) = 0 ; arrayMax(pep)-- ;  /* make room, zero terminate */
-		  for (cp = arrp(pep, 0, char), cq = arrp (mdna, j, char) ; nn > 0 ; cp++, cq += 3, nn -= 3)
-		    *cp = pepEncodeChar[(int)e_codon (cq, translationTable)] ;
-		  *cp = 0 ; 
+                  if (!strcmp (name(product), "G_tchr22_chr22|NC_060946.1_86_768.b3"))
+		    invokeDebugger () ;
+		  for (cp = arrp(pep, 0, char), cq = arrp (mdna, j, char), k = 0 ; nn > 0 ; cp++, cq += 3, nn -= 3, k++)
+		    {
+		      char cc = e_codon (cq, translationTable) ;
+		      *cp = pepEncodeChar[(int)cc] ;
+		      if (cc == '*')
+			nn = -1 ; /* will break */
+		    }
+		  *cp = 0 ; arrayMax (pep) = k ;
 		  if (orf->start == orf->leu) /* force a met */
 		    {
 		      cq = arrp (mdna, j, char) ; cp = arrp(pep, 0, char) ;
@@ -11763,57 +11764,58 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   
   /*** PolyA signal ****/
   
-  {
-    KEY product = 0 ;
-
-    if (bsFindTag (Transcript, str2tag("Found3p")) ||
-        (
-         bsGetKey (Transcript, _Product, &product) &&
-         keyFindTag (product, str2tag("COOH_Complete"))
-         ))
-      {
-        ORFT * orf = arrp (smrna->orfs, 0, ORFT) ;
-        Array dna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
-        unsigned char polyASignal[7] = { A_,A_,T_,A_,A_,A_, 0} ;
-	unsigned char polyASignal2[7] = { A_,T_,T_,A_,A_,A_, 0} ;
-        int nn = 0, n1 = 0, n2, debut = 0, dx ;
-        
-        debut = arrayMax(dna) - 40 ; /* was 40 before 2006_10_16 */
-	if (debut < 0) debut = 0 ;
-        if (debut > 10)
-          {
-            nn = dx = 0 ; /* look for signal closest to end of mRNA */
-            while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal, 0, 0)))
-              { nn = n2 + dx ; dx = nn ; }
-            if (!nn) /* favor ATTAAA */
-	      while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal2, 0, 0)))
-		{ n1 = n2 + dx ; dx = n1 ; }
-            if (!nn && !n1)
-              {
-                dx = 0 ;
-                while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal, 1, 0)))
-                  { n1 = n2 + dx ; dx = n1 ; }
-              }
-          }
-        if (nn > 0)
-          {
-            nn += debut ; nn = arrayMax(dna) - nn + 1 ;
-            bsAddData (Transcript, str2tag ("AATAAA"), _Int, &nn) ;
-          }
-        else if (n1 > 0 && n1+debut+5 < arrayMax(dna)) 
-          { 
-            int i ;
-            n1 += debut ;
-            
-            for (i = 0 ; i < 6 ; i++)
-              polyASignal[i] = dnaDecodeChar [(int)arr (dna, n1 + i - 1, char)] ;
-            
-            n1 = arrayMax(dna) - n1 + 1 ;
-            bsAddData (Transcript, str2tag ("Variant"), _Text, polyASignal) ;
-            bsAddData (Transcript, _bsRight, _Int, &n1) ;
-          }
-      }
-  }
+  if (smrna->orfs && arrayMax (smrna->orfs))
+    {
+      KEY product = 0 ;
+      
+      if (bsFindTag (Transcript, str2tag("Found3p")) ||
+	  (
+	   bsGetKey (Transcript, _Product, &product) &&
+	   keyFindTag (product, str2tag("COOH_Complete"))
+	   ))
+	{
+	  ORFT * orf = arrp (smrna->orfs, 0, ORFT) ;
+	  Array dna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
+	  unsigned char polyASignal[7] = { A_,A_,T_,A_,A_,A_, 0} ;
+	  unsigned char polyASignal2[7] = { A_,T_,T_,A_,A_,A_, 0} ;
+	  int nn = 0, n1 = 0, n2, debut = 0, dx ;
+	  
+	  debut = arrayMax(dna) - 40 ; /* was 40 before 2006_10_16 */
+	  if (debut < 0) debut = 0 ;
+	  if (debut > 10)
+	    {
+	      nn = dx = 0 ; /* look for signal closest to end of mRNA */
+	      while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal, 0, 0)))
+		{ nn = n2 + dx ; dx = nn ; }
+	      if (!nn) /* favor ATTAAA */
+		while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal2, 0, 0)))
+		  { n1 = n2 + dx ; dx = n1 ; }
+	      if (!nn && !n1)
+		{
+		  dx = 0 ;
+		  while ((n2 = dnaPickMatch (arrp (dna, debut + dx, unsigned char), 39 - dx, polyASignal, 1, 0)))
+		    { n1 = n2 + dx ; dx = n1 ; }
+		}
+	    }
+	  if (nn > 0)
+	    {
+	      nn += debut ; nn = arrayMax(dna) - nn + 1 ;
+	      bsAddData (Transcript, str2tag ("AATAAA"), _Int, &nn) ;
+	    }
+	  else if (n1 > 0 && n1+debut+5 < arrayMax(dna)) 
+	    { 
+	      int i ;
+	      n1 += debut ;
+	      
+	      for (i = 0 ; i < 6 ; i++)
+		polyASignal[i] = dnaDecodeChar [(int)arr (dna, n1 + i - 1, char)] ;
+	      
+	      n1 = arrayMax(dna) - n1 + 1 ;
+	      bsAddData (Transcript, str2tag ("Variant"), _Text, polyASignal) ;
+	      bsAddData (Transcript, _bsRight, _Int, &n1) ;
+	    }
+	}
+    }
     
   bsSave (Transcript) ; /* so that the query(tr,..) work */
   Transcript = bsUpdate (tr) ; 

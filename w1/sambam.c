@@ -34,9 +34,6 @@
  */
 
 #define VERSION "1.1"
-/*
- #define ARRAY_CHECK 
-*/
 #include "ac.h"
 #include "acedna.h"
 

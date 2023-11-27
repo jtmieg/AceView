@@ -13,9 +13,8 @@
  * Created: Thu Aug 20 16:54:55 1998 (rd)
  *-------------------------------------------------------------------
  */
+/* define MALLOC_CHECK here to check mallocs - or preferably in regular.h */
 
-/* define MALLOC_CHECK here to check mallocs - also in regular.h */
-#define MALLOC_CHECK 
 #include "regular.h"
 
 #if defined(NEXT) || defined(HP)

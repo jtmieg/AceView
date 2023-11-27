@@ -938,7 +938,8 @@ since it is very easy, when dates are involved, to mean something and write some
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \subsection{DNA and proteins, motif searches}
 
-A specificity of acedb is that it understands the genetic code. If the database contains sequences, or mRNAs, 
+A specificity of acedb is that it understands the genetic code. If the database 
+contains sequences, or mRNAs, 
 or any object with a DNA tag, one can obtain its DNA using
 \BL
    select s in class sequence, d in DNA(s)
@@ -952,13 +953,14 @@ or any object with a DNA tag, one can obtain its DNA using
       dna in DNA(s,1,6), adn in DNA(s,6,1)
 // gives
    my_sequence  atgttg    caacat
-// PEPTIDE will translate the sequence 
+// PEPTIDE will translate the sequence, including the UTR, in frame 1
    select PEPTIDE (@,1,2)
 // gives Methionine-Leucine (atg codes for Met, ttg for Leu)
    ML
+// CODING will translate only sequences with tag CDS, up to the stop 
 // To get all proteins encoded in messenger RNA, try
    select ?sequence CDS      // the CDS tag means the sequence is coding
-   select -o f ?sequence CDS ; PEPTIDE // all proteins are written to file f
+   select -o f ?sequence ; CODING // all proteins are written to file f
 \end{lstlisting}
 Notice that acedb will translate nuclear DNA using the standard genetic code, 
 but if the relevant standardized information has been provided in the database,
@@ -1144,7 +1146,7 @@ To summarize, the full list of operators, in their order of precedence is
    ISA
    + - * / ^ modulo
    class
-   DNA PEPTIDE DATEDIFF 
+   DNA PEPTIDE CODING DATEDIFF 
    count
    >> -> # => :
    @

@@ -16,10 +16,6 @@
  */
 
 /* %W% %G% */
-/*
-#define ARRAY_CHECK
-#define MALLOC_CHECK
-*/
 #define CHRONO
 
 
@@ -1485,10 +1481,11 @@ static void mrnaFindAlternatives (SC *sc, Array mrnaShadows, Array allYes, Array
 static void s2mMakeOneTranscript (S2M *s2m, SC *sc, SC *mm, SMRNA *smrna, Array allYes, Array allNo)
 {
   HIT *up = 0 ;
-  int ii, iMrna , c1, c2, b1, b2, type, oldType,  isAlternative ;
+  int ii, iMrna , b1, b2, type, oldType,  isAlternative ;
   int bMax = s2m->bMax ;
   Array chain = s2m->chain ;
   BitSet yes, no ;
+  CHAIN *c1, *c2 ;  /* mieg 2023_11_23 */
 
   smrna->clones = arrayHandleCreate (keySetMax(mm->sh.clones), KEY, s2m->h) ;
   for (ii = 0 ; ii < keySetMax(mm->sh.clones) ; ii++)
@@ -1506,9 +1503,9 @@ static void s2mMakeOneTranscript (S2M *s2m, SC *sc, SC *mm, SMRNA *smrna, Array 
    
   /* report all used exon intron gap */
   if (0) s2mShowOneShadow (100, &(mm->sh), 0) ;
-  for (iMrna = oldType = 0, c1 = arr (chain, 0, int),  ii = 1 ; ii < bMax ; ii++)
+  for (iMrna = oldType = 0, c1 = arrp (chain, 0, CHAIN),  ii = 1 ; ii < bMax ; ii++)
     {
-      c2 = arr (chain, ii, int) ;
+      c2 = arrp (chain, ii, CHAIN) ;
       type = isAlternative = 0 ;
       if (bit (yes,ii))
         {
@@ -1526,13 +1523,13 @@ static void s2mMakeOneTranscript (S2M *s2m, SC *sc, SC *mm, SMRNA *smrna, Array 
         {
           if (type & oldType & (gX | gI | gGap))
             {
-              up->a2 = c2 ; /* extend */
+              up->a2 = c2->x ; /* extend */
               up->type |= type ;
             }
           else
             {
               up = arrayp (smrna->hits, iMrna++, HIT) ;
-              up->a1 = c1 + 1 ; up->a2 = c2 ;
+              up->a1 = c1->x + 1 ; up->a2 = c2->x ;
               up->type = type ;
             }
         }

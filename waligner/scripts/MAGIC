@@ -536,7 +536,8 @@ cat <<EOF > _x.awk
   if (snp > 0) ph = ph " snp0 wait s1 wait s1A2G wait s2a wait s2b wait s2A2G wait s3a wait s3b wait snp2a "
   if (ix > 0) ph = ph " wait d5  "
   if (tsnp > 0) ph = ph "wait tsnp1b wait tsnp2a " ;
-  if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c wait  tsnp3" ;  ## make words, count words , collate word counts
+  if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c " ;  ## make words, count words , collate word counts
+  if (snp > 0) ph = ph "wait tsnp3 " ;  ## report snp_profile in ali
   if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (tsnp > 0) ph = ph "wait tsnp10 " ;
   if (snp > 0) ph = ph "wait snp4 " ;
@@ -1475,7 +1476,7 @@ echo "d1:    collect the de_uno introns, detected by genome alignemnt"
 echo "d2:    collect the alignment overhangs"
 echo "d4:    compare new and known introns"
 echo "d4SLs: obsolete parse SL counts in MetaDB"
-echo "d5:    Importation of intron support in GeneIndexDB"
+echo "d5:    Importation of intron support in INTRON_DB/chroms"
 echo "d6:    obsolete align on the intron candidates"
 echo "d7:    obsolete recover the U_introns confirmations"
 echo "d8:    obsolete collate the U_introns confirmations"
@@ -1568,7 +1569,7 @@ echo "tsnp1b:   Collate the previous table per run and group using tsf"
 echo "tsnp2a:   Centralize the tsf files in TSNP_DB for each zone"
 echo "tsnp2b:   Create a word file in each zone to allow validation of the SNPs"
 echo "tsnp2c:   Count in the original fastc files the snp and reference words using tricoteur"
-echo "tsnp3:    Collate the previous table per run and group using tsf"
+echo "tsnp3:    report snP-profile in the MetaDB Ali"
 echo "tsnp3xxx:    Report in RESULTS/SNV"
 echo "tsnp10:  Export tsnp using snpsummary into RESULTS/SNV"
 
@@ -1661,9 +1662,15 @@ if ($species == hs_37) then
   set refG=hs_ref_GRCh37.p13
   set refS=H_sapiens
 endif
-# human T2T
+# human T2T mars then oct 2023
 if ($species == hs) then
   set t2t=/am/ftp-genomes/all/annotation_releases/9606/GCF_009914755.1-RS_2023_03/
+  set ref=T2T-CHM13v2
+  set refG=T2T-CHM13v2
+  set refGfna=$t2t/GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz
+  set refS=H_sapiens
+
+  set t2t=/am/ftp-genomes/all/annotation_releases/9606/GCF_009914755.1-RS_2023_10/
   set ref=T2T-CHM13v2
   set refG=T2T-CHM13v2
   set refGfna=$t2t/GCF_009914755.1_T2T-CHM13v2.0_genomic.fna.gz
@@ -1695,6 +1702,7 @@ if (! -d TARGET) mkdir TARGET
 if (! -d TARGET/CHROMS) mkdir TARGET/CHROMS
 if (! -d TARGET/GTF) mkdir TARGET/GTF
 # we use to get the internally
+# this still works in oct 2023 at least for human T2T
 # gunzip -c /am/ftp-genomes/$refS/Assembled_chromosomes/seq/$refG'_'*.fa.gz > TARGET/CHROMS/$refG.fa
 # it is preferable to download it via the web page Genome Rat download officiel->fasta et gff
 # mv ~/ACEVIEWHELP/Rat_DATA/2019Feb27_GCF_000001895.5_Rnor_6.0_genomic.fna.gz TARGET/CHROMS
@@ -1758,7 +1766,7 @@ endif
 
 if ($species == hs) then
   # grab the title lines 
-  zcat $refG | gawk '/^>/{print}' > _t
+  zcat $refGfna | gawk '/^>/{print}' > _t
   cat _t | gawk '{split($1,aa,">");split($7,bb,",");printf("%s\tchr%s|%s\n",aa[2],bb[1],aa[2]);}'  > NC2chr.rename.txt
 endif
 
@@ -1785,7 +1793,7 @@ if ($species == dog) then
 endif
 
 ## rename all the elements of the genome fasta file as chr*  
-# simplified for ghs37.105 where we keep  chr7|NC007.7  
+# simplified for T2T and  ghs37.105 where we keep  chr7|NC007.7  
 echo ZZZZZ > ZZZZZ
 echo ZZZZZ | gzip > ZZZZZ.gz
 #cat  NC2chr.rename.txt ZZZZZ $refG.fa | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,"|");x=nam[aa[4]];ok=0;if(length(x)>1)ok=1;if(ok==1)printf(">%s %s\n",x,substr($0,2));next;}{if(ok==1)print}' > $species.genome.$ref.fasta
@@ -1797,8 +1805,10 @@ zcat  NC2chr.rename.txt.gz ZZZZZ.gz $refGfna | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<
 ## rename the source sequences in the gff files as chr*
 #gunzip -c  /am/ftp-genomes/$refS/GFF/$ref'_'top_level.gff3.gz > _t.gff3
 zcat $t2t/*.gff.gz | grep -v RefSeqFE > _t.gff3
+gunzip NC2chr.rename.txt.gz
 cat  NC2chr.rename.txt ZZZZZ _t.gff3  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}{if(length(nam[$1]) < 1)next;printf("%s",nam[$1]);for(i=2;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > $species.RefSeq.$ref.gff3
 
+\rm _t
 \rm _t.gff3
 # use the gff3 file to export the .ace annotation, done again in metadata.tcsh and the fasta of the transcripts
 # Run on lmem12 (large RAM)
@@ -1807,7 +1817,8 @@ dna2dna -gff3  $species.RefSeq.$ref.unc.gff3 -o $species.RefSeq.$ref.unc  -O fas
 
 cat $species.genome.$ref.fasta | gawk '/^>/{ok=0;}/^>mito/{ok=1;}{if(ok==1)print}' > $species.mito.$ref.fasta
 cat $species.genome.$ref.fasta | gawk '/^>/{ok=1;}/^>mito/{ok=0;}{if(ok==1)print}' > $species.chroms.$ref.fasta
-
+# this did not work for T2T i recovered the mito from GenBank 
+# >mito Homo sapiens isolate CHM13 mitochondrion, complete genome:  CP068254, circular DNA, 16569 bp, 21-MAR-2022 
 
 ## sort the fasta files for mRNAH and desambiguate the gene names
 ## av mrna, use bql to sort by genes then by mrna
@@ -1818,14 +1829,14 @@ EOF
   cat  toto.bql.dna | gawk '{printf (">%s|GENE|%s\n%s\n",$3,$1,$4);}' | gzip > worm.av.fasta.gz
 endif
 
-set ff = $species.RefSeq.$ref.fasta
+set ff=$species.RefSeq.$ref.fasta
 mv $ff.gz $ff.unsorted.gz
 dna2dna -i $ff.unsorted.gz -O raw -keepName  | grep -v pseudogene | gawk '{split($2,aa,"|") ;split(aa[1],bb,"_");printf("%s\t%s\t%s\t%s\t",aa[3],aa[5],bb[1],bb[2]);print;}' | sort -V  > toto
 echo ZZZZZ > ZZZZZ
 cat toto ZZZZZ toto  | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){if ($2 != gid[$1])ngid[$1]++;gid[$1]=$2;next;}}{g=$1;if(ngid[$1]>1)g=$1 "." $2; split($6,aa,"|");printf("%s\t%s|Gene|%s|geneId|%s\n",$5,aa[1],g,$2);}' > toto2
 
 cat toto2 | dna2dna -I raw -O fasta -keepName -maxLineLn 60 | gzip > $ff.gz
-\rm  $ff.unsorted.gz
+\rm  toto2 $ff.unsorted.gz
 
 # create an acedb to verify graphically
 if (! -e database) then
@@ -1849,35 +1860,44 @@ mkdir TARGET.$refG/Targets
 mkdir TARGET.$refG/GTF
 mkdir TARGET.$refG/CHROMS
 gzip $species.RefSeq.$ref.gff3  
+gzip $species.genome.$ref.fasta
 mv  $species.RefSeq.$ref.gff3.gz  TARGET.$refG/GTF
 mv  $species.RefSeq.$ref.fasta.gz TARGET.$refG/Targets
+mv  $species.genome.$ref.fasta.gz  TARGET.$refG/Targets
+gzip hs.mito.$ref.fasta
+mv hs.mito.$ref.fasta.gz  TARGET.$refG/Targets
 
-pushd  TARGET.$refG/GTF ; ln -s  $species.RefSeq.$ref.gff3.gz  $species.RefSeq.gff.gz ; popd
-pushd TARGET.$refG/Targets ; ln -s  $species.RefSeq.$ref.fasta.gz  $species.RefSeq.fasta.gz ; popd
-cat   $species.genome.$ref.fasta | gawk '/^>/{x=substr($1,2);split(x,aa,".");x=aa[1];split(x,aa,"_");out= species ".chrom_" aa[1] ".fasta";}{print > out}' species=$species
-mv $species.chrom_mito.fasta $species.mito.fasta ; gzip $species.mito.fasta ; mv $species.mito.fasta.gz TARGET.$refG/Targets 
-if (-e $species.genome.fasta) \rm $species.genome.fasta
-foreach chrom ($chromSetAll)
-  echo $chrom
-  mv $species.chrom_$chrom'|NC'.fasta $species.chrom_$chrom.fasta
-end
-foreach chrom ($chromSetAll)
-  cat  $species.chrom_$chrom.fasta >> $species.genome.$refG.fasta
-end
-mv   $species.genome.$refG.fasta TARGET.$refG/Targets
-pushd TARGET.$refG/Targets 
-   \rm  $species.genome.fasta.gz
-   gzip  $species.genome.$refG.fasta
-   ln -s  $species.genome.$refG.fasta.gz  $species.genome.fasta.gz
-   ln -s $species.mito.fasta.gz
+pushd  TARGET.$refG/GTF ; 
+  ln -s  $species.RefSeq.$ref.gff3.gz  $species.RefSeq.gff.gz 
 popd
-
-mv $species.chrom_*.fasta TARGET.$refG/CHROMS
-gzip TARGET.$refG/CHROMS/*.fasta
-
-
+pushd TARGET.$refG/Targets 
+  ln -s  $species.RefSeq.$ref.fasta.gz  $species.RefSeq.fasta.gz 
+  ln -s  $species.genome.$ref.fasta.gz  $species.genome.fasta.gz 
+  zcat   $species.genome.fasta.gz | gawk '/^>/{x=substr($1,2);split(x,aa,".");x=aa[1];split(x,aa,"_");out= species ".chrom_" aa[1] ".fasta";}{print > out}' species=$species
+  foreach chrom ($chromSetAll)
+    echo $chrom
+    mv $species.chrom_$chrom'|NC'.fasta $species.chrom_$chrom.fasta
+  end
+  if (-e $species.genome.fasta) \rm $species.genome.fasta
+  foreach chrom ($chromSetAll)
+    cat  $species.chrom_$chrom.fasta >> $species.genome.$refG.fasta
+  end
+  if (-e $species.genome.$refG.fasta.gz) mv $species.genome.$refG.fasta.gz $species.genome.$refG.fasta.gz.old
+  gzip $species.genome.$refG.fasta &
+  foreach chrom ($chromSetAll)
+    mv  $species.chrom_$chrom.fasta ../CHROMS
+  end
+popd
+gzip TARGET.$refG/CHROMS/*.fasta &
 
 gunzip -c $species.RefSeq.$ref.?.sponge.gz | cut -f 1 | sort -u | gawk '{print substr($1,1,3);}' | tags
+# human T2T 2023_10_29
+NM_	66971
+NR_	22978
+XM_	62692
+XR_	26168
+rna	521
+
 #######  rn.6_0 2016_08_02
 NM_	17538
 NR_	650
@@ -1896,6 +1916,9 @@ NR_	4975
 XM_	46173
 XR_	25455
  
+############################################################################
+############################################################################
+
 gunzip -c TARGET/Targets/$species.$target.fasta.gz | bin/dna2dna -I fasta -O raw -keepName | gawk -F '\t' '{split($2,aa,"|");printf("Transcript %s\nLength %d\n",aa[1],length($1));if(aa[2]=="Gene")printf("From_gene %s\n",aa[3]); if(substr(aa[4],1,6)=="GeneId")printf("GeneId  %s\n",aa[5]);printf("\n");}' | gzip > TARGET/MRNAS/$species.$target.tr2len2gene.ace.gz
 
 cat MRNAS/$species.RefSeq.fasta | gawk '/^>/{n[substr($1,2,3)]++;}END{for (k in n)print k,n[k]}'
@@ -2039,6 +2062,7 @@ cat GRCh37.70.introns  | gawk -F '\t' '{chrom=$6;if(length(chrom)>2)next;s=$9;a1
 set gff3=/am/ftp-genomes/H_sapiens/ARCHIVE/ANNOTATION_RELEASE.104/GFF/ref_GRCh37.p10_top_level.gff3
 
 # the code crashes. maybe gff3 and gtf are not using the same columns ?
+# always use lmem15, the code needs a large RAM
 $bin/dna2dna -gtf $gff3.gz -gtfRemap KT_RefSeq -o RefSeq_v104
 
 
@@ -4042,7 +4066,7 @@ phaseii4:
 
   cat MetaDB/$MAGIC/GroupIntronList MetaDB/$MAGIC/RunsIntronList | sort -u >   tmp/INTRON_DB/$MAGIC.RunList
 
-  foreach chrom (20 $chromSetAll)
+  foreach chrom ($chromSetAll)
     scripts/geneindex.tcsh ii4 $chrom
     break
   end
@@ -4057,7 +4081,8 @@ phaseii5:
   echo "phase ii5: Alternative introns"
 
 foreach chrom ( $chromSetAll )
-   scripts/submit tmp/INTRONS_DB/$chrom/altIntrons "bin/altintrons -db tmp/INTRON_DB/$chrom -o tmp/INTRON_DB/$chrom/AlternativeIntrons.$chrom" 
+   echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
+   scripts/submit tmp/INTRON_DB/$chrom/altIntrons "bin/altintrons -db tmp/INTRON_DB/$chrom -o tmp/INTRON_DB/$chrom/AlternativeIntrons.$chrom" 
 end
 qusage 1
 
@@ -5044,10 +5069,30 @@ goto phaseLoop
 
 scripts/submit  tmp/TSNP/$run/tsnp2  "bin/tricoteur -count -wLn 31 -wordFile tmp/TSNP_DB/$zone/tsnp2.$MAGIC.w31.gz -run $run -gzo -o tmp/TSNP/$run/tsnp2.$MAGIC.$zone -antistrand" 32G
 ###################################################################################
-## Report separate tables for sub, del, ins
+## Report in ali the snp stats
 phaseTSnp3:
+set ok=1
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) goto phaseLoop
+  if (-e tmp/TSNP_DB/$zone/tsnp3.$MAGIC.snp_profile.tsf.gz) continue
+  set ok=0
+  scripts/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/tsnp3.$MAGIC --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC"
+  if (-e tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz) \rm  tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz  
+end
+if ($ok == 1 && ! -e tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz) then
+  scripts/submit wait
+  gunzip -c tmp/TSNP_DB/zone*/tsnp3.$MAGIC.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | sort | gawk -F '\t' '{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n-D SNP_Profile\n",old);} printf("SNP_Profile f1 %s %d\n", substr($2,4), $4);}END{printf("\n");}' | gzip > tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz  
+ echo "pparse tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz" | bin/tacembly MetaDB -noprompt
+endif
+
+goto phaseLoop
+  
+###################################################################################
+## Report some table, see also scripts/snp3.tch developped for SEQC2
+
+phaseTSnp3b:
+foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
+  if (! -d tmp/TSNP_DB/$zone) continue
   scripts/submit tmp/TSNP_DB/$zone/tsnp3 "scripts/tsnp3.tcsh  $Strategy $zone" 32G
 end
 goto phaseLoop
@@ -5774,7 +5819,7 @@ goto phaseLoop
 ## snp4: Who_is_who
 
 phasesnp4:
-echo "phase s14: Prediction using the SNPs"
+echo "phase snp4: Prediction using the SNPs"
 
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf4) continue
@@ -8036,7 +8081,7 @@ end
 set toto=RESULTS/Mapping/$MAGIC.Aligned_length.histo.txt
 if (-e $toto) \rm $toto
 
-foreach delta (100 30 1 )
+foreach delta (1 30 100)
   set first=1
   foreach run (`cat MetaDB/$MAGIC/RunsListSorted`)
     set ffB=tmp/Profiles/$run/readsBeforeAlignment.delta.txt
@@ -8073,10 +8118,10 @@ foreach delta (100 30 1 )
       echo -n "\n\t\t\t" >> $toto
       echo $delta | gawk '{for (i=0;i<=300 ;i++)printf("\t%d",i*delta);}END{printf("\n");}' delta=$delta >> $toto
     endif
-    echo -n  "L:$run" >> $toto
+    echo -n  "Raw length:$run" >> $toto
     cat MetaDB/$MAGIC/gtitle.txt | gawk -F '\t' '{gsub(/\"/,"",$0);gsub(/NULL/,"",$0);if($1==run)printf("\t%s\t%s\t%s",$2,$6,$13) ;}' run=$run >> $toto
     cat $ffB | gawk -F '\t' '/^#/{next}{k=int(($2+delta - 1)/delta) ; if(k>300)k=300;nn[k] += $3;if(k>kMax)kMax =k;}END{for (i = 0 ; i <= kMax ; i++) printf ("\t%d", nn[i]+0);printf("\n");}' delta=$delta >> $toto
-    echo -n "A:$run" >> $toto
+    echo -n "Aligned length:$run" >> $toto
     cat MetaDB/$MAGIC/gtitle.txt | gawk -F '\t' '{gsub(/\"/,"",$0);gsub(/NULL/,"",$0);if($1==run)printf("\t%s\t%s\t%s",$2,$6,$13) ;}' run=$run >> $toto
     cat $ffA | gawk -F '\t' '/^#/{next}{k=int(($2+delta - 1)/delta) ; if(k>300)k=300;nn[k] += $3;if(k>kMax)kMax =k;}END{for (i = 0 ; i <= kMax ; i++) printf ("\t%d", nn[i]+0);printf("\n");}' delta=$delta >> $toto
   end
@@ -8089,7 +8134,7 @@ date >> $toto
 echo "\n\n" >> $toto
 cat $toto.1 >> $toto
 
-# chnge all names (Danielle 2023_09)
+# change all names (Danielle 2023_09)
 pushd RESULTS/ATGC_sequence_profiles
   ls *.txt | gawk '{f=$1;gsub("multi_profile.1","",f); gsub("target_prefix","upstream_of_insert",f);gsub("target_suffix","down_from_insert",f);gsub("prefix","unaligned_5prime",f);gsub("suffix","unaligned_3prime",f);printf("\\mv %s %s\n",$1,f);}' > _m
   source _m
@@ -10990,51 +11035,54 @@ goto phaseLoop
 
 ###################################################################################
 ## Gene Expression index
-## d5:  Importation des comptages dans la base GeneIndexDB
+## d5:  Importation des comptages dans la base INTRON_DB/chrom
 
 phased5:
-  echo "phase d5: Importation of intron support in GeneIndexDB using the files tmp/OR/run/d5.de_uno.txt.gz"
+  echo "phase d5: Importation of intron support in INTRON_DB/chrom using the files tmp/OR/run/d5.de_uno.txt.gz"
 
-if ($Strategy != RNA_seq || -e GeneIndexDB/ii1.doneZZZ) then
-  goto phaseLoopaa
-endif
+if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
 
-
-if (! -e  tmp/OR/d5.$MAGIC.minS) then
+if (! -e tmp/introns/d5.$MAGIC.minS) then
   bin/tacembly MetaDB <<EOF
-    bql -o MetaDB/$MAGIC/GroupIntronList select g from p in  ?project where p == "$MAGIC", g in p->run where g#intron
-    bql -o tmp/introns/d5.$MAGIC.minS select g,m from p in  ?project where p == "$MAGIC", g in p->run where g#intron, a in g->ali, m in a->Candidate_introns[18]
-    quit
+    query find project $MAGIC ; >run ; CLASS runs
+    spush
+    query find project $MAGIC ; >run ; CLASS groups ; Intron
+    sor
+    spop
+    follow ali
+    bql -o tmp/introns/d5.$MAGIC.minS select a,n from a in @, n in a->Candidate_introns[18]
 EOF
 endif
 
-if (! -e tmp/introns/d5.$MAGIC.chromCumul.done) then
-  foreach chrom ($chromSetAll)
-    if (! -e tmp/introns/d5.$MAGIC.de_uno.$chrom.ace.gz) then
-      scripts/submit INTRON_DB/$chrom/d5.$MAGIC.parse "scripts/d5.intronDB.tcsh chromCumul $MAGIC $chrom"
-    endif
-  end
-  touch tmp/introns/d5.$MAGIC.chromCumul.done
-
-endif
-
-if (0 && ! -e  tmp/introns/d5.$MAGIC.donorAcceptor.done) then
-  scripts/d5.intronDB.tcsh donorAcceptor $MAGIC 
-endif
-
 foreach chrom ($chromSetAll)
-  if (0 && ! -e  tmp/INTRON_DB/$chrom/d5.$MAGIC.capture.done) then
-    scripts/submit tmp/INTRON_DB/$chrom/d5.$MAGIC.capture "scripts/d5.intronDB.tcsh capture $MAGIC $chrom"
-  endif 
+  if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
+  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
 end
-scripts/submit wait
 
-if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
+goto phaseLoop
+  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
 foreach chrom ($chromSetAll)
-  if (! -e tmp/INTRON_DB/$chrom/d5.$MAGIC.done) then
-    if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
-    scripts/submit  tmp/INTRON_DB/$chrom/d5 "scripts/d5.intronDB.tcsh chromDB $MAGIC $chrom"
+  if (! -d tmp/INTRON_DB/$chrom/database) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom chromDB 
   endif
+  if (! -e tmp/INTRON_DB/$chrom/d5.parse_genome.done) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom parseGenome
+  endif
+  if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom parseGenes
+  endif
+  if (! -e tmp/introns/d5.$MAGIC.deDuo.done) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom deDuo 
+  endif
+  if (! -e tmp/introns/d5.$MAGIC.collate.done) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom collate
+  endif
+  if (! -e  tmp/INTRON_DB/d5.$MAGIC.introns.donorAcceptor.done) then
+    scripts/d5.intronDB.tcsh  $MAGIC $chrom donorAcceptor
+  endif
+  if ($?CAPTURES && ! -e  tmp/INTRON_DB/$chrom/d5.$MAGIC.capture.done) then
+    scripts/d5.intronDB.tcsh $MAGIC $chrom capture 
+  endif 
 end
 
 goto phaseLoop
@@ -11771,7 +11819,7 @@ else
     if (! -d Kantor/$chrom/tmp/$species_kantor.data/$chrom) mkdir Kantor/$chrom/tmp/$species_kantor.data/$chrom
 
     if ($phase == k1 && ! -e tmp/X.$MAGIC/XH$chrom/k1.kantor_parse.done) then
-       scripts/Kantor.tcsh $phase $chrom
+       scripts/Kantor.tcsh $phase $chrom tmp/X.$MAGIC/XH$chrom
     endif
 
     if ($phase == k2) then
@@ -11779,7 +11827,8 @@ else
     endif
 
     if ($phase == k9 &&  -e tmp/X.$MAGIC/XH$chrom/k1.kantor_parse.done  && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.done && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.start) then
-       scripts/Kantor.tcsh $phase $chrom
+       tmp/X.$MAGIC/XH$chrom/k9.megaRun.star then
+       scripts/Kantor.tcsh $phase $chrom tmp/X.$MAGIC/XH$chrom
     endif
 
   end

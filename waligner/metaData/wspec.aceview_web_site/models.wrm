@@ -3352,6 +3352,12 @@
               Sorting_title UNIQUE ?Text   // many tables are sorted alphabetically by this title
               Sorting_title_2 UNIQUE ?Text   // many tables are sorted alphabetically by this title
               Other_title  UNIQUE ?Text  // for example a micro array title
+              SEQC2_id SEQC2_title UNIQUE ?Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Text Int Text // SRR name xx reads xx Gb median n
+                       SEQC2_MegaBases Float
+                       SEQC2_nReads Float
+                       SEQC2_Median_length  Int
+                       SEQC2_SRR ?SRR 
+                       SEQC2_file_names Text             
               ERROR Text   // autamatically constructed by the parse 
       Identifier     Species ?Species  @Title 
                      RunId UNIQUE ?Text  @Quoted_in  // used for the SEQC TGX project
@@ -3377,6 +3383,7 @@
       Apply  de_duo      // optional locate introns by the de_duo method, preferably for groups
              CNV  // non additive group with tag CNV show their own lost/low/high columns in the cnv report
              SNP    SNP_add_counts     // cumulate SNP counts in non Add_counts groups,  default behaviour if Is_run OR (Is_group && Add_counts) 
+		    Ignore_lowQ_runs_in_group_allele_frequency
                     SNP_RNA SNP_RNA_ILM    // used for the tag population_xNA distribution in the individual variants
                             SNP_RNA_LIF    //   used in Variant->quality
                             SNP_RNA_ROC
@@ -3412,6 +3419,9 @@
                     U_non_unique   UNIQUE Text   // color color  , show the partial non-unique track in overlay as a single track
                     U_stranded    // show f/r tracks in an overlay, default: show frns track
                     U_sorting_title UNIQUE Text  // sort the tracks in alphabetic order of these titles
+      Quality  Cov // genes  index_10 > 4000 AND index_18 < 800 (eliminate tiny runs, small RNAs, and targeted runs)
+               Recons Recons_str
+               Low_sequence_quality
       Details  ?Text               
       Taxonomy Archea      Text Text UNIQUE Float
                Bacteria    Text Text UNIQUE Float
@@ -3465,6 +3475,7 @@
                                  PacBio UNIQUE Text
                                  Oxford_nanopore  UNIQUE Text
                                  Nanopore  UNIQUE Text
+                                 Ultima  UNIQUE Text
                                  Capillary   UNIQUE Text
                                  Complete_genomics  UNIQUE Text
                   Flowcell_lane_index UNIQUE Text                   //   goes to Library

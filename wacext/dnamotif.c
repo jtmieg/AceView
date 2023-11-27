@@ -26,10 +26,6 @@
  */
 
 /* %W% %G% */
-/* debugging flags -> slower code 
-#define ARRAY_CHECK
-#define MALLOC_CHECK
-*/
 #define PLN 250
 
 #define debug 0 

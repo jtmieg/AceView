@@ -53,11 +53,6 @@
  */
 
 #define VERSION "1.2"
-
-/*
-#define ARRAY_CHECK  
-#define MALLOC_CHECK  
-*/
 #include "ac.h"
 #include "topology.h"
 

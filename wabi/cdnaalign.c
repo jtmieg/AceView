@@ -17,11 +17,6 @@
  */
 
 /* %W% %G% */
-/*
-#define ARRAY_CHECK
-#define MALLOC_CHECK
-#define CHRONO 
-*/
 
 #include "acembly.h"
 #include "freeout.h"
@@ -6903,11 +6898,17 @@ static void cleanGeneHits (KEY cosmid, Array geneHits, KEYSET trackingClones, BO
 
   cDNASwapA (geneHits) ;
 
+  if (0 && upGene)  /* on n'a pas le bug */
+    { 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   if (1) /* remove micro introns */
     {
       oldHits = geneHits ; /* no copy needed */
       arraySort (oldHits, cDNAOrderByA1) ; /* respect reads */
-      for (j2 = 0 ; j2 < arrayMax (oldHits) ; j2++)
+      for (j2 = 1 ; j2 < arrayMax (oldHits) - 1 ; j2++)
         { 
           gh2 = arrayp (oldHits, j2, HIT) ;
           if (gh2->zone == 9999)
@@ -6934,7 +6935,7 @@ static void cleanGeneHits (KEY cosmid, Array geneHits, KEYSET trackingClones, BO
 	      continue ;
 	    }
 	  /* else more accurate undebuged possibility:  compare and upgrade previous */
-          for (j1 = 0 ; j1 <  arrayMax (oldHits) ; j1++)
+          for (j1 = 0 ; j1 <  j2 ; j1++)
             { 
               gh1 = arrayp (geneHits, j1, HIT) ;
               
@@ -6979,6 +6980,14 @@ static void cleanGeneHits (KEY cosmid, Array geneHits, KEYSET trackingClones, BO
             }
         }
     }
+
+  if (0 && upGene)  /* on A le bug */
+    { 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
+
   for (j0 = 0 ; j0 < 2 ; j0++)   /* first one round to match 3p and 5p of one clone 
                                   * second round to remove micro introns
                                   */
@@ -6992,6 +7001,12 @@ static void cleanGeneHits (KEY cosmid, Array geneHits, KEYSET trackingClones, BO
           gh2 = arrayp (oldHits, j2, HIT) ;
           if (gh2->zone == 9999)
             continue ;
+
+	  if (0 && j2>=0 && upGene)  /* on A le bug already at j0=j2=0 */
+	    { 
+	      arrayDestroy (geneHits) ;
+	      invokeDebugger () ;
+	    }
 
             /* we work with coordinates in the orientation of the gene and flags with their natural meaning */
 
@@ -7241,11 +7256,21 @@ static void cleanGeneHits (KEY cosmid, Array geneHits, KEYSET trackingClones, BO
           *ghnew = *gh2  ;
           continue ;
         nextj2:  /* do not register this gh2 */
+	  if (0 && upGene)  /* on A le bug le bug et j2 = 2 */
+	    { 
+	      arrayDestroy (geneHits) ;
+	      invokeDebugger () ;
+	    }
           continue ;  
         }  /* end j2 loop */
       arrayMax(geneHits) = newj ;
       arrayDestroy (oldHits) ;
     }  /* end j0 loop */
+      if (0 && upGene)  /* on A le bug */
+	{ 
+	  arrayDestroy (geneHits) ;
+	  invokeDebugger () ;
+	}
   if (arrayMax(geneHits))
     {
       if (upGene) 
@@ -10285,6 +10310,7 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
                                int isAlign, int type, int z1, int z2, char *nom, int direction,
                                int searchRepeats)
 {
+  static int pass = 0 ;
   int n1 = 0, n2 = 0, nDoRepeats = 0, nDoRepeats0 = 0, rNnewgenes = 0 ;
   KEY cosmidMap = 0 ; int cosmidC1 = 0, cosmidC2 = 0 ; /* IntMap of the cosmid */
   Array 
@@ -10301,8 +10327,8 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   static int nDone = 0 ;
   Array rHitsAll = 0, usedZones = 0, usedQualities = 0 ;
 
+  pass++ ;
   if (type == 9999) goto abort ; /* cleanup */
-
   if (maxIntronSize == -1)
     maxIntronSize = getMaxIntronSize () ;
 
@@ -10350,7 +10376,12 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
     default:
       break ;
     }
-
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
   if (1)   /* get the cosmid global coordinates */
     {
       KEY key = 0, target = link ? link : cosmid ;
@@ -10369,6 +10400,12 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   if (!dna || arrayMax(dna) < 50) { direction = 0 ; goto abort ; }
   dnaR = dnaCopy (dna) ;
   reverseComplement (dnaR) ;
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
 
   if (type == 3 || !clipEnds) 
     {
@@ -10429,11 +10466,24 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
         messout ("Created an associator for %d cDNA, %d oligos, %s\n", n1, n2, timeShowNow()) ;
     }
   if (!ass && !assR && ! assDifficult && ! assDifficultR) { direction = 0 ; goto abort ; }
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
 
  ladirection:
   chrono ("getHitsLaDirection") ;
   hits  = arrayReCreate (hits, 4096,HIT) ;
   /* printf ("\n#%3d:: %s\t%s\t%s\n", direction, name(cosmid),  name(cosmid1),  name(cosmid2)) ; */
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   if (direction * direction != 1)
     {
       getCosmidHits (cosmid, hits, ass, 0, dna, FALSE, clipEnds, OLIGO_LENGTH, estMaps, estMap1, estMap2, cosmidMap, cosmidC1, cosmidC2, direction) ;
@@ -10455,6 +10505,12 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
       dropOutOfZonePreMappedHits (hits, estMaps, estMap1, estMap2, cosmidMap, cosmidC1, cosmidC2, direction) ;
     }
 
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
   cDNAFilterDirectionalHits (direction, hits, FALSE) ;
   dropOutOfZonePreMappedHits (hits, estMaps, estMap1, estMap2, cosmidMap, cosmidC1, cosmidC2, direction) ;
   if (!arrayMax(hits))
@@ -10463,6 +10519,14 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   arrayCompress (hits) ;
   getcDNA_clonesAndClips (hits, cDNA_clones, clipTops, clipEnds) ;
   cDNAFilterPreviousLink (direction, previousCosmid, previousLink, hits) ;
+
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
 
   if (!arrayMax(hits))
     goto abort ;
@@ -10485,6 +10549,13 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   mergeOverlappingHits  (hits) ;
   cDNAFilterDirectionalHits (direction, hits, FALSE) ;
   dropBadHits (dna, dnaR, hits, 6) ;  /* drop low entropy hits, s < 30 bp */
+
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
 
   dropOvernumerousHits(hits, 50000) ;
   countErrors (cosmid, hits, dna, dnaR, 0, FALSE) ;
@@ -10513,6 +10584,13 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   mergeOverlappingHits  (hits) ; /* the new may overlap or mixup with the old in rare cases, so we must redo selectPath */ 
   countErrors (cosmid, hits, dna, dnaR, 0, FALSE) ; 
 
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   chronoReturn() ;
   chrono ("cPathSelectBestPath") ;
 
@@ -10536,6 +10614,13 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   dropHugeIntrons (hits, dna, dnaR, 0, TRUE) ;  /* drop introns large  and large and not gt_ag */
 
   chronoReturn() ;
+
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
 
   chrono ("dropBadHits") ;
 
@@ -10566,6 +10651,13 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   if (!arrayMax(hits))
     goto abort ;
 
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   { /* force error recount */
     int ii = arrayMax(hits) ;
     HIT *up ;	
@@ -10575,6 +10667,13 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
   countErrors (cosmid, hits, dna, dnaR, 0, FALSE) ;
   chronoReturn() ;
   chrono ("constructGenes") ;
+
+  if (0) /* here we DO NOT have the bug */
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
 
   if (isAlign == 0) /* cdna case */
     {
@@ -10586,6 +10685,12 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
       geneHits = getGeneHits (cosmid, hits, clipTops, clipEnds, walls, trackingClones, dna, dnaR) ;
       addGhostHits (arrayMax(dna), geneHits, walls) ;
       countErrors (cosmid, geneHits, dna, dnaR, 0, FALSE) ;
+      if (0)  /* PAS de bug */
+	{ 
+	  arrayDestroy(genes) ; 
+	  arrayDestroy (geneHits) ;
+	  invokeDebugger () ;
+	}
       if (nDoRepeats)
         {
           if (! usedQualities)
@@ -10593,8 +10698,26 @@ static KEYSET alignEst2Cosmid (KEY cosmid, KEYSET estSet, KEYSET currentGenes,
           cDNAFilterUsedQualities (geneHits, usedQualities) ;
         }
       plainGeneHits = arrayCopy (geneHits) ; 
+      if (0)  /* on A pas le bug */
+	{ 
+	  arrayDestroy(genes) ; 
+	  arrayDestroy (geneHits) ;
+	  invokeDebugger () ;
+	}
       cleanGeneHits (cosmid, geneHits, trackingClones, FALSE) ;
+      if (0)  /* ??? on ?? le bug */
+	{ 
+	  arrayDestroy(genes) ; 
+	  arrayDestroy (geneHits) ;
+	  invokeDebugger () ;
+	}
       cleanGeneHits (cosmid, geneHits, trackingClones, TRUE) ;
+      if (0)  /* on A le bug */
+	{ 
+	  arrayDestroy (geneHits) ;
+	  invokeDebugger () ;
+	}
+
       {
         int j2 ;
         HIT *gh2 ;
@@ -10641,6 +10764,13 @@ abort:
 
   /* destroy what is strand specific */
 
+  if (0)  /* here we have the bug */
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   if (allSpl)
     {
       int i ;
@@ -10663,6 +10793,13 @@ abort:
       arrayDestroy (sets) ;
     }
 
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   if (newgenes) 
     {
       int i, j ;
@@ -10677,7 +10814,14 @@ abort:
       keySetSort (currentGenes) ;
       keySetCompress (currentGenes) ;
     }
-  
+
+    if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
+
   if ((usedZones || nDoRepeats > 0) && plainGeneHits && arrayMax (plainGeneHits))
     {
       int i, j, ok =  1 ;
@@ -10714,11 +10858,25 @@ abort:
             }
         }
     }
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
   if (usedZones)
     arraySort (usedZones, cDNAOrderEstByA1) ;
+
+  if (0)
+    { 
+      arrayDestroy(genes) ; 
+      arrayDestroy (geneHits) ;
+      invokeDebugger () ;
+    }
   cDNAFilterUsedZonesC1 (0, 0, 0, 0, 0) ; /* clean up the static since usedZones array changed */
-  arrayDestroy (genes) ;
+
   arrayDestroy (geneHits) ;
+  arrayDestroy (genes) ;
   arrayDestroy (plainGeneHits) ;
   { /* keep for second turn only those reads that have a first round gene */
     HIT *u1p, *u2p ;
@@ -13918,7 +14076,7 @@ static KEYSET assignOncecDNAKeySet (KEYSET originalKeySet)
                             if (bsGetArray(Est, _Other, aa2, 5))  /* gene, nmatch, nerr */
                               for (j = 0 ; j < arrayMax(aa2) ; j += 5)
                                 { 
-                                  u2 = arrp (aa2, i, BSunit) ;
+                                  u2 = arrp (aa2, j, BSunit) ;
                                   if (u2[4].k == cDNA)
                                     hh->nerr +=3 ; 
                                 }
@@ -14306,6 +14464,7 @@ static KEYSET assignOncecDNAKeySet (KEYSET originalKeySet)
   ii = keySetMax (genes) ;
   if (1) while (ii--)
     {
+      if (0 && ii != 234) continue ;
       gene = keySet (genes, ii) ;
       if (gene)
         {

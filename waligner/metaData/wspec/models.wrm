@@ -73,6 +73,12 @@
               Sorting_title UNIQUE ?Text   // many tables are sorted alphabetically by this title
               Sorting_title_2 UNIQUE ?Text   // many tables are sorted alphabetically by this title
               Other_title  UNIQUE ?Text  // for example a micro array title
+              SEQC2_id SEQC2_title UNIQUE ?Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Text Int Text // SRR name xx reads xx Gb median n
+                       SEQC2_MegaBases Float
+                       SEQC2_nReads Float
+                       SEQC2_Median_length  Int
+                       SEQC2_SRR ?SRR 
+                       SEQC2_file_names Text             
               ERROR Text   // autamatically constructed by the parse 
       S Sample UNIQUE ?Sample XREF Run @T  // Precise sample identifier, please document the sample object (see below) 
         Microarray ?Text

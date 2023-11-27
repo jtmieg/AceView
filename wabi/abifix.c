@@ -4163,7 +4163,7 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
       cluster = FALSE ;
       sortNeeded = FALSE ;
 
-      if (1) 	  /* cluster polyA at same position */
+      if (arrayMax (aa3) > 1)   /* cluster polyA at same position */
 	{
 	  sortNeeded = FALSE ;
 	  for (ii = arrayMax (aa3) - 1, ap = arrp (aa3,ii, AAA) ; ii >= 0 ; ii--, ap--)
@@ -4192,15 +4192,16 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
        * Type 3 == yuji 3p clones, ap->nClones3 > 0 && ap->nAclones == 0
        */
 
-      if (1)  /* cluster on type 1 (polyA seen) positions the clusters witout polyA if they are within 25 bp */
+      if (arrayMax (aa3) > 1)  /* cluster on type 1 (polyA seen) positions the clusters witout polyA if they are within 25 bp */
 	{
 	  sortNeeded = FALSE ;
 	  for (ii = arrayMax (aa3) - 1, ap = arrp (aa3,ii, AAA) ; ii >= 0 ; ii--, ap--)
 	    if (ap->est && (ap->nAClones ||  (nRound > 1 && ap->mClones3)) && ap->aRich <= 0)
 	      {
 		a22 = ap->a22 ; 
-		for (jj = ii - 1, ap1 = arrp (aa3,jj, AAA) ; jj >= 0 ; jj--, ap1--) 
+		for (jj = ii - 1 ; jj >= 0 ; jj--)
 		  {
+		    ap1 = arrp (aa3,jj, AAA) ;
 		    if (! ap1->est) continue ;
 		    if (ap1->nAClones || ap1->a22 < a22 - 25) break ;
 		    if (ap1->aRich <= 0)
@@ -4213,8 +4214,9 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
 			  }
 		      }
 		  }
-		for (jj = ii + 1, ap1 = arrp (aa3,jj, AAA) ; jj < arrayMax (aa3) ; jj++, ap1++) 
+		for (jj = ii + 1 ; jj < arrayMax (aa3) ; jj++)
 		  {
+		    ap1 = arrp (aa3,jj, AAA) ;
 		    if (! ap1->est) continue ;
 		    if (ap1->nAClones || ap1->a22 > a22 + 12) break ;
 		    if (ap1->aRich <= 0)
@@ -4232,7 +4234,7 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
 	    arraySort (aa3, aaaTgOrder) ; /* sort again since we shifted */
 	}
       
-      if (1)  /* cluster several type 1 or 2 if they are within 12 bp on the most 3p represented position */ 
+      if (arrayMax (aa3) > 1)  /* cluster several type 1 or 2 if they are within 12 bp on the most 3p represented position */ 
 	{
 	  sortNeeded = FALSE ;
 	  for (ii = arrayMax (aa3) - 1, ap = arrp (aa3,ii, AAA) ; ii >= 0 ; ii--, ap--)
@@ -4256,11 +4258,10 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
 	    arraySort (aa3, aaaTgOrder) ; /* sort again since we shifted */
 	}
 
-
-      if (nRound > 1) /* cluster type 3 on second iteration if not well supported */ 
+      if (arrayMax (aa3) > 1 && nRound > 1) /* cluster type 3 on second iteration if not well supported */ 
 	{
 	  sortNeeded = FALSE ;
-	  for (ii = arrayMax (aa3) - 1, ap = arrp (aa3,ii, AAA) ; ii >= 0 ; ii--, ap--)
+	  for (ii = arrayMax (aa3) - 1, ap = arrp (aa3,ii, AAA) ; ii >= 1 ; ii--, ap--)
 	    if (ap->est && ap->aRich <= 0)
 	      {
 		a22 = ap->a22 ;
@@ -4284,7 +4285,7 @@ static void abiFixLabelClusterPolyA (Array aa5, Array aa3, Array gDna, BOOL isDo
 	    arraySort (aa3, aaaTgOrder) ; /* sort again since we shifted */
 	}
       
-      if (cluster)
+      if (arrayMax (aa3) > 1 && cluster)
 	{
 	  /* relocalize clusters on their best representative support */    
 	  int a20, n, bestA20, bestN, oldGroup = -1 ;

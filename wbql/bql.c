@@ -13,7 +13,7 @@ typedef enum {Zero = 0
 	      , LIKE2, LIKEREGEXP, LIKE, EQ, NEQ, LEQ, SEQ, LT, ST, LLK, SLK
 	      , ISA
 	      , MODULO, PLUS, MINUS, MULT, DIVIDE, POWER
-	      , DNA, PEPTIDE, DATEDIFF
+	      , DNA, PEPTIDE, CODING, DATEDIFF
 	      , COUNT, MIN, MAX, SUM, AVERAGE, STDEV
 	      , CLNAM, NAM, TIMESTAMP
 	      , TTAG, TAG, HASTAG, MERGETAG
@@ -39,7 +39,7 @@ static const char *bqlName[] = {
   , "like", "=~", "~", "==", "!=", ">=", "<=", ">", "<", ">~", "<~"
   , "ISA"
   , "modulo", "+", "-", "*", "/", "^"
-  , "DNA", "PEPTIDE", "DATEDIFF"
+  , "DNA", "PEPTIDE", "CODING", "DATEDIFF"
   , "count", "min", "max", "sum", "average", "stdev"
   , ".class", ".name", ".timestamp"
   , ">>", "->", "#", "=>", ":"
@@ -69,7 +69,7 @@ static const int bqlSide[] = {
   /* , ISA */ , 1
   /* , "like", "=~", "~", "==", "!=", ">=", "<=", ">", "<", ">~", "<~" */ , 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10
   /* , "modulo" , "+", "-", "*", "/", "^" */ , 10 , 10, 9, 10, 10, 10
-  /* , "DNA", "PEPTIDE", "DATEDIFF" */  , 8, 8, 8
+  /* , "DNA", "PEPTIDE", "CODING", "DATEDIFF" */  , 8, 8, 8, 8
   /* , "count", "min", "max", "sum", "average", "stdev" */ , 5, 5, 5, 5, 5
   /* , ".class", ".name", ".timestamp" */ , 0, 0, 0
   /* , ">>", "->", "#", "=>", ":" */ , 8, 8, 8, 8, 8
@@ -382,6 +382,7 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 		    (strcasecmp (cp, "TITLE") || ! strcmp (cp, "TITLE")) &&
 		    (strcasecmp (cp, "DNA") || ! strcmp (cp, "DNA")) &&
 		    (strcasecmp (cp, "PEPTIDE") || ! strcmp (cp, "PEPTIDE")) &&
+		    (strcasecmp (cp, "CODING") || ! strcmp (cp, "CODING")) &&
 		    (strcasecmp (cp, "DATEDIFF") || ! strcmp (cp, "DATEDIFF"))
 		    )
 		  { 
@@ -2024,6 +2025,7 @@ static BOOL bqlAtomizeWhere (BQL *bql, Array froms, NODE *node)
       break ;
     case DNA:
     case PEPTIDE:
+    case CODING:
     case DATEDIFF:
     case TAG:
       if (node->up)
@@ -2112,6 +2114,7 @@ static BOOL bqlAtomizeFrom (BQL *bql, Array froms, NODE *node)
       return ok ;
     case DNA:
     case PEPTIDE:
+    case CODING:
     case DATEDIFF:
       if (node->right && node->right->type == COMA)
 	{
@@ -3023,6 +3026,8 @@ static BOOL bqlCreatePhonyVariables  (BQL *bql, NODE *node0)
 	    pushText (bql->s, messprintf ("select _DNA%d  from _%d in @, _DNA%d in DNA(_%d)", nsc, nsc, nsc, nsc)) ;
 	  else if (! strncmp (cs, "PEPTIDE", 7))
 	    pushText (bql->s, messprintf ("select _PEPTIDE%d  from _%d in @, _PEPTIDE%d in PEPTIDE(_%d)", nsc, nsc, nsc, nsc)) ;
+	  else if (! strncmp (cs, "CODING", 6))
+	    pushText (bql->s, messprintf ("select _CODING%d  from _%d in @, _CODING%d in CODING(_%d)", nsc, nsc, nsc, nsc)) ;
 	  else if (lexword2key(cs, &tag, 0))
 	    pushText (bql->s, messprintf ("select _%d  from _%d in @ where (_%d #%s || _%d ~ %s)", nsc, nsc, nsc, cs, nsc, ac_protect (lexcleanup (cs, bql->h), bql->h), cs)) ;
 	  else
@@ -4431,7 +4436,7 @@ static BOOL bqlExpandObject (BQL *bql, NODE *node, NODE *coma)
 */
 
 
-static BOOL bqlExpandPeptide (BQL *bql, NODE *node, NODE *coma)
+static BOOL bqlExpandPeptide (BQL *bql, NODE *node, NODE *coma, BOOL isCoding)
 {
   BOOL ok = FALSE, ok2 ;
   NODE *var = node->down ;
@@ -4475,7 +4480,7 @@ static BOOL bqlExpandPeptide (BQL *bql, NODE *node, NODE *coma)
     }
   if (ok && dnaVar->type == VAR && dnaVar->dclNode && dnaVar->dclNode->key)
     {
-      var->dnaD = peptideTranslate (dnaVar->dclNode->key, FALSE) ;
+      var->dnaD = peptideTranslate (dnaVar->dclNode->key, isCoding) ;
     }
   if (ok && var->dnaD)
     {
@@ -4521,7 +4526,12 @@ static BOOL bqlExpandPeptide (BQL *bql, NODE *node, NODE *coma)
 	      arrayMax (pepPiece) = d2 - d1 + 1 ; /* restore */
 	      for (i = 0, cp = arrp (pepPiece, 0, unsigned char), cq = arrp (dna, dna1 - 1, unsigned char) ;
 		   i < d2 - d1 + 1 ; cp++, cq++, i++)
-		*cp = pepDecodeChar [ (int)*cq] ;
+		{
+		  *cp = pepDecodeChar [ (int)*cq] ;
+		  if (isCoding && *cp == '*')
+		    { cp[1] = 0 ; break ;
+		    }
+		}
 	      var->pepStack = stackCreate (0) ;
 	      pushText (var->pepStack, arrp (pepPiece, 0, char)) ;
 	      arrayDestroy (pepPiece) ;
@@ -5855,7 +5865,10 @@ static BOOL bqlExpandIn (BQL *bql, NODE *node, NODE *coma)
 	ok = bqlExpandDNA (bql, node, coma) ;
 	break ;
       case PEPTIDE:
-	ok = bqlExpandPeptide (bql, node, coma) ;
+	ok = bqlExpandPeptide (bql, node, coma, FALSE) ;
+	break ;
+      case CODING:
+	ok = bqlExpandPeptide (bql, node, coma, TRUE) ;
 	break ;
       case DATEDIFF:
 	ok = bqlExpandDateDiff (bql, node, coma) ;
@@ -6517,6 +6530,9 @@ BOOL bqlParse (BQL *bql, const char *query, BOOL acedbQuery)
     while ((cq = strstr (cq, "->PEPTIDE")))
       cq[2] = 'p' ;  /* prevent recognizing tag PEPTIDE as function PEPTIDE */
     cp = cq = stackText (bql->s, bql->node->mark) ;
+    while ((cq = strstr (cq, "->CODING")))
+      cq[2] = 'c' ;  /* prevent recognizing tag CODING as function CODING */
+    cp = cq = stackText (bql->s, bql->node->mark) ;
     while ((cq = strstr (cq, "->DATEDIFF")))
       cq[9] = 'f' ;  /* prevent recognizing tag DATEDIFF as function DATEDIFF */
     cp = cq = stackText (bql->s, bql->node->mark) ;
@@ -6525,6 +6541,9 @@ BOOL bqlParse (BQL *bql, const char *query, BOOL acedbQuery)
     cp = cq = stackText (bql->s, bql->node->mark) ;
     while ((cq = strstr (cq, "#PEPTIDE")))
       cq[1] = 'p' ;  /* prevent recognizing tag PEPTIDE as function PEPTIDE */
+    cp = cq = stackText (bql->s, bql->node->mark) ;
+    while ((cq = strstr (cq, "#CODING")))
+      cq[1] = 'c' ;  /* prevent recognizing tag CODING as function CODNG */
     cp = cq = stackText (bql->s, bql->node->mark) ;
     while ((cq = strstr (cq, "#DATEDIFF")))
       cq[8] = 'f' ;  /* prevent recognizing tag DATEDIFF as function DATEDIFF */

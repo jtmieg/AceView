@@ -2913,7 +2913,7 @@ static BigArray sxNewDoubleIntronsGetDeDuoIntrons (SX *sx, DICT *dict, AC_HANDLE
       DBLI *up, *vp ;
       long int i, j, min = sx->minimalIntronSupport, iMax = bigArrayMax (introns) ;
 
-      for (i = j = 0 , up = vp = arrp (introns, 0, DBLI) ; i < iMax ; up++, i++)
+      for (i = j = 0 , up = vp = bigArrp (introns, 0, DBLI) ; i < iMax ; up++, i++)
 	{
 	  if (up->support < min)
 	    continue ;

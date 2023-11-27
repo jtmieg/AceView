@@ -1237,11 +1237,11 @@ Array aceDnaTrackErrorsBackwards (Array  dna1, int pos1, int *pp1,
 /* to be used when the est is goind up in the mrna */
 
 static void fuseErr (Array err1, Array err2)
-{ int i, n1 = arrayMax(err1), n2 = arrayMax(err2) ;
-  for (i = 0 ; i < n2 ; i++)
+{ int i, j, n1 = arrayMax(err1), n2 = arrayMax(err2) ;
+  for (i = j = 0 ; i < n2 ; i++)
     {
-      if (n1 == 0 || memcmp (arrp (err1, n1 + i - 1, A_ERR), arrp(err2, i, A_ERR), sizeof (A_ERR)))
-	array(err1, n1 + i, A_ERR) = arr(err2, i, A_ERR) ;
+      if (n1 == 0 || memcmp (arrp (err1, n1 + j - 1, A_ERR), arrp(err2, i, A_ERR), sizeof (A_ERR)))
+	{ array(err1, n1 + j, A_ERR) = arr(err2, i, A_ERR) ; j++ ; }
     }
 }
 

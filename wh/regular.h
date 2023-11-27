@@ -50,6 +50,7 @@
 /*
 #define MEM_DEBUG 
 #define MALLOC_CHECK 
+#define ARRAY_CHECK 
 */
 				/* library EXPORT/IMPORT symbols */
 #if defined (WIN32)

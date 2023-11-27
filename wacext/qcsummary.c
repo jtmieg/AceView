@@ -407,9 +407,18 @@ static void qcBeforeAli (QC *qc, RC *rc)
 	    case 2:
 	      aceOutf (qc->ao, "\t%.2f", rc->var[T_Seq] ? rc->var[T_Read]/rc->var[T_Seq] : 0) ;
 	      aceOutf (qc->ao, "\t%d", ac_tag_int (rc->ali, "Maximal_read_multiplicity", 0)) ;
-	      qcShowMillions (qc, rc->var[T_Seq]) ; 
-	      qcShowMillions (qc, rc->var[T_Read]) ;
-	      aceOutf (qc->ao, "\t%.3f", rc->var[T_kb]/1000) ;   
+	      if (0) /* round values */
+		{
+		  qcShowMillions (qc, rc->var[T_Seq]) ; 
+		  qcShowMillions (qc, rc->var[T_Read]) ;
+		  aceOutf (qc->ao, "\t%.3f", rc->var[T_kb]/1000) ;   
+		}
+	      else  /* give the decimals */
+		{
+		  aceOutf (qc->ao, "\t%f", rc->var[T_Seq]/1000000.0) ;
+		  aceOutf (qc->ao, "\t%f", rc->var[T_Read]/1000000.0) ;
+		  aceOutf (qc->ao, "\t%f", rc->var[T_kb]/1000) ;   
+		}
 	      break ;
 	    case 3: /* ATGC */
 	      {
@@ -1257,7 +1266,7 @@ static void qcSnpTypesDo (QC *qc, RC *rc, BOOL isRejected)
     { "Compute", "% deletions not in polymers", 71, 0, 0} ,
     { "Compute", "% insertions in polymers", 21, 0, 0} ,
     { "Compute", "% deletions in polymers", 21, 0, 0} ,
-    { "Compute", "RNA edition: % excess of A>G relative to T>C", 21, 0, 0} ,
+    { "Compute", "A to G RNA edition: ratio of A>G relative to T>C (1 means no visible edition)", 21, 0, 0} ,
 
     {  0, 0, 0, 0, 0}
   } ; 
@@ -1451,7 +1460,7 @@ Distribution of mismatches in best unique alignments, abslute, oberved, counts
 		  aceOutf (qc->ao, "\t%.2f", 100 * zSlidingInsertion / zAny) ;
 		  aceOutf (qc->ao, "\t%.2f", 100 * zSlidingDeletion / zAny) ; 
 		  if ( zSub[1] > 100)
-		    aceOutf (qc->ao, "\t%.2f", zSub[0]/zSub[1] -1.0) ;
+		    aceOutf (qc->ao, "\t%.2f", zSub[0]/zSub[1]) ;
 		  else
 		    aceOut (qc->ao, "\t") ;
 		}
@@ -2136,7 +2145,7 @@ static void qcMainResults2 (QC *qc, RC *rc)
 	      break ;
 	    }
 	}
-      else  /* 110: accessible length */
+      else  
 	qcShowTag (qc, rc, ti) ;
     }
   ac_free (h) ;
@@ -2451,7 +2460,7 @@ static void qcMainResults4 (QC *qc, RC *rc)
 	      break ;
 	    }
 	}
-      else  /* 110: accessible length */
+      else 
 	qcShowTag (qc, rc, ti) ;
     }
   ac_free (h) ;
@@ -2506,9 +2515,9 @@ static void qcMainResults5 (QC *qc, RC *rc)
 	  target2 = target ;
 	  switch (ti->col)
 	    {
-	    case 10: tag = "Candidate_introns" ;  ic = 3 ; target2 = "Any" ;  break ;
-	    case 20: tag = "Candidate_introns" ;  ic = 5 ; target2 = "Any" ;  break ;
-	    case 30: tag = "Candidate_introns" ;  ic = 13 ; target2 = "Any" ;  break ;
+	    case 10: tag = "Candidate_introns" ;  ic = 3 ; target2 = "av" ;  break ;
+	    case 20: tag = "Candidate_introns" ;  ic = 5 ; target2 = "av" ;  break ;
+	    case 30: tag = "Candidate_introns" ;  ic = 13 ; target2 = "av" ;  break ;
 	    }
 	  tt = ac_tag_table (rc->ali, tag, h) ;
 	  z = 0 ;
@@ -2555,7 +2564,7 @@ static void qcMainResults5 (QC *qc, RC *rc)
 	    }
 	  aceOutf (qc->ao, "\t%.2f", z) ;
 	}
-      else  /* 110: accessible length */
+      else  
 	qcShowTag (qc, rc, ti) ;
     }
   ac_free (h) ;
@@ -5028,8 +5037,11 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
     { "Spacer", "", 0, 0, 0} , 
     { "TITLE", "Title", 10, 0, 0} ,
     { "Compute", 
-      "%s aligned in PhiX DNA spike-in"
-      "\t%s aligned in ERCC or Sequin RNA spike-in"
+      "%s aligned in microbiome or symbiome"
+      "\t%s aligned in viruses"
+
+      "\t%s aligned in PhiX DNA spike-in"
+      "\t%s aligned in RNA spike-in (ERCC, Sequin, or yeast enolase)"
       "\t%s aligned in ribosomal RNA"
       "\t%s aligned in mitochondria"
       "\t%s aligned in other small genes"
@@ -5042,10 +5054,6 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 
       "\t%s best aligned in any previously annotated transcripts"
       "\t%s inside introns, new exons and intergenic"
-
-      "\t%s aligned in microbiome or symbiome"
-      "\t%s aligned in viruses"
-
 
       "\t%s aligned on the imaginary genome (mapping specificity control)"
       /* "\t%s supporting known exon junctions" */
@@ -5095,11 +5103,11 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		       , "Reads"
 		       , "Reads"
 		       , "Reads"
+		       , "Reads"
+		       , "Reads"
 		       , "Reads", qc->EtargetsBeau[0]
 		       , "Reads", qc->EtargetsBeau[1]
 		       , "Reads", qc->EtargetsBeau[2]
-		       , "Reads"
-		       , "Reads"
 		       , "Reads"
 		       , "Reads"
 		       , "Reads"
@@ -5115,11 +5123,11 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		       , "% Reads"
 		       , "% Reads"
 		       , "% Reads"
+		       , "% Reads"
+		       , "% Reads"
 		       , "% Reads", qc->EtargetsBeau[0]
 		       , "% Reads", qc->EtargetsBeau[1]
 		       , "% Reads", qc->EtargetsBeau[2]
-		       , "% Reads"
-		       , "% Reads"
 		       , "% Reads"
 		       , "% Reads"
 		       , "% Reads"
@@ -5135,11 +5143,11 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		       , "Mb"
 		       , "Mb"
 		       , "Mb"
+		       , "Mb"
+		       , "Mb"
 		       , "Mb", qc->EtargetsBeau[0]
 		       , "Mb", qc->EtargetsBeau[1]
 		       , "Mb", qc->EtargetsBeau[2]
-		       , "Mb"
-		       , "Mb"
 		       , "Mb"
 		       , "Mb"
 		       , "Mb"
@@ -5231,6 +5239,8 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 	      switch (type)
 		{
 		case 1:
+		  aceOutf (qc->ao, "\t%ld", zhBacteria) ;	 
+		  aceOutf (qc->ao, "\t%ld", zhVirus) ;	 
 		  aceOutf (qc->ao, "\t%ld", zhPhiX) ;	      
 		  aceOutf (qc->ao, "\t%ld", zhe) ;
 		  aceOutf (qc->ao, "\t%ld", zhr) ;
@@ -5248,13 +5258,13 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		  aceOutf (qc->ao, "\t%ld", zhAny - zhPrevious - zhPhiX - zhBacteria -zhVirus - zhg) ; /* intronic, new exon and intergenic */
 		  
 		  
-		  aceOutf (qc->ao, "\t%ld", zhBacteria) ;	 
-		  aceOutf (qc->ao, "\t%ld", zhVirus) ;	 
 		  aceOutf (qc->ao, "\t%ld", znhg) ;	 /* decoy */ 
 		  
 		  /* aceOutf (qc->ao, "\t%ld", zSpliced) ; */
 		  break ;
 		case 3:
+		  aceOutf (qc->ao, "\t%.2f", zhBacteria/1000.0) ;	 
+		  aceOutf (qc->ao, "\t%.2f", zhVirus/1000.0) ;	 
 		  aceOutf (qc->ao, "\t%.2f", zhPhiX/1000.0) ;	      
 		  aceOutf (qc->ao, "\t%.2f", zhe/1000.0) ;
 		  aceOutf (qc->ao, "\t%.2f", zhr/1000.0) ;
@@ -5272,13 +5282,13 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		  aceOutf (qc->ao, "\t%.2f", z/1000.0) ; /* intronic, new exon and intergenic */
 		  
 		  
-		  aceOutf (qc->ao, "\t%.2f", zhBacteria/1000.0) ;	 
-		  aceOutf (qc->ao, "\t%.2f", zhVirus/1000.0) ;	 
 		  aceOutf (qc->ao, "\t%.2f", znhg/1000.0) ;	 /* decoy */ 
 		  
 		  /* aceOutf (qc->ao, "\t") ; */
 		  break ;
 		case 2: 
+		  z = zhBacteria ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
+		  z = zhVirus ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
 		  z = zhPhiX ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
 		  z = zhe ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
 		  z = zhr ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
@@ -5294,8 +5304,6 @@ static void qcMappingPerTargetType (QC *qc, RC *rc, int type)
 		  z = zhPrevious ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
 		  z = zhTotal - zhPrevious - zhPhiX - zhBacteria -zhVirus - zhg  ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ; /* intronic, new exon and intergenic */
 	
-		  z = zhBacteria ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
-		  z = zhVirus ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ;
 		  z = znhg ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ; /* decoy */
 
 		  /*   z = zSpliced ; aceOutf (qc->ao, "\t") ; z = 100 * z/zhTotal ; aceOutPercent (qc->ao, z) ; */
@@ -6084,8 +6092,13 @@ int main (int argc, const char **argv)
   qc.gzo = getCmdLineBool (&argc, argv, "-gzo") ;
 
   qc.export =  allMethods ;
+  getCmdLineOption (&argc, argv, "-e", &qc.export) ;
   getCmdLineOption (&argc, argv, "-export", &qc.export) ;
+  getCmdLineOption (&argc, argv, "--export", &qc.export) ;
+  getCmdLineOption (&argc, argv, "-p", &qc.project) ;
   getCmdLineOption (&argc, argv, "-project", &qc.project) ;
+  getCmdLineOption (&argc, argv, "--project", &qc.project) ;
+  getCmdLineInt (&argc, argv, "-t", &qc.runType) ;
   getCmdLineInt (&argc, argv, "-runType", &qc.runType) ;
   getCmdLineOption (&argc, argv, "-f", &qc.externalFiles) ;
   if (! qc.project)
