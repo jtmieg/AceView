@@ -20,6 +20,7 @@
     if ($target == av2008) set target_class=FT_av2008
     if ($target == extra) set target_class=FT_extra
     if ($target == simul) set target_class=FT_simul
+    if ($target == RvY) set target_class=FT_RvY
 
     if ($target == cloud) set target_class=FT_cloud 
 

@@ -2716,7 +2716,7 @@ static KEY mrnaGetGeneName (SC *sc)
       type = 1 ;
       cGroup = mrnaNameGeneBySection (sc) ;
       break ;
-    case 2:    /* worm genomes name by newname-gene */
+    case 2:    /* worm genome name by newname-gene */
       type = 1 ;
       cGroup = mrnaNameGeneByPhenotypicGene (sc) ;        
       if (cGroup)
@@ -13256,7 +13256,7 @@ static KEYSET mrnaSplitOneDoubleGene (KEY tg, KEYSET pgs, KEYSET gids)
   KEYSET genes = keySetCreate () ;
   KEYSET mrnas = queryKey (tg, ">mRNA") ;
   int mMax = arrayMax (mrnas) ;
-  Array aa = arrayHandleCreate (mMax, HIT, h) ;
+  Array aa = arrayHandleCreate (1+mMax, HIT, h) ;
   vTXT txt = vtxtHandleCreate (h) ;
   OBJ Mrna  = 0 ;
 
@@ -13560,7 +13560,8 @@ void mrnaSplitDoubleGenes (KEYSET tgs)
       if (gids && keySetMax (gids) > 1) 
 	{
 	  KEYSET subGenes = mrnaSplitOneDoubleGene (tg, pgs, gids) ;
-	  while (mrnaSplitOneMerge (subGenes)) ;
+	  while (mrnaSplitOneMerge (subGenes))
+	    {} 
 	  mrnaSplitOneCoords (subGenes) ;
 	  mrnaSplitOneProducts (subGenes) ;
 	  mrnaSplitOnePg (subGenes) ;

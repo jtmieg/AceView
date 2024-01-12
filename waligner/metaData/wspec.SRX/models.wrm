@@ -188,6 +188,8 @@
       Sequencing  Machine UNIQUE Helicos UNIQUE Text   
                                  Illumina UNIQUE Text   // the machine names are used in LIMITS to get the list of previously known adaptors for that machine, 
                                  SOLiD UNIQUE Text      // please do not change the spelling
+                                 DNBSEQ UNIQUE Text
+                                 Ultima UNIQUE Text
                                  Roche_454 UNIQUE Text
                                  Ion_Torrent UNIQUE Text
                                  PGM UNIQUE Text        // Lif personal genome machine, successor of ion torrent 
@@ -268,8 +270,8 @@
        Construction_protocol UNIQUE ?Text
        Design UNIQUE ?Text
        Submitted_by UNIQUE ?Author
-     SRR ?SRR XREF SRX
-     SRP ?SRP XREF SRX
+     SRR ?SRR XREF SRX @Title
+     SRP ?SRP XREF SRX @Title
      Sequencing Spots  UNIQUE Int UNIQUE Text UNIQUE Text UNIQUE Text UNIQUE Int UNIQUE Text  UNIQUE Text UNIQUE Text UNIQUE Int   // <#spots> bases_in_SRA <Mb> Average_length  <n> Insert_size <n> +- <delta> spots_with_mate <n>
 
 ?SRP T Title UNIQUE ?Text
@@ -280,12 +282,12 @@
        Comment ?Text
        Identifier ?Text
        GEO ?GEO XREF SRP @Author
-     SRR ?SRR XREF SRP
-     SRX ?SRX XREF SRP
+     SRR ?SRR XREF SRP @Title
+     SRX ?SRX XREF SRP @Title
 
 ?GEO Author UNIQUE ?Author
      Comment ?Text
-     SRP ?SRP XREF GEO
+     SRP ?SRP XREF GEO @Title
      Reference ?Paper XREF GEO
       
 ?Medline Paper  ?Paper XREF Medline_acc

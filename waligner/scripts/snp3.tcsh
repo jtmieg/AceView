@@ -4,10 +4,10 @@
 set phase=$1
 set  zone=$2
 
-
+echo "snp3 $1 $2"
 
 if ($phase == 1) then 
-  bin/snpsummary -db tmp/TSNP_DB/$zone -o RESULTS/SNV/$MAGIC.snp3a.$zone --snpType 0  -minSnpFrequency 5 -minSnpCover 20
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.snp3a.$zone --snpType 0  # -minSnpFrequency 5 -minSnpCover 20
   goto done
 endif
 
@@ -27,7 +27,7 @@ if ($phase == kill) then
 EOF
   goto done
 endif
-  
+
 
 if ($phase == G) then
 # export all well covered counts c>=20
@@ -56,6 +56,7 @@ EOF
 
 else
   cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>45 && fMin<5)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
+  #  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>80 && fMin<10)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
 if ($MAGIC == NASA && -e tmp/TSNP_DB/$zone/snp3.Nano.cmw20.txt) then
    cat tmp/TSNP_DB/$zone/snp3.Nano.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>40 && fMin<10)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >>  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
 endif
@@ -66,10 +67,8 @@ endif
 
 endif
 
-  goto done
-endif
 
-  cat tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.txt | gawk '{v=$1;if(v!=old){if (fMax>80 && fMin<10)print old;fMax=0;fMin=100;old=v;}c=$3;m=$4;w=$5;if (c<20)next;f=100*m/c;if(f>fMax)fMax=f;if(f<fMin)fMin=f;}' >  tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good_list
+
 
 if ($phase == p) then
   set pp=SnpA2R2 
@@ -117,8 +116,20 @@ if ($phase == R) then
     set remap2g=remap2genome
 # if -o filename is not provided, tsnp directly edits the database
     # bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone --force 
+    bin/tace  tmp/TSNP_DB/$zone <<EOF
+      read-models
+      pparse tmp/METADATA/RvY.GENE.info.ace
+      pparse tmp/METADATA/gtf.av.goodProduct.ace
+      save
+      quit
+EOF
+    echo -n "parse "
+    ls -ls tmp/METADATA/gtf.av.goodProduct.ace
+    echo -n "translate start: "
+    date
     bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC
-
+    echo "translate done :"
+    date
   goto done
 endif
 
@@ -420,3 +431,18 @@ cat $ff | gawk -F '\t' '/^#/{print}' | transpose | grep -n etected
 cat $ff | gawk -F '\t' '/^#/{next;}{print $32}' | tags | grep A2
 
 
+
+
+gene_name "HPD";
+ annotation "4-hydroxyphenylpyruvate dioxygenase";
+ Pfam "[Glyoxalase] Glyoxalase/Bleomycin resistance protein/Dioxygenase superfamily|[Glyoxalase_4] Glyoxalase/Bleomycin resistance protein/Dioxygenase superfamily|[Glyoxalase_3] Glyoxalase-like domain|[Glyoxalase_2] Glyoxalase-like domain";
+ CDD "4-hydroxyphenylpyruvate dioxygenase. This protein oxidizes 4-hydroxyphenylpyruvate, a tyrosine and phenylalanine catabolite, to homogentisate. Homogentisate can undergo a further non-enzymatic oxidation and polymerization into brown pigments that protect some bacterial species from light. A similar process occurs spontaneously in blood and is hemolytic (see PMID:8000039). In some bacterial species, this enzyme has been studied as a hemolysin.";
+ EC "EC1.13.11.27";
+ KO "K00457";
+ similar_genes "HPPD_DANRE(e-value:1.9e-90;
+bit-score:330.0)";
+
+zcat kumamushi_gtf_RvY_cds_scaf199.gtf.gz | cut -f 9 | grep gene_name | sed -e 's/\;/\n/g' -e 's/\"\"//g' | gawk '/^ transcript_id/{printf("\nSequence %s\n",$2);next;}/^ gene_name/{gsub("gene_name","LocusLink",$0);print;next;}/^ annotation/{gsub("annotation","Remark",$0);print;}/^ Pfam/{gsub("Pfam","Remark",$0);print;}/^ CDD/{gsub(/^ CDD/,"Remark",$0);print;next;}' > toto.ace
+zcat kumamushi_gtf_RvY_cds_scaf199.gtf.gz | cut -f 9 | grep annotation | grep -v gene_name | sed -e 's/\;/\n/g' -e 's/\"\"//g' | gawk '/^ transcript_id/{printf("\nSequence %s\n",$2);next;}/^ annotation/{gsub("annotation","Remark",$0);print;}/^ Pfam/{gsub("Pfam","Remark",$0);print;}/^ CDD/{gsub(/^ CDD/,"Remark",$0);print;next;}' >> toto.ace
+zcat kumamushi_gtf_RvY_cds_scaf199.gtf.gz | cut -f 9 | grep Pfam| grep -v annotation | grep -v gene_name | sed -e 's/\;/\n/g' -e 's/\"\"//g' | gawk '/^ transcript_id/{printf("\nSequence %s\n",$2);next;}/^ Pfam/{gsub("Pfam","Remark",$0);print;}/^ CDD/{gsub(/^ CDD/,"Remark",$0);print;}' >> toto.ace
+zcat kumamushi_gtf_RvY_cds_scaf199.gtf.gz | cut -f 9 | grep CDD | grep -v Pfam| grep -v annotation | grep -v gene_name | sed -e 's/\;/\n/g' -e 's/\"\"//g' | gawk '/^ transcript_id/{printf("\nSequence %s\n",$2);next;}/^ CDD/{gsub(/^ CDD/,"Remark",$0);print;}' >> toto.ace

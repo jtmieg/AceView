@@ -163,10 +163,11 @@ set geneBoxMaxLn=1000000
     cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '{n=$4-$3;if(n<0)n=-n; if (n<nMax)printf("%s\t1\t%s\t%d\t%d\t%s\n",$1,$2,$3,$4,$1);}' nMax=$geneBoxMaxLn > tmp/METADATA/$target.ns.gene.sponge
 
     if (-e  tmp/METADATA/gtf.$target.goodProduct.ace.gz) then
-      gunzip tmp/METADATA/gtf.$target.goodProduct.ace.gz
+      \rm  tmp/METADATA/gtf.$target.goodProduct.ace.gz
     endif
-    if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz && ! -e  tmp/METADATA/gtf.$target.goodProduct.ace) then
-      gunzip -c tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{if(p1>0)printf("%s\t%d\t%d\n",m,p1,p2);m=$2;dx=1;p1=0;next;}/^Source_exons/{a1=$2;a2=$3;if($4=="CDS"){if(p1==0)p1=dx;p2=dx+a2-a1+1;}dx+=a2-a1+1;}END{if(p1>0)printf("last %s\t%d\t%d\n",m,p1,p2);}' | gawk -F '\t' '{printf ("mRNA %s\nProduct %s %d %d\n\nProduct %s\nBest_product\nGood_product\n\n", $1,$1,$2,$3,$1);}' >  tmp/METADATA/gtf.$target.goodProduct.ace
+    if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz && ! -e  tmp/METADATA/gtf.$target.goodProduct.aceZZ) then
+      gunzip -c tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{if(p1>0)printf("%s\t%d\t%d\n",m,p1,p2);m=$2;dx=1;p1=0;next;}/^Source_exons/{a1=$2;a2=$3;if($4=="CDS"){if(p1==0)p1=dx;p2=dx+a2-a1+1;}dx+=a2-a1+1;}END{if(p1>0)printf("last %s\t%d\t%d\n",m,p1,p2);}' | gawk -F '\t' '{printf ("mRNA %s\nProduct %s %d %d\n\nProduct %s\nBest_product\nGood_product\n\n", $1,$1,$2,$3-1,$1);}' >  tmp/METADATA/gtf.$target.goodProduct.ace
+ \cp tmp/METADATA/gtf.$target.goodProduct.ace  tmp/METADATA/gtf.$target.goodProduct.ace42
     endif
 
    gunzip -c   tmp/METADATA/gtf.$target.introns.gz | gawk -F '\t' '{if ($9 == "+") printf("%s\t%09d\t%09d\t+\n",$6,$7,$8);}'  | sort -u > tmp/METADATA/$target.f.introns
@@ -304,6 +305,7 @@ foreach target ($allRNAtargets)
     endif
 end
 
+
 foreach target ($allRNAtargets)
   if ($target == introns) continue
   if ($target == rrna) continue
@@ -318,6 +320,7 @@ foreach target ($allRNAtargets)
     cat   tmp/METADATA/gtf.$target.mrna2intMap.txt ZZZZZ tmp/METADATA/$target.mrna_ln_gc_gene_geneid.txt | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){m=$1;m2map[m]=$2 ":" $3 "-" $4;next;}printf("%s\t%s",$1,m2map[$1]);for(i=2;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > tmp/METADATA/$target.mrna_map_ln_gc_gene_geneid.txt
 # reformat in .ace format tmp/METADATA/av.mrna_map_ln_gc_gene_geneid.txt
   
+
     cat tmp/METADATA/$target.mrna_map_ln_gc_gene_geneid.txt |   gawk -F '\t' '/^#/{next;}{m=$1;chr=$2;ln=$3;gc=$4;g=$5;gid=$6;if(length(m)<1)next;printf("mRNA \"%s\"\nLength %d\n",m,ln);if(gc+0>0)printf("GC_percent %d\n",gc);k1=split(chr,aa,":");k2=split(aa[2],bb,"-");if(k1==2 && k2==2)printf("IntMap %s %s %s\n",aa[1],bb[1],bb[2]);if(length(g)>1)printf("Gene \"%s\"\n",g);if(length(gid)>1)printf("GeneId \"%s\"\n",gid);printf("\n");}' >  tmp/METADATA/$target.MRNA.ln.ace
 
   else

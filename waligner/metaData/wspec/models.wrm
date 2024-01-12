@@ -256,6 +256,7 @@
       Sequencing  Machine UNIQUE Helicos UNIQUE Text   
                                  Illumina UNIQUE Text   // the machine names are used in LIMITS to get the list of previously known adaptors for that machine, 
                                  SOLiD UNIQUE Text      // please do not change the spelling
+                                 DNBSEQ UNIQUE Text
                                  Roche_454 UNIQUE Text
                                  Ion_Torrent UNIQUE Text
                                  PGM UNIQUE Text        // Lif personal genome machine, successor of ion torrent 
@@ -740,6 +741,7 @@
                             RefSeq
                             magic
                             FlyBase
+                            RvY
                             UCSC
                             mito
                             SpikeIn

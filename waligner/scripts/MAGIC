@@ -1770,9 +1770,17 @@ if ($species == hs) then
   cat _t | gawk '{split($1,aa,">");split($7,bb,",");printf("%s\tchr%s|%s\n",aa[2],bb[1],aa[2]);}'  > NC2chr.rename.txt
 endif
 
+###  in tardigrade RvYokozuna
+if ($species == TD) then 
+   dna2dna -gtf TD.RvY.gtf.gz -gtfRemap FT_RvY -o TD.RvY -gzo -gtfGenome  TD.genome.fasta.gz  
+   dna2dna -gtf TD.RvY.gtf.gz -gtfRemap FT_RvY -o TD.RvY -O fasta -gzo -gtfGenome  TD.genome.fasta.gz 
+   dna2dna -gtf TD.av.gtf.gz -gtfRemap ET_av -o TD.av -gzo -gtfGenome  TD.genome.fasta.gz  
+   dna2dna -gtf TD.av.gtf.gz -gtfRemap ET_av -o TD.av -O fasta -gzo -gtfGenome  TD.genome.fasta.gz 
+endif
+
 ### in mouse we must select the strain and remove the patches and the names are horrible
 if ($species == mm) then
-  # grab the title lines excluding the pathcehs and excluding the Venter other strain
+  # grab the title lines excluding the patches and excluding the Venter other strain
   cat $refG.fa | gawk '/^>/{print}' | grep -v PATCH | grep C57BL/6J > _t
   cat $refG.fa | gawk '/^>/{print}' | grep -v PATCH | grep mito >> _t
 
@@ -1783,7 +1791,7 @@ endif
 
 ### in dog
 if ($species == dog) then
-  # grab the title lines excluding the pathcehs and excluding the Venter other strain
+  # grab the title lines excluding the patches and excluding the Venter other strain
   cat $refG.fa | gawk '/^>/{print}' > nams
   cat nams | grep chromosome > _t
   cat nams | grep mitochondrion >> _t
@@ -1810,6 +1818,7 @@ cat  NC2chr.rename.txt ZZZZZ _t.gff3  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz
 
 \rm _t
 \rm _t.gff3
+# gtf
 # use the gff3 file to export the .ace annotation, done again in metadata.tcsh and the fasta of the transcripts
 # Run on lmem12 (large RAM)
 dna2dna -gff3  $species.RefSeq.$ref.gff3 -o $species.RefSeq.$ref -O fasta -gzo -gtfGenome  $species.genome.$ref.fasta  -gtfRemap KT_RefSeq
@@ -3276,6 +3285,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
       end
       if (-e tmp/COUNT/$run/Venn.u.txt) \rm tmp/COUNT/$run/Venn.*.txt
       if (-e tmp/COUNT/$run/c2.alistats.ace) \rm  tmp/COUNT/$run/c2.*
+      if (-e tmp/Profiles/$run/c5.profile.done) \rm  tmp/Profiles/c5.*
       if (-e RESULTS/Mapping/$MAGIC.job_statistics.txt) \rm RESULTS/Mapping/$MAGIC.job_statistics.txt
       if ( -e tmp/PLEASE_UPDATE) touch  tmp/$MAGIC_COUNT_DIR/$lane.update.done
       scripts/submit tmp/COUNT/$lane.a123 "scripts/alignAndSelectBest.tcsh $run $lane $minInsertLength $USEMAGICBLAST"    32G
@@ -4653,7 +4663,7 @@ phaseVir1:
         scripts/submit tmp/VIRUS/$run/vir1 "scripts/virus.tcsh vir1 $run " 32G
       endif
     end
-  endif
+
 goto phaseLoop
 
 phaseVir2: 
@@ -5000,8 +5010,7 @@ cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.before.tsf   | sed -e 's/ciiiii/i
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.after.tsf    | sed -e 's/ciiiii/iiiiii/' | grep -v monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.notRejected.after -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.notRejected.centered.tsf | sed -e 's/ciiiii/iiiiii/' | grep -v monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.notRejected.centered -s anyRun
 
-cat tmp/TSN
-P_DB/zoner.*/tsnp2g.any.rejected.before.tsf   | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.before -s anyRun
+cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.before.tsf   | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.before -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.after.tsf    | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.after -s anyRun
 cat tmp/TSNP_DB/zoner.*/tsnp2g.any.rejected.centered.tsf | sed -e 's/ciiiii/iiiiii/' | grep monomodal | bin/tsf -I tsf -O tsf -o tmp/TSNP_DB/tsnp2g.GGG.rejected.centered -s anyRun
 
@@ -5031,8 +5040,8 @@ if (! -d tmp/TSNP_DB) mkdir tmp/TSNP_DB
 
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) continue
-  if (! -e tmp/TSNP_DB/$zone/$MAGIC.$phase.done) then
-    scripts/submit tmp/TSNP_DB/$zone/$phase "scripts/tsnp10.export.tcsh $phase $zone"
+  if (! -e tmp/TSNP_DB/$zone/$MAGIC.tsnp10.done2) then
+    scripts/submit tmp/TSNP_DB/$zone/$phase "scripts/tsnp10.export.tcsh $zone"
   endif
 end
 
@@ -8136,7 +8145,7 @@ cat $toto.1 >> $toto
 
 # change all names (Danielle 2023_09)
 pushd RESULTS/ATGC_sequence_profiles
-  ls *.txt | gawk '{f=$1;gsub("multi_profile.1","",f); gsub("target_prefix","upstream_of_insert",f);gsub("target_suffix","down_from_insert",f);gsub("prefix","unaligned_5prime",f);gsub("suffix","unaligned_3prime",f);printf("\\mv %s %s\n",$1,f);}' > _m
+  ls *.txt | gawk '{f=$1;gsub("multi_profile.1","",f); gsub("target_prefix","upstream_of_insert",f);gsub("target_suffix","down_from_insert",f);gsub("prefix","unaligned_5prime",f);gsub("suffix","unaligned_3prime",f);if ($1 != f) printf("\\mv %s %s\n",$1,f);}' > _m
   source _m
   \rm _m
 popd
@@ -10664,6 +10673,14 @@ foreach run (`cat MetaDB/$MAGIC/RunsList`)
   endif
 end
 
+set target=genome
+foreach run (`cat MetaDB/$MAGIC/RunsList`)
+   if (! -d RESULTS/ChromFusion/$run) $mkDir ChromFusion $run
+   if (! -e tmp/ChromFusion/$run/t1.chrom_fusion.genome.tsf.gz) then
+    scripts/submit tmp/ChromFusion/$run/t1 "scripts/t1.chrom_fusion.tcsh t1 $run $target"
+   endif
+end
+
 goto phaseLoop
 
 #######################################################################################
@@ -10907,13 +10924,6 @@ if (0 && $species == worm) then
   set av_count=`cat  TARGET/MRNAS/introns_av.txt | grep -v NULL | grep "$chromFilter" | wc | gawk '{printf ("%d", $1);}'`
   echo "Wormbase: $RefSeq_count introns, AceView: $av_count introns" >> tutu.$$
   echo "Group\tSupport\tde novo intron\tIn WormBase-190\tNot in WormBase-190\t%in WormBase\t% of WormBase\tIn AceView cDNAs\tNot previously in cDNAs\t% in cDNAs\t% of cDNAs" >> tutu.$$
-else if (0) then
-  date > tmp/introns/introns.known.$$
-
-  set RefSeq_count=`cat  TARGET/MRNAS/introns_RefSeq.txt | grep -v NULL |  grep "$chromFilter" |wc | gawk '{printf ("%d", $1);}'`
-  set av_count=`cat  TARGET/MRNAS/introns_av.txt | grep -v NULL |   grep "$chromFilter" |wc | gawk '{printf ("%d", $1);}'`
-  echo "RefSeq: $RefSeq_count introns, AceView: $av_count introns" >> tutu.$$
-  echo "Group\tSupport\tde novo intron\tIn RefSeq-nov09\tNot in RefSeq-nov09\t%in RefSeq\t% of RefSeq\tIn AceView cDNAs\tNot previously in cDNAs\t% in cDNAs\t% of cDNAs" >> tutu.$$
 else
   set tutu=tmp/introns/introns.known.$$
   echo -n "##  tmp/introns/introns.known " > $tutu
@@ -11633,7 +11643,7 @@ pushd TARGET/CHROMS
   if (! -e NC2chrom.done) then
     touch NC2chrom.done
     if (-e toto) \rm toto
-    foreach ff (`ls $species.chrom_chr*.fasta.gz`)
+    foreach ff (`ls $species.chrom_*.fasta.gz`)
       echo -n "$ff\t" >> toto
       zcat $ff | head -1 >> toto
     end
@@ -11649,13 +11659,6 @@ if (! -e TARGET/CHROMS) then
   echo "f1: missing TARGET/CHROMS dir"
   goto phaseLoop
 endif
-
-foreach chrom ($chromSetAll)
-  if (0 && ! -e TARGET/CHROMS/$species.chrom_$chrom.fasta.gz) then
-    echo "f1: missing file  TARGET/CHROMS/$species.chrom_$chrom.fasta.gz"
-    goto phaseLoop
-  endif
-end
 
 if (! -d tmp/X.$MAGIC) mkdir tmp/X.$MAGIC
 if (! -d tmp/X.$MAGIC/EHITS) mkdir tmp/X.$MAGIC/EHITS
@@ -11827,7 +11830,6 @@ else
     endif
 
     if ($phase == k9 &&  -e tmp/X.$MAGIC/XH$chrom/k1.kantor_parse.done  && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.done && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.start) then
-       tmp/X.$MAGIC/XH$chrom/k9.megaRun.star then
        scripts/Kantor.tcsh $phase $chrom tmp/X.$MAGIC/XH$chrom
     endif
 

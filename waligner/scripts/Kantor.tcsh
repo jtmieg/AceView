@@ -4,20 +4,51 @@ set phase=$1
 set chrom=$2
 set db=$3
 
+echo "scripts/Kantor.tcsh $*"
+
+if ($phase == k0) goto phasek0
 if ($phase == k1) goto phasek1
 if ($phase == k2) goto phasek2
 if ($phase == k9) goto phasek9
 
 # if ($species == hs && $chrom != chr4) goto phaseLoop
 
+
 ############################################################
-## Phase k1 : recover the available kantor
+## Phase k0 : create the Kantor/$chrom database
+
+phasek0:
+
+# Create the Kantor database
+  set KDB=Kantor/$chrom/KantorDB
+  if (! -d $KDB) then
+     if (! -d Kantor/$chrom/done) mkdir  Kantor/$chrom/done Kantor/$chrom/done/creation
+     if (! -d Kantor/$chrom/tmp) mkdir  Kantor/$chrom/tmp
+     echo "// hello" > touch Kantor/$chrom/done/creation/ace.creation
+     mv Kantor/$chrom/done/* Kantor/$chrom/tmp
+     mkdir $KDB
+    pushd $KDB
+      mkdir database
+      ln -s ../../../acedata/wspec
+      mkdir database
+      tacembly . <<EOF
+y
+        save
+        quit
+EOF
+     popd
+  endif
+goto phaseLoop
+
+############################################################
+## Phase k1 : recover the available kantor and parse them in the kantor database
 
 phasek1:
-
 echo -n "Start of phase k1 chrom=$chrom "
 date
 
+set KDB=Kantor/$chrom/KantorDB
+if (-d $KDB && ! -e $db/k1.kantor_parse.done) then
 # construct the list of existing kantor files, and parse them
   echo 'read-models' >  Kantor/$chrom/_r
  
@@ -42,29 +73,63 @@ date
     end
   endif
 
+# parse the data in the kantor database
+
   if ($ok == 0) touch $db/k1.kantor_parse.done
-  if ($ok == 1 && -e $db/database/log.wrm && ! -e $db/database/lock.wrm) then
+  if ($ok == 1  && -e $KDB/database/log.wrm && ! -e $KDB/database/lock.wrm) then
     if (-e $db/k9.megaRun.done) \rm $db/k9.megaRun.done
+    if (-e $db/k2.db_parse.done) \rm $db/k2.db_parse.done
 
-    tacembly $db <  Kantor/$chrom/k1._r
-
-    tacembly $db << EOF
-      query find pfam IS Pox_polyA_pol
-      kill
-      query find Kantor psr ; > product ; >mrna 
-      acembly
-        cdna_kantor // kantorizes active mrna set
-        quit
-      // dna mmMrna.$chrom.dna
-      save
-      find model
-      list -a -f $db/k1.kantor_parse.done
-      quit
-EOF
+    tacembly $KDB <  Kantor/$chrom/k1._r
     if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
     mv Kantor/$chrom/tmp/*  Kantor/$chrom/done
   endif
-touch $db/k1.kantor_parse.done
+  touch $db/k1.kantor_parse.done
+endif
+
+goto phaseLoop
+
+############################################################
+############################################################
+## Phase k2 : parse the data in the active database
+
+#to change the kantor because of the model change
+
+phasek2:
+
+set KDB=Kantor/$chrom/KantorDB
+if (-d $KDB && ! -e $db/k2.db_parse.done) then
+  if (-e $db/k9.megaRun.done) \rm $db/k9.megaRun.done
+
+  tacembly $db << EOF
+    query find kantor product
+    list -a -f $db/k2.list
+    quit
+EOF
+
+  tacembly $KDB << EOF
+    query find pfam IS Pox_polyA_pol
+    kill
+    key $db/k2.list
+    show -a -f $db/k2.ace
+    quit
+EOF
+  tacembly $db << EOF
+    query find pfam IS Pox_polyA_pol
+    kill
+    pparse $db/k2.ace
+    query find Kantor psr ; > product ; >mrna 
+    acembly
+      cdna_kantor // kantorizes active mrna set
+      quit
+      // dna mmMrna.$chrom.dna
+    save
+    find model
+    list -a -f $db/k2.db_parse.done
+    quit
+EOF
+
+  endif
 goto phaseLoop
 
 ############################################################
@@ -74,6 +139,45 @@ goto phaseLoop
 #to change the kantor because of the model change
 
 phasek9:
+
+echo -n "Start of phase k9 megaRun chrom=$chrom "
+date
+
+set KDB=Kantor/$chrom/KantorDB
+if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then 
+
+    setenv megaRun ~/MEGA3/scripts/megaRun
+    echo -n 'starting MEGA3/scripts/megaRun :'
+    date
+
+    setenv chrom $chrom
+    pushd Kantor/$chrom/tmp
+      # if (! -d tmp/$species_kantor.data) mkdir tmp/$species_kantor.data
+       $megaRun $ici/$db  psort $species_kantor
+       $megaRun $ici/$db  acekog $species_kantor  
+      # $megaRun $ici/$db  pfam $species_kantor  
+      $megaRun $ici/$db blastp $species_kantor  
+      # $megaRun $ici/$db oligo $species_kantor   
+      # $megaRun $ici/$db acekog_n $species_kantor  
+      date
+    popd
+    
+    if (-e $db/k1.kantor_parse.done) \rm $db/k1.kantor_parse.done
+    touch  $db/k9.megaRun.done
+endif
+
+echo -n 'End of phase k9'
+date
+
+goto phaseLoop
+
+############################################################
+############################################################
+## Phase k9_server : megaRun this chromosome
+
+#to change the kantor because of the model change
+
+phasek9_server:
 
 echo -n "Start of phase k9 megaRun chrom=$chrom "
 date
@@ -182,7 +286,7 @@ EOF
   popd
 end
 
-echo -n 'End of phase k9'
+echo -n 'End of phase k9_server'
 date
 
 goto phaseLoop

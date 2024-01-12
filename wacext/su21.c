@@ -8796,15 +8796,16 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
   int mx1 = 8 ;
   static BOOL firstPass = TRUE ;
   static BOOL firstPassGhost = TRUE ;
-  BOOL isAdjoint = (kas->NN >= 0 && kas->a == 1 && kas->b == 1) ? TRUE : FALSE ;
+  BOOL isAdjoint = (kas->NN >= 0 && kas->a == 1 && kas->b == 0) ? TRUE : FALSE ;
 
   if (isGhost)
     {
       if (!kas->cccGhost)
 	kas->cccGhost = mxCreate (kas->h,  "cccGhost", MX_FLOAT, 10, 10, 10, 0) ;
       ccc = kas->cccGhost ;
-      if (! isAdjoint || ! firstPassGhost)
-	goto done ;
+      if (0)
+	if (! isAdjoint || ! firstPassGhost)
+	  goto done ;
       firstPassGhost = FALSE ;
     }
   else
@@ -8812,8 +8813,9 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
       if (! kas->ccc)
 	kas->ccc = mxCreate (kas->h,  "ccc", MX_FLOAT, 10, 10, 10, 0) ;
       ccc = kas->ccc ;
-      if (! isAdjoint || ! firstPass)
-	goto done ;
+      if (0)
+	if (! isAdjoint || ! firstPass)
+	  goto done ;
       firstPass = FALSE ;
     }
   
@@ -8869,10 +8871,10 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
 	  zz /= scale ;
 	
 	yy [100*i + 10*j + k] = zz ;
-	if (zz != 0)
-	  printf ("C3(%d%d%d)=%g ",i,j,k,zz) ;
+	if ((i+j+k==0)|| (zz != 0))
+	  printf ("ccc(%d%d%d)=%g ",i,j,k,zz) ;
       }
-  if (!firstPass && ! isAdjoint)
+  if (!firstPass && ! isAdjoint && ! isGhost)
     {
       float z0 = yyAdjoint[0] ;
       zscale = yy[0]/z0 ;
@@ -8894,7 +8896,7 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
     }
 
   niceShow (ccc) ;
-  /* the lower 3 tensor scales (a,b) relative to the lepton (a=1,b=0) by a factor s=(a+1)(2b-a-1)
+  /* the lower 3 tensor scales (a,b) relative to the lepton (a=1,b=0) by a factor s=(a+1)(2b-a-1) = (a+1)(y-1) = 1/4  Tr(Y)
    * for the quarks b=2/3,a=0  s=1/3, really -1/3 because we start on a right state, hence BIM lepton + 3 quarks = 0
    * whereas as operrators C_3(lepton)==0 (atypic) c_3(quarks) non zero
    */

@@ -2270,7 +2270,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   BOOL wantGene = !strcasecmp (featureType, "gene") ;
   BOOL wantMRNA = !strcasecmp (featureType, "mRNA") ;
   BOOL wantExon = !strcasecmp (featureType, "exon") ;
-  int ncRNA_type, mRNA_type, tRNA_type, Exon_type, CDS_type, gene_type ;
+  int ncRNA_type, mRNA_type, tRNA_type, rRNA_type, Exon_type, CDS_type, gene_type ;
   DICT *itemDict, *dict ;
   SHADOW *shadow, *shadow2 ;
   Array shadows ; 
@@ -2293,6 +2293,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   dictAdd (dict, "ZERO", 0) ;
   dictAdd (dict, "mRNA", &mRNA_type) ;
   dictAdd (dict, "tRNA", &tRNA_type) ;
+  dictAdd (dict, "rRNA", &rRNA_type) ;
   dictAdd (dict, "ncRNA", &ncRNA_type) ;
   dictAdd (dict, "exon", &Exon_type) ;
   dictAdd (dict, "CDS", &CDS_type) ;
@@ -2358,7 +2359,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	  if (sx->isGff3)
 	    {
 	      char *cq = aceInPos (ai) ;
-	      if (strcasecmp (cp, "tRNA") && 
+	      if (strcasecmp (cp, "rRNA") && 
+		  strcasecmp (cp, "tRNA") && 
 		  strcasecmp (cp, "ncRNA") && /*  in mouse the ncRNA seem to have exons */
 		  strcasecmp (cp, "exon") && 
 		  (strcasecmp (cp, "mRNA") || ! sx->gffBacteria) && 
@@ -2477,7 +2479,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		if (! wantCDS)
 		  shadow->gene = gtfItem ("gene", itemDict, ks) ;
 		if (! shadow->mrna &&
-		    ( type == tRNA_type || type == ncRNA_type)
+		    ( type == rRNA_type || type == tRNA_type || type == ncRNA_type)
 		    )
 		  shadow->mrna = shadow->ID ;
 	      }
@@ -2510,6 +2512,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	    shadow->gene = gtfItem ("gene_id", itemDict, ks) ;
 	    shadow->GeneID = gtfItem ("NCBI_GeneID", itemDict, ks) ;
 	    shadow->mrna = gtfItem ("transcript_id", itemDict, ks) ;
+	    shadow->protein_id = gtfItem ("protein_id", itemDict, ks) ;
 	    shadow->gene_title = gtfItem ("gene_name", itemDict, ks) ;
 	    shadow->gene_biotype = gtfItem ("gene_biotype", itemDict, ks) ;
 	    if (shadow->mrna && ! shadow->gene) shadow->gene = shadow->mrna ;
@@ -3402,6 +3405,7 @@ static void parseGtfFile (SX *sx)
       parseGtfFeature (sx, "pre_miRNA", ".mirnaRemap", 1, FALSE,  mrna2gene) ; /* mrna */
       parseGtfFeature (sx, "rRNA", ".rRNA", 1, FALSE,  mrna2gene) ; /* mrna */
       parseGtfFeature (sx, "tRNA", ".tRNA", 1, FALSE,  mrna2gene) ; /* mrna */
+      parseGtfFeature (sx, "ncRNA", ".ncRNA", 1, FALSE,  mrna2gene) ; /* mrna */
     }
   else
     {   /* written for the E.coli K12 gff dump from NCBY june 1 2015 

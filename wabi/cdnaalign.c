@@ -8244,8 +8244,21 @@ static Array  getGeneHits (KEY cosmid, Array hits, Array clipTops, Array clipEnd
 /*********************************************************************/
 typedef struct { KEY gene, type ; 
                 int a1, a2, x1, x2, exonNb, iGap ; 
-                BOOL isExon, isIntron, isGap, isOrfGap, isFirstExon, isLastExon ; } SPL ;
+  BOOL isExon, isIntron, isGap, isOrfGap, isFirstExon, isLastExon, isBack ; } SPL ;
 /* a1 a2 are in genomic, x1 x2 in mrna in construction */
+
+/*********************************************************************/
+
+static int splOrder (const void *va, const void *vb)
+{
+  const SPL *up = (const SPL *)va, *vp = (const SPL *)vb ;
+
+  if (up->a1 != vp->a1)
+    return up->a1 - vp->a1 ;
+  else if (up->a2 != vp->a2)
+    return up->a2 - vp->a2 ;      
+  return 0 ;
+} /* splOrder */
 
 /********************************************************************************/
 /* clean up all data associated to the gene */
@@ -11815,6 +11828,239 @@ static Array cDNARealignGetConnectedParts (KEY gene, BOOL splitCloud)
 }  /* cDNARealignGetConnectedParts */
 
 /*********************************************************************/
+/* 2023_12_01 :  splitClup == 4: splitOnGeneId
+ */
+
+static Array cDNARealignGetGeneIdParts (KEY gene)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  const char *errors = 0 ;
+  int nId = 0, nM = 0, nGCP = 0 ;
+  AC_DB db = ac_open_db (0, &errors) ; /* local database, cannot fail */
+  AC_OBJ Gene = ac_get_obj (db, className (gene), name (gene), h) ;
+  AC_TABLE ids = 0, tbl = 0 ;
+  Array aa = 0, aaM, aaIds ;
+  KEY typeMax = 0 ;
+  const char *ccp ;
+  GCP *gcp ;
+  SPL *up ;
+  int tg1, tg2 ;
+  ccp = "select tg,id from tg in @, g in tg->gene, pg in g->genefinder, id  in pg->GeneId " ;
+  ids = ac_obj_bql_table (Gene, ccp, 0, &errors, h) ; 
+  if (! ids || ids->rows < 2)
+    goto done ;
+   
+  aa = arrayHandleCreate (ids->rows, GCP, 0) ; 
+  aaIds = arrayHandleCreate (ids->rows, SPL, h) ; 
+
+  /* get the genome coordinate of each geneid */
+  ccp = "select id,chrom,a1,a2, tg1, tg2 from tg in @, g in tg->gene, pg in g->genefinder, id in pg->GeneId, chrom in pg->intmap, a1 in chrom[1], a2 in chrom[2], tchrom in tg->intmap, tg1 in tchrom[1], tg2 in tchrom[2]" ;
+  tbl = ac_obj_bql_table (Gene, ccp, 0, &errors, h) ; 
+  for (int ir = 0 ; ir < tbl->rows ; ir++)
+    {
+      int a1 = 0, a2 = 0 ;
+      KEY id = ac_table_key (tbl, ir, 0, 0) ;
+      for (int jr = ir ; jr < tbl->rows ; jr++)
+	{
+	  int b1, b2 ;
+	  KEY id2 = ac_table_key (tbl, jr, 0, 0) ;
+	  if (id2 != id)
+	    break ;
+	  b1 = ac_table_int (tbl, jr, 2, 0) ;
+	  b2 = ac_table_int (tbl, jr, 3, 0) ;
+	  if (b1 > b2) 
+	    { int b0 = b1 ; b1 = b2 ; b2 = b0 ; }
+	  tg1 = ac_table_int (tbl, jr, 4, 0) ;
+	  tg2 = ac_table_int (tbl, jr, 5, 0) ;
+	  if (tg1 > tg2) 
+	    { int tg0 = tg1 ; tg1 = tg2 ; tg2 = tg0 ;}
+
+	  if (a1 == 0)
+	    { a1 = b1 ; a2 = b2 ; continue ; }
+	  if (a1 > b1) a1 = b1 ;
+	  if (a2 < b2) a2 = b2 ;
+	}
+      up = arrayp (aaIds, nId++, SPL) ;
+      up->gene = id ; up->a1 = a1 ; up->a2 = a2 ;
+    }
+  /* merge overlapping Ids and extend them to the end of the genes */
+  if (nId > 1)
+    {
+      BOOL ok = TRUE ;
+      arraySort (aaIds, splOrder) ;
+      while (ok)   /* merge the geneid that overlap by half size */
+	{
+	  ok = FALSE ;
+	  for (int ii = 0 ; ! ok && ii < nId && ii < sizeof(KEY) ; ii++)
+	    {
+	      SPL *up = arrp (aaIds, ii, SPL) ;
+	      if (up->gene == 0)
+		continue ;
+	      for (int jj = ii + 1 ; !ok && jj < nId ; jj++)
+		{
+		  SPL *vp = arrp (aaIds, jj, SPL) ;
+		  if (vp->gene == 0)
+		    continue ;
+		  if (up->a2 > (vp->a1 + vp->a2)/2) /* fuse */
+		    { 
+		      if (up->a2 < vp->a2) 
+			up->a2 = vp->a2 ;
+		      vp->gene = 0 ;
+		      ok = TRUE ;
+		    }
+		  if ((up->a1 + up->a2)/2 > vp->a1) /* fuse */
+		    { 
+		      if (up->a2 < vp->a2) 
+			up->a2 = vp->a2 ;
+		      vp->gene = 0 ;
+		      ok = TRUE ;
+		    }
+		}
+	    }
+	}
+      ok = TRUE ;
+      while (ok)   /* shorten geneid that overlap a little */
+	{
+	  ok = FALSE ;
+	  for (int ii = 0 ; ! ok && ii < nId && ii < sizeof(KEY) ; ii++)
+	    {
+	      SPL *up = arrp (aaIds, ii, SPL) ;
+	      if (up->gene == 0)
+		continue ;
+	      for (int jj = ii + 1 ; !ok && jj < nId ; jj++)
+		{
+		  SPL *vp = arrp (aaIds, jj, SPL) ;
+		  if (vp->gene == 0)
+		    continue ;
+		  if (up->a2 > vp->a1)
+		    { 
+		      int x = vp->a1 ;
+		      vp->a1 = up->a2 ;
+		      up->a2 = x ;
+		      ok = TRUE ;
+		    }
+		}
+	    }
+	}
+      arraySort (aaIds, splOrder) ;
+      if (1)
+	{
+	  int jj = 0 ;
+	  SPL *up = arrp (aaIds, 0, SPL) ;
+	  SPL *vp = arrp (aaIds, 0, SPL) ;
+	  for (int ii = 0 ; ii < arrayMax (aaIds) ; ii++, up++)
+	    {
+	      if (up->gene)
+		{
+		  if (jj < ii) {*vp = *up ; }
+		  vp++ ; jj++ ;
+		}
+	    }
+	  nId = arrayMax (aaIds) = jj ;
+	}
+    }
+  if (nId < 2)
+    goto done ;
+  else
+    {  /* expand the first and last geneid to the end of the gene */
+      SPL *up = arrp (aaIds, 0, SPL) ;
+      if (up->a1 > tg1) up->a1 = tg1 ;
+      up = arrp (aaIds, nId - 1, SPL) ;
+      if (up->a2 < tg2) up->a2 = tg2 ;
+    }
+  /* get the genome coordinate of each mrna */
+  ccp = "select m, chrom, a1,a2 from tg in @, m in tg->mrna, chrom in m->intmap, a1 in chrom[1], a2 in chrom[2]" ;
+  tbl = ac_obj_bql_table (Gene, ccp, 0, &errors, h) ; 
+  aaM = arrayHandleCreate (1+tbl->rows, SPL, h) ; 
+  for (int ir = 0 ; ir < tbl->rows ; ir++)
+    {
+      int a1 = 0, a2 = 0 ;
+      KEY id = ac_table_key (tbl, ir, 0, 0) ;
+      BOOL isBack = FALSE ;
+      for (int jr = ir ; jr < tbl->rows ; jr++)
+	{
+	  int b1, b2 ;
+	  KEY id2 = ac_table_key (tbl, jr, 0, 0) ;
+	  if (id2 != id)
+	    break ;
+	  b1 = ac_table_int (tbl, jr, 2, 0) ;
+	  b2 = ac_table_int (tbl, jr, 3, 0) ;
+	  if (b1 > b2) { int b0 = b1 ; b1 = b2 ; b2 = b0 ; isBack = TRUE ; }
+	    {
+	      if (a1 == 0)
+		{ a1 = b1 ; a2 = b2 ; continue ; }
+	      if (a1 > b1) a1 = b1 ;
+	      if (a2 < b2) a2 = b2 ;
+	    }
+	}
+      up = arrayp (aaM, nM++, SPL) ;
+      up->isBack = isBack ;
+      up->gene = id ; up->a1 = a1 ; up->a2 = a2 ;
+      /* check if mrna intersects the NM */
+      for (int ii = 0 ; ii < nId && ii < sizeof(KEY) ; ii++)
+	{
+	  SPL *vp = arrp (aaIds, ii, SPL) ;
+	  if (up->a1 < vp->a2 - 50 && up->a2 > vp->a1 + 50)
+	    up->type |= (1<<ii) ;
+	  if (up->type > typeMax)
+	    typeMax = up->type ;
+	}
+    }
+
+  /* now we create the GCP with all mrna of a given type */
+  for (KEY type = 0 ; type <= typeMax ; type++)
+    {
+      for (int ii = 0 ; ii < nM ; ii++)
+	{
+	  up = arrayp (aaM, ii, SPL) ;
+	  if (up->type == type)
+	    {
+	      AC_OBJ Mrna = ac_get_obj (db, className (up->gene), name (up->gene), h) ;
+	      AC_TABLE clones = ac_obj_bql_table (Mrna, ">cdna_clone", 0, &errors, 0) ; 
+	      
+	      if (clones)
+		{
+		  gcp = arrayp (aa, type, GCP) ;
+		  gcp->isReversed = up->isBack ;
+		  if (! gcp->clones)
+		    gcp->clones = keySetCreate () ;
+		  for (int i = 0 ; i < clones->rows ; i++)
+		    keySet (gcp->clones, keySetMax(gcp->clones)) = ac_table_key (clones, i, 0, 0) ;
+		}
+	      ac_free (Mrna) ;
+	      ac_free (clones) ;
+	    }
+	}
+    }
+
+  /* compress the GCP */
+  nGCP = arrayMax (aa) ;
+  if (nGCP > 0)
+    {
+      int jj = 0 ;
+      GCP *up = arrp (aa, 0, GCP) ; 
+      GCP *vp = arrp (aa, 0, GCP) ; 
+      for (int ii = 0 ; ii < arrayMax (aa) ; up++, ii++)
+	{
+	  if (up->clones)
+	    {
+	      if (ii > jj)
+		vp->clones = up->clones ;
+	      keySetSort (vp->clones) ;
+	      keySetCompress (vp->clones) ;
+	      jj++ ; vp++ ;
+	    }
+	}
+      nGCP = arrayMax (aa) = jj ;
+    }
+ 
+ done:
+  ac_free (db) ;
+  ac_free (h) ;
+  return aa ;
+}  /* cDNARealignGetGeneIdParts */
+
+/*********************************************************************/
 /* cut the clones of this genes in subsets corresponding to 
  * connected groups of mRNAs: sharing at least a clone or a boundary
  * 2007_02_10 or touching if no intron, or touching by 1/3 if introns
@@ -11854,7 +12100,15 @@ static KEYSET cDNARealignCutPart (KEY cosmid, KEY gene,
       GCP *gcp ;
       int ii ;
       
-      aa = cDNARealignGetConnectedParts (gene, splitCloud) ;
+      if (splitCloud == 4)
+	{
+	  aa = cDNARealignGetGeneIdParts (gene) ;
+	  if (! aa || arrayMax (aa) < 2)
+	    goto done ;
+	}
+      else
+	aa = cDNARealignGetConnectedParts (gene, splitCloud) ;
+
       if (! keyFindTag (gene, _Assembled_from) ||
           arrayMax(aa)
           )
@@ -11889,7 +12143,7 @@ static KEYSET cDNARealignCutPart (KEY cosmid, KEY gene,
               }
         }
       else
-        gene = 0 ; /* avoid desctruction */
+        gene = 0 ; /* avoid destruction */
       arrayDestroy (aa) ;
     }
   else if (0)
@@ -11934,8 +12188,9 @@ static KEYSET cDNARealignCutPart (KEY cosmid, KEY gene,
       if ((Gene = bsUpdate(gene)))
         bsKill (Gene) ;
     }
+
+ done:  
   OLIGO_LENGTH = old ;
-  
   recursionLevel-- ;
   return genes ;
 } /* cDNARealignGeneCutPart */
@@ -11947,6 +12202,7 @@ static KEYSET cDNARealignCutPart (KEY cosmid, KEY gene,
  *
  * searchRepeats = 1 => align recursivelly from bottom of cosmid up
  * searchRepeats = 2 => rubber, repeat with increased inron cost
+ *  splitCloud == 4 => splitGeneId
  */
 KEY cDNARealignGene (KEY gene, int z1, int z2, int direction,
                      BOOL doFuse, int doLimit, int  searchRepeats, int splitCloud)
@@ -12108,6 +12364,16 @@ KEY cDNARealignGene (KEY gene, int z1, int z2, int direction,
           newGenes = cDNARealignCutPart (cosmid, gene, z1, z2
                                          , direction, doLimit
                                          , 0, mySplitCloud) ;  
+          mySplitCloud = 1 ; /* recalculate if several mrna-sets */
+          if (newGenes)
+            cDNARealignGeneKeySet (newGenes, FALSE, 2, 0, mySplitCloud) ;
+        }
+       else if (splitCloud == 4) /* split geneId recalculation, then split */
+        {
+          mySplitCloud = 0 ; /* force recalculation if several mrna-sets  OR if !read */
+          newGenes = cDNARealignCutPart (cosmid, gene, z1, z2
+                                         , direction, doLimit
+                                         , 0, 4) ;  
           mySplitCloud = 1 ; /* recalculate if several mrna-sets */
           if (newGenes)
             cDNARealignGeneKeySet (newGenes, FALSE, 2, 0, mySplitCloud) ;

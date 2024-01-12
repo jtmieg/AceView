@@ -5081,6 +5081,7 @@ lao:
     case 's': /* Recompute Splicing */
     case 'S': /* Limit this gene to the active zone */
     case 'T': /* Shed weakly connected variants */
+    case 'U': /* split genebox by geneId */
      if (gene)
 	{
 	  KEY cosmid = keyGetKey (gene, _Genomic_sequence) ;
@@ -5102,6 +5103,14 @@ lao:
 		cDNARealignGene (gene, z2 - myMax, z2 - myMin, 1, FALSE, 1, 0, 2) ;
 	      else
 		cDNARealignGene (gene, myMin - z1, myMax - z1, 2, FALSE, 1, 0, 2) ;
+	    }
+	  else if ( key == 'U')
+	    { 
+	      myMin = look->zoneMin ; myMax = look->zoneMax;  
+	      if (seg1->type & 0x1) /* up cosmid */
+		cDNARealignGene (gene, z2 - myMax, z2 - myMin, 1, FALSE, 1, 0, 4) ;
+	      else
+		cDNARealignGene (gene, myMin - z1, myMax - z1, 2, FALSE, 1, 0, 4) ;
 	    }
 	  else 
 	    { 
@@ -5407,8 +5416,6 @@ lao:
       fMapTranscribedGeneAbsorbInGeneBoxTg = gene ;
       displayBlock (fMapTranscribedGeneAbsorbInGeneBoxPick, 0) ;
       return ; /* no fmapredraw needed */
-    case 'U': /* split genebox by geneId */
-      break ; /* fmapredraw needed */
      case 'B': /* new annotator */
       if ((key = keyGetKey (gene, str2tag ("Derived_from_gene"))))
 	geneAnnotDisplay (0, key, 0) ;

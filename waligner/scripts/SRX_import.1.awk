@@ -207,6 +207,10 @@ function parseDate(d) {
 	z = "Helicos" ;
     else if ($19 == "ILLUMINA")
 	z = "Illumina" ;
+    else if ($19 == "ULTIMA")
+	z = "Ultima" ;
+    else if ($19 == "DNBSEQ")
+	z = "DNBSEQ" ;
     else if ($19 == "BGISEQ")
 	z = "Illumina" ;
     else if ($19 == "ION_TORRENT")

@@ -1869,7 +1869,7 @@ static BOOL snpFilter (TSNP *tsnp, SNP *snp)
 
 /*************************************************************************************/
 
-static const char *allMethods = "VIQSgd" ;
+static const char *allMethods = "VIQSgrGR" ;
 /* VIQSgd   */
 /* VIQSDGR     */
 /* VIQSG2   */
@@ -2201,7 +2201,7 @@ static int snpGetSnpsRunsGroups (TSNP *tsnp)
   if (! keySetMax (tsnp->runs))
     messcrash ("No run in project %s\n", tsnp->project) ;
   if (! keySetMax (tsnp->groups))
-    messcrash ("No group in project %s\n", tsnp->project) ;
+    messout ("No group in project %s\n", tsnp->project) ;
 
   switch (tsnp->snpType)
     {

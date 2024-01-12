@@ -139,6 +139,9 @@ endif
     endif
   end
 
+  if (-e tmp/METADATA/gtf.av.goodProduct.ace( then
+    echo "pparse tmp/METADATA/gtf.av.goodProduct.ace" >> $toto
+  endif
   if (-e tmp/METADATA/$MAGIC.av.captured_genes.ace) then
     echo "pparse tmp/METADATA/$MAGIC.av.captured_genes.ace" >> $toto
   endif

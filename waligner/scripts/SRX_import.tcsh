@@ -109,6 +109,13 @@ if ($species == Lysobacter) then
   set date=2019_01_28
   set ff='/home/mieg/ACEVIEWHELP/Viruses_microbes_DATA/2019_Jan28Michael_Galperin_Lysobacter_enzymogenes_SraRunInfo.txt'
 endif
+if ($species == TD) then
+  set date=2023_12_11
+  set ff1='/home/mieg/AW/tardigrade_DATA/20231208_16_DNA_Ramazzottius_varieornatus_SraRunInfo.txt'
+  set ff2='/home/mieg/AW/tardigrade_DATA/20231208_161_RNA_Ramazzottius_varieornatus_SraRunInfo.txt'
+  cat $ff1 $ff2 > SRX_DB/TD.runInfo.txt
+  set ff=`pwd`/SRX_DB/TD.runInfo.txt
+endif
 
 echo "species=$species date=$date"
 set today=`echo $date | sed -e 's/_/-/g'`
