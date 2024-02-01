@@ -8806,7 +8806,8 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
       if (0)
 	if (! isAdjoint || ! firstPassGhost)
 	  goto done ;
-      firstPassGhost = FALSE ;
+      if (isAdjoint)
+	firstPassGhost = FALSE ;
     }
   else
     {
@@ -8816,7 +8817,8 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
       if (0)
 	if (! isAdjoint || ! firstPass)
 	  goto done ;
-      firstPass = FALSE ;
+      if (isAdjoint)
+	firstPass = FALSE ;
     }
   
   printf ("Lower ccc:: ") ;
@@ -8837,7 +8839,7 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
 	MX u,v,x,y ;
 	MX z = mxCreate (h, "z", MX_INT, d, d, 0) ;
 	const int *xx ;
-	
+	float zz1 ;	
 	u = mxMatMult (a, b, h) ;
 	v = mxMatMult (u, c, h) ;
 	x = mxMatMult (a, c, h) ;
@@ -8856,24 +8858,30 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
 	else
 	  z = mxAdd (z, v, y, h) ;
 	mxValues (z, &xx, 0, 0) ;
-	zz = 0 ;
+	zz = 0  ; /* STr (a[i,j]) */
+	zz1 = 0 ; /*  Tr (a[i,j]) */
 	for (i1 = 0 ; i1 < d ; i1++)
 	  {
 	    int NN = kas->NN ;
 	    int dd2 = NN ? d/NN : d ;
 	    int i2 = i1 % dd2 ; 
 	    zz += (i2 < d1 || i2 >= d1 + d2 + d3 ? xx[d*i1 + i1] : - xx[d*i1 + i1]) ;
+	    zz1 += (i2 < d1 || i2 >= d1 + d2 + d3 ? xx[d*i1 + i1] : + xx[d*i1 + i1]) ;
 	  }
 	zz *= kas->chi/2.0 ;
 
 	scale = (i>=4 || j >= 4 || k >= 4) ? kas->scale : 0 ;
 	if (scale != 0)
-	  zz /= scale ;
+	  { zz /= scale ; zz1 /= scale ; }
 	
 	yy [100*i + 10*j + k] = zz ;
 	if ((i+j+k==0)|| (zz != 0))
-	  printf ("ccc(%d%d%d)=%g ",i,j,k,zz) ;
+	  printf ("LOWERcccSTr (%d%d%d a=%d b=%d)=%g\n ",i,j,k,kas->a,kas->b,zz) ;
+	if ((i+j+k==0)|| (zz1 != 0))
+	  printf ("LOWERcccTr (%d%d%d a=%d b=%d)=%g\n ",i,j,k,kas->a,kas->b,zz1) ;
       }
+  if (! isAdjoint || ! firstPassGhost)
+    goto done ;
   if (!firstPass && ! isAdjoint && ! isGhost)
     {
       float z0 = yyAdjoint[0] ;
@@ -11959,7 +11967,7 @@ static void muInitNMarcu (int a, int b, int NN)
 	  {
 	    KasimirUpperTensor (&kasQ) ;
 	  }
-	if (0 && kasQ.show)
+	if (1 && kasQ.show)
 	  KasimirOperatorK3 (&kasQ) ;
 
   exit(0) ;

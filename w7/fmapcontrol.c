@@ -146,7 +146,7 @@ static KEY _EMBL_feature ;
        KEY _Arg1_URL_suffix ;
        KEY _Arg2_URL_prefix ;
        KEY _Arg2_URL_suffix ;
-static KEY _Spliced_cDNA, _Spliced_cDNA_Decorate,  _Gene_name, _Transcribed_gene, _From_gene ;
+static KEY _Exon_support, _Spliced_cDNA, _Spliced_cDNA_Decorate,  _Gene_name, _Transcribed_gene, _From_gene ;
 static KEY _Probe_hit, _Probe_exact_hit ;
 static KEY _VIntron = 0, _VTranscribed_gene = 0, _VTranscript = 0 , _VmRNA = 0,  _VmProduct = 0, _VRNAi = 0, _VIST = 0, _VOST = 0 ;
 static KEY _Fmap_Header
@@ -199,6 +199,7 @@ void fMapInitialise (void)
   _Arg2_URL_prefix = str2tag ("Arg2_URL_prefix") ;
   _Arg2_URL_suffix = str2tag ("Arg2_URL_suffix") ;
   _From_gene  = str2tag ("From_gene") ;
+  _Exon_support = str2tag ("Exon_support") ;
   _Spliced_cDNA  = str2tag ("Spliced_cDNA") ;
   _Spliced_cDNA_Decorate  = str2tag ("Spliced_cDNA_Decorate") ;
   _Gene_name = str2tag ("Gene_name") ;
@@ -1843,36 +1844,18 @@ int fMapOrder (const void *a, const void *b)
   else if (diff < 0)
     return -1 ;
 
-  if ((seg1->type | 0x1) == SPLICED_cDNA_UP)
+  if ((seg1->type | 0x1) == SPLICED_cDNA_UP || (seg1->type | 0x1) == EXON_SUPPORT_UP)
     {
       if (! (seg1->source && seg2->source)) /* The transcribed_gene */
 	return seg1->source ? -1 : 1 ;
-      diff = * (int*) (&seg1->source) - * (int*) (&seg2->source) ;
-      if (diff)
-	return diff ;
-      diff = seg1->parent - seg2->parent ;  /* The cdna top coord */
-      if (diff)
-	return (seg1->type & 0x1) ? -diff : diff ;
-      else /* same parent */
-      {
-	int x1, x2, y1, y2 ;  /* the way this est-seg goes in the gene */
+      if (seg1->source < seg2->source) return -1 ;
+      if (seg1->source > seg2->source) return 1 ;
 
-	x1 = seg1->data.i >> 14 & 0x3FFF ;
-	x2 = seg1->data.i & 0x3FFF ;
-	y1 = seg2->data.i >> 14 & 0x3FFF ;
-	y2 = seg2->data.i & 0x3FFF ;
-	
-	if ((x1 - x2) * (y1 - y2) < 0) 
-	  {
-	    if (seg1->type & 0x1)
-	      return x1 > x2 ? -1 : 1 ;
-	    else
-	      return x1 < x2 ? -1 : 1 ;
-	  }
-	diff = seg1->key - seg2->key ;
-	if (diff) /* different reads from same clone */
-	  return diff ;
-      }
+      if (seg1->x1 < seg2->x1) return -1 ;
+      if (seg1->x1 > seg2->x1) return 1 ;
+
+      if (seg1->key < seg2->key) return -1 ;
+      if (seg1->key > seg2->key) return 1 ;
     }
   if ((seg1->type | 0x1) == TRANSCRIBEDGENE_UP ||
       (seg1->type | 0x1) == TRANSCRIPT_UP ||
@@ -2074,13 +2057,15 @@ void fMapProcessMethods (LOOK look)
 	    processMethod (look, key, 3.25, fMapcDNAShowProbe) ; 
 	    break ;
 	  case MOST: case MOST_UP:
-	    processMethod (look, key, 3.28, fMapcDNAShowOST) ; 
+	    processMethod (look, key, 3.27, fMapcDNAShowOST) ; 
 	    break ;
 	  case MPRODUCT: case MPRODUCT_UP:
 	    processMethod (look, key, 3.08, fMapcDNAShowMProduct) ; 
 	    break ;
+	  case EXON_SUPPORT: case EXON_SUPPORT_UP:
+	    processMethod (look, key, 3.28, fMapcDNAShowExonSupport) ; 
 	  case SPLICED_cDNA: case SPLICED_cDNA_UP:
-	    processMethod (look, key, 3.32, fMapcDNAShowSplicedcDNA) ; 
+	    processMethod (look, key, 3.30, fMapcDNAShowSplicedcDNA) ; 
 	  case SPLICED_cDNA_DECORATE: case SPLICED_cDNA_DECORATE_UP:
 	    processMethod (look, key, 3.30, fMapcDNADecorateSplicedcDNA) ; 
 	    break ;
@@ -2232,7 +2217,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
   BOOL	isDown, isExons ;
   AC_HANDLE oldSegsHandle ;
   SEQINFO *sinf ;
-  KEY M_Transposon, M_SPLICED_cDNA, M_SPLICED_cDNA_DECORATE, M_GENE_NAME, M_RNA ;
+  KEY M_Transposon, M_EXON_SUPPORT, M_SPLICED_cDNA, M_SPLICED_cDNA_DECORATE, M_GENE_NAME, M_RNA ;
   KEY M_TRANSCRIBEDGENE, M_TRANSCRIPT, M_mRNA, M_PmRNA, M_mProduct, M_GENES, M_RNAI, M_SOLEXA, M_OST, M_Pseudogene, M_Coding ;
   KEY _Best_product = str2tag ("Best_product") ;
   Array units = 0 ;
@@ -2259,6 +2244,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
   M_OST = defaultSubsequenceKey ("OST", DARKGRAY, 3.06, TRUE) ;
   M_mProduct = defaultSubsequenceKey ("mProduct", DARKGRAY, 3.3, TRUE) ;
   M_TRANSCRIPT = defaultSubsequenceKey ("TRANSCRIPT", DARKGRAY, 3.24, FALSE) ;
+  M_EXON_SUPPORT = defaultSubsequenceKey ("EXON_SUPPORT", DARKGRAY, 3.35, TRUE) ;
   M_SPLICED_cDNA = defaultSubsequenceKey ("SPLICED_cDNA", DARKGRAY, 3.4, FALSE) ;
   M_SPLICED_cDNA_DECORATE = defaultSubsequenceKey ("SPLICED_cDNA_DECORATE", DARKGRAY, 3.4, FALSE) ;
   M_GENE_NAME = defaultSubsequenceKey ("GENE_NAME", DARKGRAY, 10.0, FALSE) ;
@@ -3464,7 +3450,9 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	  seg1 = arrayp (segs,nsegs++,SEG) ; seg = arrp (segs,iseg,SEG) ;
 	  seg1->key = M_SPLICED_cDNA ;
 	  seg1->type = (isDown) ? SPLICED_cDNA : SPLICED_cDNA_UP ;
-
+	  seg1 = arrayp (segs,nsegs++,SEG) ; seg = arrp (segs,iseg,SEG) ;
+	  seg1->key = M_EXON_SUPPORT ;
+	  seg1->type = (isDown) ? EXON_SUPPORT : EXON_SUPPORT_UP ;
 	  for (i = 0 ; !foundGeneName && i < arrayMax (units) ; i += 5)
 	    { 
 	      KEY est = arr (units, i+2, BSunit).k ;
@@ -3516,7 +3504,9 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	      fMapcDNADoFillData (seg1) ; /* implies objCreate, unfortunate, but needed for ordering */ 
 	      /* now seg1->parent == KEYKEY (cdna_clone */
 	      seg1->type = (isDown) ? SPLICED_cDNA : SPLICED_cDNA_UP ;
-	      seg1->source = seg->x1 + 1 ;  /* avoid zero , as happens in mRNA case where parent is main object*/
+	      if (! strncmp (name(seg1->key), "XH_",3)|| ! strncmp (name(seg1->key), "XG_",3))
+		seg1->type = (isDown) ? EXON_SUPPORT : EXON_SUPPORT_UP ;
+	      seg1->parent = seg->x1 + 1 ;  /* avoid zero , as happens in mRNA case where parent is main object*/
 	    }
 	  for (i = i0 ; i < nsegs ; i++) /* get the lowest x1 for each clone */
 	    {
@@ -3524,7 +3514,8 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	      KEY myparent, mysource, mytag ;
 	      BOOL myup ;
 	      seg = arrp (segs, i , SEG) ;
-	      if ((seg->type | 0x1) != SPLICED_cDNA_UP)
+	      if ((seg->type | 0x1) != SPLICED_cDNA_UP &&
+		  (seg->type | 0x1) != EXON_SUPPORT_UP)
 		continue ;
 
 	      if (class (seg->key) == _VMethod)
@@ -3578,10 +3569,12 @@ BOOL fMapConvert (LOOK look, BOOL force)
 		{
 		  /* cheat so that tilingEst appear globaly left of the non tiling est if fMapOrder */
 		case SPLICED_cDNA:
+		case EXON_SUPPORT:
 		  if (keySetFind (tilingEst, seg1->key, 0))
 		    seg1->source-- ; 
 		  break ;
 		case SPLICED_cDNA_UP:
+		case EXON_SUPPORT_UP:
 		  if (keySetFind (tilingEst, seg1->key, 0))
 		    seg1->source++ ; 
 		  break ;
@@ -4031,6 +4024,8 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	    seg->type ^= 1 ;
 	  if ((seg->type | 0x1) == TRANSCRIBEDGENE_UP)
 	    seg->source = top - seg->source - seg->sourceDx ;
+	  if ((seg->type | 0x1) == EXON_SUPPORT_UP)
+	    seg->source = top - seg->source  - seg->sourceDx;
 	  if ((seg->type | 0x1) == SPLICED_cDNA_UP)
 	    seg->source = top - seg->source  - seg->sourceDx;
 	  if ((seg->type | 0x1) == TRANSCRIPT_UP)
@@ -4126,6 +4121,7 @@ char* fMapSegTypeName[] = {
   "SPLICE5", "SPLICE5_UP",
   "CODING", "CODING_UP",
   "TRANSCRIBEDGENE", "TRANSCRIBEDGENE_UP",
+  "EXON_SUPPORT", "EXON_SUPPORT_UP",
   "SPLICED_cDNA", "SPLICED_cDNA_UP",
   "SPLICED_cDNA_DECORATE", "SPLICED_cDNA_DECORATE_UP",
   "GENE_NAME", "GENE_NAME_UP",
@@ -4412,6 +4408,7 @@ void fMapReportLine (LOOK look, SEG *seg, BOOL isGIF, float x)
 			     look->gf.cum[seg->x2 + 1 - look->gf.min] -
 			     look->gf.cum[seg->x1 - look->gf.min]), 64) ;
       break ;
+    case EXON_SUPPORT: case EXON_SUPPORT_UP:
     case SPLICED_cDNA: case SPLICED_cDNA_UP:
      	fMapcDNAReportLine (look->segTextBuf,seg,256) ;
       break ;
@@ -4878,6 +4875,7 @@ static void fMapFollow (LOOK look, double x, double y)
     }
 
   if ((seg->type | 0x1) == SPLICED_cDNA_UP ||
+      (seg->type | 0x1) == EXON_SUPPORT_UP ||
       (seg->type | 0x1) == TRANSCRIBEDGENE_UP )
     { if (fMapcDNAFollow (look->activeBox))
 	return ;
@@ -5015,6 +5013,7 @@ void fMapRC (LOOK look)
       if (seg->type >= SEQUENCE && seg->type <= ALLELE_UP)
 	seg->type ^= 1 ;
       if ((seg->type | 0x1) == SPLICED_cDNA_UP ||
+	  (seg->type | 0x1) == EXON_SUPPORT_UP ||
 	  (seg->type | 0x1) == TRANSCRIBEDGENE_UP ||
 	  (seg->type | 0x1) == TRANSCRIPT_UP ||
 	  (seg->type | 0x1) == PMRNA_UP ||

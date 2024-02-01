@@ -3182,12 +3182,12 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		  {
 		    int v1 = 0 ; /*  v2 = 0 ; */
 		    hasCDS = FALSE ;
-		    for ( ; j < i && ! hasCDS; j++, shadow2++)
+		    for ( ; j < i && ! hasCDS ; j++, shadow2++)
 		      {
 			if (shadow2->cds && ! hasCDS)
 			  {
 			    hasCDS = TRUE ;
-			    aceOutf (ao, "CDS\n") ; 
+			    aceOutf (ao, "CDS // a=%d %d   x=%d %d\n", shadow2->a1, shadow2->a2, shadow2->x1, shadow2->x2) ; 
 			    v1 = shadow2->a1 ;
 			    /* v2 = shadow2->a2 ;   v1, v2 first cds */
 			  }
@@ -3242,6 +3242,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 			    {
 			      if (! cds->cds)
 				continue ;
+
 			      b1 = cds->x1 + dxCDS > shadow2->x1 ? cds->x1 + dxCDS : shadow2->x1 ;
 			      b2 = cds->x2 + dxCDS < shadow2->x2 ? cds->x2 + dxCDS : shadow2->x2 ;
 			      if (b1 <= b2)
@@ -3266,7 +3267,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 				      v2 = shadow2->isDown ? u2 - a1 + 1 : a1 - u2 + 1 ;
 				      v2 = v1 + b2 - shadow2->x1 ;
 				      v1 = v1 + b1 - shadow2->x1 ;
-				      aceOutf (ao, "Source_exons %d %d %s\n" 
+				      aceOutf (ao, "Source_exons %d %d %s\n"
 					       , v1+ dv, v2+ dv
 					       , "CDS"
 					       ) ;

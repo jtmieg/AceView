@@ -123,6 +123,7 @@
                             Dauer UNIQUE ?Text
                             Larva UNIQUE ?Text
                             Pupa UNIQUE ?Text
+                            Juvenile UNIQUE ?Text
                             Adult UNIQUE  ?Text
                             Mixed_stages UNIQUE   UNIQUE ?Text
                             Age UNIQUE Text

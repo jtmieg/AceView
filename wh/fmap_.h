@@ -169,6 +169,7 @@ typedef enum {
   MRNA, MRNA_UP,
   MPRODUCT, MPRODUCT_UP,
   TRANSCRIPT, TRANSCRIPT_UP,
+  EXON_SUPPORT,  EXON_SUPPORT_UP,
   SPLICED_cDNA, SPLICED_cDNA_UP,
   SPLICED_cDNA_DECORATE, SPLICED_cDNA_DECORATE_UP,
   MGENES, MGENES_UP,
@@ -357,6 +358,7 @@ void fMapcDNAShowProbe (LOOK look, float *offset) ;
 BOOL fMapcDNAProbePosition (LOOK look, OBJ Mrna, SEG *seg, KEY probe, int *p1, int *p2) ;
 void fMapcDNADecorateSplicedcDNA (LOOK look, float *offset) ;
 void fMapcDNAGeneName (LOOK look, float *offset) ;
+void fMapcDNAShowExonSupport (LOOK look, float *offset) ;
 void fMapcDNAShowSplicedcDNA (LOOK look, float *offset) ;
 void fMapcDNAShowTranscribedgene (LOOK look, float *offset) ;
 void fMapcDNAShowTranscript (LOOK look, float *offset) ;

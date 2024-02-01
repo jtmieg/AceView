@@ -226,6 +226,7 @@ static void sxVentilate (WIGGLE *sx)
   BOOL multiVentilate = sx->multiVentilate ;
   BOOL hierarchic = sx->hierarchic ;
   BOOL firstRead ;
+  BOOL inTranscript = FALSE ;
   BOOL hasPair = sx->pair ? TRUE : FALSE ;  /* we also autodetect the pairs */
   BOOL goodPair = TRUE ;
   BOOL isPartial = FALSE ;
@@ -335,6 +336,7 @@ static void sxVentilate (WIGGLE *sx)
 
       if (0 && target_class != 'B') /* hack to do just the rrna */
 	continue ;
+      inTranscript = FALSE ;
       switch (target_class)
 	{
 	case 'A': /* mito */ 
@@ -355,6 +357,7 @@ static void sxVentilate (WIGGLE *sx)
 	    {
 	      if (! dictFind (sx->mapDict, messprintf("%s:%s", dictName (sx->target_mapDict, tc), ccp), &map))
 		continue ;
+	      inTranscript = TRUE ;
 	      chrom = keySet (sx->map2remap, map) ;
 	      if (! chrom)
 		continue ;
@@ -376,6 +379,13 @@ static void sxVentilate (WIGGLE *sx)
       if (! aceInStep (ai, '\t') || ! aceInInt (ai, &nN)) continue ;
       if (! aceInStep (ai, '\t') || ! aceInInt (ai, &nErr)) continue ;
 
+      /* 2024_01_12: in non stranded case, trust the strand of the annotated gene */
+      if (inTranscript && sx->ventilate && ! sx->strand && ! sx->antistrand)
+	{
+	  if (firstRead && a1 > a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
+	  if (!firstRead && a1 < a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
+	}
+
       if (sx->maxErr && nErr > sx->maxErr && 100 * nErr > sx->maxErrRate * ali)
 	continue ;
 
@@ -393,7 +403,7 @@ static void sxVentilate (WIGGLE *sx)
 	  if (e1 > e2 && e2 < e1 - sx->out_step) e2 = e1 - sx->out_step ;
 	}
       
-      if (1 && sx->antistrand)    /* we need to do that to allow adding up stranded and antistraned runs in the same group */
+      if (sx->antistrand)    /* we need to do that to allow adding up stranded and antistraned runs in the same group */
 	firstRead = ! firstRead ;
       /*  2015_06_12 : getting this right is amazingly difficult !
        * E [LR] {FR} : E = ends, LR = left or right end of the genebox in the orientation of the genome
@@ -1346,6 +1356,7 @@ int main (int argc, const char **argv)
 	  if (sx.swiggleFileName1 || sx.swiggleFileName2)
 	    {
 	      Array Aaaa = 0, Baaa = 0, Alpha = 0 ;
+	      Array aaa1 = 0 ;
 	      ACEIN old = sx.ai ;
 	      AC_HANDLE h = 0 ;
 
@@ -1400,19 +1411,28 @@ int main (int argc, const char **argv)
 		{
 		  sx.ai = aceInCreate (sx.wiggleFileName1, sx.gzi, h) ;
 		  aceInSpecial (sx.ai,"\t\n") ;
-		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
+		  sxWiggleParse (&sx, 0, 0) ;      /* parse x1 */
+		  ac_free (sx.ai) ;
+		}
+	      if (1) /* preserve the first wiggle and parse again */
+		{
+		  aaa1 = sx.aaa ;
+		  sx.aaa = arrayHandleCreate (arrayMax (Aaaa), Array, h) ;
+		  sx.ai = aceInCreate (sx.wiggleFileName1, sx.gzi, h) ;
+		  aceInSpecial (sx.ai,"\t\n") ;
+		  sxWiggleParse (&sx, 0, 0) ;      /* parse x1 */
 		  ac_free (sx.ai) ;
 		}
 	      if (1) /* parse y, and add into z = x + y */
 		{
 		  sx.ai = aceInCreate (sx.wiggleFileName2, sx.gzi, h) ;
 		  aceInSpecial (sx.ai,"\t\n") ;
-		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
-		  ac_free (sx.ai) ;
+		  sxWiggleParse (&sx, 0, 0) ;      /* parse x2 -> x1+x2 */
+		  ac_free (sx.ai) ;    
 		}
 	      if (1) /* compute x' = alpha * zadd y */
 		{
-		  sxWiggleMultiplyLocally (&sx, Alpha) ;      /* parse x */
+		  sxWiggleMultiplyLocally (&sx, Alpha, aaa1) ;      /* ratio */
 		}
 	      sxWiggleExport (&sx) ;
 	   

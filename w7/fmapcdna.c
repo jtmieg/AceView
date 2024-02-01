@@ -769,7 +769,8 @@ static void estBubbleInfo (int box, SEG *seg, int origin, int type)
     }
 }
 
-void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
+
+void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSupport)
 {
   int ii, box = -1, x1, x2; KEY bgCol ;
   SEG *seg ;
@@ -783,6 +784,7 @@ void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
   BSMARK mark = 0 ;
   int MY_MAGENTA = LIGHTGRAY ;
   KEY _aForward = 0, _aReverse = 0 ;
+  BOOL foundCompositeColour = FALSE ;
 
   if (*offset > mapGraphWidth)
     return ;
@@ -803,13 +805,27 @@ void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
 
   for (ii = 1 ; ii < arrayMax(look->segs) ; ++ii)
     { 
+      foundCompositeColour = FALSE ;	       
       seg = arrp(look->segs,ii,SEG) ;
-      switch (seg->type)
+      if (showExonSupport)
 	{
-	case SPLICED_cDNA: if (isDown) break ; else continue ;
-	case SPLICED_cDNA_UP: if (!isDown) break ; else continue ;
-	default: continue ;
-	} 
+	  switch (seg->type)
+	    {
+	    case EXON_SUPPORT: if (isDown) break ; else continue ;
+	    case EXON_SUPPORT_UP: if (!isDown) break ; else continue ;
+	    default: continue ;
+	    }
+	}
+      else
+	{
+	  switch (seg->type)
+	    {
+	    case SPLICED_cDNA: if (isDown) break ; else continue ;
+	    case SPLICED_cDNA_UP: if (!isDown) break ; else continue ;
+	    default: continue ;
+	    }
+	}
+
 
      if (class(seg->key) == _VMethod)
        continue ;
@@ -1087,6 +1103,61 @@ void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
       if (x >= xMax) continue ;
       if (0) printf ("est:%s ix=%d x1=%d x2=%d", name(seg->key), ix, seg->x1, seg->x2) ;
 
+      if (
+	  (!strncmp (name(seg->key), "XH_",3) || !strncmp (name(seg->key), "XG_",3))  &&
+	  keyFindTag (seg->key, _Is_read) && keyFindTag (seg->key, _Composite))
+	{
+	  OBJ obj = bsCreate(seg->key) ;
+	  Array aa =  arrayCreate (24, BSunit) ;
+	  
+	  if (bsGetArray (obj, _Composite, aa, 3) &&
+	      arrayMax (aa) >= 3)
+	    {
+	      int r, rMax = arrayMax (aa) ;
+	      for (r = 0 ; r < rMax ; r+=3)
+		{
+		  BSunit *u = arrp (aa, r, BSunit) ;
+		  int x1 = u[0].i ;
+		  int x2 = u[1].i ;
+		  int cover = u[2].i ; 
+		  float z = log(1.0+cover) ;
+		  float z1 = log(8000.0)/8 ;
+		  float yy1, yy2 ;
+		  int iCol = .5 + z/z1 ;
+		  if (iCol > 8) 
+		    iCol = 8 ;
+		  if (iCol < 0)
+		    iCol = 0 ;
+		  bgCol = GREEN1 + iCol - 1 ;
+
+		  if (isDown)
+		    {
+		      yy1 = MAP2GRAPH(look->map,seg->x1 + x1 - 1 - .5) ;
+		      yy2 = MAP2GRAPH(look->map,seg->x1 + x2 - 1 + .5) ;
+		    }
+		  else
+		    {
+		      yy1 = MAP2GRAPH(look->map,seg->x2 - x2 + 1 - .5) ;
+		      yy2 = MAP2GRAPH(look->map,seg->x2 - x1 + 1 + .5) ;
+		    }
+		  if (yy1 < .2 + topMargin) yy1 = .2 + topMargin ;
+		  if (yy2 > mapGraphHeight - .2)  yy2 = mapGraphHeight - .2 ;  
+		  if (yy1 < yy2 - .01)
+		    {
+		      int box2 = graphBoxStart() ; 
+		      int oldColour = graphColor (bgCol) ;
+		      graphRectangle (x+.1, yy1, x+1.5, yy2) ;
+		      graphBoxEnd () ;
+		      graphBoxDraw (box2, WHITE, bgCol) ;
+		      graphColor (oldColour) ;
+		    }
+		  bgCol = TRANSPARENT ;
+		  foundCompositeColour = TRUE ;		}
+	    }
+	  arrayDestroy (aa) ;
+	  bsDestroy (obj) ;
+	}
+
       /* draw the beginning of the est line as arrow circle or line*/
       if (seg->key != (seg-1)->key)
 	{
@@ -1209,7 +1280,9 @@ void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
       bgCol =  fMapQueryColor (seg->key) ;
 
 #endif
-      if (keyFindTag (seg->key, _Colour))
+      if (foundCompositeColour)
+	bgCol = TRANSPARENT ;
+      else if (keyFindTag (seg->key, _Colour))
 	{
 	  OBJ obj = bsCreate(seg->key) ;
 	  bsGetKeyTags (obj,_Colour, &bgCol) ;
@@ -1404,6 +1477,15 @@ void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
   graphColor (BLACK) ;
 
 } /* fMapcDNAShowSplicedcDNA */
+
+void fMapcDNAShowSplicedcDNA (LOOK look, float *offset)
+{
+  return fMapcDNAShowSplicedcDNAorExon (look, offset, FALSE) ;
+}
+void fMapcDNAShowExonSupport (LOOK look, float *offset)
+{
+  return fMapcDNAShowSplicedcDNAorExon (look, offset, TRUE) ;
+}
 
 /*********************************************************************/
 

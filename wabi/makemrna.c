@@ -4120,7 +4120,8 @@ static void mrnaSaveMrnaHierarchy (KEY tg)
   keySetDestroy (mrnaSet) ;
 
   /* mark good ones */
-  mrnaSet = queryKey (tg, "{COUNT mrna = 1 ; > mrna ;} SETOR {>mrna ; COUNT {>cdna_clone ; ! double_fuzzy } > 0 ; gt_ag || gc_ac || (!gap && !fuzzy && !other)}") ;
+  /* 2024_01_22  in f4 reconstruction the mrna do NOT ontain cdna_clones, so i changed to COUNT () >=0 rather than >0 */ 
+  mrnaSet = queryKey (tg, "{COUNT mrna = 1 ; > mrna ;} SETOR {>mrna ; COUNT {>cdna_clone ; ! double_fuzzy } >= 0 ; gt_ag || gc_ac || (!gap && !fuzzy && !other)}") ;
   for (ii = 0 ; ii < keySetMax (mrnaSet) ; ii++)
     {
       mrna = keySet (mrnaSet, ii) ;

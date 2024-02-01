@@ -2978,7 +2978,7 @@ static void dropBadQualityGlobalHits (Array dna, Array dnaR, Array hits, int *jp
       if (14 * nerr > nmatch) /* 14 per 100 global error rate, one ok zone  , reject */
         return ;
       if (x1min < 250 && nmatch > 150 &&
-          (keyFindTag (up->est, _CTF_File) || keyFindTag (up->est, _CTF_File)))
+          (keyFindTag (up->est, _CTF_File) || keyFindTag (up->est, _SCF_File)))
         break ; /* could be salvaged by editing */
       else      /* hopeless */
         return ; 

@@ -91,7 +91,7 @@ void sxWiggleFloor (WIGGLE *sx, float mini) ;
 void sxWiggleRatio (WIGGLE *sx) ;
 Array sxWiggleStrandedRatio (WIGGLE *sx, Array aaa, Array bbb, int damper, AC_HANDLE h) ;
 Array sxWiggleMultiply (WIGGLE *sx, Array aaa, AC_HANDLE h) ;
-void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb) ;
+void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb, Array aaa1) ;
 void sxWiggleCopy (WIGGLE *sx) ;
 void sxWiggleExport (WIGGLE *sx) ;
 

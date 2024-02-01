@@ -21,22 +21,27 @@ phasek0:
 
 # Create the Kantor database
   set KDB=Kantor/$chrom/KantorDB
+  if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
+  if (! -d Kantor/$chrom/done/creation) mkdir Kantor/$chrom/done/creation
+  if (! -d Kantor/$chrom/tmp/$species_kantor.data) mkdir Kantor/$chrom/tmp/$species_kantor.data
+  if (! -d Kantor/$chrom/tmp/$species_kantor.data/$chrom) mkdir Kantor/$chrom/tmp/$species_kantor.data/$chrom
+
   if (! -d $KDB) then
-     if (! -d Kantor/$chrom/done) mkdir  Kantor/$chrom/done Kantor/$chrom/done/creation
-     if (! -d Kantor/$chrom/tmp) mkdir  Kantor/$chrom/tmp
      echo "// hello" > touch Kantor/$chrom/done/creation/ace.creation
      mv Kantor/$chrom/done/* Kantor/$chrom/tmp
      mkdir $KDB
-    pushd $KDB
-      mkdir database
-      ln -s ../../../acedata/wspec
-      mkdir database
-      tacembly . <<EOF
+     pushd $KDB
+       mkdir database
+       ln -s ../../../metaData/wspec.aceview_web_site wspec
+       mkdir database
+       tacembly . <<EOF
 y
         save
         quit
 EOF
      popd
+     touch $db/k0.done
+     \rm $db/k0.start
   endif
 goto phaseLoop
 
@@ -48,7 +53,7 @@ echo -n "Start of phase k1 chrom=$chrom "
 date
 
 set KDB=Kantor/$chrom/KantorDB
-if (-d $KDB && ! -e $db/k1.kantor_parse.done) then
+
 # construct the list of existing kantor files, and parse them
   echo 'read-models' >  Kantor/$chrom/_r
  
@@ -75,16 +80,18 @@ if (-d $KDB && ! -e $db/k1.kantor_parse.done) then
 
 # parse the data in the kantor database
 
-  if ($ok == 0) touch $db/k1.kantor_parse.done
+  if ($ok == 0) touch $db/k1.done
   if ($ok == 1  && -e $KDB/database/log.wrm && ! -e $KDB/database/lock.wrm) then
-    if (-e $db/k9.megaRun.done) \rm $db/k9.megaRun.done
-    if (-e $db/k2.db_parse.done) \rm $db/k2.db_parse.done
+    if (-e $db/k2.done) \rm $db/k2.done
+    if (-e $db/k9.done) \rm $db/k9.done
+
 
     tacembly $KDB <  Kantor/$chrom/k1._r
     if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
     mv Kantor/$chrom/tmp/*  Kantor/$chrom/done
   endif
-  touch $db/k1.kantor_parse.done
+  \rm $db/k1.start
+  touch $db/k1.done
 endif
 
 goto phaseLoop
@@ -98,8 +105,8 @@ goto phaseLoop
 phasek2:
 
 set KDB=Kantor/$chrom/KantorDB
-if (-d $KDB && ! -e $db/k2.db_parse.done) then
-  if (-e $db/k9.megaRun.done) \rm $db/k9.megaRun.done
+if (-d $KDB && ! -e $db/k2.ddone) then
+  if (-e $db/k9.done) \rm $db/k9.done
 
   tacembly $db << EOF
     query find kantor product
@@ -118,18 +125,22 @@ EOF
     query find pfam IS Pox_polyA_pol
     kill
     pparse $db/k2.ace
-    query find Kantor psr ; > product ; >mrna 
+    query  > product ; >mrna 
     acembly
       cdna_kantor // kantorizes active mrna set
       quit
       // dna mmMrna.$chrom.dna
     save
     find model
-    list -a -f $db/k2.db_parse.done
+    list -a -f $db/k2.done
     quit
 EOF
 
-  endif
+endif
+
+ if (-e $db/k9.done) \rm $db/k9.done
+\rm $db/k2.start
+touch $db/k2.done
 goto phaseLoop
 
 ############################################################
@@ -143,6 +154,7 @@ phasek9:
 echo -n "Start of phase k9 megaRun chrom=$chrom "
 date
 
+setenv ici `pwd`
 set KDB=Kantor/$chrom/KantorDB
 if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then 
 
@@ -154,16 +166,18 @@ if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then
     pushd Kantor/$chrom/tmp
       # if (! -d tmp/$species_kantor.data) mkdir tmp/$species_kantor.data
        $megaRun $ici/$db  psort $species_kantor
-       $megaRun $ici/$db  acekog $species_kantor  
+      # $megaRun $ici/$db  acekog $species_kantor  
       # $megaRun $ici/$db  pfam $species_kantor  
-      $megaRun $ici/$db blastp $species_kantor  
+      # $megaRun $ici/$db blastp $species_kantor  
       # $megaRun $ici/$db oligo $species_kantor   
       # $megaRun $ici/$db acekog_n $species_kantor  
       date
     popd
     
-    if (-e $db/k1.kantor_parse.done) \rm $db/k1.kantor_parse.done
-    touch  $db/k9.megaRun.done
+    if (-e $db/k1.done) \rm $db/k1.done
+    if (-e $db/k2.done) \rm $db/k2.done
+    \rm $db/k9.start
+    touch  $db/k9.done
 endif
 
 echo -n 'End of phase k9'
@@ -265,7 +279,7 @@ EOF
     pushd Kantor/$chrom/tmp
       # if (! -d tmp/$species_kantor.data) mkdir tmp/$species_kantor.data
       $megaRun a:localhost:$port  psort $species_kantor
-      $megaRun a:localhost:$port acekog $species_kantor  
+      # $megaRun a:localhost:$port acekog $species_kantor  
       # $megaRun a:localhost:$port   pfam $species_kantor  
       # $megaRun a:localhost:$port blastp $species_kantor  
       # $megaRun a:localhost:$port oligo $species_kantor   

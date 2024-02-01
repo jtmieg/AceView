@@ -135,7 +135,7 @@ foreach target ($allRNAtargets)
           bin/dna2dna -gff3  TARGET/GTF/$species.$target.gff.gz -gtfGenome TARGET/Targets/$species.chloro.fasta.gz -o TARGET/Targets/tutuy3
         endif
         cat TARGET/Targets/tutuy[123].fasta >  TARGET/Targets/tutuy.unsorted
-        dna2dna -i  TARGET/Targets/tutuy.unsorted -O raw -keepName  | gawk -F '\t' '{u2=$2;gsub(" ","_",u2);split(u2,aa,"|") ;split(aa[1],bb,"_");printf("%s\t%s\t%s\t%s\t",aa[3],aa[5],bb[1],bb[2]);print;}' | sort -Vf -k 1,1 -k 2,2n -k 3,3 -k 4,4n > toto
+        bin/dna2dna -i  TARGET/Targets/tutuy.unsorted -O raw -keepName  | gawk -F '\t' '{u2=$2;gsub(" ","_",u2);split(u2,aa,"|") ;split(aa[1],bb,"_");printf("%s\t%s\t%s\t%s\t",aa[3],aa[5],bb[1],bb[2]);print;}' | sort -Vf -k 1,1 -k 2,2n -k 3,3 -k 4,4n > toto
         echo ZZZZZ > ZZZZZ
         cat toto ZZZZZ toto  | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){if ($2 != gid[$1])ngid[$1]++;gid[$1]=$2;next;}}{g=$1;if(ngid[$1]>1)g=$1 "." $2; split($6,aa,"|");printf("%s\t%s\n",$5,$6);}' > toto2
         cat toto2 | dna2dna -I raw -O fasta -keepName -maxLineLn 60 >  TARGET/Targets/tutuy.sorted
@@ -166,7 +166,7 @@ set geneBoxMaxLn=1000000
       \rm  tmp/METADATA/gtf.$target.goodProduct.ace.gz
     endif
     if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz && ! -e  tmp/METADATA/gtf.$target.goodProduct.aceZZ) then
-      gunzip -c tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{if(p1>0)printf("%s\t%d\t%d\n",m,p1,p2);m=$2;dx=1;p1=0;next;}/^Source_exons/{a1=$2;a2=$3;if($4=="CDS"){if(p1==0)p1=dx;p2=dx+a2-a1+1;}dx+=a2-a1+1;}END{if(p1>0)printf("last %s\t%d\t%d\n",m,p1,p2);}' | gawk -F '\t' '{printf ("mRNA %s\nProduct %s %d %d\n\nProduct %s\nBest_product\nGood_product\n\n", $1,$1,$2,$3-1,$1);}' >  tmp/METADATA/gtf.$target.goodProduct.ace
+      gunzip -c tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{if(p1>0)printf("%s\t%d\t%d\n",m,p1,p2);m=$2;dx=1;p1=0;next;}/^Source_exons/{a1=$2;a2=$3;if($4=="CDS"){if(p1==0)p1=a1;p2=a2;}}END{if(p1>0)printf("%s\t%d\t%d\n",m,p1,p2);}' | gawk -F '\t' '{printf ("mRNA %s\nProduct %s %d %d\n\nProduct %s\nBest_product\nGood_product\n\n", $1,$1,$2,$3,$1);}' >  tmp/METADATA/gtf.$target.goodProduct.ace
  \cp tmp/METADATA/gtf.$target.goodProduct.ace  tmp/METADATA/gtf.$target.goodProduct.ace42
     endif
 

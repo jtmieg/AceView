@@ -2574,8 +2574,8 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 	  RMC *rmc = arrp (rmcs, i, RMC) ;
 	  KEY run = rmc->run ;
 
-	  for ( ; i < irmc && rmc->run == run ; i++, rmc++)
-	    { c += rmc->c ; m += rmc->m ; }
+	  for (int j = i ; j < irmc && rmc->run == run ; j++, rmc++)
+	    { c += rmc->c ; m += rmc->m ; i = j ; }
 	  if (c >= minSnpCover && m >= minSnpCount && 100*m >= minSnpFrequency * c)
 	    {
 	      int *kp, k = 0 ;
@@ -6238,7 +6238,8 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "//   --db_remap2genes tmp/METADATA/mrnaRemap.gz --db ACEDB [--force]\n"
 	   "//      Remap the genome variants into transcript coordinates\n"
 	   "//      --force : remap all variants, default: remmap on those lacking the GeneBox tag\n"
-	   "//   --db_translate --db ACEDB : translate the mRNA variants (or genome variants remapped to mRNAs) if they map to a protein coding exon\n"
+	   "//   --db_translate --db ACEDB [--select snp_name]\n"
+	   "//      Translate all [matching] mRNA variants (or genome variants remapped to mRNAs) if they map to a protein coding exon\n"
 	   "//   --db_count_types  --db ACEDB  : count per run the number of SNP passing the cover/count/frquency thresholds of each type sub/indels/transition ...\n"
 	   "// GENE FUSION\n"
 	   "//   --target_class : target class (KT_RefSeq ET_av...) [default ET_av]\n"

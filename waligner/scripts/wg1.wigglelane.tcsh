@@ -25,7 +25,6 @@ set ici=`pwd`
 set mytmp=$TMPDIR/aceview.wigglerun.$$
 # set mytmp=$TMPDIR/aceview.wigglerun.11702
 # set mytmp=tmp/WIGTMP
-# goto laba
 
 echo  $mytmp
 mkdir $mytmp
@@ -50,7 +49,9 @@ echo hello1a
     endif
   endif
 
-#  goto laba
+# goto laba 2024
+# goto laba 
+
 echo -n "splitting the hits file per chromosomes "
 date
 echo $mytmp/$run 
@@ -74,7 +75,7 @@ endif
 
 
 
-
+ # u nu pp   2024
  foreach uu (u nu pp)
    if (-e tmp/WIGGLERUN/$run/wg2a.$uu.done) continue
    set filter="" 
@@ -92,7 +93,7 @@ endif
 
 echo -n "splitting done tralala"
 date
-
+# exit 0
 laba:
 # RefSeq takes at lest 14Gb of memory
 # $chromSetAll
@@ -133,6 +134,7 @@ if ($Strategy == RNA_seq) set frs="f r ELF ELR ERF ERR"
     # if ($map == remapped && $target != genome) continue 
     if ($map == remapped && $Strategy != RNA_seq) continue 
     echo "### $target $map $chrom"
+    # (u nu pp 2024)
     foreach uu (u nu pp)
       if (-e tmp/WIGGLERUN/$run/wg2a.$uu.done) continue
       set frs="f r"
@@ -171,7 +173,7 @@ if ($Strategy == RNA_seq) set frs="f r ELF ELR ERF ERR"
                set x2=`echo $fff | gawk -F _ '{print $2}'`
                set x3=`echo $fff | gawk -F _ '{print $3}'`
                if (-e $mytmp/$lane/$x1.$map.$chrom.$uu.BV || -e $mytmp/$lane/$x2.$map.$chrom.$uu.BV || -e $mytmp/$lane/K.$map.$chrom.$uu.$x3.BV) then
-                  echo "cat $mytmp/$lane/$x1.$map.$chrom.$uu.BV  $mytmp/$lane/$x2.$map.$chrom.$uu.BV  |  $mytmp/wiggle -I BV -O BV $out_step -gzo -o $mytmp/$lane/K.$map.$chrom.$uu.$x3"
+                  echo "cat $mytmp/$lane/$x1.$map.$chrom.$uu.BV  $mytmp/$lane/$x2.$map.$chrom.$uu.BV  |  $mytmp/wiggle -I BV -O BV $out_step -gzo -o $mytmp/$lane/KK.$map.$chrom.$uu.$x3"
                         cat $mytmp/$lane/$x1.$map.$chrom.$uu.BV  $mytmp/$lane/$x2.$map.$chrom.$uu.BV  |  $mytmp/wiggle -I BV -O BV $out_step -gzo -o $mytmp/$lane/KK.$map.$chrom.$uu.$x3
                         mv  $mytmp/$lane/KK.$map.$chrom.$uu.$x3.BV.gz  $mytmp/$lane/K.$map.$chrom.$uu.$x3.BV.gz 
                 endif

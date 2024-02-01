@@ -530,16 +530,17 @@ cat <<EOF > _x.awk
 # d3 is obsolete
 # d4 must run after ii2d twice, once per run in parallel, once to cumulate the results
   if (ix > 0) ph = ph " wait tgf3  SLpA3 d4 wait d4 " ;
-  if (w > 0) ph = ph " wg1 wait wg2a wait wg2ba wait wg2bb wait wg2bb wait wg2bb wait wg2bb wait wg3a wait wg3b  wait wg4 wg4b wait  wg4c wg5 wait wg6 wg4d sponge1 wait sponge2 wait sponge3 wait " ;
+  if (w > 0) ph = ph " wg1 wait wg2a wait wg2ba wait wg2bb wait wg3a wait wg3b  wait wg4 wg4b wait  wg4c wg5 wait wg6 wg4d sponge1 wait sponge2 wait sponge3 wait " ;
 # s2c (extend, must come after s3a (detect) and would influence the BRS, so we would do s1 s2a s2b s3a,  extend which would create a modified BRS file, then s3b:count
   if (cnv > 0)  ph = ph " cnv wait cnv "
   if (snp > 0) ph = ph " snp0 wait s1 wait s1A2G wait s2a wait s2b wait s2A2G wait s3a wait s3b wait snp2a "
   if (ix > 0) ph = ph " wait d5  "
   if (tsnp > 0) ph = ph "wait tsnp1b wait tsnp2a " ;
   if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c " ;  ## make words, count words , collate word counts
-  if (snp > 0) ph = ph "wait tsnp3 " ;  ## report snp_profile in ali
-  if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
+  if (snp > 0) ph = ph "wait tsnp3 wait tsnp3 " ;  ## report snp_profile in ali, must be run twice
+  if (snp > 0) ph = ph "wait tsnp10 " ;  ## report qcsummary in RESULTS/SNV
   if (tsnp > 0) ph = ph "wait tsnp10 " ;
+  if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (snp > 0) ph = ph "wait snp4 " ;
   if (iv > 0) ph = ph " wait d6 wait d7 wait d8 " ;
   if (w > 1000)       ph = ph "  g4sp " ;
@@ -1140,6 +1141,7 @@ if ($phase == f4) goto phasef4
 if ($phase == f5) goto phasef5
 if ($phase == f6) goto phasef6
 
+if ($phase == k0) goto phasek0
 if ($phase == k1) goto phasek1
 if ($phase == k2) goto phasek2
 if ($phase == k9) goto phasek9
@@ -1496,6 +1498,7 @@ echo "f5:    Export the new transcriptome mrna.dna and structure"
 echo "f6:    Collate the new mrna structure and fasta sequence"
 
 
+echo "k0:    initialize Kantor"
 echo "k1:    shops for kantors in Kantor"
 echo "k2:    integrate kantor results"
 echo "k9:    linear launch megaRun all on a chromosome"
@@ -4981,6 +4984,13 @@ phaseTSnp2g:
 
 if (! -d tmp/TSNP_DB) mkdir tmp/TSNP_DB
 
+ # retrofit the mRNA class name into the mRNA fasta file
+  foreach target ( mito SpikeIn $Etargets $Ttargets)
+    if (-e TARGET/Targets/$species.$target.fasta.gz && ! -e tmp/TSNP_DB/$species.$target.mrna.fasta.gz) then
+      gunzip -c TARGET/Targets/$species.$target.fasta.gz | gawk '/^>/{i=index($1,"|");if(i>0)s=substr($1,2,i-2);else s=substr($1,2);printf(">mRNA:%s\n",s);next;}{print}' | gzip >  tmp/TSNP_DB/$species.$target.mrna.fasta.gz
+    endif
+  end
+
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) mkdir tmp/TSNP_DB/$zone
   if (! -e tmp/TSNP_DB/$zone/$MAGIC.$phase.done2) then
@@ -5090,7 +5100,7 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
 end
 if ($ok == 1 && ! -e tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz) then
   scripts/submit wait
-  gunzip -c tmp/TSNP_DB/zone*/tsnp3.$MAGIC.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | sort | gawk -F '\t' '{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n-D SNP_Profile\n",old);} printf("SNP_Profile f1 %s %d\n", substr($2,4), $4);}END{printf("\n");}' | gzip > tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz  
+  gunzip -c tmp/TSNP_DB/zone*/tsnp3.$MAGIC.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | sort | gawk -F '\t' '/^#/{next;}{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n-D SNP_Profile\n",old);} printf("SNP_Profile f1 %s %d\n", substr($2,4), $4);}END{printf("\n");}' | gzip > tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz  
  echo "pparse tmp/TSNP_DB/tsnp3.$MAGIC.snp_profile.ace.gz" | bin/tacembly MetaDB -noprompt
 endif
 
@@ -8731,7 +8741,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
 # 2019_12_16, in SILVER a few of the reads are standed (contaminant Oligo) but the experiment is non stranded
 # by swithcing at 60% we maintain the strand of the contaminants
   if ($s >= 0 && $s < 4000) set stranded="antistrand"
-  if ($s >= 4000 && $s <= 10000) set stranded="strand"
+  if ($s >= 6000 && $s <= 10000) set stranded="strand"
   echo "wgi.wigglelane $run $stranded"
   set paired="singlets"
   foreach run2 (`cat MetaDB/$MAGIC/RunPairedList`)
@@ -11800,11 +11810,16 @@ goto phaseLoop
 ###########################################################################
 ## phase f7: Export import the Kantor
 
+phasek0:
 phasek1:
 phasek2:
 phasek9:
  
 if ($Strategy != RNA_seq) goto phaseLoop
+if ($phase == k2Z) then
+   goto phaseLoop
+   echo "phase k2 is obsolete"
+ endif
 
 echo -n "Export/Import the Kantor phase $phase : start "
  date
@@ -11815,22 +11830,26 @@ else
 
   if (! -d Kantor) mkdir Kantor
   foreach chrom ($chromSetAll)
-    if (! -e tmp/X.$MAGIC/XH$chrom/f4.assemble.done) continue
+echo "a1 $chrom"
+    set fDB=tmp/X.$MAGIC/XH$chrom
+    if (! -e $fDB/f4.assemble.done) continue
+echo "a2 $chrom"
+ls -ls $fDB/k?.done
+    if (! -d Kantror/$chrom && ! -e $fDB/k0.done) \rm $fDB/k?.done
+echo "a3 $chrom"
+ls -ls $fDB/k?.done
+    if ( -d Kantror/$chrom/done && ! -e $fDB/k0.done) touch $fDB/k0.done
+echo "a4 $chrom"
     if (! -d Kantor/$chrom) mkdir Kantor/$chrom
     if (! -d Kantor/$chrom/tmp) mkdir Kantor/$chrom/tmp
-    if (! -d Kantor/$chrom/tmp/$species_kantor.data) mkdir Kantor/$chrom/tmp/$species_kantor.data
-    if (! -d Kantor/$chrom/tmp/$species_kantor.data/$chrom) mkdir Kantor/$chrom/tmp/$species_kantor.data/$chrom
-
-    if ($phase == k1 && ! -e tmp/X.$MAGIC/XH$chrom/k1.kantor_parse.done) then
-       scripts/Kantor.tcsh $phase $chrom tmp/X.$MAGIC/XH$chrom
-    endif
-
-    if ($phase == k2) then
-        echo "phase $phase is obsolete"
-    endif
-
-    if ($phase == k9 &&  -e tmp/X.$MAGIC/XH$chrom/k1.kantor_parse.done  && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.done && ! -e tmp/X.$MAGIC/XH$chrom/k9.megaRun.start) then
-       scripts/Kantor.tcsh $phase $chrom tmp/X.$MAGIC/XH$chrom
+echo "a5 $chrom"
+    if ($phase == k2 && ! -e $fDB/k1.done) continue
+    if ($phase == k9 && ! -e $fDB/k2.done) continue
+echo "a6 $chrom"
+    if (! -e $fDB/$phase.done && ! -e $fDB/$phase.start) then
+echo "a7 $chrom"
+      touch $fDB/$phase.start
+      scripts/submit Kantor/$chrom/$phase  "scripts/Kantor.tcsh $phase $chrom $fDB"
     endif
 
   end

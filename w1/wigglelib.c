@@ -1766,6 +1766,7 @@ void sxWiggleRatio (WIGGLE *sx)
  * compute alpha = a + 10 / a + b + 20
  *          beta = b + 10 / a + b + 20
  *    => alpha + beta = 1, so we only need to compute alpha
+ * if (a+b < 20) -> -1 (NA)
  */
 Array sxWiggleStrandedRatio (WIGGLE *sx, Array aaa, Array bbb, int damper, AC_HANDLE h)
 {
@@ -1803,7 +1804,7 @@ Array sxWiggleStrandedRatio (WIGGLE *sx, Array aaa, Array bbb, int damper, AC_HA
 	  wbp = bb && j >= 0 && j < jMax ? arrp (bb, j, WIGGLEPOINT) : 0 ;
 	  a = wap->y  + damper ;
 	  b = (wbp ? wbp->y : 0)  + damper ;
-	  wcp->y = a / (a+b) ;
+	  wcp->y = a+b> 20+2*damper ? a / (a+b) : -1 ;
 	}
     }
 
@@ -1815,12 +1816,13 @@ Array sxWiggleStrandedRatio (WIGGLE *sx, Array aaa, Array bbb, int damper, AC_HA
 /* At each point of sx->aaa, which contains z = sum of the non stranded wiggle
  * get the corresponding bbb value rho = ratio of the stranded wiggle
  * compute wap->y = rho * z giving the restranded wiggle
+ * if ratio = -1 (NA), do not edit the values
  */
-void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb)
+void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb, Array aaa1)
 {
-  Array aaa = sx->aaa, aa, bb ;
+  Array aaa = sx->aaa, aa, aa1, bb ;
   int map, i, j, iMax, jMax, delta ;
-  WIGGLEPOINT *wap, *wbp ;
+  WIGGLEPOINT *wap, *wap1, *wbp ;
 
   for (map = 0 ; map < arrayMax (aaa) ; map++)
     {
@@ -1828,8 +1830,10 @@ void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb)
       iMax = aa ? arrayMax (aa) : 0 ;
       if (! iMax)
 	continue ;
+      aa1 = aaa1 && map < arrayMax (aaa1) ?  arr (aaa1, map, Array) : 0 ;
       bb = map < arrayMax (bbb) ?  arr (bbb, map, Array) : 0 ;
       jMax = bb ? arrayMax (bb) : 0 ;
+      wap1 = aa1 ? arrp (aa1, 0, WIGGLEPOINT) : 0 ;
       wap = arrp (aa, 0, WIGGLEPOINT) ;
       wbp = bb ? arrp (bb, 0, WIGGLEPOINT) : 0 ;
       delta = (wbp ? wap->x - wbp->x : 0) / sx->out_step ;
@@ -1839,7 +1843,15 @@ void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb)
 	  j = i + delta ;
 	  wbp = bb && j >= 0 && j < jMax ? arrp (bb, j, WIGGLEPOINT) : 0 ;
 	  if (wbp)
-	    wap->y = wap->y * wbp->y ; 
+	    {
+	      if (wbp->y < 0)
+		{
+		  wap1 = aa1 && i < arrayMax (aa1) ? arrp (aa1, i, WIGGLEPOINT) : 0 ;
+		  wap->y = wap1 ? wap1->y : 0 ;
+		}
+	      else
+		wap->y = wap->y * wbp->y ; 
+	    }
 	  else
 	    wap->y = 0 ;
 	}

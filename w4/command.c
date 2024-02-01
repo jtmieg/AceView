@@ -661,9 +661,11 @@ static BOOL cWebImage (KEY tg, int style, char *view, char *params)
 	     
 	     " seqcolumns -off TRANSCRIBEDGENE ;"
 	     " seqcolumns -off -TRANSCRIBEDGENE ;"
-	     " seqcolumns -off \"-SPLICED_cDNA\" ;"
-	     " seqcolumns -off \"SPLICED_cDNA\" ;"
-	     " seqcolumns -off \"SPLICED_cDNA_DECORATE\" ;"
+	     " seqcolumns -off -SPLICED_cDNA ;"
+	     " seqcolumns -off -EXON_SUPPORT ;"
+	     " seqcolumns -off EXON_SUPPORT ;"
+	     " seqcolumns -off SPLICED_cDNA ;"
+	     " seqcolumns -off SPLICED_cDNA_DECORATE ;"
 	     
 	     " seqcolumns -on \"Genes\" ;"
 	     " seqcolumns -on \"-Genes\" ;"
