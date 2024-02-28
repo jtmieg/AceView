@@ -46,6 +46,8 @@ if (! -e tmp/INTRON_DB/$chrom/d5.parse_genome.done) then
   pushd tmp/INTRON_DB/$chrom
     ../../../bin/tace . <<EOF
       parse ../../../TARGET/CHROMS/$species.chrom_$chrom.fasta.gz
+      find sequence $chrom
+      edit genomic
       parse ../../../TARGET/CHROMS/$species.mito.fasta.gz
       save
       quit
@@ -59,10 +61,28 @@ endif
 goto phaseLoop
 
 ###############################################################
-### parse the gene structure
+### parse the gene, mrna, intron relations  : intron->supports
 parseGenes:
 # parse in INTRON_DB/$chrom the introns/genes/mRNA/chromosomes
-if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done && -d ~/37lm5/database) then
+
+if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done) then
+  cat tmp/METADATA/*.introns.info.ace  tmp/METADATA/gtf.*.[fr].intron.ace | gawk '/^Intron/{ok=0;split($2,aa,"__");if(aa[1]==chrom)ok=1;}{if(ok==1)print;}' chrom=$chrom > tmp/INTRON_DB/$chrom/d5.parse_genes.ace
+  pushd tmp/INTRON_DB/$chrom
+  ../../../bin/tace . <<EOF
+      read-models
+      parse d5.parse_genes.ace
+      save
+      quit
+EOF
+  touch d5.parse_genes.done
+  popd
+endif
+
+
+goto phaseLoop
+
+
+If (0 && ! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done && -d ~/37lm5/database) then
   pushd tmp/INTRON_DB/$chrom
   set chrom2=$chrom'__'
 
@@ -81,6 +101,7 @@ if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done && -d ~/37lm5/database) then
       show -a -f 37.$chrom.intron.ace
       quit
 EOF
+
 
     cat 37.$chrom.gene.preace | gawk '/^MicroArray/{next;}/^Run_nU/{next;}/^DEG/{next;}/^NP_id/{next;}{print}' > 37.$chrom.gene.ace
     cat 37.$chrom.tg.preace | gawk '/^Read/{next;}/^cDNA_clone/{next;}/^Assembled_from/{next;}/^Fully_sequenced_clone/{next;}{print}' > 37.$chrom.tg.ace
@@ -216,8 +237,8 @@ EOF
     cat d5.donor.r.txt | gawk -F '\t' '{ii=$1;m=$2;a1=$3;a2=$4;d1=$5;d2=$6;printf("Intron %s\n-D DA\nD %s__%d_r\nA %s__%d_r\nDonor %s\nAcceptor %s\n\n",ii,m,a1+1,m,a2-1,d1,d2);}' | grep -v NULL  >> d5.DA.ace
     echo "pparse d5.DA.ace" | ../../../bin/tace . -no_prompt
 # check for same donor same acceptor
-    cat d5.donor.f.txt | cut -f 2,3,4 | sort -k 1,1 -k 2,2n | gawk -F '\t' '{if($1==m && $2==a1){printf("Intron %d__%s_%d\nSame_donor %s__%d_%d\n\n",m,a1,a2,m,$2,$3);}m=$1;a1=$2;a2=$3;}' > d5.sameDA.ace  
-    cat d5.donor.r.txt | cut -f 2,3,4 | sort -k 1,1 -k 3,3n | gawk -F '\t' '{if($1==m && $3==a2){printf("Intron %d__%s_%d\nSame_acceptor %s__%d_%d\n\n",m,a1,a2,m,$2,$3);}m=$1;a1=$2;a2=$3;}' >> d5.sameDA.ace  
+    cat d5.donor.f.txt | cut -f 2,3,4 | sort -k 1,1 -k 2,2n | gawk -F '\t' '{if($1==m && $2==a1){printf("Intron %s__%d_%d\nSame_donor %s__%d_%d\n\n",m,a1,a2,m,$2,$3);}m=$1;a1=$2;a2=$3;}' > d5.sameDA.ace  
+    cat d5.donor.r.txt | cut -f 2,3,4 | sort -k 1,1 -k 3,3n | gawk -F '\t' '{if($1==m && $3==a2){printf("Intron %s__%d_%d\nSame_acceptor %s__%d_%d\n\n",m,a1,a2,m,$2,$3);}m=$1;a1=$2;a2=$3;}' >> d5.sameDA.ace  
     echo "pparse d5.sameDA.ace" | ../../../bin/tace . -no_prompt
     touch d5.introns.$MAGIC.DA.done
   popd
@@ -355,6 +376,46 @@ EOF
   touch d5.$MAGIC.introns.donorAcceptor.done
   popd
 endif
+
+
+  pushd tmp/INTRON_DB/$chrom
+    ../../../bin/tace . <<EOF
+      query find intron ! type
+      bql -o d5.notype.txt select ii,d,a  from ii in @, d in ii->donor, a in ii->acceptor
+      quit
+EOF
+cat d5.notype.txt | gawk -F '\t' '{if(length($2)==100 && length($3)==100) printf("Intron %s\nType %s_%s\n\n",$1, substr($2,51,2),substr($3,49,2));}' | gawk '/gt_ag/{print;next;}/ct_ac/{print;next;}/gc_ag/{print;next;}/^Type/{printf("Other %s\n",$2);next;}{print}' > d5.newtype.ace
+
+
+
+
+    ../../../bin/tace . <<EOF
+      pparse d5.newtype.ace
+      find intron 
+      bql -o d5.stats.txt select ii,type,rvy,av,n from ii in @, rvy in ii#rvy, av in ii#av, n in ii->rna_seq, type in ii->type
+      save
+      quit
+EOF
+cat d5.stats.txt | gawk '{ii=$1;split(ii,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1>a2){a0=a1;a1=a2;a2=a0;}ip=ii;if(bb[1]>bb[2]){ip=aa[1] "__" bb[2] "_" bb[1];ii2[ip]=ii;}iip[ip]=1;}END{for(ii in iip){i2=ii2[ii];if(i2)printf("Intron %s\nHas_echo %s\nIs_echo %s\n\n",ii,i2,i2);}}' > d5.echo.ace
+    ../../../bin/tace . <<EOF
+      read-models
+      pparse d5.echo.ace
+      query find intron Is_echo && (gt_ag || gc_ag)
+      edit -D Is_echo
+      query find intron Is_echo && ! type && ! intmap
+      kill
+      query Find intron type
+      bql -o d5.stats.txt select ii,type,echo,rvy,av,n from ii in @, rvy in ii#rvy, av in ii#av, n in ii->rna_seq, type in ii->type, echo in ii#is_echo
+      save
+      quit
+EOF
+
+
+  popd
+endif
+
+
+
 goto phaseLoop
 
 ########################################################################

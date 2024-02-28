@@ -249,6 +249,7 @@
                            Adaptor1      ?Text    //sequence      // should be made more automatic and documented here or in ?Ali by clipalign
                            Adaptor2  ?Text                        // should be made more automatic and documented here or in ?Ali by clipalign
                            Entry_adaptor ?Text
+                           Entry_adaptor2 ?Text
                            Barcode  ?Text       //sequence and number per lane  
                            UMI UNIQUE Int UNIQUE Int // barcode lengths in read1 and read 2, the bar code are exported in lieu of traget prefix and suffix col 20 and 21
                            Jump5 UNIQUE Int UNIQUE Int   // if non zero, jump the first n bases of read 1, same for read 2 if second number > 0
@@ -299,6 +300,7 @@
              Accepted  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Rejected  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Entry_adaptor_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
+             Entry_adaptor2_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Exit_adaptor_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Min_probe_length UNIQUE Int
              Max_probe_length UNIQUE Int	

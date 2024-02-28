@@ -16,7 +16,7 @@
  * Stop when all introns are used or enough paths have been constructed 
  */
 typedef struct compositeDesignStruct { Array exons, introns, covering ; BitSet bbIn, bbOut ; KEYSET reads ; int c1, c2 ; AC_HANDLE h ; } DS ;
-typedef struct dsVertexStruct { int a1, a2, donor, acceptor, cover, path, type, score, nn ; } DSX ;
+typedef struct dsVertexStruct { int a1, a2, donor, acceptor, cover, path, type, score, nn, clipable ; } DSX ;
 
 /**********************************************************************************/
 
@@ -402,6 +402,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 			b2 = a1 + uu[1].i - 1 ; 
 			ssp = arrayp (ss, iss++, DSX) ;
 			ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
+			ssp->clipable = 1 ;
 			if (debug)
 			  fprintf(stderr, "%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
 		      }
@@ -731,7 +732,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
       /* possibly increment the coverage */
       while (iss2 < arrayMax (ss2) && ssp2->a1 <= ssp->a2) 
 	{ 
-	  if (ssp2->cover < ssp->cover)
+	  if (ssp2->cover < ssp->cover) /* 2024_02 */
 	    ssp2->cover = ssp->cover ;
 	  iss2++ ; ssp2++ ; 
 	}
@@ -955,7 +956,7 @@ static void mrnaDesignSplitOneExon (DS *ds, SC *sc, DSX *up0)
 
 static void mrnaDesignSplitExons (DS *ds, SC *sc)
 {
-  BOOL debug = FALSE ;
+  BOOL debug =  FALSE ;
 
   if (debug)
     {
@@ -1668,7 +1669,7 @@ void mrnaDesignSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrna
   int iii, j ;
   SMRNA *smrna ;
 
-  for (iii = 0 ; iii < 0 && iii < arrayMax(smrnas) ; iii++) 
+  for (iii = 0 ; iii >-1 && iii < arrayMax(smrnas) ; iii++) 
     {
       smrna = arrp (smrnas, iii, SMRNA) ;
       
@@ -1693,7 +1694,7 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
   int i ;
   HIT *up ;
   BOOL ok = FALSE ;
-  BOOL debug = FALSE ;
+  BOOL debug =  FALSE ;
 
   if (0 || arrayMax (smrnas) < 1) 
     return FALSE; 
@@ -1718,6 +1719,7 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
     }
   smrnas = arrayReCreate (smrnas, 12, SMRNA) ;
   mrnaDesignFindPaths (s2m, sc, &ds, smrnas) ;
+  mrnaDesignSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
   mrnaDesignCleanUp (s2m, sc, &ds, smrnas) ;
   
   ac_free (h) ;

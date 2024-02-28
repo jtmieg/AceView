@@ -10566,10 +10566,28 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
             keySetInsert (ks, up->cDNA_clone) ;
           }
 
+        if (!estUp &&            /* composite 5' read */
+	    keyFindTag (est, _Composite) &&
+            !keySetFind (ks, up->cDNA_clone, 0) &&
+            !keyFindTag (up->cDNA_clone, _Not_real_5prime) &&
+            !keyFindTag (up->cDNA_clone, _RT_PCR) &&
+            /*   smrna->a1 < 200 && suppressed 2007_02_07 */
+            up->a1 > smrna->a1 - 20 && up->a1 < smrna->a1 + 20 &&        /* cluster at top of mrna */
+            up->x1 == up->clipTop /* avoid genomic gap */ 
+            )
+          {
+	    OBJ Est = bsCreate (est) ;
+	    int n = 0 ;
+	    bsGetData (Est, _Composite, _Int, &n) ;
+	    bsDestroy (Est) ;
+            naggregated += n ; 
+            keySetInsert (ks, up->cDNA_clone) ;
+          }
+
         /* now here to count aggregated in whole gene
          *  but limit constructed_from to single mrna
          */
-        if (!keySetFind (smrna->clones, up->cDNA_clone, 0))
+        if (0 && !keySetFind (smrna->clones, up->cDNA_clone, 0))
           continue ;
 
         for (wp = 0, jj = 0 ; jj < arrayMax(cloneHits) ; jj++)
@@ -10857,7 +10875,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                 complete3 = TRUE ;
                 bsAddTag (Transcript, str2tag ("PolyA_primed_clone")) ;
                 if (bsFindTag (Est, _PolyA_after_base))
-                  bsAddData (Transcript, str2tag ("PolyA_seen"), _Int, &a2) ;
+                  bsAddData (Transcript, str2tag ("PolyA_found"), _Int, &a2) ;
                 else
                   bsAddData (Transcript, str2tag ("PolyA_primed_clone_seen"), _Int, &a2) ;
                 bsAddKey (Transcript, _bsRight, up->cDNA_clone) ;
@@ -13210,7 +13228,7 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 	mrnaSaveGeneKillNonBest (s2m, sc, gmrna, smrnas) ;
       mrnaSaveMicroIntrons (s2m, sc, gmrna, smrnas) ;
       mrnaSaveProductHierarchy (s2m, sc, gmrna, smrnas) ;
-      if (! s2m->compositeDesignCovering)
+      if (1 || ! s2m->compositeDesignCovering)
 	abiFixLabelPolyATg (sc->gene, 0, 0, 0) ;
       /* this code should work on the genen for tg and/or pg */
       genes = queryKey (sc->gene, ">Gene") ;

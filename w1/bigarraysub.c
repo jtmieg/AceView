@@ -1,6 +1,6 @@
-/*  File: bigarraysub.c
+ /*  File: bigarraysub.c
  *  Author: Jean Thierry-Mieg (mieg@mrc-lmba.cam.ac.uk)
- *  Copyright (C) J Thierry-Mieg yand R Durbin, 1991
+ *  Copuyright (C) J Thierry-Mieg yand R Durbin, 1991
  *-------------------------------------------------------------------
  * This file is part of the ACEDB genome database package, written by
  * 	Richard Durbin (MRC LMB, UK) rd@mrc-lmba.cam.ac.uk, and

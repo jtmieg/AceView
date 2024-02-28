@@ -201,19 +201,18 @@ static void sxGetSelection (WIGGLE *sx)
 
 static void sxVentilate (WIGGLE *sx)
 {
-  typedef struct rHitStruct {int x1, x2;} RHIT ; 
   AC_HANDLE h = 0 ;
   ACEIN ai = sx->ai ;
   ACEOUT ao = 0, eo = 0, po = 0 ;
   Array aos = arrayHandleCreate (64,ACEOUT,h) ;
   Array eos = arrayHandleCreate (64,ACEOUT,h) ;
   Array pos = arrayHandleCreate (64,ACEOUT,h) ;
-  Array rHits = arrayHandleCreate (64, RHIT, h) ;
-  int iir ;
   char *ccp, probeBuf[1024], gBuf[1024],  mBuf[1024], target_class = 0 , buf[10001], wall1[256], wall2[256], *fr, *Efr ;
   char oldProbeBuf[1024] ;
-  int chrom, score, tc, tc2, a1, a2, e1, e2, p1, p2, x1, x2, ali, toali, map, mult, tmult, pass ;
-  int oldtc = 0, tcGenome = 0, mateAli = 0, mateToAli = 0 ;
+  int chrom, score, tc, tc2, a1, a2, e1, e2, p1, p2, x1, x2, ali, toali, map, mult, tmult, firstX1 = 0 ;
+  int oldScore = 0,  oldX1 = 0, oldX2 = 0, oldA1 = 0, oldA2 = 0 ;
+  int oldMap = 0, oldtc = 0, tcGenome = 0 ;
+  /* int  mateAli = 0, mateToAli = 0,  oldAli = 0, oldToAli = 0  ; */
   int nN = 0, nErr = 0 ;
   int ifr, iEfr ;
   float weight ;
@@ -222,8 +221,6 @@ static void sxVentilate (WIGGLE *sx)
   BOOL non_unique = sx->non_unique ;
   BOOL partial = sx->partial ;
   BOOL noPartial = sx->noPartial ;
-  BOOL RNA_seq = sx->RNA_seq ;
-  BOOL multiVentilate = sx->multiVentilate ;
   BOOL hierarchic = sx->hierarchic ;
   BOOL firstRead ;
   BOOL inTranscript = FALSE ;
@@ -231,8 +228,9 @@ static void sxVentilate (WIGGLE *sx)
   BOOL goodPair = TRUE ;
   BOOL isPartial = FALSE ;
   int lastScore = 0, lastAli = 0, lastToAli = 0 ;
-  int oldScore = 0, oldAli = 0, oldToAli = 0 ;
- 
+  int EndLength = 30 ;
+  int chainNumber, chainFrom, chainTo, mateScore, mateAli , mateToAli ;
+
   probeBuf[0] = 0 ;   oldProbeBuf[0] = 0  ;  
   gBuf[0] = 0 ; mBuf[0] = 0 ;
   
@@ -259,16 +257,15 @@ static void sxVentilate (WIGGLE *sx)
       if ( strcmp (ccp, probeBuf))
 	{
 	  newProbe = 1 ;
-	  iir = 0 ;
 	  strcpy (oldProbeBuf, probeBuf) ;
-	  oldScore = lastScore ;
-	  oldAli = lastAli ;
-	  oldToAli = lastToAli ;
+	  oldScore = lastScore = 0 ;
+	  /* oldAli = lastAli ; 	  oldToAli = lastToAli ; */
 	  lastScore = lastAli = lastToAli = 0 ;
 	  strcpy (probeBuf, ccp) ;
 	  
 	  oldtc = gBuf[0] = 0 ;
  
+#ifdef JUNK
 	  mateAli = mateToAli = 0 ; 
 	  if (sx->pair)
 	    {
@@ -281,7 +278,8 @@ static void sxVentilate (WIGGLE *sx)
 		  mateAli = oldAli ;
 		  mateToAli = oldToAli ;
 		}
-	    }	      
+	    }
+#endif	      
 	}
 	  
  
@@ -298,9 +296,8 @@ static void sxVentilate (WIGGLE *sx)
       if (sx->target_class && ccp && strcmp (ccp, sx->target_class))
 	continue ;
       target_class = *ccp ;
-      if (sx->out == BG  && sx->multiVentilate && target_class == 'Z')
+      if (hierarchic && target_class == 'Z')
 	continue ;
-
       dictAdd (sx->target_mapDict, ccp, &tc) ; 
       dictAdd (sx->remapDict, ccp, &chrom) ; 
 
@@ -316,8 +313,7 @@ static void sxVentilate (WIGGLE *sx)
       strncpy (mBuf, ccp, 1000) ;
 
       /* keep tags only one mrna per gene */
-      /* ATTENTION we may want to keep genome discontinuous aligments */
-      if (0 && (! multiVentilate || hierarchic) &&
+      if (hierarchic &&
 	  ! newProbe &&
 	  tc != oldtc	   
 	  )
@@ -332,6 +328,7 @@ static void sxVentilate (WIGGLE *sx)
 
       /* ok, ccp == the chromosome or the mRNA */
       oldtc = tc ;
+      oldMap = map ;
       map = tc2 = 0 ;	  
 
       if (0 && target_class != 'B') /* hack to do just the rrna */
@@ -351,7 +348,7 @@ static void sxVentilate (WIGGLE *sx)
 	  dictAdd (sx->remapDict, ccp, &chrom) ;
 	  dictAdd (sx->mapDict, ccp, &map) ;
 	  break ;
-	case 'B': /* ribosomal rrna now intergated in the mrnaRemap.gz table is treated as RefSeq and AceView */ 
+	case 'B': /* ribosomal rrna now integrated in the mrnaRemap.gz table is treated as RefSeq and AceView */ 
 	default:
 	  if (keySetMax (sx->map2remap))
 	    {
@@ -380,6 +377,7 @@ static void sxVentilate (WIGGLE *sx)
       if (! aceInStep (ai, '\t') || ! aceInInt (ai, &nErr)) continue ;
 
       /* 2024_01_12: in non stranded case, trust the strand of the annotated gene */
+      if (! firstRead) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
       if (inTranscript && sx->ventilate && ! sx->strand && ! sx->antistrand)
 	{
 	  if (firstRead && a1 > a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
@@ -389,22 +387,54 @@ static void sxVentilate (WIGGLE *sx)
       if (sx->maxErr && nErr > sx->maxErr && 100 * nErr > sx->maxErrRate * ali)
 	continue ;
 
-      if (x1 > x2)  /* x1<x2 is the convention, this should never be necessary, do it just in case */
+      /************* restore natural order ******************/
+      /* x1<x2 is the convention, this should never be necessary, do it just in case */
+      if (x1 > x2)  
 	{ int x0 = x1 ; x1 = x2 ; x2 = x0 ; x0 = a1 ; a1 = a2 ; a2 = x0 ; }
-      /************** partial ***************/ 
-      /************** ENDS ***************/
-      /* e1 e2 will be used to find the ends of the template, they match x1 and x1+30 */
-      e1 = a1 ; e2 = a2 ;
-      if (e1 < e2) e2 = e1 + sx->out_step ;
-      if (e1 > e2) e2 = e1 - sx->out_step ;
-      if (sx->out_step)
+
+      /************* remove exon overlap *********************/
+      /* hierarchic clean up before we map to the wiggles */
+      if (map != oldMap && score < oldScore)
+	continue ;
+      /* clip exon overlap when both exon leak in the intron */
+      if (0 && oldX1 && map == oldMap)  
 	{
-	  if (e1 < e2 && e2 > e1 + sx->out_step) e2 = e1 + sx->out_step ;
-	  if (e1 > e2 && e2 < e1 - sx->out_step) e2 = e1 - sx->out_step ;
+	  int dx = oldX2 - x1 + 1 ;
+
+	  if (dx > 0)  /* overlap on the read */
+	    {  /* check the overlap exists also in the target */
+	      if ((a2 - a1)*(oldA2 - oldA1) < 0)  /* opposite strands */
+		dx = 0 ;
+	      if (a1 < a2 && a1 > oldA2)
+		dx = 0 ;   /* we already have a hole */
+	      if (a1 > a2 && a1 < oldA2)
+		dx = 0 ;
+	    }
+	  if (dx > 0 && oldX2 > x1) /* drop */
+	    continue ;
+	    
+	  if (dx > 0) /* reclip */
+	    {	    
+	      x1 += dx ;
+	      if (a1 < a2) a1 += dx ;
+	      else  a1 -= dx ;
+	    }
 	}
-      
-      if (sx->antistrand)    /* we need to do that to allow adding up stranded and antistraned runs in the same group */
-	firstRead = ! firstRead ;
+      oldX1 = x1 ; oldX2 = x2 ; oldA1 = a1; oldA2 = a2 ; oldScore = score ;
+
+      /************** ENDS ***************/
+      /* e1 e2 will be used to position the start of the reads on the template */
+      e1 = e2 = 0 ;
+      if (strcmp (probeBuf, oldProbeBuf) &&
+	  (x1 < 10  || ali == toali)
+	  ) 
+	{
+	  e1 = a1 ; 
+	  if (e1 < e2 && e2 > e1 + EndLength) e2 = e1 + EndLength ;
+	  if (e1 > e2 && e2 < e1 - EndLength) e2 = e1 - EndLength ;
+	}
+      strcpy (oldProbeBuf, probeBuf) ;
+
       /*  2015_06_12 : getting this right is amazingly difficult !
        * E [LR] {FR} : E = ends, LR = left or right end of the genebox in the orientation of the genome
        *                          FR = the gene is on the forward or the reverse strand of the genome
@@ -412,7 +442,7 @@ static void sxVentilate (WIGGLE *sx)
        *  for reads mappaed to a gene, the names stay if the gene maps to the plus strand
        *  both letters LR  and FR are exchanged if the gene maps to the negative starnd 
        */
-      if (e1 < e2) 
+      if (a1 < a2) 
 	{
 	  iEfr = 0 ; Efr = "EL" ;
 	  if (firstRead)  { iEfr = 0 ; Efr = "ELF" ; }
@@ -420,29 +450,19 @@ static void sxVentilate (WIGGLE *sx)
 	}
       else
 	{ 
-	  int e0 = e1 ; e1 = e2 ; e2 = e0 ;
 	  iEfr = 2 ; Efr = "ER" ; 
 	  if (firstRead)  { iEfr = 3 ; Efr = "ERR" ; }
 	  else            { iEfr = 2 ; Efr = "ERF" ; }
 	}
  
-      /************ Stranded support *************/
-
-     if (0 && sx->antistrand)  /* reverse the antistrand reads */
-	{ int x0 = x1 ; x1 = x2 ; x2 = x0 ; x0 = a1 ; a1 = a2 ; a2 = x0 ; }
-      /* a1/a2 are used in the stranded wiggle to give the strand of the gene box */
-      if (! firstRead)  /* reverse the strand of the < read */
-	{  int a0 = a1 ; a1 = a2 ; a2 = a0 ; }
-      if (a1 < a2)
-	{  ifr = 0 ; fr = "f" ; }
-      else
-	{   int a0 = a1 ; a1 = a2 ; a2 = a0 ; ifr = 1 ; fr = "r" ; }
 
       /* missmatches and overhangs, reported in col 14 to 21 are ignored in this program */
 
       goodPair = TRUE ; 
-      if (sx->pair)
+      if (1)
 	{
+	  int mateAliDirect  = 0, mateToAliDirect  = 0,  mateScoreDirect = 0 ; /* in case they are available in cols 23 24 */
+	  
 	  aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; /* list of missmatches in read frame */
 	  aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; /* list of missmatches in target frame */
 	  aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; if (! ccp) ccp = "-" ; strncpy (wall1, ccp, 120) ;
@@ -450,23 +470,29 @@ static void sxVentilate (WIGGLE *sx)
 	  aceInStep (ai, '\t') ; ccp = aceInWord (ai) ;	/* target prefix */
 	  aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; /* target suffix */
  
+	  chainFrom = chainTo = 0 ;
 	  /* keep only matched pairs */
 	  {
 	    int deltaPair = 0 ;
-	    if (aceInStep (ai, '\t') &&  aceInInt (ai, &deltaPair))
+	    aceInStep (ai, '\t') ;  aceInInt (ai, &deltaPair) ; aceInStep (ai, '-') ; 
+	      
+	    if (deltaPair > 30 || deltaPair < -30) hasPair = TRUE ; /* at least one correctly annotated pair was found */
+	    if (hasPair &&  deltaPair >  NON_COMPATIBLE_PAIR && deltaPair < 0 && deltaPair != -2 && deltaPair != -5)  /* synchronize to hack these reserved values with bestali.c */
+	      goodPair = FALSE ;
+	    
+	    /*                synchronize with snp.c */
+	    aceInStep (ai, '\t') ; aceInInt (ai, &mateScore) ; aceInStep (ai, '-') ; 
+	    aceInStep (ai, '\t') ; aceInInt (ai, &mateAli) ; aceInStep (ai, '-') ; 
+	    aceInStep (ai, '\t') ;  aceInInt (ai, &mateToAli) ; aceInStep (ai, '-') ; 
+	    
+	    mateAli = mateAliDirect ; mateScore = mateScoreDirect ; mateToAli = mateToAliDirect ; /* if I find them directly that is ok */
+	    
+	    aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; 
+	    if (ccp && !strcmp(ccp, "chain"))
 	      {
-
-		if (deltaPair > 30 || deltaPair < -30) hasPair = TRUE ; /* at least one correctly annotated pair was found */
-		if (hasPair &&  deltaPair >  NON_COMPATIBLE_PAIR && deltaPair < 0 && deltaPair != -2 && deltaPair != -5)  /* synchronize to hack these reserved values with bestali.c */
-		  goodPair = FALSE ;
-#ifdef JUNK
-                synchronize with snp.c
-		int mateAliDirect  = 0, mateToAliDirect  = 0,  mateScoreDirect = 0 ; /* in case they are available in cols 23 24 */
-		if (aceInStep (ai, '\t') &&  aceInInt (ai, &mateScore) && aceInStep (ai, '\t') &&  aceInInt (ai, &mateAli) && aceInStep (ai, '\t') &&  aceInInt (ai, &mateToAli) )
-		  {
-		    mateAli = mateAliDirect ; mateScore = mateScoreDirect ; mateToAli = mateToAliDirect ; /* if I find them directly that is ok */
-		  }
-#endif
+		aceInStep (ai, '\t') ;  aceInInt (ai, &chainNumber) ; aceInStep (ai, '-') ; 
+		aceInStep (ai, '\t') ;  aceInInt (ai, &chainFrom) ; aceInStep (ai, '-') ; 
+		aceInStep (ai, '\t') ;  aceInInt (ai, &chainTo) ; aceInStep (ai, '-') ; 
 	      }
 	  }
 	}
@@ -474,167 +500,139 @@ static void sxVentilate (WIGGLE *sx)
       if (tmult <= 0) tmult = 1 ;
       weight = mult/((float)tmult) ;
  
+      /************** partials ***************/
       /* check partial */
       isPartial = FALSE ;
-      p1 = a1 ; p2 = a2 ;
+      p1 = p2 = 0 ;
       
       if (hasPair && ! goodPair)
 	isPartial = TRUE ;
    
       /* quality control */
       lastAli = ali ; lastToAli = toali ; lastScore = score ;
-      if ( 0 && sx->minAliRate > 0 && 
-	   ali < sx->minAliLength && 100 * ali < toali * sx->minAliRate && 
-	   ali + mateAli < 2 * sx->minAliLength && 100 * (ali + mateAli) < (toali + mateToAli) * sx->minAliRate && ali < toali - 20
-	   )
-	isPartial = TRUE ;
+      if (newProbe) firstX1 = x1 ;
+      if (x1 < 30) toali -= x1 ;
       if ( (ali > 25 || ali > sx->minAliLength || 100 * ali > toali * sx->minAliRate) && 
-	   ali < toali - 20
+	   ali < toali - 30 &&  
+	   (
+	    (! chainTo || x2 == chainTo) ||
+	    (! chainFrom || x1 == chainFrom) 
+	    )
 	   )
 	isPartial = TRUE ;
-
-      /* 1 || because we want to show as discontinuous the guys i get from the genome
-       * as opposed to the reads i get via an annotatted transcriptome which
-       * are continuous and will be remappad as discontinuous
-       */
-      if ((1 || RNA_seq) &&   /* in exome studies, a discontinuous ali counts as a partial */
-	  (ali > x2 - x1 + 10)
-	  )
-	isPartial = TRUE ;
-
+      if (isPartial && x2 == chainTo && ali + firstX1 < toali)
+	{ p2 = a2 ; p1 = p2 - (a1 < a2 ? 30 : -30) ; }
+      else if (isPartial && x1 == chainFrom && x1 > 30)
+	{ p1 = a1 ; p2 = p1 + (a1 < a2 ? 30 : -30) ; }
+      if (! p1) 
+	isPartial = FALSE ;
       if (noPartial)
 	isPartial = FALSE ;
-      if (isPartial && ! partial)
+      if (0 && isPartial && ! partial) /* the partial are just a supplementary info */
 	continue ;
-     if (! isPartial && partial)
-	continue ;
- 
-      if (1)  /* hierarchic clean up before we map tot he wiggles */
-	{
-	  RHIT *vp, *up = arrayp (rHits, iir++, RHIT) ;
-	  int i, u1, u2 ;
-	  up->x1 = x1 ;
-	  up->x2 = x2 ;
-	  for (i = 0 ; i < iir - 1 ; i++)
-	    {
-	      vp = arrp (rHits, i, RHIT) ;
-	      u1 = x1 > vp->x1 ? x1 : vp->x1 ;
-	      u2 = x2 < vp->x2 ? x2 : vp->x2 ;
-	      if (u1 < u2) /* there is an intersect */
-		{
-		  int dx1 = u2 - x1 ;
-		  int dx2 = x2 - u1 ;
-
-		  x1 += dx1 ;
-		  x2 -= dx2 ;
-		  if (a1 < a2) 
-		    { a1 += dx1 ; a2 -= dx2 ; }
-		  else
-		    { a1 -= dx1 ; a2 += dx2 ; }
-		}
-	    }
-	  if (x1 > x2) /* drop */
-	    continue ;
-	  up->x1 = x1 ;
-	  up->x2 = x2 ;
+      if (a1 < a2)
+	{ ifr = 0 ; fr = "f" ; }
+      else
+	{ 
+	  int a0 = a1 ; a1 = a2 ; a2 = a0 ; ifr = 1 ; fr = "r" ; 
+	  int e0 = e1 ; e1 = e2 ; e2 = e0 ; 
+	  int p0 = p1 ; p1 = p2 ; p2 = p0 ; 
 	}
-      
-      for (pass = 0 ; pass < 1 ; pass++)
+	  
+      ao = eo =  po = 0 ;
+      int pass = 0 ;
+      if (! partial)
+       {
+	 ao = array (aos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ;
+	 if (! ao)
+	   {
+	     ao = aceOutCreate (sx->outFileName
+				, messprintf(".%s.%s.%s.minerr%d.%s"
+					     , (tc2  ? "remapped" : "mapped")
+					     , dictName(sx->remapDict, chrom)
+					     , fr, (pass ? sx->minErrRate : 0)
+					     , (sx->out == BHIT ? "hits" : (unique ? "u.BG" :"nu.BG") )
+					     )
+				, sx->gzo, h
+				) ;
+	     array (aos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = ao ;
+	     aceOutf (ao,"# %s\n", timeShowNow()) ;
+	   }
+       }
+      if (e1)
 	{
-	  if (pass == 1)
-	    {
-	      if (partial)
-		continue ;
-	      if (sx->minErrRate > 0 ) /* funny idea, just export the error rich ali */
-		{
-		  int dx = x1 < x2 ? x2 - x1 + 1 : x1 - x2 + 1 ;
-		  
-		  if (100 * nErr < sx->minErrRate * dx) 
-		    continue ;
-		}
-	      else
-		continue ;
-	    }
-	  
-	  ao = array (aos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ;
-	  if (!partial && !ao)
-	    {
-	      ao = array (aos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = 
-		aceOutCreate (sx->outFileName
-			      , messprintf(".%s.%s.%s.minerr%d.%s"
-					   , (tc2  ? "remapped" : "mapped")
-					   , dictName(sx->remapDict, chrom)
-					   , fr, (pass ? sx->minErrRate : 0)
-					   , (sx->out == BG ? (unique ? "u.BG" :"nu.BG") : "hits")
-					   )
-			      , sx->gzo, h
-			      ) ;
-	      if (sx->out == BG)
-		{
-		  aceOutf (ao,"# %s\n", timeShowNow()) ;
-		  aceOutf (ao, "trackName type=bedGraph\n") ;
-		}
-	    }
-	  
 	  eo = array (eos, iEfr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ; 
-	  if (!partial && sx->out == BG && !eo)
+	  if (partial && ! eo)
 	    {
-	      eo = array (eos, iEfr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = 
+	      eo = 
 		aceOutCreate (sx->outFileName
-			      , messprintf(".%s.%s.%s.minerr%d.%s"
+			      , messprintf(".%s.%s.%s.minerr%d.%s.%s"
 					   , (tc2  ? "remapped" : "mapped")
 					   , dictName(sx->remapDict, chrom)
 					   , Efr, (pass ? sx->minErrRate : 0)
-					   , (sx->out == BG ? (unique ? "u.BG" :"nu.BG") : "hits")
+					   , (unique ? "u" : "nu") 
+					   , (sx->out == BHIT ? "hits" : "BG")
 					   )
 			      , sx->gzo, h
 			      ) ;
-	      if (sx->out == BG)
-		{
-		  aceOutf (eo,"# %s\n", timeShowNow()) ;
-		  aceOutf (eo, "trackName type=bedGraph\n") ;
-		}
+	      array (eos, iEfr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = eo ;
+	      aceOutf (eo,"# %s\n", timeShowNow()) ;
+	      aceOutf (eo, "trackName type=bedGraph\n") ;
 	    }
-	  
+	}
+      if (p1)
+	{
 	  po = array (pos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ;
-	  if (partial && sx->out == BG && !po)
+	  if (partial &&  !po)
 	    {
-	       po = array (pos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = 
+	      po = 
 		aceOutCreate (sx->outFileName
 			      , messprintf(".%s.%s.%s.minerr%d.%s"
 					   , (tc2  ? "remapped" : "mapped")
 					   , dictName(sx->remapDict, chrom)
 					   , fr, (pass ? sx->minErrRate : 0)
-					   , "pp.BG"
+					   , (sx->out == BHIT ? "pp.hits" : "pp.BG")
 					   )
 			      , sx->gzo, h
 			      ) ;
-	      if (sx->out == BG)
-		{
-		  aceOutf (po,"# %s\n", timeShowNow()) ;
-		  aceOutf (po, "trackName type=bedGraph\n") ;
-		}
+	      array (pos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) = po ;
+	      aceOutf (po,"# %s\n", timeShowNow()) ;
+	      aceOutf (po, "trackName type=bedGraph\n") ;
 	    }
-	  
-	  if (sx->out == BG)  /* a1 in BG is zero based */
-	    {
-	      if (ao && a1 < a2) a1-- ; else a2-- ; 	
-	      if (ao) aceOutf (ao, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), a1, a2, weight) ; 
-	      
-	      if (eo && e1 < e2) e1-- ; else e2-- ; 	
-	      if (eo) aceOutf (eo, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), e1, e2, weight) ; 
-
-	      if (po && p1 < p2) p1-- ; else p2-- ; 	
-	      if (po) aceOutf (po, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), p1, p2, weight) ; 
-	    }
-	  else if (ao)
-	    {
+	}
+      
+      if (sx->out == BHIT)
+	{
+	  if (ao) 
+	    { 
 	      aceOutf (ao, "%s\t%d\t%d\t%f\t\t",  dictName(sx->mapDict, map), a1, a2, weight) ; 
 	      aceOutf (ao, "%s\n", buf) ;
 	    }
+	  if (eo) 
+	    { 
+	      aceOutf (eo, "%s\t%d\t%d\t%f\t\t",  dictName(sx->mapDict, map), e1, e2, weight) ; 
+	      aceOutf (eo, "%s\n", buf) ;
+	    }
+	  if (po) 
+	    { 
+	      aceOutf (po, "%s\t%d\t%d\t%f\t\t",  dictName(sx->mapDict, map), p1, p2, weight) ; 
+	      aceOutf (po, "%s\n", buf) ;
+	    }
+	}
+      if (sx->out == BG)
+	{
+	  /* a1 in BG is zero based */
+	  a1-- ;
+	  if (ao && a1 > 0) aceOutf (ao, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), a1, a2, weight) ; 
+	  
+	  e1-- ;
+	  if (eo && e1 > 0) aceOutf (eo, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), e1, e2, weight) ; 
+	  
+	  p1-- ;
+	  if (po && p1 > 1) aceOutf (po, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), p1, p2, weight) ; 
 	}
     }
-  /* this seems needed to correctly close the gzipping pipes */
+  /* close the multiple output files */
   for (tc = 0 ; tc < arrayMax (aos) ; tc++)
     {
       ao = array (aos, tc, ACEOUT) ; array (aos, tc, ACEOUT) = 0 ;
@@ -1058,11 +1056,9 @@ static void usage (const char *error)
 	   "// -strand_shift max -ssf file1.f -ssr file2.r : auto-correlation of forward and reverse wiggles\n"
 	   "//    In ChIP-seq for example the reads on the 2 strands are shifted by the effective length of the library\n"
 	   "//    This function reports the correlation (cosine in the scalar product) for shifts up to max bp\n"
-	   "// -ventilate | -multiVentilate  [-hierarchic] [-minAliRate number -minAliLength number -naxSnp number -maxErrRate number] [-pair fragmentLength]\n"
-	   "//    Implies -I BHIT -O BG, requires -o, splits a HIT file in one BG file per chromosome\n" 
-	   "//    in -multiVentilate case we reexport all hits, useful only when -mapon is specified\n"
-	   "//    otherwise the tag is exported only once in the first acceptable place\n"
-	   "//    in -multiV.. -hierarchic mode, a single hit per target_class is exported , excluding the genome\n"
+	   "// -ventilate [-hierarchic] [-minAliRate number -minAliLength number -naxSnp number -maxErrRate number] [-pair fragmentLength]\n"
+	   "//    Implies -I BHIT -O BHIT, requires -o, splits a HIT file in one BG file per chromosome\n" 
+	   "//    in -hierarchic mode, a single target per target_class is exported , excluding the genome\n"
 	   "//    reject ali shorter than minAliLength [default 70] and below minAliRate [default 0]\n"
 	   "//    reject ali shorter above maxErr and above maxErrRate [default 0 and 0%%]\n"
 	   "//    pair rejects all reads which are not pair compatible\n"
@@ -1097,8 +1093,6 @@ int main (int argc, const char **argv)
   
   
   sx.ventilate = getCmdLineBool(&argc, argv, "-ventilate") ;
-  sx.multiVentilate = getCmdLineBool(&argc, argv, "-multiVentilate") ;
-  if (sx.multiVentilate) sx.ventilate = TRUE ;
   sx.cumul = getCmdLineBool(&argc, argv, "-cumul") ; 
   sx.peaks = getCmdLineBool (&argc, argv, "-peaks") ;
   if (getCmdLineInt (&argc, argv, "-multiPeaks", &(sx.multiPeaks)))
@@ -1158,16 +1152,27 @@ int main (int argc, const char **argv)
   else if (!sx.strandShift_max)
     usage ("missing output format option -O") ;
 
-  if (sx.partial && sx.out != BG)
-    usage ("option -partial is only compatible with -o BG") ;
 
   /* specific input options relative to 'wy' imput format */
   getCmdLineInt(&argc, argv, "-in_step", &(sx.in_step));
   getCmdLineInt(&argc, argv, "-in_span", &(sx.in_span));
   getCmdLineInt(&argc, argv, "-in_x1", &(sx.in_step));
   
-  sx.out_step = 10 ;
+
   sx.delta = 0 ;
+  
+  switch (sx.out)
+    {
+    case BHIT : 
+    case BG:
+    case AF:  /* allele frequency */
+    case COUNT:
+      sx.out_step = 0 ;
+      break ;
+    default: /* BF, BV, AM, AG, AW,  TABIX */
+      sx.out_step = 10 ;
+      break ;
+    }
   getCmdLineInt(&argc, argv, "-out_step", &(sx.out_step)) ;
   getCmdLineInt(&argc, argv, "-delta", &(sx.delta));
   getCmdLineInt(&argc, argv, "-out_span", &(sx.out_span));
@@ -1195,6 +1200,8 @@ int main (int argc, const char **argv)
   sx.non_unique = (getCmdLineBool (&argc, argv, "-nu") ||  getCmdLineBool (&argc, argv, "-non_unique") ) ;
   sx.partial = (getCmdLineBool (&argc, argv, "-partial")) ;
   sx.noPartial = getCmdLineBool (&argc, argv, "-noPartial") ;
+  if (sx.partial && ! sx.ventilate && sx.out != BG)
+    usage ("option -partial is only compatible with -o BG") ;
   if (sx.unique && sx.non_unique)
     usage ("Sorry: options -unique and -non_unique are incompatible") ;
   if (sx.partial && sx.noPartial)
@@ -1205,6 +1212,8 @@ int main (int argc, const char **argv)
     usage ("Sorry: options -ventilate requires -unique or -non_unique or -partial") ;
   sx.gzi = getCmdLineBool (&argc, argv, "-gzi");
   sx.gzo = getCmdLineBool (&argc, argv, "-gzo");
+  if (sx.ventilate && sx.gzo)
+    usage ("Sorry: options -ventilate is incompatible with -gzo, it would saturate the computer") ;
 
   getCmdLineOption (&argc, argv, "-mapon", &(sx.mapFileName));
   getCmdLineOption (&argc, argv, "-mapOnChrom", &(sx.sxxChromosome));

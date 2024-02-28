@@ -139,6 +139,7 @@ typedef struct hitStruct3 {
     , nN, nErr
     , c1, c2 /* chain start/stop in x coordinates */
     , gt_ag, ct_ac /* justified introns */
+    , hardClip1, hardClip2 
     ;
 } HIT3 ;
 
@@ -596,7 +597,11 @@ static BOOL baParseOneHit (ACEIN ai, BA *ba, HIT *up, int nn)
       return FALSE ;
     }
   if (strcmp (ccp, "-"))
-    dictAdd (ba->dnaDict,ccp, &(up3->prefix)) ;
+    {
+      dictAdd (ba->dnaDict,ccp, &(up3->prefix)) ;
+      if (*ccp == ace_upper(*ccp))
+	up3->hardClip1 = up->x1 ;
+    }
   
   ccp = aceInWordCut (ai, "\t", &cutter) ; /* col 19: suffix */
   if (! ccp || ! *ccp)
@@ -607,6 +612,8 @@ static BOOL baParseOneHit (ACEIN ai, BA *ba, HIT *up, int nn)
   if (strcmp (ccp, "-"))
     {
       dictAdd (ba->dnaDict,ccp, &(up3->suffix)) ;
+      if (*ccp == ace_upper(*ccp))
+	up3->hardClip2 = up->x2 ;
     }
   
   ccp = aceInWordCut (ai, "\t", &cutter) ; /* col 20: targetPrefix */
@@ -1116,6 +1123,14 @@ static BOOL baKeepOneHit (BA *ba, HIT *up, const int nn, const int Z_genome)
 		  }
 		else if (score > vp->score)
 		  vp->score = 0 ;
+	      }
+	    if (
+		(vp3->hardClip1 && up->x2 < vp3->hardClip1 + 30) ||
+		(vp3->hardClip2 && up->x1 < vp3->hardClip2 - 30)
+		)
+	      {
+		score = up->score = 0 ;
+		break ;
 	      }
 	  }
 	}

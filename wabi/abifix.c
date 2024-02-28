@@ -3604,7 +3604,7 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
   if (bsGetArray (Mrna, _Constructed_from, units, 5))
     for (ii = 0 ; ii < arrayMax (units) ; ii+= 5)
       {
-	int e1, e2, x1, x2, v1 = 1, x, isSl = 0 ;
+	int e1, e2, x1, x2, v1 = 1, x, isSl = 0, n ;
 	BOOL top = FALSE ;
 	OBJ Est ;
 	KEY clone, sl ;
@@ -3627,6 +3627,13 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	     )
 	    )
 	  top = TRUE ;
+	if (bsFindTag (Est, _Forward) &&
+	    bsFindTag (Est, _Composite) &&
+	    bsGetData (Est, _Composite, _Int, &n) &&
+	    bsFindTag (Est, _Real_5prime) &&
+	    bsGetData (Est, _bsRight, _Int, &x) &&
+	    e1 < x + 5)
+	  { top = TRUE ; isSl = 1 ; nSl+= n; }
 	if (bsFindTag (Est, _Forward) &&
 	    bsGetKey (Est, _Transpliced_to, &sl) &&
 	    bsGetData (Est, _bsRight, _Int, &x) &&
@@ -3666,7 +3673,7 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
   if (1)
     for (ii = 0 ; ii < arrayMax (units) ; ii+= 5)
       {
-	int e1, e2, de2, x2, pA = 0, v1 = 1, tail = 0 ;
+	int e1, e2, de2, x2, pA = 0, v1 = 1, tail = 0, n = 1 ;
 	BOOL isMrna, iPriming, polyAPriming ;
 	OBJ Est ;
 	KEY clone ;
@@ -3683,9 +3690,18 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	  continue ;
 	Est = bsCreate (est) ;
 	bsGetKey (Est, _cDNA_clone, &clone) ;
+	bsGetData (Est, _Composite, _Int, &n) ;
 
 	if (!strncmp(name(clone),"yk",2) && !strncmp(name(est),"GB",2))
 	  { bsDestroy (Est); continue ; }
+	/*
+	if (bsFindTag (Est, _Reverse) &&
+	    bsFindTag (Est, _Composite) &&
+	    bsGetData (Est, _Composite, _Int, &n) &&
+	    bsFindTag (Est, _Real_3prime) &&
+	    e1 < x + 5)
+	  { top = TRUE ; isSl = 1 ; nSl+= n; }
+	*/
 	iPriming = keyFindTag (clone, _Internal_priming) ;
 	polyAPriming = keyFindTag (clone, _Primed_on_polyA) ;
 	if (bsFindTag (Est, _PolyA_after_base))
@@ -3768,7 +3784,10 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	ap->iPriming = iPriming ;
 	ap->polyAPriming = polyAPriming ;
 	if (keySetInsert (clones3, clone)) /* only if new, since may be in a variant */
-	  ap->nClones3 = 1 ;
+	  {
+	    ap->nClones3 = n ;
+	    ap->mClones03 = n ;
+	  }
       }
 
   /* gather valid3p from the Feature AAA stored on the cosmid */
@@ -4443,7 +4462,7 @@ static int abiFixLabelReportPolyA (KEY mrna, Array aa5, Array aa3, DICT *dict)
 	  for (ii = 0, ap = arrp (aa3, 0, AAA) ; ii < arrayMax (aa3) ; ii++, ap++)
 	    if (ap->est && /* a cluster point */
 		ap->aRich <= 0 &&
-		(ap->signal || isWorm) &&
+		(ap->signal || isWorm || ap->mClones03 > 10) &&
 		(ap->nClones3 >= (ap->polyAPriming ? 1 : 3) || ap->tail || ap->mClones3 > (UTR_showAll ? 1 : 3))
 		)
 	      { /* report if represented in this mrna, or if matching the end of the mrna */
@@ -4456,6 +4475,13 @@ static int abiFixLabelReportPolyA (KEY mrna, Array aa5, Array aa3, DICT *dict)
 		    if (d > -26 && d < 26) 
 		      {
 			atEnd = TRUE ;
+			if (keyFindTag (ap2->est, _Composite) &&
+			    keyFindTag (ap2->est, _PolyA_after_base)
+			    )
+			  {
+			    xTags += ap2->mClones03 ;  
+			    continue ;
+			  }
 			if (ap2->est0 && ap2->group == ap->group)
 			  {
 			    if (ap2->mrna == mrna ||

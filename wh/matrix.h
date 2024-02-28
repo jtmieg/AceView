@@ -111,7 +111,9 @@ MX  mxFlipTranspose (MX at, MX a, int g1, int g2, AC_HANDLE h) ; /* if at==0, at
 
 BOOL mxCheck (MX a, const char *nam) ; /* check matrix existence */
 
+float complex nicePrint (const char *prefix, float complex z) ; /* show on stdout */
 void mxShow (MX a) ;        /* show on stderr */
+void mxNiceShow (MX a) ;        /* show on stderr */
 void mxSet (MX a, const void *x) ; /* x is memcpy in a->z, it must have the correct type and size, no check */
 
 

@@ -1033,6 +1033,10 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 			  }
 			bsGoto(obj, mark);
 		      } while (bsGetKey (obj, _bsDown, &motif)) ;
+		  else if (bsFindTag (obj, _Real_3prime))
+		    {
+		      bestMotif = _Real_3prime ; bold = TRUE ;
+		    }
 
 		  if (bestMotif) 
 		    motif = bestMotif ;
@@ -1054,7 +1058,24 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 			    graphBubbleInfo (bx1, 0, 0, messprintf ("Transpliced leader %s", name(motif))) ;
 			}
 		      else if (motif == _Real_5prime)
-			graphText("=", x + .3, y1 - .95) ;
+			{
+			  if (isDown)
+			    {
+			      float y11 = MAP2GRAPH (look->map, seg->x1 - 30) ;
+			      graphLine (look->mrnaOffset, y11, x + 5, y11) ;
+			    }
+			  graphLine (x + .1, y1 - .1, x + 1.5, y1 - .1) ; 
+			  graphText("=", x + .3, y1 - .95) ;
+			}
+		      else if (motif == _Real_3prime)
+			{
+			  if (isDown)
+			    {
+			      float y22 = MAP2GRAPH (look->map, seg->x2 + 30) ;
+			      graphLine (look->mrnaOffset, y22, x + 5, y22) ;
+			    }
+			  graphLine (x + .1, y2 + .1, x + 1.5, y2 + .1) ; 
+			}
 		      else if (strcmp(name(motif),"gccgtgctc") &&
 			       strncmp(name(motif),"gagaga",6)) ; /* rien du tout */
 		      else if (*name(motif) == 'a')
@@ -1179,7 +1200,7 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 			  float yy = MAP2GRAPH(look->map, seg->x1 + .5 - .5) ; 
 			  int bx1 = graphBoxStart () ;
 			  
-			  graphColor (RED) ; 
+			  graphColor (RED) ;
 			  if (yy - y1 < .20) yy = y1 + .20 ;
 			  graphFillRectangle (x + .1, y1, x + 1.5, yy) ; 
 			  graphColor (TRANSPARENT) ;
@@ -1213,7 +1234,8 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 		    }
 		  else
 		    { 
-		      if (seg->data.i & 0x20000000) graphColor (RED) ;
+		      if (seg->data.i & 0x20000000) 
+			graphColor (RED) ;
 		      graphLine (x + .1 , y1 + .6, x + .8, y1) ;
 		      graphLine (x + 1.5, y1 + .6, x + .8, y1) ; 
 		      if (seg->data.i & 0x20000000) graphColor (BLACK) ;
@@ -1343,7 +1365,8 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 		}
 	      else /* (is3p && !isReadUp) */
 		{  
-		  if (seg->data.i & 0x20000000) graphColor (RED) ;
+		  if (seg->data.i & 0x20000000)
+		    graphColor (RED) ;
 		  graphLine (x + .1 , y2 - .6, x + .8, y2) ;
 		  graphLine (x + 1.5, y2 - .6, x + .8, y2) ;  
 		  if (seg->data.i & 0x20000000) graphColor (BLACK) ;
@@ -1371,7 +1394,8 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 		    }
 		  else
 		    { 
-		      if (seg->data.i & 0x20000000) graphColor (RED) ;
+		      if (seg->data.i & 0x20000000) 
+			graphColor (RED) ;
 		      graphLine (x + .1 , y2 - .6, x + .8, y2) ;
 		      graphLine (x + 1.5, y2 - .6, x + .8, y2) ; 
 		      if (seg->data.i & 0x20000000) graphColor (BLACK) ;
@@ -2636,6 +2660,7 @@ void fMapcDNADoShowMrna (LOOK look, float *offset, BOOL isPredicted)
 
   cDNAAlignInit () ; 
 
+  look->mrnaOffset = *offset ;
   if (0 && look->view && isPredicted)
     return ;
 

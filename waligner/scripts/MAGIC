@@ -771,7 +771,7 @@ bin/tacembly MetaDB << EOF > MetaDB/makelists.log
   list -a -f MetaDB/$MAGIC/GroupTransloc.list
 
   query find project IS $MAGIC ; > Run  ; is_Run // always computed for runs
-  bql -a -o MetaDB/$MAGIC/run2machine2adaptors.txt select r,m,a1,a2,aa1,aa2,e1 from r in @, m in r->machine, a1 in r->adaptor1, a2 in r->adaptor2, ali in r->ali, aa1 in ali->adaptor1, aa2 in ali->adaptor2, e1 in r->Entry_adaptor
+  bql -a -o MetaDB/$MAGIC/run2machine2adaptors.txt select r,m,a1,a2,aa1,aa2,e1,e2 from r in @, m in r->machine, a1 in r->adaptor1, a2 in r->adaptor2, ali in r->ali, aa1 in ali->adaptor1, aa2 in ali->adaptor2, e1 in r->Entry_adaptor, e2 in r->Entry_adaptor2
   query find project IS $MAGIC ; > Run  ; is_Run || is_group // always computed for runs
   bql -o MetaDB/$MAGIC/run2capture.txt select r,c from r in @, c in r->capture
   query find project IS $MAGIC ; > Run  ;Is_run && (nonStranded OR NOT (Forward OR Reverse)) 
@@ -2439,7 +2439,7 @@ bin/tacembly MetaDB <<EOF
   read-models
   pparse  tmp/Adaptors/$MAGIC.adaptors.ace  
   query find project IS $MAGIC ; >run is_Run // always computed for runs
-  bql -a -o MetaDB/$MAGIC/run2machine2adaptors.txt select r,m,a1,a2,aa1,aa2 from r in @, m in r->machine, a1 in r->adaptor1, a2 in r->adaptor2, ali in r->ali, aa1 in ali->adaptor1, aa2 in ali->adaptor2
+  bql -a -o MetaDB/$MAGIC/run2machine2adaptors.txt select r,m,a1,a2,aa1,aa2,e1,e2 from r in @, m in r->machine, a1 in r->adaptor1, a2 in r->adaptor2, ali in r->ali, aa1 in ali->adaptor1, aa2 in ali->adaptor2, e1 in r->Entry_adaptor, e2 in r->Entry_adaptor2
   save
   quit
 EOF
@@ -11076,10 +11076,28 @@ endif
 
 foreach chrom ($chromSetAll)
   if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
-  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
+  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes  deDuo collate donorAcceptor'"
 end
 
 goto phaseLoop
+
+set toto=RESULTS/Introns_exons_polyA/$MAGIC.known_new.introns.txt
+echo -n "### Known and new gt_ag introns: $toto " > $toto
+date >> $toto
+echo -n "# log2 of min support\tMin support" >> $toto
+set ABI="in YoK capped clones"
+set RvY="in Rvy annotation"
+echo -n "\t\t\tAny gt_ag\t$RvY gt_ag\t$ABI gt_ag\t$ABI and $RvY gt_ag\tIn Magic but not in RvY  gt_ag" >> $toto
+echo -n "\t\t\tAny gc_ag\t$RvY gc_ag\t$ABI gc_ag\t$ABI and $RvY gc_ag\tIn Magic but not in RvY gc_ag" >> $toto
+echo -n "\t\t\tAny ct_ac\t$RvY ct_ac\t$ABI ct_ac\t$ABI and $RvY ct_ac\tIn Magic but not in RvY ct_ac" >> $toto
+echo  "\t\t\tAny other\t$RvY other\t$ABI other\t$ABI and $RvY other\tIn Magic but not in RvY other" >> $toto
+cat tmp/INTRON_DB/*/d5.stats.txt | gawk '/^#/{next;}/Is_echo/{next;}{t=4}/gt_ag/{t=1;}/gc_ag/{t=2;}/ct_ac/{t=3;}{z=0}/AV/{z+=2;}/RvY/{z+=1;}{n=$6+0;N=0;for(i=0;i<=21;i++){if(n>=N){nnAny[t,i]++;if(z==0 || z==2)nnNew[t,i]++;if(z==1)nnRvY[t,i]++;if(z==2)nnAv[t,i]++;if(z==3){nnRvAv[t,i]++;nnAv[t,i]++;nnRvY[t,i]++;}N=2*N;if(N==0)N=1;;}}}END{N=0;for(i=0;i<=21;i++){printf("%d\t%d",i-1,N) ;for (t=1;t<=4;t++) printf("\t\t\t%d\t%d\t%d\t%d\t%d",nnAny[t,i],nnRvY[t,i],nnAv[t,i],nnRvAv[t,i],nnNew[t,i]);printf("\n") ;N=2*N;if(N==0)N=1;}}' >> $toto
+cat $toto
+
+
+
+
+
   scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
 foreach chrom ($chromSetAll)
   if (! -d tmp/INTRON_DB/$chrom/database) then

@@ -285,11 +285,24 @@ setenv USE_MAGIC_BLAST 0
 ## The rest of the files deals with adaptors per platform
 ## Define here the different adaptors for each platform
 ###########################################################
+
 # LIF vectors
 setenv exitAdaptorSOLiD  gttagacatatctccgtcgtagggatccc,gttagacatatctccgtcgtagggat,gttagacatatctccgtcgt,gtgccatgcgctaactt
 
 if (0) then 
- seen in suffix AGATCGGAA
+  #Tardigrade
+    gagatcggaagagcggttcagcagga ABI traces tardigrade
+      TGGAATTCTCGGGTGCCAAG GAACTCCAGTCAC       NNNNNN      ATCTCGTATGCCGTCTTCTGCTTGAAAAAAAA deja connu
+      GATCGGAAGAGCACACGTCT GAACTCCAGTCAC       GATCAG      ATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAGGG     tardigrade           srr13696363                                                                     GATCGTCGGACTGTAGAACTCTGAACGTGTAGATCTCGGTGGTCGCCGTATCATTAAAAAA   deja connu
+
+   # project 003_ and 004_   same since we give the reverse complement of the entry adaptor
+        entry_adaptor cccGTACTCTGCGTTGATACCACTGCTT
+        adaptor1 cccGTACTCTGCGTTGATACCACTGCTT
+   # project 002  exit adaptor1  (end of read 1)
+        adaptor1 agatcggaagagcggttcagcaggaatgc
+        adaptor2 agatcggaagagcgtcgtgtagggaaaga
+        entry_adaptor agatcggaagagcgtcgtgtagggaaaga
+
 
 fasta: adaptor in the forward LIF is
 tcgccttggccgtacagcag/bar code 10 letters == reverse complement du bar code declare /aga(ga peu lisible)nnnnnnn, exemple
@@ -429,7 +442,7 @@ setenv exitAdaptorPacBio GTACTCTGCGTTGATACCACTGCTT
 
 # The A in position 1 is incorporated a fraction of the time
 # we list the version with the A first, so preferable the program clips the longer vector
-#                                                                                                                                  
+#       
 setenv exitAdaptorIllumina GATCGGAAGAGCACACGTCTGAACTCCAGTCAC,aGATCGGAAGAGCTCGTATGCCGTCTtctgcttg,GATCGGAAGAGCTCGTATGCCGTCTtctgcttg,aGATCGGAAGAGCACACGTCTGAACTCCAGTCAC,AGATCGGAAGAGCGtcgtgtAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT,GATCGGAAGAGCGtcgtgtAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT,AATGATACGGCGACCACCGAGATCTACACTCTTTCCCTACACGACGCTCTTCCGATCT,ATCTCGTATGCCGTCTTCTGCTTGAAAAAA,CGCTCTTCCGATCT,gagatcggaagagcgtcgtgtagggaaaga,tagatcggaagagcgtcgtgtagggaaaga,cagatcggaagagcgtcgtgtagggaaaga,aagatcggaagagcgtcgtgtagggaaaga,agatcggaagagcgtcgtgtagggaaaga,TGGAATTCTCGGGTGCCAAGGAACTCCAGTCACNNNNNNATCTCGTATGCCGTCTTCTGCTTGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA,GATCGTCGGACTGTAGAACTCTGAACGTGTAGATCTCGGTGGTCGCCGTATCATTAAAAAAAAAAAAAAAAAAAAAAAA,GATCnGTCGGACTGTAGAACTCTGAACGTGTAGATCTCGGTGGTCGCCGTATCATTAAAAAAAAAAAAAAAAAAAAAAAA
 
 # JGI joint genome institute Coli Rec30 short RNA
@@ -501,7 +514,7 @@ setenv inPhaseEntryAdaptor "$exitAdaptorIllumina"
 # AGATCGGAAGAGCGtcgtgtAGGgaaagagtgt  in reads/2  (complement of PCR primer 1)
 
 # paired end DNA oligonucleotides sequences
-# PE adaptors
+# PE adaptors 
 #  P-GATCGGAAGAGCGgttcagcAGGAATGCCGAG
 #     ACACTCTTTCCCTACACGACGCTCTTCCGATCT
 # paired end PCR primer 1, reverse complemented (seen as the exit adaptor of the second reads)

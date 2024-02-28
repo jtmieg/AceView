@@ -2790,7 +2790,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	  u = x / (100 * y + x + 20) ; /* 2017_08_01 */
 
 	  if (u < 0) u = 0 ;
-	  slx->signal[ns] = 100000 * u * u ;
+	  slx->signal[ns] = 10000 * u * u ;
 	  
 	  /* take the median of the last 3 points */
 	  if (0) /* rolling median */

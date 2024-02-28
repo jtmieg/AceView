@@ -69,7 +69,7 @@ typedef struct wiggleStruct {
   const char *strandShift_f, *strandShift_r ;
   const char *strategy ;
   BOOL RNA_seq ;
-  BOOL ventilate, cumul, peaks, multiVentilate, hierarchic, lengthCoverage, flagEnds ;
+  BOOL ventilate, cumul, peaks, hierarchic, lengthCoverage, flagEnds ;
   int wiggleRatio, wiggleRatioDamper ;
   int multiPeaks ;  
   int BF_predictor ; /* degree of the polynome used to compress the BF format */

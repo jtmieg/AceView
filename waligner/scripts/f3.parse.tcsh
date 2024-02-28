@@ -327,8 +327,6 @@ foreach XGH (XG XH)
   foreach fr (ELF ELR ERF ERR)
     cat tmp/X.$MAGIC/XH$chrom/f3.Xends.*.$fr.transcriptsEnds >> tmp/X.$MAGIC/XH$chrom/f3.Xends.$fr.transcriptsEnds
   end
-
-
 end
 
 foreach fr (ELF ELR ERF ERR)
@@ -609,5 +607,6 @@ foreach chrom ($chromSetAll)
   mv tmp/TABIX/$ggNS/$chrom.u0.f.tabix.gz.tbi tmp/TABIX/$ggNS/$chrom.u.f.tabix.gz.tbi
   mv tmp/TABIX/$ggNS/$chrom.u0.r.tabix.gz.tbi tmp/TABIX/$ggNS/$chrom.u.r.tabix.gz.tbi
 end
+
 
 

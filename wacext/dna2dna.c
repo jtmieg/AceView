@@ -13,9 +13,10 @@
 #include <waceview/cgi.h>
 #include <bitset.h>
 
-typedef enum { FASTA=0, FASTC, FASTQ, CSFASTA, CSFASTC, CCFA, CCFAR, RAW,  CRAW, TAG_COUNT, CTAG_COUNT, COUNT, TENSORFLOW, LETTER, LETTERPLOT, LETTERSHOW } DNAFORMAT ;
+typedef enum { FASTA=0, FASTC, FASTQ, CSFASTA, CSFASTC, CCFA, CCFAR, RAW,  CRAW, TAG_COUNT, CTAG_COUNT, COUNT, TENSORFLOW, LETTER, LETTERPLOT, LETTERSHOW, POLYMER} DNAFORMAT ;
 
 #define MAXMULT 16
+#define POLYMER_MAX 1010
 typedef struct seqStruct { int dna, count, dnaLn ; vTXT id ;  } SEQ ;
 typedef struct shadowStruct { int mrna, gene, x1, x2, target, a1, a2, ID, Parent, type, ncRNA, GeneID, gene_name, gene_title, name, gene_biotype, note, description, Dbxref,protein_id,locus_tag ; BOOL isDown ; BOOL cds ; } SHADOW ;
 
@@ -23,8 +24,9 @@ typedef struct sxStruct {
   DNAFORMAT in, out ; 
   int minEntropy, minLength, maxLength, minQuality, minMultiplicity, split, splitMb ;
   long int nProcessed, nRejected , fProcessed, fRejected, fmProcessed, fmRejected ;
-  int  nSplit, nExported, count, maxCount, minLn, maxLn, splitByPrefix, letterNN ;
+  int  nSplit, nExported, count, maxCount, minLn, maxLn, splitByPrefix, letterNN, polymer ;
   long int *letterCount, *letterProfile, *letterLength ; 
+  long int polymerCount[4], polymerProfile[4*POLYMER_MAX] ;
   long int tagProcessed, tagRejected ;
   long int bpSeqProcessed, bpSeqRejected ;
   long int bpTagsProcessed, bpTagsRejected ;
@@ -698,6 +700,7 @@ static BOOL getSequencePart (SX *sx, ACEIN ai)
     {
     case TENSORFLOW:
     case COUNT:
+    case POLYMER:
     case LETTER:
     case LETTERPLOT:
     case LETTERSHOW:
@@ -1128,6 +1131,7 @@ static BOOL encodeSequence (SX *sx)
   switch (sx->in)
     {
     case COUNT:
+    case POLYMER:
     case LETTER:
     case LETTERPLOT:
     case LETTERSHOW:
@@ -1146,6 +1150,7 @@ static BOOL encodeSequence (SX *sx)
 	  case TAG_COUNT:
 	  case RAW:
 	  case COUNT:
+	  case POLYMER:
 	  case LETTER:
 	  case LETTERPLOT:
 	  case LETTERSHOW:
@@ -1188,6 +1193,7 @@ static BOOL encodeSequence (SX *sx)
 	  cfa2cfa (sx) ;
 	  break ;
 	case COUNT:
+	case POLYMER:
 	case LETTER:
 	case LETTERPLOT:
 	case LETTERSHOW:
@@ -1230,6 +1236,88 @@ static void selectOutFile (SX *sx, const char *ccp)
      }
   return ;
 } /* selectOutFile */
+
+/*************************************************************************************/
+/* Cumul the histogram of the polymers */
+static void sxPolymerAccumulate (SX *sx)
+{
+  long int *b = sx->polymerCount ;
+  long int *bb = sx->polymerProfile ;
+  const char *ccp ;
+  int n, cc ;
+  BOOL isForward = TRUE ;
+
+  for (ccp = vtxtPtr (sx->dna) ; *ccp ; ccp++)
+    {
+      cc = *ccp ;
+      if (cc == '>') continue ;
+      if (cc == '<') { if (0) isForward = FALSE ; continue ;}
+      for (n = 0 ; *ccp == cc ; ccp++)
+	n++ ;
+      ccp-- ;
+
+      /* we have localized n repeats of base cc */
+      cc = dnaEncodeChar[cc] ;
+      if (!  isForward)
+	cc = complementBase[cc] ;
+      switch (cc)
+	{
+	case A_: cc = 0 ; break ;
+	case T_: cc = 1 ; break ;
+	case G_: cc = 2 ; break ;
+	case C_: cc = 3 ; break ;
+	default: continue ;
+	}
+      b[cc]+= n ;
+      if (n > sx->polymer)
+	n = sx->polymer ;
+      bb[4*n + cc]++ ;
+    }
+  return ;
+} /* sxPolymerAccumulate */
+
+/**************************/
+
+static void sxPolymerReport (SX *sx)
+{
+  long int *b = sx->polymerCount ;
+  long int *bb = sx->polymerProfile ;
+
+  if (0)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (sx->outFileName, ".polymer.histo", FALSE, h) ;
+      aceOutDate (ao, "###", sx->title) ;
+      
+      aceOutf (ao, "# Base\tA\tT\tG\tC") ;
+      aceOutf (ao, "\n# Cumul") ;
+      for (int i = 0 ; i < 4 ; i++)
+	aceOutf (ao, "\t%ld", b[i]) ;
+      aceOutf (ao, "\n# Length\tpolyA\tpolyT\tpolyG\tpolyC") ;
+      for (int n = 1 ; n <= sx->polymer && n < POLYMER_MAX ; n++)
+	{
+	  aceOutf (ao, "\n%d", n) ;
+	  for (int i = 0 ; i < 4 ; i++)
+	    aceOutf (ao, "\t%ld", bb[4*n + i]) ;
+	}
+      aceOut (ao, "\n\n") ;
+      ac_free (h) ;
+    }
+  if (1)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (sx->outFileName, ".polymer.tsf", FALSE, h) ;
+      aceOutDate (ao, "###", sx->title) ;
+      const char *run = sx->runTitle ? sx->runTitle : "X" ;
+      char base[4] = "ATGC" ;
+      int nMax = sx->polymer ;
+      for (int i = 0 ; i < 4 ; i++)
+	for (int n = 1 ; n <= nMax + 4 ; n++)
+	  if (bb[4*n+i] >  0)
+	    aceOutf (ao, "%s\t%c%d\ti\t%ld\n", run, base[i], n, bb[4*n + i]) ;
+      ac_free (h) ;
+    }
+} /* sxPolymerReport */
 
 /*************************************************************************************/
 /* Cumul the bp according to their position */
@@ -1979,6 +2067,9 @@ static void exportSequence (SX *sx)
 	  else
 	    vtxtPrintf(sq->id, "\t%s", vtxtPtr (sx->id)) ;
 	}
+      break ;
+    case POLYMER:
+      sxPolymerAccumulate (sx) ;
       break ;
     case LETTER:
     case LETTERPLOT:
@@ -4679,8 +4770,10 @@ static void dna2dnaRun (SX *sx)
 	exportTagCount (sx) ;    
     }
 
-  else if (sx->letterCount)
+  if (sx->letterCount)
     sxLetterDistribReport (sx) ;
+  if (sx->polymer)
+    sxPolymerReport (sx) ;
 
   return ;
 } /* dna2dnaRun */
@@ -5096,6 +5189,7 @@ static void usage (char *message)
 	    "//          idem but exports the distribution in fil_name.txt and a picture in file_name.ps\n"
 	    "//   -gvplot <int> : requires -o file_name, and the programs \"gnuplot\" and \"gv\"\n"
 	    "//          idem but directly displays the postscript file file_name.ps using gv\n"
+	    "//   -polymer <int> : histogram of homopolymers of length 1 to n\n"
 	    "// Special applications\n"
 	    "//   -editGenome : edit the [-i genome] with subs and non-sliding indels\n"
 	    "//          -ctsPeriod p : periodic editions,  every p positions\n"
@@ -5324,6 +5418,9 @@ int main (int argc, const char **argv)
   getCmdLineOption (&argc, argv, "-gffgenome", &sx.gtfGenomeFastaFileName) ;
   sx.makeFastaUnique = getCmdLineBool (&argc, argv, "-makeFastaUnique") ;
 
+  if (getCmdLineInt (&argc, argv, "-polymer", &sx.polymer))
+    sx.out = POLYMER ;
+
   getCmdLineOption (&argc, argv, "-fastqSelect", &sx.fastqSelect) ;
   sx.letterNN = -9999999 ;
   if (getCmdLineInt (&argc, argv, "-plot", &sx.letterNN))
@@ -5342,6 +5439,8 @@ int main (int argc, const char **argv)
     }
   if (sx.letterNN > -9999999 && sx.letterNN <= 0)
     usage ("The length of the requested letter profile should be a positive number") ;
+  if (sx.polymer < 0 || sx.polymer > POLYMER_MAX - 10)
+    usage ("The maximal polymer length should be between 1 and 1000") ;
 
   sx.prefix = "n" ; /* default */
   getCmdLineOption (&argc, argv, "-prefix", &sx.prefix) ;
@@ -5434,7 +5533,7 @@ int main (int argc, const char **argv)
   if (sx.runQualityFileName)
     sxParseQualityFile (&sx) ;
   
-  if (!sx.splitByPrefix && sx.letterNN <= 0 && ! sx.getTm  && ! sx.makeTest)
+  if (!sx.splitByPrefix && sx.letterNN <= 0 && sx.polymer <= 0 && ! sx.getTm  && ! sx.makeTest)
     {
       if (sx.outFileName)
 	{
@@ -5462,7 +5561,7 @@ int main (int argc, const char **argv)
 	  sx.outFileName = "stdout" ;
 	}
     }
-  else if (sx.splitByPrefix && sx.letterNN <= 0)
+  else if (sx.splitByPrefix && sx.letterNN <= 0 && sx.polymer <= 0)
     {
       if (sx.outFileName)
 	{

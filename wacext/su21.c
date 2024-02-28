@@ -1,6 +1,7 @@
 #include "ac.h"
 #include <complex.h>
 #include "matrix.h"
+#include "polynome.h"
 
 /* Create june 2020
  * edited 27 july 2021
@@ -42,44 +43,6 @@
  * we have explicitly the leptons, the quarks, and several indecomposable reps
  */
 
-#define minAbs 0.0000001
-#define INDEXMAX 1000
-#define GMAX 256
-#define SMAX (256*sizeof(short))
-typedef struct termStruct {
-  int type ;
-  double complex z ;/* complex scalar multiplier. If zero, the whole TT is NULL */
-  int sqrt1,sqrt2 ;
-  short sigma[GMAX] ; /* sigma     matrices : non-commutative list of index "ab" means sigma_a sigma-bar_b */
-  short sigB[GMAX] ;  /* sigma-bar matrices : non-commutative list of index "ab" means sigma-bar_a sigma_b */
-  int N ; /* Taylor degree in x  symbol */
-  char x[GMAX]  ; /* a,b,  i,j  x(meaning chi)  symbol to exponentiate */
-  short g[GMAX] ;     /* Lorentz metric */
-  short gg[GMAX] ;    /* group metric */
-  short eps[GMAX] ; /* espislon anti symmetric set of n times 4 indices */ 
-  short mm[4][GMAX] ;      /*(k p q r)_mu momenta :  "1 ab" means the product p_a p_b */
-                          /*  "1 a"  "2 b" means the product p_a q_b */
-  int  denom[4] ;     /* number of terms of the form 1/k^, 1/(k+p)^2, 1/(k+p+q)^2, 1/(k+p+q+r)^2 */
-  int Id2 ; /* Pauli identity matrix, needed its value is 2 when we trace */
-  short freeIndex[GMAX] ;
-} TT ;
-
-
-typedef struct polynomeStruct *POLYNOME ;
-struct polynomeStruct {
-  int id ;
-  BOOL isFlat, isSum, isProduct ;
-  POLYNOME p1, p2 ;
-  TT tt ;
-} ;
-
-static POLYNOME newMultiSum (POLYNOME ppp[]) ;
-static POLYNOME expand (POLYNOME pp) ;
-static POLYNOME newPolynome (void) ;
-static void showPol (POLYNOME pp) ;
-static POLYNOME squareMomentaCleanUp (POLYNOME pp) ;
-static POLYNOME dimIntegralDo (POLYNOME pp, int pass) ;
-static BOOL freeIndex (POLYNOME pp) ;
 
 /***********************************************************************************************************************************************/
 /* find the polynome equal to the sum n=0 to N of the n^k */
@@ -218,972 +181,6 @@ static void powerSum (void)
 }  /* powerSum */
 
 /***********************************************************************************************************************************************/
-/***************************************************************** Utilities  ******************************************************************/
-/***********************************************************************************************************************************************/
-
-static short firstDummyIndex = 'a' ;
-static short newDummyIndex (void)
-{
-  short cc = firstDummyIndex++ ;
-  
-  if (cc >= INDEXMAX)
-    messcrash ("too many dummy indices") ;
-  return (short)cc  ;
-}
-
-/***********************************************************************************************************************************************/
-/* look for all indices, 
- * edit = FALSE: count occurences of a,b,c...
- * edit = TRUE: replace by a continuous list liberating the high values
- */
-static void reduceIndicesTtDo (short *cp, KEYSET ks, BOOL edit)
-{  
-  int i ;
-  
-  for (i = 0 ; *cp && i<GMAX ; cp++, i++)
-    {
-      if (! edit)
-	keySet (ks, *(short *)cp) ++ ;
-      else
-	*cp = keySet (ks, *(short *)cp) ;
-    }
-  return ;
-} /* reduceIndices */
-
-/***********************************************************************************************************************************************/
-
-static void reduceIndicesTt (POLYNOME pp, KEYSET ks, BOOL edit)
-{
-  reduceIndicesTtDo (pp->tt.g, ks, edit) ;
-  reduceIndicesTtDo (pp->tt.gg, ks, edit) ;
-  reduceIndicesTtDo (pp->tt.sigma, ks, edit) ;
-  reduceIndicesTtDo (pp->tt.sigB, ks, edit) ;
-  reduceIndicesTtDo (pp->tt.eps, ks, edit) ;
-  reduceIndicesTtDo (pp->tt.mm[0], ks, edit) ;
-  reduceIndicesTtDo (pp->tt.mm[1], ks, edit) ;
-  reduceIndicesTtDo (pp->tt.mm[2], ks, edit) ;
-  reduceIndicesTtDo (pp->tt.mm[3], ks, edit) ;
-} /* reduceIndicesTt */
-
-/***********************************************************************************************************************************************/
-
-static void reduceIndicesDo (POLYNOME pp, KEYSET ks, BOOL edit)
-{
-  if (! pp) 
-    return ;
-  reduceIndicesDo (pp->p1, ks, edit) ;
-  reduceIndicesDo (pp->p2, ks, edit) ;
-  if (pp->tt.type)
-    reduceIndicesTt (pp, ks, edit) ;
-} /* reduceIndices */
-
-/***********************************************************************************************************************************************/
-
-static int reduceIndicesIsProduct (POLYNOME pp)
-{
-  int i, j, n ;
-  KEYSET ks = keySetCreate () ;
-  KEYSET ks2 = keySetCreate () ;
-  KEYSET ks3 = keySetCreate () ;
-
-  /* count the occurence of all indices */
-  reduceIndicesDo (pp, ks, FALSE) ;
-  /* contract the list by dropping unused values */
-  for (i = j = 0 ; 'a' + i < keySetMax (ks) ; i++)
-    {
-      n = keySet (ks, 'a' + i) ;
-      if (n == 1)    /* block and do not rename the free indices present once */
-	{
-	  keySet (ks2, 'a' + i)  = 'a' + i ;
-	  keySet (ks3, 'a' + i)  = 1 ;       /* block it */ 
-	  if (firstDummyIndex <= 'a' + i)
-	    firstDummyIndex = 'a' + i + 1 ;
-	}
-      else if (n > 2)
-	{
-	  showPol (pp) ;
-	  messcrash ("no index (%c) should be repeated %d > 2 times", 'a'+i, n) ;
-	}
-    }
-  for (i = 0 ; 'a' + i < keySetMax (ks) ; i++)
-    {
-      n = keySet (ks, 'a' + i) ;
-      if (n == 2)
-	{
-	  for (j = 0 ; ; j++)
-	    if (keySet (ks3, 'a' + j)  == 0)  /* first unblocked index  */
-	      {
-		keySet (ks2, 'a' + i)  = 'a' + j ;
-		keySet (ks3, 'a' + j)  = 1 ;
-		if (firstDummyIndex <= 'a' + j)
-		  firstDummyIndex = 'a' + j + 1 ;
-		break ;
-	      }
-	}
-    }
-  /* rename all indices */
-  reduceIndicesDo (pp, ks2, TRUE) ;
-
-  keySetDestroy (ks) ; 
-  keySetDestroy (ks2) ; 
-  keySetDestroy (ks3) ; 
-  return 'a' + j ;
-} /* reduceIndicesIsProduct */
-
-/***********************************************************************************************************************************************/
-
-static POLYNOME reduceIndices (POLYNOME pp)
-{
-  static int level = 0 ;
-
-  level++ ;
-  if (0 && level == 1)
-    {
-      pp = squareMomentaCleanUp (pp) ;
-    }
-  if (pp && pp->isSum)
-    {
-      if (pp->p1) 
-	pp->p1 = reduceIndices (pp->p1) ;
-      if (pp->p2) 
-	pp->p2 = reduceIndices (pp->p2) ;
-    }
-  if (pp && ! pp->isSum) reduceIndicesIsProduct (pp) ;
-  level-- ;
-  if (level == 0 && pp)
-    {
-      if (! pp->isSum)
-	reduceIndicesIsProduct (pp) ;
-    }
-  return pp ;
-} /* reduceIndices */
-
-/***********************************************************************************************************************************************/
-/***********************************************************************************************************************************************/
-
-static int polOrder (const void *va, const void *vb)
-{
-  const POLYNOME p1 = *(POLYNOME *)va ;
-  const POLYNOME p2 = *(POLYNOME *)vb ;
-  float complex z1 = p1->tt.z ;
-  float complex z2 = p2->tt.z ;
-  int id1 = p1->tt.Id2 ;
-  int id2 = p2->tt.Id2 ;
-  int s ;
-  p1->tt.z = 0 ;       
-  p2->tt.z = 0 ;
-  p1->tt.Id2 = 0 ;
-  p2->tt.Id2 = 0 ;
-  memset (p1->tt.freeIndex, 0, SMAX) ;
-  memset (p2->tt.freeIndex, 0, SMAX) ;
-  s = memcmp (&(p1->tt), &(p2->tt), sizeof(TT)) ;
-  p1->tt.z = z1 ;       
-  p2->tt.z = z2 ;
-  p1->tt.Id2 = id1 ;
-  p2->tt.Id2 = id2 ;       
-
-  return s ;
-}
-
-/***********************************************************************************************************************************************/
-
-static void sortPolGetSum (POLYNOME pp, Array aa)
-{
-  if (! pp)
-    return ;
-  if (pp->isSum)
-    {
-      sortPolGetSum (pp->p1, aa) ;
-      sortPolGetSum (pp->p2, aa) ;
-    }
-  else if (pp)
-    array (aa, arrayMax (aa), POLYNOME) = pp ;
-  return ;
-}
-
-/***********************************************************************************************************************************************/
-
-static POLYNOME sortReduceSum (Array aa)
-{
-  POLYNOME pp = 0 ;
-  int ii, jj ;
-
-  if (!aa)
-    return 0 ;
-
-  if (arrayMax (aa) > 1)
-    arraySort (aa, polOrder) ;
-
-  for (ii = 0 ; ii + 1 < arrayMax (aa) ; ii++)
-    {	/* add identical terms */				
-      int jj ;
-      POLYNOME q1 = arr (aa, ii, POLYNOME) ; 
-      if (! q1 || ! q1->tt.type)
-	continue ;
-      for (jj = ii + 1 ; jj < arrayMax (aa) ; jj++)
-	{
-	  POLYNOME q2 = arr (aa, jj, POLYNOME) ; 
-	  if (q2)
-	    {
-	      int n = polOrder (&q1, &q2) ;
-	      if (n == 0)
-		{
-		  q1->tt.z += q2->tt.z ;
-		  arr (aa, jj, POLYNOME)  = 0 ;
-		}
-	      else if (n < 0)
-		break ;
-	    }
-	}
-    }
-  for (ii = jj = 0 ; ii < arrayMax (aa) ; ii++)
-    {  /* elimimate the killed terms */
-      POLYNOME qq = arr (aa, ii, POLYNOME) ; 
-      if (qq && (qq->isSum || qq->isProduct || qq->tt.z != 0))
-	arr (aa, jj++, POLYNOME) = qq ;
-    }
-  arrayMax (aa) = jj ;
-  
-  if (arrayMax (aa) == 0)
-    pp = 0 ;
-  else if (arrayMax (aa) == 1)
-    pp = arr (aa, 0, POLYNOME) ;
-  else 
-    {
-      POLYNOME qq ;
-      
-      pp =  newPolynome () ;
-      for (qq = pp, ii = 0 ; ii + 1 < arrayMax (aa) ; ii++)
-	{
-	  qq->isSum = TRUE ;
-	  qq->p1 = arr (aa, ii, POLYNOME) ;
-	  if (ii < arrayMax (aa) - 2)
-	    { qq->p2 = newPolynome () ; qq = qq->p2 ; }
-	}
-      qq->p2 = arr (aa, ii, POLYNOME) ;
-    }
-  return pp ;
-} /* sortReduceSum */
-    
-/***********************************************************************************************************************************************/
-
-static POLYNOME sortPol (POLYNOME pp)
-{
-  if (! pp)
-    return 0 ;
-  else if (pp->isSum)
-    {
-      int ii = 0, jj = 0 ;
-      Array aa = arrayCreate (32, POLYNOME) ;
-      
-      sortPolGetSum (pp, aa) ;
-      if (0)
-	{
-	  for (ii = jj = 0 ; ii < arrayMax (aa) ; ii++)
-	    {
-	      POLYNOME qq = arr (aa, ii, POLYNOME) ; 
-	      qq = sortPol (qq) ;
-	      if (qq)
-		arr (aa, jj++, POLYNOME) = qq ;
-	    }
-	  arrayMax (aa) = jj ;
-	}
-      pp = sortReduceSum (aa) ;
-      arrayDestroy (aa) ;
-    }
-  else if (pp->isProduct)
-    {
-      pp->p1 = sortPol (pp->p1) ;
-      pp->p2 = sortPol (pp->p2) ;
-      if (pp->p1 && pp->p2)
-	return pp ;
-      return 0 ;
-    }
-  else if (! pp->tt.type ||  cabs (pp->tt.z) < minAbs)
-    return 0 ;
-
-  return pp ;
-}
-
-/***********************************************************************************************************************************************/
-/***********************************************************************************************************************************************/
-
-static BOOL ppIsNumber (POLYNOME pp)
-{
-  TT tt = pp->tt ;
-  BOOL ok = tt.type ;
-  if (tt.x[0])  ok = FALSE ;
-  if (tt.mm[0][0])  ok = FALSE ;
-  if (tt.mm[1][0])  ok = FALSE ;
-  if (tt.mm[2][0])  ok = FALSE ;
-  if (tt.mm[3][0])  ok = FALSE ;
-  if (tt.g[0])  ok = FALSE ;
-  if (tt.gg[0])  ok = FALSE ;
-  if (tt.sigma[0])  ok = FALSE ;
-  if (tt.sigB[0])  ok = FALSE ;
-  if (tt.eps[0])  ok = FALSE ;
-  return ok ;
-} /* ppIsNumber */
-
-/***********************************************************************************************************************************************/
-/*********************************************************** Display utilitie ******************************************************************/
-/***********************************************************************************************************************************************/
-
-static double  nicePrintFraction (const char *prefix, double x, const char *suffix);
-
-static float complex nicePrint (const char *prefix, float complex z)
-{
-  double a = creal (z) ;
-  double b = cimag (z) ;
-  if (b == 0)
-    a = nicePrintFraction (prefix, a, "") ;
-  else if (a == 0)
-    b = nicePrintFraction (prefix, b, "i") ;
-  else
-    {
-      a = nicePrintFraction (prefix, a, "") ;
-      b = nicePrintFraction (" + ", b, "i") ;
-    }
-  return a + I * b ;
-} /* nicePrint */
-
-/*******************************************************************************************/
-static int niceInt (float x)
-{
-  int k = x >= 0 ? x + .01 : x - .01 ;
-  return k ;
-} /* niceInt */
-
-/*******************************************************************************************/
-
-static double nicePrintFraction (const char *prefix, double x, const char *suffix)
-{
-  int i = 1000000 ;
-  int s = x >= 0 ? 1 : -1 ;
-  
-  x *= s ;
-  if (niceInt (1000000*x) == 0)
-    { x = 0 ; s = 1 ; }
-  printf ("%s", prefix) ;
-  if (niceInt (1000000*x) == 1000000 * niceInt (x))
-    printf ("%.0f", s*x) ;
-  else
-    for (i = 2 ; i <= 2048 ; i++)
-      if (niceInt (10000*i*x) == 10000 * niceInt (i*x))
-	{
-	  int y = i * x + .1 ;
-	  printf ("%d/%d", s*y, i) ;
-	  i = 1000000 ;
-	}
-  if (i < 1000000)
-    printf ("%.5f", s*x) ;
-  if (x != 0)
-    printf ("%s", suffix) ;
-
-  return s * x ;
-} /* nicePrintFraction */
-
-/*******************************************************************************************/
-
-static void niceComplexShow (MX a)
-{
-  int i,j, iMax = a->shapes[0], jMax = a->shapes[1] ;
-  const complex float *zc ;
-
-  if (a->rank == 1) { jMax = iMax ; iMax = 1 ;}
-  mxValues (a, 0, 0, &zc) ;
-  printf ("## %s", a->name) ;
-  for (i = 0 ; i < iMax ; i++)
-    {
-      printf ("\n") ;
-      for (j = 0 ; j < jMax ; j++)
-	nicePrint ("\t", zc[iMax*j + i]) ;
-    }
-  printf ("\n") ;
-  return ;
-} /* niceShow */
-
-/*******************************************************************************************/
-
-static void niceFloatShow (MX a)
-{
-  int i,j, iMax = a->shapes[0], jMax = a->shapes[1] ;
-  const float *zf ;
-
-  if (a->rank == 1) { jMax = iMax ; iMax = 1 ;}
-  mxValues (a, 0, &zf, 0) ;
-  printf ("## %s", a->name) ;
-  for (i = 0 ; i < iMax ; i++)
-    {
-      printf ("\n") ;
-      for (j = 0 ; j < jMax ; j++)
-	nicePrintFraction ("\t", zf[iMax*j + i],"") ;
-    }
-  printf ("\n") ;
-  return ;
-} /* niceFloatShow */
-
-/*******************************************************************************************/
-static void niceIntShow (MX a)
-{
-  int i,j, iMax = a->shapes[0], jMax = a->shapes[1] ;
-  const int *zi ;
-
-  if (a->rank == 1) { jMax = iMax ; iMax = 1 ;}
-  mxValues (a, &zi, 0, 0) ;
-  printf ("## %s", a->name) ;
-  for (i = 0 ; i < iMax ; i++)
-    {
-      printf ("\n") ;
-      for (j = 0 ; j < jMax ; j++)
-	printf ("\t%d", zi[iMax*j + i]) ;
-    }
-  printf ("\n") ;
-  return ;
-} /* niceIntShow */
-
-/*******************************************************************************************/
-
-static void niceShow (MX a)
-{
-  switch (a->type)
-    {
-    case MX_NULL: break ;
-    case MX_BOOL:
-    case MX_INT: niceIntShow (a) ; break ;
-    case MX_FLOAT: niceFloatShow (a) ; break ;
-    case MX_COMPLEX: niceComplexShow (a) ; break ;
-    }
-  return ;
-} /* niceShow */
-
-/*******************************************************************************************/
-
-static void cleanTtSqrt (TT *ttp)
-{
-  if (ttp->sqrt1 == 0) ttp->sqrt1 = 1 ;
-  if (ttp->sqrt2 == 0) ttp->sqrt2 = 1 ;
-  
-  if (ttp->sqrt1 * ttp->sqrt2 > 1)
-    {
-      int i ;
-      /* reduce to common denominator */
-      for (i = 2 ; i <= ttp->sqrt1 && i <= ttp->sqrt2 ; i++)
-	{
-	  if ((ttp->sqrt1 % i == 0) && (ttp->sqrt2 % i == 0))
-	    {
-	      ttp->sqrt1 /= i ;
-	      ttp->sqrt2 /= i ;
-	      i = 1 ;
-	      continue ;
-	    }
-	}
-      /* remove squares */
-      for (i = 2 ; i*i <= ttp->sqrt1 ; i++)
-	{
-	  if (ttp->sqrt1 % (i*i) == 0)
-	    {
-	      ttp->sqrt1 /= (i*i)  ;
-	      ttp->z *= i ;
-	      i = 1 ;
-	      continue ;
-	    }
-	}
-      for (i = 2 ; i*i <= ttp->sqrt2 ; i++)
-	{
-	  if (ttp->sqrt2 % (i*i) == 0)
-	    {
-	      ttp->sqrt2 /= (i*i)  ;
-	      ttp->z /= i ;
-	      i = 1 ;
-	      continue ;
-	    }
-	}
-    }
-} /* cleanTtSqrt */
-
-/*******************************************************************************************/
-
-static void gprintf (char *prefix, short *sp)
-{
-  printf (" %s_", prefix) ;
-  sp-- ;
-  while (*++sp)
-    printf ("%c", (char)(*sp % 256)) ;
-  printf (" ") ;
-}
-
-  static void showTT (POLYNOME pp)
-{
-  TT tt ;
-  int i ; 
-  
-  if (!pp) 
-    return ;
-  tt = pp->tt ;  
-  if (!tt.type)
-    return ;
-  
-  cleanTtSqrt (&tt) ;
-
-  if (1 && ! ppIsNumber (pp))
-    {
-      if (cabs (tt.z + 1) < minAbs)
-	printf (" -") ;
-      else if (cabs (tt.z - 1) > minAbs)
-	{ tt.z = nicePrint ("", tt.z) ; }
-    }
-  else
-    { tt.z = nicePrint ("", tt.z) ; }
-  if (tt.sqrt1 > 1 || tt.sqrt2 > 1)
-    {
-      printf ("sqrt(%d",tt.sqrt1) ;
-      if (tt.sqrt2 > 1) printf ("/%d",tt.sqrt2) ;
-      printf (")") ;
-    }
-
-
-
-  if (*tt.x) printf (" %s ", tt.x) ;
-  if (*tt.g) gprintf ("g", tt.g) ;
-  if (*tt.gg) gprintf ("gg", tt.gg) ;
-  if (*tt.eps) gprintf ("epsilon", tt.eps) ;
-
-  if (*tt.sigma) gprintf ("s", tt.sigma) ;
-  if (*tt.sigB) gprintf ("sB", tt.sigB) ;
-
-  if (tt.mm[0][0]) gprintf ("k", tt.mm[0]) ;
-  if (tt.mm[1][0]) gprintf ("p", tt.mm[1]) ;
-  if (tt.mm[2][0]) gprintf ("q", tt.mm[2]) ;
-  if (tt.mm[3][0]) gprintf ("r", tt.mm[3]) ;
-
-  i = 0 ;
-  if      (tt.denom[0]) printf (" %c k^%d ", i++ ? ' ' : '/', 2 * tt.denom[0]) ;
-  if      (tt.denom[1]) printf (" %c (k+p)^%d ", i++ ? ' ' : '/', 2 * tt.denom[1]) ;
-  if      (tt.denom[2]) printf (" %c (k+p+q)^%d ", i++ ? ' ' : '/', 2 * tt.denom[2]) ;
-  if      (tt.denom[3]) printf (" %c (k+p+q+r)^%d ", i++ ? ' ' : '/', 2 * tt.denom[3]) ;
-
-  return ;
-} /* showTT */
-
-/*******************************************************************************************/
-
-static void showPol (POLYNOME pp)
-{
-  POLYNOME p1, p2 ;
-  static int nn = 0, level = 0 ;
-
-   if (!pp)
-     {
-       if (level == 0) printf ("(NULL) #### zero term ###\n") ;
-       return ;
-     }
-   if (! level) nn = 0 ;
-   level++ ;
-   p1 = pp->p1 ;
-   p2 = pp->p2 ;
-   if (p1 == pp) messcrash ("pp == pp->p1 in showPol") ;
-   if (p2 == pp) messcrash ("pp == pp->p2 in showPol") ;
-   if (p1 && p1 == p2) messcrash ("pp->p1 == pp->p2 in showPol") ;
-
-   if (pp->isProduct)
-     { printf ("(");  showPol (p1) ; printf (")*(");  showPol(p2) ; printf(")") ; }
-   else if (pp->isSum)
-     { printf ("(");  showPol (p1) ; printf (")+") ; if (p2 && !p2->isSum) printf("(");  showPol(p2) ; if (p2 && !p2->isSum) printf(")") ; }
-   else if (pp->tt.type)
-     { showTT (pp) ; nn++ ; }
-   level-- ;
-
-   if (! level) printf ("  ### %d term%s ###\n", nn, nn > 1 ? "s" : "") ;
-} /* showPol */
-
-/***********************************************************************************************************************************************/
-/******************************************* New Polynomes of all types ************************************************************************/
-/***********************************************************************************************************************************************/
-
-static POLYNOME newPolynome (void) 
-{
-  static int id = 0 ;
-  int n = sizeof (struct polynomeStruct) ;
-  POLYNOME pp = (POLYNOME) halloc (n, 0) ;
-  memset (pp, 0, n) ;
-  pp->id = ++id ;
-  return pp ;
-}
-
-/***********************************************************************************************************************************************/
-
-static void freePolynome (POLYNOME pp)
-{
-  if (pp && pp->id)
-    {
-      pp->id = 0 ;
-      ac_free (pp->p1) ;
-      ac_free (pp->p2) ;
-      ac_free (pp) ;
- }
-  return ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME copyPolynome (POLYNOME p1)
-{
-  POLYNOME pp = 0 ; 
- 
-  if (p1)
-    {
-      int id ;
-      pp = newPolynome () ;
-      id = pp->id ;
-      memcpy (pp, p1, sizeof (struct polynomeStruct)) ;
-      pp->id = id ;
-      if (pp->p1)
-	pp->p1 =  copyPolynome (pp->p1) ;
-      if (pp->p2)
-	pp->p2 =  copyPolynome (pp->p2) ;
-    }
-  return pp ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newScalar (complex float z)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type = 1 ;
-  p->tt.z = z ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newG (short mu, short nu)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.g[0] = mu ;
-  p->tt.g[1] = nu ;
-  return p ;
-}
-
-/*************************************************************************************************/
-/* newAG (... ,  0) antisymmetric link 1/2(ac bd - ad bc). Optionally adding the i epsilon 
- * newAG (... , +1) is the self-dual projector P+ = 1/4 ( ac bd - ad bc) + i/2 epsilon(abcd)
- * newAG (... , -1) is the self-dual projector P- = 1/4 ( ac bd - ad bc) - i/2 epsilon(abcd)
- *     WE have (P+)^2 = (P+),   (P-)^2 = (P-),   (P+)(P-) = (P-)(P+) = 0 
- */
-static POLYNOME newEpsilon (short a, short b, short c, short d)
-{
-  POLYNOME pp ;
-  
-  pp = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = 1.0 ;
-  pp->tt.eps[0] = a ;
-  pp->tt.eps[1] = b ;
-  pp->tt.eps[2] = c ;
-  pp->tt.eps[3] = d ;
-  return pp ;
-}
-
-static POLYNOME newAG (short a, short b, short c, short d, int parity)
-{
-  POLYNOME pp, ppp[4] ;
-
-  pp = ppp[0] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = 1.0/2.0 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = c ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = d ;
-
-  pp = ppp[1] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = -1.0/2.0 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = d ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = c ;
-
-  ppp[2] = ppp[3] = 0 ;
-
-  if (parity)
-    {
-      ppp[0]->tt.z /= 2 ;
-      ppp[1]->tt.z /= 2 ;
-
-      pp = ppp[2] = newEpsilon (a, b, c, d) ;
-      pp->tt.z = (parity ) / 4.0 ;             /* I * parity,  in Minkovski */
-      if (parity == 2 || parity == -2)
-	return pp ;
-    }
-  
-  pp = newMultiSum (ppp) ;
-  return pp ; 
-} /* newAG */
-
-/*************************************************************************************************/
-
-static POLYNOME newAG6 (short a, short b, short c, short d, short e, short f)
-{
-  POLYNOME pp, ppp[7] ;
-
-  pp = ppp[0] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = 1 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = d ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = e ;
-  pp->tt.g[4] = c ;
-  pp->tt.g[5] = f ;
-
-  pp = ppp[1] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = -1 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = d ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = f ;
-  pp->tt.g[4] = c ;
-  pp->tt.g[5] = e ;
-
-  pp = ppp[2] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = -1 ;
-  pp->tt.g[0] = b ;
-  pp->tt.g[1] = e ;
-  pp->tt.g[2] = a ;
-  pp->tt.g[3] = f ;
-  pp->tt.g[4] = c ;
-  pp->tt.g[5] = d ;
-
-  pp = ppp[3] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = -1 ;
-  pp->tt.g[0] = c ;
-  pp->tt.g[1] = f ;
-  pp->tt.g[2] = a ;
-  pp->tt.g[3] = e ;
-  pp->tt.g[4] = b ;
-  pp->tt.g[5] = d ;
-
-  pp = ppp[4] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = 1 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = e ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = f ;
-  pp->tt.g[4] = c ;
-  pp->tt.g[5] = d ;
-
-  pp = ppp[5] = newPolynome () ;
-  pp->tt.type = 1 ;
-  pp->tt.z = 1 ;
-  pp->tt.g[0] = a ;
-  pp->tt.g[1] = f ;
-  pp->tt.g[2] = b ;
-  pp->tt.g[3] = d ;
-  pp->tt.g[4] = c ;
-  pp->tt.g[5] = e ;
-
-  ppp[6] = 0 ;
-  
-  pp = newMultiSum (ppp) ;
-  return pp ; 
-} /* newAG6 */
-
-/*************************************************************************************************/
-
-static POLYNOME newK (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.mm[0][0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newP (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.mm[1][0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newQ (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.mm[2][0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newR (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.mm[3][0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newPQR (int pqr, short mu)
-{
-  POLYNOME p0 = pqr >=0 ? newK (mu) : 0 ;
-  POLYNOME p1 = pqr >=1 ? newP (mu) : 0 ;
-  POLYNOME p2 = pqr >=2 ? newQ (mu) : 0 ;
-  POLYNOME p3 = pqr >=3 ? newR (mu) : 0 ;
-  POLYNOME ppp[5] = {p0, p1, p2, p3, 0} ;
-
-  return newMultiSum (ppp) ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newSigma (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type =1 ;
-  p->tt.z = 1 ;
-  p->tt.Id2 = 1 ;
-  p->tt.sigma[0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newSigB (short cc)
-{
-  POLYNOME p = newPolynome () ;
-  p->tt.type = 1 ;
-  p->tt.z = 1 ;
-  p->tt.Id2 = 1 ;
-  p->tt.sigB[0] = cc ;
-  return p ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newSum (POLYNOME p1, POLYNOME p2)
-{
-  if (p1 && ! p1->isSum && ! p1->isProduct && ! p1->tt.z) p1 = 0 ;
-  if (p2 && ! p2->isSum && ! p2->isProduct && ! p2->tt.z) p2 = 0 ;
-  if (p1 && p2)
-    {
-      POLYNOME p = newPolynome () ;
-      p->p1 = copyPolynome (p1) ;
-      p->p2 = copyPolynome (p2) ; 
-      if (p1->tt.type && p2->tt.type && p1->tt.Id2 + p2->tt.Id2 == 1)
-	messcrash ("Cannot add aPauli matrix to a number\n") ;;
-      p->isSum = TRUE ;
-      if (p1 == p2)
-	messcrash ("p1 == p2 in newSum") ;
-      return p ;
-    }
-  else if (p1)
-    return copyPolynome (p1) ;
-  else if (p2)
-    return copyPolynome (p2) ;
-  return 0 ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newProduct (POLYNOME p1, POLYNOME p2)
-{
-  if (p1 && ! p1->isSum && ! p1->isProduct && ! p1->tt.z) p1 = 0 ;
-  if (p2 && ! p2->isSum && ! p2->isProduct && ! p2->tt.z) p2 = 0 ;
-  if (p1 && p2)
-    {
-      POLYNOME p = newPolynome () ;
-      p->p1 = copyPolynome (p1) ;
-      p->p2 = copyPolynome (p2) ; 
-      p->isProduct = TRUE ;
-      return p ;
-    }
-  return 0 ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME polynomeScale (POLYNOME pp, double complex z)
-{
-  if (! pp)
-    return 0 ;
-
-  pp = copyPolynome (pp) ;
-  if (pp->isSum)
-    {
-      pp->p1 = polynomeScale (pp->p1, z) ;
-      pp->p2 = polynomeScale (pp->p2, z) ;
-    }
-  else if (pp->isProduct)
-    {
-      pp->p1 = polynomeScale (pp->p1, z) ;
-    }
-  else
-    pp->tt.z *= z ;
-  
-  return pp ;
-} /* polynomeScale */
-
-/*************************************************************************************************/
-
-static POLYNOME newMultiSum (POLYNOME ppp[])
-{
-  POLYNOME pp, p1, p2 ;
-  int i = 0 ;
-
-  while (ppp[i]) i++ ;
-  if (i <= 1) return copyPolynome(ppp[0]) ;
-
-  pp = ppp[--i] ;
-  while (i > 0)
-    {
-      p2 = pp ;
-      p1 = ppp[--i] ;
-      pp = newSum (p1, p2) ;
-    }
-  return pp ;
-}
-
-/*************************************************************************************************/
-
-static POLYNOME newMultiProduct (POLYNOME ppp[])
-{
-  POLYNOME pp, p1, p2 ;
-  int i = 0 ;
-
-  while (ppp[i]) i++ ;
-  if (i <= 1) return copyPolynome (ppp[0]) ;
-
-  pp = ppp[--i] ;
-  while (i > 0)
-    {
-      p2 = pp ;
-      p1 = ppp[--i] ;
-      pp = newProduct (p1, p2) ;
-    }
-  return pp ;
-}
-
-/***********************************************************************************************************************************************/
 /**************************************** Quantum Field theory rules ***************************************************************************/
 /***********************************************************************************************************************************************/
 #ifdef JUNK
@@ -1244,6 +241,7 @@ static int indexTtSort (short *cp, int dx, int sign)
 /* Einstein contraction rules */
 static POLYNOME contractTtIndices (POLYNOME pp)
 {
+  AC_HANDLE h = pp->h ;
   complex float zz = 1 ;
   TT tt = pp->tt ;
   int kkkk = 0 ;
@@ -1434,12 +432,12 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      ok = FALSE ;
 		      
 		      /* sixplicate the polynome and anisymmetrize */
-		      POLYNOME p1 = newScalar (1) ;
-		      POLYNOME p2 = newScalar (1) ;
-		      POLYNOME p3 = newScalar (1) ;
-		      POLYNOME p4 = newScalar (1) ;
-		      POLYNOME p5 = newScalar (1) ;
-		      POLYNOME p6 = newScalar (1) ;
+		      POLYNOME p1 = newScalar (1, h) ;
+		      POLYNOME p2 = newScalar (1, h) ;
+		      POLYNOME p3 = newScalar (1, h) ;
+		      POLYNOME p4 = newScalar (1, h) ;
+		      POLYNOME p5 = newScalar (1, h) ;
+		      POLYNOME p6 = newScalar (1, h) ;
 		      
 		      p1->tt = tt ;
 		      
@@ -1494,7 +492,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      l -= 6 ;
 		      
 		      POLYNOME ppp3[] = {p1, p2, p3, p4, p5, p6, 0} ;
-		      POLYNOME p7 = newMultiSum (ppp3) ;
+		      POLYNOME p7 = newMultiSum (pp->h, ppp3) ;
 		      ok = FALSE ;
 		      *pp = *p7 ;
 		      return pp ;
@@ -1545,8 +543,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      ok = FALSE ;
 
 		      /* duplicate the polynome and anisymmetrize */
-		      p1 = newScalar (1) ;
-		      p2 = newScalar (1) ;
+		      p1 = newScalar (1,h) ;
+		      p2 = newScalar (1,h) ;
 		      
 		      p1->tt = tt ;
 		      p2->tt = tt ;
@@ -1556,7 +554,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      p2->tt.g[l++] = f1 ;
 		      
 		      p2->tt.z *= -1 ;
-		      p3 = newSum (p1, p2) ;
+		      p3 = newSum (p1, p2,h) ;
 		      ok = FALSE ;
 		      *pp = *p3 ;
 		      return pp ;
@@ -1648,15 +646,15 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      s[k] = 0 ;
 
 		    /* duplicate the polynome and anisymmetrize */
-		    p1 = newScalar (1) ;
-		    p2 = newScalar (1) ;
+		    p1 = newScalar (1,h) ;
+		    p2 = newScalar (1,h) ;
 
 		    p1->tt = tt ;
 		    p2->tt = tt ;
 		    p2->tt.sigma[i] = f ;
 		    p2->tt.sigma[i+1] = e;
 		    p2->tt.z *= -1 ;
-		    p3 = newSum (p1, p2) ;
+		    p3 = newSum (p1, p2,h) ;
 		    ok = FALSE ;
 		    *pp = *p3 ;
 		    return pp ;
@@ -1701,15 +699,15 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		    for (; k < GMAX - 4 ; k++)
 		      s[k] = 0 ;
 
-		    p1 = newScalar (1) ;
-		    p2 = newScalar (1) ;
+		    p1 = newScalar (1,h) ;
+		    p2 = newScalar (1,h) ;
 
 		    p1->tt = tt ;
 		    p2->tt = tt ;
 		    p2->tt.sigB[i] = f ;
 		    p2->tt.sigB[i+1] = e;
 		    p2->tt.z *= -1 ;
-		    p3 = newSum (p1, p2) ;
+		    p3 = newSum (p1, p2,h) ;
 		    ok = FALSE ;
 		    *pp = *p3 ;
 		    return pp ;
@@ -1888,6 +886,17 @@ static int contractTTProducts (POLYNOME pp, POLYNOME p1, POLYNOME p2)
   tt.z = t1.z * t2.z ;
   tt.sqrt1 = t1.sqrt1 * t2.sqrt1 ;
   tt.sqrt2 = t1.sqrt2 * t2.sqrt2 ;
+  tt.sqrti = t1.sqrti + t2.sqrti ;
+  {
+    char *cp = tt.theta ;
+    char *cp1 = t1.theta ;
+    char *cp2 = t2.theta ;
+    while (*cp1)
+      *cp++ = *cp1++ ;
+    while (*cp2)
+      *cp++ = *cp2++ ;
+    *cp = 0 ;
+  }
   cleanTtSqrt (&tt) ;
 
   
@@ -1918,7 +927,7 @@ static int contractTTProducts (POLYNOME pp, POLYNOME p1, POLYNOME p2)
       tt.N = t1.N + t2.N ;
     }
   
-  /* count the chi to know if at the end we get one on zero x */
+  /* count the chi to know if at the end we get one or zero x */
   if (1)
     {
       int nx = 0, s = 1, i = 0 ;
@@ -2283,6 +1292,7 @@ static POLYNOME contractProducts (POLYNOME pp)
  */
 static POLYNOME pauliTraceTT (POLYNOME pp)
 {
+  AC_HANDLE h = pp->h ;
   BOOL epsilon = TRUE ;
   TT tt = pp->tt ; 
   int iss ;
@@ -2358,7 +1368,7 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
 	  n++ ;
 	}
       ppp[n++] = 0 ; /* zero terminate the list */	
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h, ppp) ;
     }
   else /* iss even and > 4 */
     { 
@@ -2374,7 +1384,7 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
       for (N = 0, ii = 1 ; ii < iss ; ii++)
 	{
 	  int m ;
-	  POLYNOME p1 = newScalar (tt.z) ;
+	  POLYNOME p1 = newScalar (tt.z, h) ;
 	  short *s1 ;
 	  p1->tt = tt ;
 	  p1->tt.g[ng] = s[0] ;
@@ -2398,7 +1408,7 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
 	    for (k = j + 1 ; k < iss ; k++)
 	      {
 		int m ;
-		POLYNOME p1 = newScalar (1) ;
+		POLYNOME p1 = newScalar (1, h) ;
 		short *s1 ;
 		
 		p1->tt = tt ;
@@ -2427,7 +1437,7 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
       /* add up all the contractions, since we always ue index zero, we are not overcounting */
       if (N >= NN)
 	messcrash ("Too many terms iss=%d NN = %d N=%d", iss, N, NN) ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h, ppp) ;
     }
   return pp ;
 } /* pauliTraceTT */
@@ -2521,9 +1531,11 @@ static POLYNOME expandDo (POLYNOME pp, int force)
 {
   POLYNOME p1, p2 ;
   BOOL debug = FALSE ;
-
+  AC_HANDLE h = pp ? pp->h : 0 ;
+  
   if (!pp)
     return 0 ;
+
   if (force) pp->isFlat = FALSE ;
   p1 = pp->p1 ;
   p2 = pp->p2 ;
@@ -2586,14 +1598,14 @@ static POLYNOME expandDo (POLYNOME pp, int force)
 
   if (pp->isProduct && p1 && p1->isSum)
     {
-      POLYNOME q1 = newPolynome () ;
-      POLYNOME q2 = newPolynome () ;
+      POLYNOME q1 = newPolynome (h) ;
+      POLYNOME q2 = newPolynome (h) ;
       pp->isSum = TRUE ;
       pp->isProduct = FALSE ;
       q1->isProduct = TRUE ;
       q2->isProduct = TRUE ;
       q1->p2 = p2 ;
-      q2->p2 = copyPolynome (p2) ;
+      q2->p2 = copyPolynome (p2, h) ;
       q1->p1 = p1->p1 ;
       q2->p1 = p1->p2 ;
       pp->p1 = q1 ;
@@ -2607,14 +1619,14 @@ static POLYNOME expandDo (POLYNOME pp, int force)
     }
   if (pp->isProduct && p2 && p2->isSum)
     {
-      POLYNOME q1 = newPolynome () ;
-      POLYNOME q2 = newPolynome () ;
+      POLYNOME q1 = newPolynome (h) ;
+      POLYNOME q2 = newPolynome (h) ;
       pp->isSum = TRUE ;
       pp->isProduct = FALSE ;
       q1->isProduct = TRUE ;
       q2->isProduct = TRUE ;
       q1->p1 = p1 ;
-      q2->p1 = copyPolynome (p1) ;
+      q2->p1 = copyPolynome (p1, h) ;
       q1->p2 = p2->p1 ;
       q2->p2 = p2->p2 ;
       if (q2 && q2->p1 && q2->p1 == q2->p2) messcrash ("q2->p1 == q2->p2 in expandDo") ;
@@ -2754,10 +1766,10 @@ static POLYNOME killMomenta (POLYNOME pp)
 
 /*************************************************************************************************/
 /* compute the dervative of (1/(k + p + q)^2*order) relative to (pqr)_mu */ 
-static POLYNOME newDeriveDenom (POLYNOME p0, int pqr, int mu)
+static POLYNOME newDeriveDenom (POLYNOME p0, int pqr, int mu, AC_HANDLE h)
 {
   TT tt = p0->tt ;
-  POLYNOME ppp[6], pp = newPolynome () ;
+  POLYNOME ppp[6], pp = newPolynome (h) ;
   int j, nn = 0 ;
   BOOL debug = FALSE ;
 
@@ -2784,14 +1796,14 @@ static POLYNOME newDeriveDenom (POLYNOME p0, int pqr, int mu)
 		vv[k]->tt.denom[j] = n + 1 ;
 		vv[k]->tt.z *= (-2 * n ) ;
 	      }
-	  w = newMultiSum (vv) ; /* 1/(k+p+q)^n  -> w = (k+p+q) = derivee du denominateur */
+	  w = newMultiSum (h,vv) ; /* 1/(k+p+q)^n  -> w = (k+p+q) = derivee du denominateur */
 	  ppp[nn++] = w ;
 	}
     }
   pp = 0 ;
   if (nn)
     {
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       pp->isFlat = FALSE ;
       if (debug) checkPolynome (pp) ;  
     }
@@ -2808,6 +1820,7 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
   BOOL debug = FALSE ;
 
   if (! pp) return 0 ;
+  AC_HANDLE h = pp->h ;
   if (debug) checkPolynome (pp) ;  
   if (pp->isSum)
     { /* linearity */
@@ -2850,7 +1863,7 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
     
   /* derive the numerator */
   if (! empty)
-    empty = newPolynome () ;
+    empty = newPolynome (h) ;
 
   
   tt = pp->tt ;
@@ -2871,7 +1884,7 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
       
       if (iMax == 1) /* simplest case, just add a g_munu and suppress the p_mu */
 	{
-	  pp = copyPolynome (pp) ;
+	  pp = copyPolynome (pp, h) ;
 	  short *v = tt.g, *w = tt.mm[pqr] ;
 	  v += slen (v) ;
 	  v[0] = mu ; v[1] = tt.mm[pqr][0] ; v[2] = 0 ;
@@ -2889,7 +1902,7 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
 	    {
 	      short *v,*w = tt.mm[pqr] ;
 	      /* copy the original polynome */
-	      qq[k] = newPolynome () ;
+	      qq[k] = newPolynome (h) ;
 	      qq[k]->tt.type = 1 ;
 	      qq[k]->tt = tt ;
 	      /* replace one dependence on p_alpha by g_mu_alpha */
@@ -2903,14 +1916,14 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
 	      if(v[0]==v[1]) qq[k]->tt.z /= 4.0 ;  /* because we want delat_{aa} not g_{aa} */
 	    }
 	  qq[iMax] = 0 ;
-	  pp = newMultiSum (qq) ;
+pp = newMultiSum (h, qq) ;
 	  if (debug) checkPolynome (pp) ;  
 	}
     }
   else if (hasDenom)
     { /* construct the product (f'/g + fg'/g^2) */
-      POLYNOME q3, q1prime, q1 = newScalar (1) ;
-      POLYNOME q4, q2prime, q2 = newScalar(1) ;
+      POLYNOME q3, q1prime, q1 = newScalar (1,h) ;
+      POLYNOME q4, q2prime, q2 = newScalar(1,h) ;
       int i ;
 
       /* contruct f: copy and remove the denom */
@@ -2926,9 +1939,9 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu)
       q2prime = newDeriveDenom(q2, pqr, mu) ;
 
       /* construct the 2 products (q1 and q1prime both commute) */
-      q3 = newProduct (q1, q2prime) ;
-      q4 = q1prime ? newProduct (q2, q1prime) : 0 ;
-      pp = q4 ? newSum (q3,q4) : q3 ;
+      q3 = newProduct (q1, q2prime,h) ;
+      q4 = q1prime ? newProduct (q2, q1prime,h) : 0 ;
+      pp = q4 ? newSum (q3,q4,h) : q3 ;
       if (debug) checkPolynome (pp) ;  
       /*
       ac_free (q1) ;      
@@ -3004,8 +2017,8 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		pp->p1->tt.z /= 2 ;
 	      else if (pp->isSum)
 		{
-		  POLYNOME qq = newScalar (.5) ;
-		  pp = newProduct (qq, pp) ;
+		  POLYNOME qq = newScalar (.5,h) ;
+		  pp = newProduct (qq, pp,h) ;
 		}
 	      else
 		pp->tt.z /= 2 ;
@@ -3042,7 +2055,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 	      for (n = 0 ; n < NN ; n++)
 		{                             /* we need N products of type g_ab g_cd g_ef, then we zero terminate the list */
 		  int i ;
-		  qqq[n] = copyPolynome (pp) ;
+		  qqq[n] = copyPolynome (pp, h) ;
 		  cp = qqq[n]->tt.g ;
 		  while (*cp) cp++ ;
 		  
@@ -3051,7 +2064,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		  *cp++ = 0 ;
 		}
 	      qqq[n] = 0 ; /* zero terminate the list */	
-	      pp = newMultiSum (qqq) ;
+	      pp = newMultiSum (h, qqq) ;
 	    }	  
 	  else if (k == 4)
 	    { 
@@ -3065,7 +2078,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 	      for (n = 0 ; n < NN ; n++)
 		{                             /* we need N products of type g_ab g_cd g_ef, then we zero terminate the list */
 		  int i ;
-		  qqq[n] = copyPolynome (pp) ;
+		  qqq[n] = copyPolynome (pp, h) ;
 		  cp = qqq[n]->tt.g ;
 		  while (*cp) cp++ ;
 
@@ -3074,7 +2087,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		  *cp++ = 0 ;
 		}
 	      qqq[n] = 0 ; /* zero terminate the list */	
-	      pp = newMultiSum (qqq) ;
+	      pp = newMultiSum (h, qqq) ;
 	    }	  
 	  else if (k == 6)
 	    { 
@@ -3101,7 +2114,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		  *cp++ = 0 ;
 		}
 	      qqq[n] = 0 ; /* zero terminate the list */	
-	      pp = newMultiSum (qqq) ;
+	      pp = newMultiSum (h, qqq) ;
 	    }	  
 	  else if (k == 8)
 	    { 
@@ -3164,7 +2177,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		  *cp++ = 0 ;
 		}
 	      qqq[n] = 0 ; /* zero terminate the list */	
-	      pp = newMultiSum (qqq) ;
+	      pp = newMultiSum (h, qqq) ;
 	    }	  
 	  else 
 	    messcrash ("Sorry, i cannot yet integrate k^10/k^14\n") ;
@@ -3219,6 +2232,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 
 static POLYNOME dimIntegrateByPart (POLYNOME pp) 
 {
+  AC_HANDLE h = pp->h ;
   POLYNOME ppp[4] ;
   int nn = 0 ;
   int i, j ;
@@ -3229,8 +2243,8 @@ static POLYNOME dimIntegrateByPart (POLYNOME pp)
   level++ ;
   for (j = 1 ; j <= 3 ; j++)
     {
-      POLYNOME p1d = 0, p1 = copyPolynome (pp) ;
-      POLYNOME p2d = 0, p2 = newScalar (1) ;
+      POLYNOME p1d = 0, p1 = copyPolynome (pp,h) ;
+      POLYNOME p2d = 0, p2 = newScalar (1,h) ;
       POLYNOME puu = 0, pvv = 0 ;
  
      if (debug)
@@ -3256,14 +2270,14 @@ static POLYNOME dimIntegrateByPart (POLYNOME pp)
       p2d = deriveP (p2, j, mu) ;
       if (p1d)
 	{
-	  POLYNOME pm = newScalar (1.0) ;
+	  POLYNOME pm = newScalar (1.0, h) ;
 	  pm->tt.mm[j][0] = mu ;
 	  puu = dimIntegralDo (p1d, 1) ;
 	  if (puu) puu = newProduct (pm, puu) ;
 	}
       if (p2d)
 	{
-	  POLYNOME pm = newScalar (1.0) ;
+	  POLYNOME pm = newScalar (1.0, h) ;
 	  pm->tt.mm[j][0] = mu ;
 	  pvv = dimIntegralDo (p2d, 1) ;
 	  if (pvv) pvv = newProduct (pm, pvv) ;
@@ -3288,7 +2302,7 @@ static POLYNOME dimIntegrateByPart (POLYNOME pp)
   ppp[nn] = 0 ;
 
   if (nn > 1)
-    pp = newMultiSum (ppp) ;
+    pp = newMultiSum (h, ppp) ;
   else if (nn == 1)
     pp = ppp[0] ;
   else
@@ -3698,7 +2712,7 @@ static POLYNOME dimIntegral (POLYNOME p0)
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 /* New vertex A B HB and A H BB */
-static POLYNOME vertex_A_B_HB (short mu, short a, short b, int mm[4]) /* A_mu B_a_b, momentum of the incoming photon */
+static POLYNOME vertex_A_B_HB (short mu, short a, short b, int mm[4], AC_HANDLE h) /* A_mu B_a_b, momentum of the incoming photon */
 {
   POLYNOME pp, ppp[6] ; 
   int nn = 0 ; 
@@ -3716,23 +2730,23 @@ static POLYNOME vertex_A_B_HB (short mu, short a, short b, int mm[4]) /* A_mu B_
   if (mm[3]) { pp = newR (c) ; pp->tt.z = mm[3] ; ppp[nn++] = pp ; }
   ppp[nn++] = 0 ;
 
-  pp = newMultiSum (ppp) ;
+  pp = newMultiSum (h, ppp) ;
   nn = 0 ;
-  ppp[nn++] = newScalar (I) ;
+  ppp[nn++] = newScalar (I, h) ;
   ppp[nn++] = pp ;
-  ppp[nn++] = newG (mu, d) ;
-  if (useProjector) ppp[nn++] = newAG (a,b,c,d,z) ;
+  ppp[nn++] = newG (mu, d, h) ;
+  if (useProjector) ppp[nn++] = newAG (a,b,c,d,z,h) ;
   ppp[nn++] = 0 ;
 
   
-  pp = newMultiProduct (ppp) ;
+  pp = newMultiProduct (h,ppp) ;
 
   return pp ; 
 } /* vertex_A_B_HB */
 
 /**************************************************/
 
-static POLYNOME vertex_A_H_BB (short mu, short a, short b, int mm[4]) /* momentum of the incoming mu-photon */
+static POLYNOME vertex_A_H_BB (short mu, short a, short b, int mm[4], AC_HANDLE h) /* momentum of the incoming mu-photon */
 {
   POLYNOME pp, ppp[6] ; 
   int nn = 0 ; 
@@ -3749,15 +2763,15 @@ static POLYNOME vertex_A_H_BB (short mu, short a, short b, int mm[4]) /* momentu
   if (mm[3]) { pp = newR (c) ; pp->tt.z = mm[3] ; ppp[nn++] = pp ; }
   ppp[nn++] = 0 ;
 
-  pp = newMultiSum (ppp) ;
+  pp = newMultiSum (h, ppp) ;
   nn = 0 ;
-  ppp[nn++] = newScalar (I) ;
+  ppp[nn++] = newScalar (I,h) ;
   ppp[nn++] = pp ;
-  ppp[nn++] = newG (mu, d) ;
-  if (useProjector) ppp[nn++] = newAG (a,b,c,d,z) ;
+  ppp[nn++] = newG (mu, d,h) ;
+  if (useProjector) ppp[nn++] = newAG (a,b,c,d,z,h) ;
   ppp[nn++] = 0 ;
   
-  pp = newMultiProduct (ppp) ;
+  pp = newMultiProduct (h,ppp) ;
   
   return pp ;
 } /* vertex_A_B_HB  */
@@ -3765,7 +2779,7 @@ static POLYNOME vertex_A_H_BB (short mu, short a, short b, int mm[4]) /* momentu
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 /*   A_mu diffusion of B_ab -> BB_cd */
-static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int  mm1[4], int  mm2[4])   /* B(mm1)->BB(mm2) in the orientation of the BB->B line */
+static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int  mm1[4], int  mm2[4], AC_HANDLE h)   /* B(mm1)->BB(mm2) in the orientation of the BB->B line */
 {
   POLYNOME pp, ppp[6] ; 
   int i, nn = 0 ; 
@@ -3774,7 +2788,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
     {
       if (mm1[i])
 	{
-	  pp = newScalar (4 * mm1[i]) ;
+	  pp = newScalar (4 * mm1[i],h) ;
 	  pp->tt.mm[i][0] = a ;
 	  pp->tt.g[0] = mu ;
 	  pp->tt.g[1] = c ;
@@ -3784,7 +2798,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
 	}
       if (mm2[i])
 	{
-	  pp = newScalar (4 * mm2[i]) ;
+	  pp = newScalar (4 * mm2[i],h) ;
 	  pp->tt.mm[i][0] = c ;
 	  pp->tt.g[0] = mu ;
 	  pp->tt.g[1] = a ;
@@ -3794,7 +2808,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
 	}
     }
   ppp[nn++] = 0 ;	  
-  pp = newMultiSum (ppp) ;
+  pp = newMultiSum (h,ppp) ;
   pp->tt.z *= I ;
 
   return pp ;
@@ -3802,7 +2816,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
 
 /***********************************************************************************************************************************************/
 /*   A_mu(p) diffusion of A_nu(q)\, A_rho(r) */
-static POLYNOME vertex_A_A_A (short a, short b, short c, int  p[4], int  q[4], int r[4])   /* all 3 are incoming momenta */
+static POLYNOME vertex_A_A_A (short a, short b, short c, int  p[4], int  q[4], int r[4], AC_HANDLE h)   /* all 3 are incoming momenta */
 {
   POLYNOME p1, ppp[20] ;
   int nn = 0 ;
@@ -3845,14 +2859,14 @@ static POLYNOME vertex_A_A_A (short a, short b, short c, int  p[4], int  q[4], i
 
     }
   ppp[nn] = 0 ;
-  POLYNOME pp = newMultiSum (ppp) ;
+  POLYNOME pp = newMultiSum (h, ppp) ;
   pp = expand (pp) ;
   return pp ;
 }
 
 /**********************************************************************************************************************************************/
 /*   A_mu diffusion of H -> HB */
-static POLYNOME vertex_A_H_HB (short mu, int mm[4])  /* 2k+p = (2,1,0,0) : sum of the momentum of the H->HB in that direction */
+static POLYNOME vertex_A_H_HB (short mu, int mm[4], AC_HANDLE h)  /* 2k+p = (2,1,0,0) : sum of the momentum of the H->HB in that direction */
 {
   POLYNOME pp, ppp[6] ; 
   int i, nn = 0 ; 
@@ -3860,19 +2874,19 @@ static POLYNOME vertex_A_H_HB (short mu, int mm[4])  /* 2k+p = (2,1,0,0) : sum o
   for (i = 0 ; i < 4 ; i++)
     if (mm[i])
       {
-	pp = newScalar (mm[i]) ;
+	pp = newScalar (mm[i],h) ;
 	pp->tt.mm[i][0] = mu ;
 	ppp[nn++] = pp ;	  
       }
   ppp[nn++] = 0 ;	  
-  pp = newMultiSum (ppp) ;
+  pp = newMultiSum (h,ppp) ;
   pp->tt.z *= I ;
   return pp ;
 } /* vertex_A_H_HB */
 
 /**********************************************************************************************************************************************/
 /*   A_mu diffusion of c  -> cB ghost */
-static POLYNOME vertex_A_c_cB (short mu, int mm[4])  /* k+p = (1,1,0,0) : incoming momentum of the cB */
+static POLYNOME vertex_A_c_cB (short mu, int mm[4], AC_HANDLE h)  /* k+p = (1,1,0,0) : incoming momentum of the cB */
 {
   POLYNOME pp, ppp[6] ; 
   int i, nn = 0 ; 
@@ -3880,20 +2894,20 @@ static POLYNOME vertex_A_c_cB (short mu, int mm[4])  /* k+p = (1,1,0,0) : incomi
   for (i = 0 ; i < 4 ; i++)
     if (mm[i])
       {
-	pp = newScalar (mm[i]) ;
+	pp = newScalar (mm[i],h) ;
 	pp->tt.z *= -I ;        /* -1 because of the incoming momentum */
 	pp->tt.mm[i][0] = mu ;
 	ppp[nn++] = pp ;	  
       }
   ppp[nn++] = 0 ;	  
-  pp = newMultiSum (ppp) ;
+  pp = newMultiSum (h,ppp) ;
   return pp ;
 } /* vertex_A_c_cB */
 
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 /* This vertex is by itelf self dual */
-static POLYNOME vertex_B_PsiR_PsiLB (short a, short b)
+static POLYNOME vertex_B_PsiR_PsiLB (short a, short b, AC_HANDLE h)
 {
   int X = 0 ; /* -1 B is anti-self-dual */
   short mu = newDummyIndex() ;
@@ -3911,7 +2925,7 @@ static POLYNOME vertex_B_PsiR_PsiLB (short a, short b)
 
 /***********************************************************************************************************************************************/
 /* This vertex is by itelf anti self dual */
-static POLYNOME vertex_BB_PsiL_PsiRB (short a, short b)
+static POLYNOME vertex_BB_PsiL_PsiRB (short a, short b, AC_HANDLE h)
 {
   int X = 0 ; /* 1 : Bbar is self-dual */ ;
   short mu = newDummyIndex() ;
@@ -3930,7 +2944,7 @@ static POLYNOME vertex_BB_PsiL_PsiRB (short a, short b)
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 
-static POLYNOME vertex_A_PsiR_PsiRB (short mu)
+static POLYNOME vertex_A_PsiR_PsiRB (short mu, AC_HANDLE h)
 {
   POLYNOME p = newSigma (mu) ;
   p->tt.z *= I ;
@@ -3939,7 +2953,7 @@ static POLYNOME vertex_A_PsiR_PsiRB (short mu)
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME vertex_A_PsiL_PsiLB (short mu)
+static POLYNOME vertex_A_PsiL_PsiLB (short mu, AC_HANDLE h)
 {
   POLYNOME p = newSigB (mu) ;
   p->tt.z *= I ;
@@ -3950,9 +2964,9 @@ static POLYNOME vertex_A_PsiL_PsiLB (short mu)
 /***********************************************************************************************************************************************/
 
 
-static POLYNOME vertex_H_PsiR_PsiLB (void)
+static POLYNOME vertex_H_PsiR_PsiLB (,AC_HANDLE h)
 {
-  POLYNOME p = newScalar (1) ;
+  POLYNOME p = newScalar (1,h) ;
   p->tt.z *= I ;  /* 2*I/3 */
   p->tt.sqrt1 = 1 ;
   p->tt.sqrt2 = 1 ;
@@ -3961,9 +2975,9 @@ static POLYNOME vertex_H_PsiR_PsiLB (void)
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME vertex_HB_PsiL_PsiRB (void)
+static POLYNOME vertex_HB_PsiL_PsiRB (AC_HANDLE h)
 {
-  POLYNOME p = newScalar (1) ;
+  POLYNOME p = newScalar (1,h) ;
   p->tt.z *= I ;
   p->tt.sqrt1 = 1 ;
   p->tt.sqrt2 = 1 ;
@@ -4057,7 +3071,7 @@ static POLYNOME momentaCleanUp (POLYNOME pp, short alpha)
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr)
+static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC_HANDLE h)
 {
   short a = newDummyIndex () ;
   short b = newDummyIndex () ;
@@ -4083,16 +3097,16 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr)
 
   p4->tt.denom[pqrD] = 2 ;
   p4->tt.z *= u*I ;
-  pp = newMultiProduct (ppp) ;
+  pp = newMultiProduct (h, ppp) ;
 
   return pp ;
 }
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_AA (short mu, short nu, int pqr)
+static POLYNOME prop_AA (short mu, short nu, int pqr, AC_HANDLE h)
 {
-  POLYNOME pp = newG (mu,nu) ;
+  POLYNOME pp = newG (mu,nu, h) ;
   pp->tt.denom[pqr] = 1 ;
   pp->tt.z *= I ;
   return pp ;
@@ -4100,9 +3114,9 @@ static POLYNOME prop_AA (short mu, short nu, int pqr)
 
 /***********************************************************************************************************************************************/
 #ifdef JUNK
-static POLYNOME prop_AR (short mu, short nu, int pqr)
+static POLYNOME prop_AR (short mu, short nu, int pqr, AC_HANDLE h)
 {
-  POLYNOME pp = newG (mu,nu) ;
+  POLYNOME pp = newG (mu,nu, h) ;
   pp->tt.denom[pqr] = 1 ;
   pp->tt.z = -I ; /* negative norm */
   return pp ;
@@ -4110,9 +3124,9 @@ static POLYNOME prop_AR (short mu, short nu, int pqr)
 #endif
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_HB_H (int pqr) 
+static POLYNOME prop_HB_H (int pqr, AC_HANDLE h) 
 {
-  POLYNOME pp = newScalar (1.0) ;
+  POLYNOME pp = newScalar (1.0, h) ;
   pp->tt.denom[pqr] = 1 ;
   pp->tt.z *= I ;
   return pp ;
@@ -4120,9 +3134,9 @@ static POLYNOME prop_HB_H (int pqr)
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_cB_c (int pqr) 
+static POLYNOME prop_cB_c (int pqr, AC_HANDLE h) 
 {
-  POLYNOME pp = newScalar (1.0) ;
+  POLYNOME pp = newScalar (1.0, h) ;
   pp->tt.denom[pqr] = 1 ;
   pp->tt.z *= I ;
   return pp ;
@@ -4130,27 +3144,27 @@ static POLYNOME prop_cB_c (int pqr)
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_PsiRB_PsiR (int pqr)
+static POLYNOME prop_PsiRB_PsiR (int pqr, AC_HANDLE h)
 {
   short cc = newDummyIndex () ;
-  POLYNOME p1 = newSigB (cc) ;
+  POLYNOME p1 = newSigB (cc, h) ;
   p1->tt.z *= I ;
   p1->tt.denom[pqr] = 1 ;
-  POLYNOME p2 = newPQR (pqr,cc) ;
-  POLYNOME pp = contractIndices(newProduct (p1, p2)) ;
+  POLYNOME p2 = newPQR (pqr,cc,h) ;
+  POLYNOME pp = contractIndices(newProduct (p1, p2,h)) ;
   return contractProducts (pp) ;
 }
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME prop_PsiLB_PsiL (int pqr)
+static POLYNOME prop_PsiLB_PsiL (int pqr, AC_HANDLE h)
 {
   short cc = newDummyIndex () ;
-  POLYNOME p1 = newSigma (cc) ;
+  POLYNOME p1 = newSigma (cc,h) ;
   p1->tt.z *= I ;
   p1->tt.denom[pqr] = 1 ;
-  POLYNOME p2 = newPQR (pqr,cc) ;
-  POLYNOME pp = contractIndices(newProduct (p1, p2)) ;
+  POLYNOME p2 = newPQR (pqr,cc,h) ;
+  POLYNOME pp = contractIndices(newProduct (p1, p2,h)) ;
   return contractProducts (pp) ;
 }
 
@@ -4170,12 +3184,13 @@ static POLYNOME pauliCleanUp (POLYNOME pp, short w)
     }
   else if (pp->tt.type)
     {
-      POLYNOME p1 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigB (w) : newSigma (w) ;
-      POLYNOME p11 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigma (w) : newSigB (w) ;
-      POLYNOME p2 = newProduct (p1, pp) ;
+      AC_HANDLE h = pp->h ;
+      POLYNOME p1 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigB (w,h) : newSigma (w,h) ;
+      POLYNOME p11 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigma (w,h) : newSigB (w,h) ;
+      POLYNOME p2 = newProduct (p1, pp,h) ;
       POLYNOME p4 = pauliTrace (p2) ;
       POLYNOME p6 = contractIndices (p4) ;
-      POLYNOME p7 = newProduct (p11, p6) ;
+      POLYNOME p7 = newProduct (p11, p6,h) ;
       POLYNOME p8 = expand (p7) ;
       POLYNOME p9 = contractIndices (p8) ;
       POLYNOME p10 = expand (p9) ;
@@ -4192,6 +3207,7 @@ static POLYNOME pauliCleanUp (POLYNOME pp, short w)
 
 static POLYNOME Z2_AA__loopH  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short mu = newDummyIndex () ;
@@ -4204,7 +3220,7 @@ static POLYNOME Z2_AA__loopH  (const char *title)
   POLYNOME p4 = prop_HB_H (0) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h, ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4229,6 +3245,7 @@ static POLYNOME Z2_AA__loopH  (const char *title)
 
 static POLYNOME Z2_AA__loopA  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
@@ -4246,14 +3263,14 @@ static POLYNOME Z2_AA__loopA  (const char *title)
   int ppv2e[4] = {1,0,0,0} ;  /* k : vertex */
 
 	
-  POLYNOME p10 = newScalar (.5) ; /* real loop, symmetric */
-  POLYNOME p1 = vertex_A_A_A (a,c,f,ppv1a,ppv1c,ppv1f) ;
-  POLYNOME p2 = prop_AA (c,d,1) ;   /* (1/(pk)^2 */
-  POLYNOME p3 = vertex_A_A_A (d,b,e,ppv2d,ppv2b,ppv2e) ;
-  POLYNOME p4 = prop_AA (e,f,0) ;   /* (1/(k) */
-  POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
+  POLYNOME p10 = newScalar (.5,h) ; /* real loop, symmetric */
+  POLYNOME p1 = vertex_A_A_A (a,c,f,ppv1a,ppv1c,ppv1f,h) ;
+  POLYNOME p2 = prop_AA (c,d,1,h) ;   /* (1/(pk)^2 */
+  POLYNOME p3 = vertex_A_A_A (d,b,e,ppv2d,ppv2b,ppv2e,h) ;
+  POLYNOME p4 = prop_AA (e,f,0,h) ;   /* (1/(k) */
+  POLYNOME ppp[] = {p10,p1,p2,p3,p4,0,h} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h, ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4278,6 +3295,7 @@ static POLYNOME Z2_AA__loopA  (const char *title)
 
 static POLYNOME Z2_AA__loopGhost  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short mu = newDummyIndex () ;
@@ -4285,14 +3303,14 @@ static POLYNOME Z2_AA__loopGhost  (const char *title)
   int ppv1[4] = {-1,0,0,0} ; /* k  : vertex */
   int ppv2[4] = {-1,-1,0,0} ; /* k + p : vertex */
 
-  POLYNOME p10 = newScalar (-1) ; /* Ghost loop */
-  POLYNOME p1 = vertex_A_c_cB (mu, ppv2) ; /*(2k + p)_mu */
-  POLYNOME p2 = prop_cB_c (1) ;   /* (1/(k+p)^2 */
-  POLYNOME p3 = vertex_A_c_cB (nu, ppv1) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p4 = prop_cB_c (0) ;   /* (1/(k)^2 */
+  POLYNOME p10 = newScalar (-1,h) ; /* Ghost loop */
+  POLYNOME p1 = vertex_A_c_cB (mu, ppv2,h) ; /*(2k + p)_mu */
+  POLYNOME p2 = prop_cB_c (1,h) ;   /* (1/(k+p)^2 */
+  POLYNOME p3 = vertex_A_c_cB (nu, ppv1,h) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
+  POLYNOME p4 = prop_cB_c (0,h) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = newMultiProduct (ppp) ;
+  POLYNOME pp = newMultiProduct (h,ppp) ;
   pp = contractIndices(pp) ;
 
   printf ("%s\n", title) ;
@@ -4318,6 +3336,7 @@ static POLYNOME Z2_AA__loopGhost  (const char *title)
 
 static POLYNOME Z2_BB__loopPsi  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
@@ -4325,15 +3344,15 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   short c = newDummyIndex () ;
   short d = newDummyIndex () ;
 
-  POLYNOME p10 = newScalar (-1) ; /* Ghost loop */
-  POLYNOME p1 = vertex_BB_PsiL_PsiRB (a,b) ;
-  POLYNOME p2 = prop_PsiLB_PsiL (1) ;   /* (1/(k)^2 */
-  POLYNOME p3 = vertex_B_PsiR_PsiLB (c,d) ;
-  POLYNOME p4 = prop_PsiRB_PsiR (0) ;   /* (1/(k)^2 */
-  POLYNOME p5 = prop_BB_B (a, b, c, d, 0) ;
-  POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
+  POLYNOME p10 = newScalar (-1,h) ; /* Ghost loop */
+  POLYNOME p1 = vertex_BB_PsiL_PsiRB (a,b,h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (1,h) ;   /* (1/(k)^2 */
+  POLYNOME p3 = vertex_B_PsiR_PsiLB (c,d,h) ;
+  POLYNOME p4 = prop_PsiRB_PsiR (0,h) ;   /* (1/(k)^2 */
+  POLYNOME p5 = prop_BB_B (a, b, c, d, 0,h) ;
+  POLYNOME ppp[] = {p10,p1,p2,p3,p4,0,h} ;
 
-  POLYNOME pp = newMultiProduct (ppp) ;
+  POLYNOME pp = newMultiProduct (h,ppp) ;
   printf ("%s\n", title) ;
   showPol (pp) ;
 
@@ -4369,17 +3388,18 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
 
 static POLYNOME Z2_HH__loopPsi  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
 
-  POLYNOME p10 = newScalar (-1) ; /* Ghost loop */
-  POLYNOME p1 = vertex_HB_PsiL_PsiRB () ;
-  POLYNOME p2 = prop_PsiLB_PsiL (1) ;   /* (1/(k)^2 */
-  POLYNOME p3 = vertex_H_PsiR_PsiLB () ;
-  POLYNOME p4 = prop_PsiRB_PsiR (0) ;   /* (1/(k)^2 */
-  POLYNOME p5 = prop_HB_H (0) ;
+  POLYNOME p10 = newScalar (-1,h) ; /* Ghost loop */
+  POLYNOME p1 = vertex_HB_PsiL_PsiRB (h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (1,h) ;   /* (1/(k)^2 */
+  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p4 = prop_PsiRB_PsiR (0,h) ;   /* (1/(k)^2 */
+  POLYNOME p5 = prop_HB_H (0,h) ;
   POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (p5) ;
@@ -4407,20 +3427,21 @@ static POLYNOME Z2_HH__loopPsi  (const char *title)
 
 static POLYNOME Z2_AA__loopPsi  (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short mu = newDummyIndex () ;
   short nu = newDummyIndex () ;
 
-  POLYNOME p10 = newScalar (-1) ; /* Ghost loop */
-  POLYNOME p1 = vertex_A_PsiL_PsiLB (mu) ;
-  POLYNOME p2 = prop_PsiLB_PsiL (0) ;   /* (1/(k)^2 */
-  POLYNOME p3 = vertex_A_PsiL_PsiLB (nu) ;
-  POLYNOME p4 = prop_PsiLB_PsiL (1) ;   /* (1/(k+p)^2 */
-  POLYNOME p5 = prop_AA (mu, nu, 0) ;
+  POLYNOME p10 = newScalar (-1,h) ; /* Ghost loop */
+  POLYNOME p1 = vertex_A_PsiL_PsiLB (mu,h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (0,h) ;   /* (1/(k)^2 */
+  POLYNOME p3 = vertex_A_PsiL_PsiLB (nu,h) ;
+  POLYNOME p4 = prop_PsiLB_PsiL (1,h) ;   /* (1/(k+p)^2 */
+  POLYNOME p5 = prop_AA (mu, nu, 0,h) ;
   POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   p5 = expand (p5) ;
@@ -4451,6 +3472,7 @@ static POLYNOME Z2_AA__loopPsi  (const char *title)
 
 static POLYNOME Z2_AA__loopB (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
 
   short a = newDummyIndex () ;
@@ -4467,14 +3489,14 @@ static POLYNOME Z2_AA__loopB (const char *title)
   int mm1[4] = {1,1,0,0} ;    /* k+p */
   int mm2[4] = {1,0,0,0} ;    /* k */
 
-  POLYNOME p0 = newScalar (1) ;
-  POLYNOME p1 = vertex_A_B_BB (a,c,d,i,j,mm1,mm2) ;
-  POLYNOME p2 = prop_BB_B (c,d,e,f,1) ;   /* (1/(k+p)^2 */
-  POLYNOME p3 = vertex_A_B_BB (b,g,h,e,f,mm2,mm1) ;
-  POLYNOME p4 = prop_BB_B (g,h,i,j,0) ;   /* (1/(k)^2 */
+  POLYNOME p0 = newScalar (1,h) ;
+  POLYNOME p1 = vertex_A_B_BB (a,c,d,i,j,mm1,mm2,h) ;
+  POLYNOME p2 = prop_BB_B (c,d,e,f,1,h) ;   /* (1/(k+p)^2 */
+  POLYNOME p3 = vertex_A_B_BB (b,g,h,e,f,mm2,mm1,h) ;
+  POLYNOME p4 = prop_BB_B (g,h,i,j,0,h) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p0, p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h, ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4509,6 +3531,7 @@ static POLYNOME Z2_AA__loopB (const char *title)
 
 static POLYNOME Z2_AA__loopHB (const char *title) 
 {    
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
 
   short a = newDummyIndex () ;
@@ -4521,14 +3544,14 @@ static POLYNOME Z2_AA__loopHB (const char *title)
   int mm1[4] = {0,1,0,0} ; /*  p  */
   int mm2[4] = {0,-1,0,0} ; /* -p  */
 
-  POLYNOME p1 = prop_HB_H (1) ;   /* (1/(k+p)^2 */
-  POLYNOME p2 = vertex_A_B_HB (a, c, d, mm1) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p3 = prop_BB_B (c,d,e,f, 0) ;   /* (1/(k)^2 */
-  POLYNOME p4 = vertex_A_H_BB (b, e, f, mm2) ; /*(2k + p)_mu */
+  POLYNOME p1 = prop_HB_H (1,h) ;   /* (1/(k+p)^2 */
+  POLYNOME p2 = vertex_A_B_HB (a, c, d, mm1,h) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
+  POLYNOME p3 = prop_BB_B (c,d,e,f, 0,h) ;   /* (1/(k)^2 */
+  POLYNOME p4 = vertex_A_H_BB (b, e, f, mm2,h) ; /*(2k + p)_mu */
 
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4556,19 +3579,20 @@ static POLYNOME Z2_AA__loopHB (const char *title)
 
 static POLYNOME Z2_HH__Aunder (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
   short b = newDummyIndex () ;
   int ppv[4] = {1,2,0,0} ; /* 2p + k : vertex */
   
-  POLYNOME p1 = vertex_A_H_HB (b, ppv) ; /*(2k + p)_mu */
-  POLYNOME p2 = prop_HB_H (1) ;   /* (1/(p+k)^2 */
-  POLYNOME p3 = vertex_A_H_HB (a, ppv) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p4 = prop_AA (a,b,0) ;   /* (1/(k)^2 */
+  POLYNOME p1 = vertex_A_H_HB (b, ppv,h) ; /*(2k + p)_mu */
+  POLYNOME p2 = prop_HB_H (1,h) ;   /* (1/(p+k)^2 */
+  POLYNOME p3 = vertex_A_H_HB (a, ppv,h) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
+  POLYNOME p4 = prop_AA (a,b,0,h) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4592,6 +3616,7 @@ static POLYNOME Z2_HH__Aunder (const char *title)
 
 static POLYNOME Z2_ghost__Aunder (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
@@ -4599,13 +3624,13 @@ static POLYNOME Z2_ghost__Aunder (const char *title)
   int ppva[4] = {-1,-1,0,0} ; /* -p - k : vertex */
   int ppvb[4] = {0,1,0,0} ;   /* p : vertex */
   
-  POLYNOME p1 = vertex_A_c_cB (b, ppva) ; /*(2k + p)_mu */
-  POLYNOME p2 = prop_cB_c (1) ;   /* (1/(p+k)^2 */
-  POLYNOME p3 = vertex_A_c_cB (a, ppvb) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p4 = prop_AA (a,b,0) ;   /* (1/(k)^2 */
+  POLYNOME p1 = vertex_A_c_cB (b, ppva,h) ; /*(2k + p)_mu */
+  POLYNOME p2 = prop_cB_c (1,h) ;   /* (1/(p+k)^2 */
+  POLYNOME p3 = vertex_A_c_cB (a, ppvb,h) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
+  POLYNOME p4 = prop_AA (a,b,0,h) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4629,6 +3654,7 @@ static POLYNOME Z2_ghost__Aunder (const char *title)
 
 static POLYNOME Z2_HH__loopAB (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
@@ -4640,14 +3666,14 @@ static POLYNOME Z2_HH__loopAB (const char *title)
   int m1[4] = {-1, -1,0,0} ; /* -p - k : incoming A momentum */
   int m2[4] = {1,1,0,0} ; /* p + k : vertex */
   
-  POLYNOME p1 = vertex_A_H_BB (a,c,d,m1) ; /*(2k + p)_mu */
-  POLYNOME p2 = prop_BB_B (c,d,e,f,0) ;   /* (1/(p+k)^2 */
-  POLYNOME p3 = vertex_A_B_HB (b,e,f, m2) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p4 = prop_AA (b,a,1) ;   /* (1/(k)^2 */
+  POLYNOME p1 = vertex_A_H_BB (a,c,d,m1,h) ; /*(2k + p)_mu */
+  POLYNOME p2 = prop_BB_B (c,d,e,f,0,h) ;   /* (1/(p+k)^2 */
+  POLYNOME p3 = vertex_A_B_HB (b,e,f, m2,h) ; /* (2k + p)_mu */prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
+  POLYNOME p4 = prop_AA (b,a,1,h) ;   /* (1/(k)^2 */
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ; 
   /* POLYNOME ppp[] = {p2,p3,0} ; */
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4672,6 +3698,7 @@ static POLYNOME Z2_HH__loopAB (const char *title)
 
 static POLYNOME Z2_BB__loopAH (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   firstDummyIndex = 'a' ;
     
   short a = newDummyIndex () ;
@@ -4681,7 +3708,7 @@ static POLYNOME Z2_BB__loopAH (const char *title)
   short e = newDummyIndex () ;
   short f = newDummyIndex () ;
   short g = newDummyIndex () ;
-  short h = newDummyIndex () ;
+  short h1 = newDummyIndex () ;
   short i = newDummyIndex () ;
   short j = newDummyIndex () ;
   int m1[4] = {1,0,0,0} ; /*  k : vertex */
@@ -4689,15 +3716,15 @@ static POLYNOME Z2_BB__loopAH (const char *title)
 
 
   
-  /*  POLYNOME p0 = newAG(a,b,g,h,1) ; */
-  POLYNOME p1 = vertex_A_H_BB (e,a,b,m1) ; /* k incoming */
-  POLYNOME p2 = prop_HB_H (1) ;   /* (1/(p+k)^2 */
-  POLYNOME p3 = vertex_A_B_HB (f,c,d, m2) ; /* k outgoing */
-  POLYNOME p4 = prop_AA (f,e,0) ;   /* (1/(k)^2 */
-  /*   POLYNOME p5 = newAG(c,d,i,j,-1) ; */
+  /*  POLYNOME p0 = newAG(a,b,g,h1,1,h) ; */
+  POLYNOME p1 = vertex_A_H_BB (e,a,b,m1,h) ; /* k incoming */
+  POLYNOME p2 = prop_HB_H (1,h) ;   /* (1/(p+k)^2 */
+  POLYNOME p3 = vertex_A_B_HB (f,c,d, m2,h) ; /* k outgoing */
+  POLYNOME p4 = prop_AA (f,e,0,h) ;   /* (1/(k)^2 */
+  /*   POLYNOME p5 = newAG(c,d,i,j,-1,h) ; */
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = newMultiProduct (ppp) ;
+  POLYNOME pp = newMultiProduct (h,ppp) ;
 
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4717,10 +3744,10 @@ static POLYNOME Z2_BB__loopAH (const char *title)
 
   exit (0) ;
   
-  POLYNOME p02 = newAG(a,b,g,h,1) ;
-  POLYNOME p52 = newAG(i,j,c,d,-1) ;
+  POLYNOME p02 = newAG(a,b,g,h1,1,h) ;
+  POLYNOME p52 = newAG(i,j,c,d,-1,h) ;
   POLYNOME ppp2[] = {p02,pp,p52,0} ;
-  pp = newMultiProduct (ppp2) ;
+  pp = newMultiProduct (h,ppp2) ;
   showPol (pp) ;
   pp = expand (pp) ;
   showPol (pp) ;
@@ -4743,6 +3770,7 @@ static POLYNOME Z2_BB__loopAH (const char *title)
 
 static POLYNOME Z2_PsiL__B_Psi (const char *title) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   short mu = newDummyIndex () ;
   short nu = newDummyIndex () ;
   short rho = newDummyIndex () ;
@@ -4750,13 +3778,13 @@ static POLYNOME Z2_PsiL__B_Psi (const char *title)
 
   short w = newDummyIndex () ;
     
-  POLYNOME p4 = vertex_BB_PsiL_PsiRB (mu,nu) ;
-  POLYNOME p2 = prop_BB_B (mu,nu,rho,sigma, 0) ;   /* (1/(k)^2 */
-  POLYNOME p3 = prop_PsiRB_PsiR (1) ; /* (1/(k+p)^2 */
-  POLYNOME p1 = vertex_B_PsiR_PsiLB (rho,sigma) ;
+  POLYNOME p4 = vertex_BB_PsiL_PsiRB (mu,nu,h) ;
+  POLYNOME p2 = prop_BB_B (mu,nu,rho,sigma, 0,h) ;   /* (1/(k)^2 */
+  POLYNOME p3 = prop_PsiRB_PsiR (1,h) ; /* (1/(k+p)^2 */
+  POLYNOME p1 = vertex_B_PsiR_PsiLB (rho,sigma,h) ;
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
   
   printf ("%s\n",title) ;
   showPol (pp) ;
@@ -4783,17 +3811,18 @@ static POLYNOME Z2_PsiL__B_Psi (const char *title)
 
 static POLYNOME Z2_PsiL__A_Psi (const char *title)
 {
+  AC_HANDLE h = ac_new_handle () ;
   short mu = newDummyIndex () ;
   short nu = newDummyIndex () ;
   short w = newDummyIndex () ;
 
-  POLYNOME p1 = vertex_A_PsiL_PsiLB (mu) ;
-  POLYNOME p2 = prop_AA (mu,nu, 0) ;   /* (1/(k)^2 */
-  POLYNOME p3 = prop_PsiLB_PsiL (1) ; /* (1/(k+p)^2 */
-  POLYNOME p4 = vertex_A_PsiL_PsiLB (nu) ;
+  POLYNOME p1 = vertex_A_PsiL_PsiLB (mu,h) ;
+  POLYNOME p2 = prop_AA (mu,nu, 0,h) ;   /* (1/(k)^2 */
+  POLYNOME p3 = prop_PsiLB_PsiL (1,h) ; /* (1/(k+p)^2 */
+  POLYNOME p4 = vertex_A_PsiL_PsiLB (nu,h) ;
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
 
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
   
   printf ("%s\n",title) ;
   showPol (pp) ;
@@ -4814,15 +3843,16 @@ static POLYNOME Z2_PsiL__A_Psi (const char *title)
 
 static POLYNOME Z2_PsiL__H_Psi (const char *title)
 {
+  AC_HANDLE h = ac_new_handle () ;
   BOOL debug = FALSE ;
-  POLYNOME p1 = vertex_HB_PsiL_PsiRB () ;
-  POLYNOME p2 = prop_HB_H (0) ;          /* (1/(k)^2 */ 
-  POLYNOME p3 = prop_PsiRB_PsiR (1) ;   /* (1/(k+p)^2 */ 
-  POLYNOME p4 = vertex_H_PsiR_PsiLB () ;
+  POLYNOME p1 = vertex_HB_PsiL_PsiRB (h) ;
+  POLYNOME p2 = prop_HB_H (0,h) ;          /* (1/(k)^2 */ 
+  POLYNOME p3 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k+p)^2 */ 
+  POLYNOME p4 = vertex_H_PsiR_PsiLB (h) ;
   POLYNOME ppp[] = {p1,p2,p3,p4,0} ;
   short w = newDummyIndex () ;
   
-  POLYNOME pp = contractIndices(newMultiProduct (ppp)) ;
+  POLYNOME pp = contractIndices(newMultiProduct (h,ppp)) ;
   
   printf ("%s\n", title) ;
   showPol (pp) ;
@@ -4844,6 +3874,7 @@ static POLYNOME Z2_PsiL__H_Psi (const char *title)
 /* check some integrals */
 static void Thooft (void) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   short a = newDummyIndex () ;
   short b = newDummyIndex () ;
   short c = newDummyIndex () ;
@@ -4855,7 +3886,7 @@ static void Thooft (void)
 
   POLYNOME pp, qq, rr ;
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
   pp->tt.denom[0] = 1 ;
@@ -4865,10 +3896,10 @@ static void Thooft (void)
   pp = dimIntegral (pp) ;
   showPol (pp) ;
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -4882,16 +3913,16 @@ static void Thooft (void)
   pp = dimIntegral (pp) ;
   showPol (pp) ;
   printf ("# trace it, expect zero\n") ;
-  rr = newProduct (pp, qq) ;
+  rr = newProduct (pp, qq, h) ;
   rr = expand (rr) ;
   rr = reduceIndices (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -4910,10 +3941,10 @@ static void Thooft (void)
   showPol (rr) ;
 
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -4931,10 +3962,10 @@ static void Thooft (void)
   showPol (rr) ;
 
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -4949,15 +3980,15 @@ static void Thooft (void)
   showPol (pp) ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  rr = newProduct (pp, qq) ;
+  rr = newProduct (pp, qq, h) ;
   rr = expand (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -4974,16 +4005,16 @@ static void Thooft (void)
   showPol (pp) ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  rr = newProduct (pp, qq) ;
+  rr = newProduct (pp, qq, h) ;
   showPol (rr) ;
   rr = expand (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
 
-  pp = newPolynome () ;
+  pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -5003,16 +4034,16 @@ static void Thooft (void)
   showPol (pp) ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  rr = newProduct (pp, qq) ;
+  rr = newProduct (pp, qq, h) ;
   rr = expand (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
  
 
- pp = newPolynome () ;
+ pp = newPolynome (h) ;
   pp->tt.z = 1 ;
   pp->tt.type = 1 ;
-  qq = newPolynome () ;
+  qq = newPolynome (h) ;
   qq->tt.z = 1 ;
   qq->tt.type = 1 ;
 
@@ -5030,13 +4061,14 @@ static void Thooft (void)
   showPol (pp) ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  rr = newProduct (pp, qq) ;
+  rr = newProduct (pp, qq, h) ;
   showPol (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
   rr = expand (rr) ;
   showPol (rr) ;
 
+  ac_free (h) ;
   return ;
 } /* tHooft */
 
@@ -5044,6 +4076,7 @@ static void Thooft (void)
 /* check self duality projectors */
 static POLYNOME Hodge (void) 
 {
+  AC_HANDLE h = ac_new_handle () ;
   short a = newDummyIndex () ;
   short b = newDummyIndex () ;
   short c = newDummyIndex () ;
@@ -5067,47 +4100,47 @@ static POLYNOME Hodge (void)
 
   if (1)
     {
-      pP1 = newAG (mu,nu,a,b,1) ;
-      /*  pM1 = newAG (mu,nu,a,b,-1) ; */
-      pP2 = newAG (rho,sig,a,b,1) ;
-      pM2 = newAG (rho,sig,a,b,-1) ;
-      pG1 = newAG (mu,nu,a,b,0) ;
-      pG2 = newAG (rho,sig,a,b,0) ;
+      pP1 = newAG (mu,nu,a,b,1,h) ;
+      /*  pM1 = newAG (mu,nu,a,b,-1, h) ; */
+      pP2 = newAG (rho,sig,a,b,1, h) ;
+      pM2 = newAG (rho,sig,a,b,-1, h) ;
+      pG1 = newAG (mu,nu,a,b,0, h) ;
+      pG2 = newAG (rho,sig,a,b,0, h) ;
     }
   if (0)
     {
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdabcd") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
       
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdabdc") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
       
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdacbd") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
       
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdabce") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
       
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdaebc") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
       
       
-      pp = newG (mu,nu) ;
+      pp = newG (mu,nu,h) ;
       tcpy (pp->tt.eps, "abcdabec") ;
       showPol (pp) ;
       pp = expand (pp) ;
@@ -5116,30 +4149,30 @@ static POLYNOME Hodge (void)
   
   if (0)
     {
-      ppp[0] = newG ('a','b') ;
+      ppp[0] = newG ('a','b',h) ;
       ppp[1] = 0 ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       showPol (pp) ;
       pp = sortPol (pp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
 
-      ppp[0] = newG ('a','b') ;
-      ppp[1] = newG ('c','d') ;
+      ppp[0] = newG ('a','b',h) ;
+      ppp[1] = newG ('c','d',h) ;
       ppp[2] = 0 ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       showPol (pp) ;
       pp = sortPol (pp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
 
-      ppp[0] = newG ('a','b') ;
-      ppp[1] = newG ('c','d') ;
-      ppp[2] = newG ('a','b') ;
+      ppp[0] = newG ('a','b',h) ;
+      ppp[1] = newG ('c','d',h) ;
+      ppp[2] = newG ('a','b',h) ;
       ppp[3] = 0 ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       showPol (pp) ;
       pp = sortPol (pp) ;
       showPol (pp) ;
@@ -5149,12 +4182,12 @@ static POLYNOME Hodge (void)
     }
   if (1)
     {
-      ppp[0] = newG ('a','b') ;
-      ppp[1] = newG ('c','d') ;
-      ppp[2] = newG ('a','b') ;
-      ppp[3] = newG ('c','d') ;
+      ppp[0] = newG ('a','b',h) ;
+      ppp[1] = newG ('c','d',h) ;
+      ppp[2] = newG ('a','b',h) ;
+      ppp[3] = newG ('c','d',h) ;
       ppp[4] = 0 ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       showPol (pp) ;
       pp = sortPol (pp) ;
       showPol (pp) ;
@@ -5162,13 +4195,13 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
       exit (0) ;
 
-      ppp[0] = newG ('a','b') ;
-      ppp[1] = newG ('c','d') ;
-      ppp[2] = newG ('a','b') ;
-      ppp[3] = newG ('c','d') ;
-      ppp[4] = newG ('a','b') ;
+      ppp[0] = newG ('a','b',h) ;
+      ppp[1] = newG ('c','d',h) ;
+      ppp[2] = newG ('a','b',h) ;
+      ppp[3] = newG ('c','d',h) ;
+      ppp[4] = newG ('a','b',h) ;
       ppp[5] = 0 ;
-      pp = newMultiSum (ppp) ;
+      pp = newMultiSum (h,ppp) ;
       showPol (pp) ;
       pp = sortPol (pp) ;
       showPol (pp) ;
@@ -5182,7 +4215,7 @@ static POLYNOME Hodge (void)
       ppp[0] = pP1 ;
       ppp[1] = pP2 ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
 
@@ -5192,7 +4225,7 @@ static POLYNOME Hodge (void)
       ppp[0] = pG1 ;
       ppp[1] = pG2 ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       pp = contractProducts (pp) ;
@@ -5205,7 +4238,7 @@ static POLYNOME Hodge (void)
       ppp[0] = pP1 ;
       ppp[1] = pM2 ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       pp = contractProducts (pp) ;
@@ -5218,7 +4251,7 @@ static POLYNOME Hodge (void)
       ppp[0] = pP1 ;
       ppp[1] = pG2 ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       pp = expand (pp) ;
@@ -5226,20 +4259,20 @@ static POLYNOME Hodge (void)
       
       printf ("Test : compute PG eps\n") ;
       ppp[0] = pG1 ;
-      ppp[1] = newEpsilon (rho,sig,a,b) ;
+      ppp[1] = newEpsilon (rho,sig,a,b,h) ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
 
       printf ("Test : compute B propagator\n") ;
-      ppp[0] = newAG (a,b,e,f,-1) ; 
+      ppp[0] = newAG (a,b,e,f,-1,h) ; 
       ppp[1] = prop_BB_B (e,f,g,h,0) ;
-      ppp[2] = newAG (g,h,c,d,1) ; 
+      ppp[2] = newAG (g,h,c,d,1,h) ; 
       ppp[3] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = reduceIndices (pp) ;
       pp = expand (pp) ;
@@ -5257,12 +4290,12 @@ static POLYNOME Hodge (void)
   if (1)
     {
       printf ("Test : compute eps eps\n") ;
-      ppp[0] = newEpsilon (mu,nu,a,b) ;
-      ppp[1] = newEpsilon (rho,b,a,sig) ;
+      ppp[0] = newEpsilon (mu,nu,a,b,h) ;
+      ppp[1] = newEpsilon (rho,b,a,sig,h) ;
       ppp[0]->tt.z = I/4 ;
       ppp[1]->tt.z = I/4 ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,pp) ;
       showPol (pp) ;
       pp = expand (pp) ;
 
@@ -5272,10 +4305,10 @@ static POLYNOME Hodge (void)
   if (1)
     {
       printf ("Test : compute chiral projectors PP PP = PP\n") ;
-      ppp[0] = newAG (a,b,c,d,1) ;
-      ppp[1] = newAG (c,d,e,f,1) ;
+      ppp[0] = newAG (a,b,c,d,1,h) ;
+      ppp[1] = newAG (c,d,e,f,1,h) ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h.ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5285,11 +4318,11 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : compute chiral projectors PP PP PP = PP\n") ;
-      ppp[0] = newAG (a,b,c,d,1) ;
-      ppp[1] = newAG (c,d,e,f,1) ;
-      ppp[2] = newAG (e,f,g,h,1) ;
+      ppp[0] = newAG (a,b,c,d,1,h) ;
+      ppp[1] = newAG (c,d,e,f,1,h) ;
+      ppp[2] = newAG (e,f,g,h,1,h) ;
       ppp[3] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5303,12 +4336,12 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : compute chiral projectors PP PP PP PP = PP\n") ;
-      ppp[0] = newAG (a,b,c,d,1) ;
-      ppp[1] = newAG (c,d,e,f,1) ;
-      ppp[2] = newAG (e,f,g,h,1) ;
-      ppp[3] = newAG (g,h,i,j,1) ;
+      ppp[0] = newAG (a,b,c,d,1,h) ;
+      ppp[1] = newAG (c,d,e,f,1,h) ;
+      ppp[2] = newAG (e,f,g,h,1,h) ;
+      ppp[3] = newAG (g,h,i,j,1,h) ;
       ppp[4] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5322,10 +4355,10 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : compute chiral projectors PP PM = 0\n") ;
-      ppp[0] = newAG (a,b,c,d,1) ;
-      ppp[1] = newAG (c,d,e,f,-1) ;
+      ppp[0] = newAG (a,b,c,d,1,h) ;
+      ppp[1] = newAG (c,d,e,f,-1,h) ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5335,10 +4368,10 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : compute chiral projectors PM PP = 0\n") ;
-      ppp[0] = newAG (a,b,c,d,-1) ;
-      ppp[1] = newAG (c,d,e,f,1) ;
+      ppp[0] = newAG (a,b,c,d,-1,h) ;
+      ppp[1] = newAG (c,d,e,f,1,h) ;
       ppp[2] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5348,11 +4381,11 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : compute chiral projectors PP PM PP = PP\n") ;
-      ppp[0] = newAG (a,b,c,d,1) ;
-      ppp[1] = newAG (c,d,e,f,-1) ;
-      ppp[2] = newAG (e,f,g,h,1) ;
+      ppp[0] = newAG (a,b,c,d,1,h) ;
+      ppp[1] = newAG (c,d,e,f,-1,h) ;
+      ppp[2] = newAG (e,f,g,h,1,h) ;
       ppp[3] = 0 ;
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h,ppp) ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
@@ -5366,12 +4399,13 @@ static POLYNOME Hodge (void)
       showPol (pp) ;
 
       printf ("Test : double epsilon, no common index\n") ;
-      pp = newG (a,b) ;
+      pp = newG (a,b,h) ;
       tcpy (pp->tt.eps, "cdefghij") ;
       showPol (pp) ;
       pp = expand (pp) ;
       showPol (pp) ;
     }
+  ac_free (h) ;
   exit (0) ;
   return pp ;
 } /* Hodge */
@@ -5387,7 +4421,7 @@ static POLYNOME Z2_BB__Aunder (const char *title)
   short e = newDummyIndex () ;
   short f = newDummyIndex () ;
   short g = newDummyIndex () ;
-  short h = newDummyIndex () ;
+  short h1 = newDummyIndex () ;
   short i = newDummyIndex () ;
   short j = newDummyIndex () ;
   short k = newDummyIndex () ;
@@ -5404,17 +4438,17 @@ static POLYNOME Z2_BB__Aunder (const char *title)
 
   if (1)
     { 
-      ppp[0] = newAG (a,b,i,j, -1) ;
+      ppp[0] = newAG (a,b,i,j, -1,h) ;
       ppp[0]->tt.z = 384 ;
-      ppp[1] = prop_AA (mu, nu, 1) ; /* 1/(p+k^2 */
-      ppp[2] = vertex_A_B_BB (mu, i, j, e, f, mm1, mm2) ;
-      ppp[3] = prop_BB_B (e,f,g,h,0) ; /* kk/(k)^4 */
-      ppp[4] = vertex_A_B_BB (nu, g, h, k, l, mm2, mm3) ;
-      ppp[5] = newAG (k,l,c,d, 1) ;
-      ppp[6] = newScalar (384) ;
+      ppp[1] = prop_AA (mu, nu, 1,h) ; /* 1/(p+k^2 */
+      ppp[2] = vertex_A_B_BB (mu, i, j, e, f, mm1, mm2,h) ;
+      ppp[3] = prop_BB_B (e,f,g,h1,0,h) ; /* kk/(k)^4 */
+      ppp[4] = vertex_A_B_BB (nu, g, h1, k, l, mm2, mm3,h) ;
+      ppp[5] = newAG (k,l,c,d, 1,h) ;
+      ppp[6] = newScalar (384,h) ;
       ppp[7] = 0 ;
 
-      pp = newMultiProduct (ppp) ;
+      pp = newMultiProduct (h, ppp) ;
       printf ("########### 384 Z2 B with transient A TRES FAUX resultat en p^4 au lieu de p^2 \n") ;  
       showPol (pp) ;
       pp = expand (pp) ;
@@ -5447,7 +4481,7 @@ static POLYNOME Z3_AHH__loopPsiL (const char *title)
   POLYNOME p16 = vertex_H_PsiR_PsiLB () ;
   POLYNOME pppP[] = {p10,p11,p12,p13,p14,p15,p16,0} ;
 
-  POLYNOME PP = contractIndices(newMultiProduct (pppP)) ;
+  POLYNOME PP = contractIndices(newMultiProduct (h,pppP)) ;
 
   printf ("%s\n", title) ;
   printf ("############# Z3 A H HB with loop psiL (psiL touches A)\n") ;
@@ -6172,7 +5206,7 @@ static POLYNOME Z3_A_PsiL_PsiLB__Bover (void)
   POLYNOME p6 = prop_BB_B (h,i,f,g,20) ; /* 1/(k+p+q)^2 */
 
   POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
-  POLYNOME ppp2[7] = {p1, p2, p5, p6, 0} ;
+  /*   POLYNOME ppp2[7] = {p1, p2, p5, p6, 0} ; */
 
   POLYNOME pp = newMultiProduct (ppp) ;
   printf ("Z3 Classic vertex A psi with tensor over: expect 1 \n") ;
@@ -7825,8 +6859,8 @@ static MX KasCheckR16 (KAS *kas, MX a, MX b, MX c, int scale, int sign)
       float y = creal(z)*creal(z) + cimag(z)*cimag(z) ;
       if (y > 1/100.0)
 	{
-	  niceShow (ab) ;
-	  niceShow (s) ;
+	  mxNiceShow (ab) ;
+	  mxNiceShow (s) ;
 	  messcrash ("\nKasCheckR12 Failed [%s,%s] = %d * %s\n", a->name, b->name, scale, c->name) ;
 	}
     }
@@ -8127,7 +7161,7 @@ static void KasimirOperatorK2 (KAS *kas)
   dz = 2*b * (b - a - 1)/(a+1.0) ; /* natural metric STr(ab) in the same rep */
   dz = b * (b - a - 1) ; /* fixed  metric STr(ab) in the adjoint rep */
   mxSet (kas2, zz) ;
-  if (kas->show && a<4) niceShow (kas2) ;
+  if (kas->show && a<4) mxNiceShow (kas2) ;
   if (dz != 0)
     for (i = 0 ; i < d*d ; i++)
       zz[i] /= dz ;
@@ -8236,12 +7270,12 @@ static void GhostKasimirOperatorMinus (KAS *kas)
 	  if (0 && ok)
 	    {
 	      printf ("************************** X2 i = %d j = %d sign=%.2f\n", i, j, -z) ;
-	      niceShow (c) ;
+	      mxNiceShow (c) ;
 	    }
 	}
 
   mxSet (kas2, zz) ;
-  if (0) niceShow (kas2) ;
+  if (0) mxNiceShow (kas2) ;
   if (0) memset (zz, 0, sizeof (zz)) ;
   for (i = 4 ; i < 8 ; i++)
     for (j = 4 ; j < 8 ; j++)
@@ -8276,7 +7310,7 @@ static void GhostKasimirOperatorMinus (KAS *kas)
 		if (0 &&  ok)
 		  {
 		    printf ("*** X2 i = %d j = %d  k=%d  l=%d sign=%d\n", i, j,k,l,jj> 0 ? 1 : -1) ;
-		    niceShow (g) ;
+		    mxNiceShow (g) ;
 		  }
 	      }
 	  }
@@ -8288,9 +7322,9 @@ static void GhostKasimirOperatorMinus (KAS *kas)
   int a = kas->a, b = kas->b ;
   dz = b * (b - a - 1) ;
   /* dz1 = -6*(2*b -a - 1)*(2*b - 1) ; */
-  if (0) niceShow (kas2) ;
+  if (0) mxNiceShow (kas2) ;
   mxSet (kas2, zz) ;
-  if (0) niceShow (kas2) ;
+  if (0) mxNiceShow (kas2) ;
   if (dz != 0)
     for (i = 0 ; i < d*d ; i++)
       zz[i] /= dz ;
@@ -8306,7 +7340,7 @@ static void GhostKasimirOperatorMinus (KAS *kas)
   else
     printf ("SUCCESS Ghost-Casimir operator Xtilde2 (a=%d,b=%d) expect = b * (b - a - 1) * %.3f\n", kas->a, kas->b, zz[0]) ;
 
-  if (kas->show && kas->a<4) niceShow (kas2) ;
+  if (kas->show && kas->a<4) mxNiceShow (kas2) ;
   if (0 && ! isAdjoint) exit (0) ;
   ac_free (h) ;
   return ;
@@ -8361,12 +7395,12 @@ static void GhostKasimirOperatorXtilde2New (KAS *kas)
 	  if (0 && ok)
 	    {
 	      printf ("************************** X2 i = %d j = %d sign=%.2f\n", i, j, -z) ;
-	      niceShow (c) ;
+	      mxNiceShow (c) ;
 	    }
 	}
 
   mxSet (XT2, zz) ;
-  if (1 && kas->show && kas->a<4) niceShow (XT2) ;
+  if (1 && kas->show && kas->a<4) mxNiceShow (XT2) ;
   if (0 && kas->show) memset (zz, 0, sizeof (zz)) ;
   
   if (0)   memset (zz, 0, sizeof (zz)) ;
@@ -8403,13 +7437,13 @@ static void GhostKasimirOperatorXtilde2New (KAS *kas)
 		if (0 && kas->show && ok)
 		  {
 		    printf ("*** X2 i = %d j = %d  k=%d  l=%d sign=%d\n", i, j,k,l,jj> 0 ? 1 : -1) ;
-		    if (0) niceShow (g) ;
+		    if (0) mxNiceShow (g) ;
 		  }
 	      }
 	  }
 
   mxSet (XT2, zz) ;
-  if (1 && kas->show && kas->a<4) niceShow (XT2) ;
+  if (1 && kas->show && kas->a<4) mxNiceShow (XT2) ;
   
   /* we already added the 2 terms */
   for (i = 0 ; i < d*d ; i++)
@@ -8424,7 +7458,7 @@ static void GhostKasimirOperatorXtilde2New (KAS *kas)
       zz[i] /= dz ;
 
 
-  if (kas->show && kas->a<4) niceShow (XT2) ;
+  if (kas->show && kas->a<4) mxNiceShow (XT2) ;
 
   if (1 && dz == 0 && (zz[0]*zz[0]) > 1.0/10000)
     messcrash ("ERROR, non zero ghost casimir %f\n", zz[0]) ;
@@ -8511,14 +7545,14 @@ static void GhostKasimirOperatorXtilde3 (KAS *kas)
 	  if (1 && i*j*k != 0 && ok)
 	    {
 	      printf ("***#######*********************** X2 i = %d j = %d k=%d sign=%.2f\n", i, j, k, z) ;
-	      niceShow (f) ;
+	      mxNiceShow (f) ;
 	    }
 	}
 
   mxSet (XT3, zz) ;
   printf ("#$#$#$#$#$ GHOST Chisimir 3\n") ;
-  if (1) niceShow (XT3) ;
-  niceShow (kas->CCC) ;
+  if (1) mxNiceShow (XT3) ;
+  mxNiceShow (kas->CCC) ;
 
 
 
@@ -8609,14 +7643,14 @@ static void GhostKasimirOperatorXtilde3 (KAS *kas)
 		if (ok && yy[6] > 0)
 		  {
 		    printf ("***#######*********************** X2 i = %d j = %d k=%d l=%d m=%d sign=%.2f\n", i, j, k, l, m, z) ;
-		    niceShow (x) ;
+		    mxNiceShow (x) ;
 		  }
 	      }
 
   mxSet (XT3, zz) ;
   printf ("#$#$#$#$#$ GHOST Chisimir 3\n") ;
-  if (1) niceShow (XT3) ;
-  niceShow (kas->C5) ;
+  if (1) mxNiceShow (XT3) ;
+  mxNiceShow (kas->C5) ;
 
   return ;
   
@@ -8689,7 +7723,7 @@ static void GhostKasimirOperatorXtilde3 (KAS *kas)
 		if (1 && ok)
 		  {
 		    printf ("*** X2 i = %d j = %d  k=%d  l=%d sign=%d\n", i, j,k,l,jj> 0 ? 1 : -1) ;
-		    niceShow (g) ;
+		    mxNiceShow (g) ;
 		  }
 	      }
 	  }
@@ -8717,7 +7751,7 @@ static void GhostKasimirOperatorXtilde3 (KAS *kas)
   else
     printf ("######QUESTION  Ghost-Casimir operator Xtilde3 (a=%d,b=%d) expect = b * (b - a - 1) * (2b - a - 1) = %d\n", kas->a, kas->b, b * (b-a-1)*(2*b-a-1)) ;
 
-  if (kas->show && kas->a<4) niceShow (XT3) ;
+  if (kas->show && kas->a<4) mxNiceShow (XT3) ;
   if (0 && ! isAdjoint) exit (0) ;
   ac_free (h) ;
   return ;
@@ -8903,7 +7937,7 @@ static void  KasimirLower3tensor (KAS *kas, BOOL isGhost)
       printf ("SUCCESS all lower 3 tensor scale up by a factor %g\n", zscale) ;
     }
 
-  niceShow (ccc) ;
+  mxNiceShow (ccc) ;
   /* the lower 3 tensor scales (a,b) relative to the lepton (a=1,b=0) by a factor s=(a+1)(2b-a-1) = (a+1)(y-1) = 1/4  Tr(Y)
    * for the quarks b=2/3,a=0  s=1/3, really -1/3 because we start on a right state, hence BIM lepton + 3 quarks = 0
    * whereas as operrators C_3(lepton)==0 (atypic) c_3(quarks) non zero
@@ -9149,7 +8183,7 @@ static void  KasimirLower5tensor (KAS *kas)
    */
  done:
     mxSet (c5, yyAdjoint) ;
-    niceShow (c5) ; 
+    mxNiceShow (c5) ; 
   ac_free (h) ;
   return  ;
 } /* KasimirLower5tensor */
@@ -9240,7 +8274,7 @@ static void  KasimirUpper5tensor (KAS *kas)
       yy[i] += z * kas->zC4 ;
     }
   mxSet (CCC, yy) ;
-  niceShow (CCC) ;
+  mxNiceShow (CCC) ;
   ac_free (h) ;
   return  ;
 } /* KasimirUpper5tensor */
@@ -9312,7 +8346,7 @@ static void KasimirOperatorK3 (KAS *kas)
   else
     messerror ("\nCubic super-Casimir operator KAS3 (a=%d,b=%d) z = %f expect b(b-a-1)(2b - a -1)/2 =  %f\n", kas->a, kas->b, zz[0], zexpected/2.0) ;
   
-  if (kas->show && kas->a<6) niceShow (kas3) ;
+  if (kas->show && kas->a<6) mxNiceShow (kas3) ;
 
   ac_free (h) ;
   return ;
@@ -9368,19 +8402,19 @@ static void QFTscalar (KAS *kas)
 	    printf ("QFT i=%d j=%d\n", i, j) ;
 	    if (0)
 	      {
-		niceShow (a) ;
-		niceShow (b) ;
-		niceShow (c) ;
-		niceShow (e) ;
-		niceShow (f) ;
+		mxNiceShow (a) ;
+		mxNiceShow (b) ;
+		mxNiceShow (c) ;
+		mxNiceShow (e) ;
+		mxNiceShow (f) ;
 	      }
-	    niceShow (g) ;
+	    mxNiceShow (g) ;
 	  }
       }
     
     mxSet (w, zz) ;
-    niceShow (K) ;
-    niceShow (w) ;
+    mxNiceShow (K) ;
+    mxNiceShow (w) ;
     
     ac_free (h) ;
 } /* QFTscalar */
@@ -9442,7 +8476,7 @@ static void Kasimirs (int a, int b, BOOL show)
       MX Com =  mxCreate (h, "[casimir,H]", MX_COMPLEX,d,d, 0) ;
       Com = mxSubstract (CKX, CXK, h) ;
       if (kas.show)
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
       
       printf ("Verify that the casimir commutes with X\n") ;
       MX CKX2 = mxMatMult (kas.kas2, qmuX, h) ;
@@ -9450,26 +8484,26 @@ static void Kasimirs (int a, int b, BOOL show)
       MX Com2 =  mxCreate (h, "[casimir,X]", MX_COMPLEX,d,d, 0) ;
       Com = mxSubstract (CKX2, CXK2, h) ;
       if (kas.show)
-	niceShow (Com2) ;
+	mxNiceShow (Com2) ;
       
       printf ("Verify that the S-casimir anticommutes with XU and YV\n") ;
       MX SCKX = mxMatMult (kas.CHI, qmuX, h) ;
       MX SCXK = mxMatMult (qmuX, kas.CHI, h) ;
       MX SCom =  mxCreate (h, "{S-casimir,X}", MX_COMPLEX, d,d, 0) ;
       SCom = mxAdd (SCom, SCKX, SCXK, h) ;
-      if (kas.show) niceShow (SCom) ;
+      if (kas.show) mxNiceShow (SCom) ;
       
       printf ("Compute the square of the S-casimir\n") ;
       MX SC2 = mxMatMult (kas.CHI,kas.CHI, h) ;
       if (0) SC2 = mxLinearCombine (SC2, 1, SC2, -1, kas.kas2, h) ;
       SC2->name = "S-Casimir square" ;
-      if (kas.show) niceShow (SC2) ;
+      if (kas.show) mxNiceShow (SC2) ;
       
       printf ("Compute the product of the Casimir by the S-casimir Q^3 = Q\n") ;
       MX SC3 = mxMatMult (kas.kas2, kas.CHI, h) ;
       if (0) SC3 = mxLinearCombine (SC3, 1, SC3, -1, kas.CHI, h) ;
       SC3->name = "S-Casimir cube" ;
-      if (kas.show) niceShow (SC3) ;
+      if (kas.show) mxNiceShow (SC3) ;
     }
   KasimirUpperTensor (&kas) ;
   
@@ -9506,7 +8540,7 @@ static void GhostKasimirOperatorR16 (KAS *kas)
       XT2 = mxAdd (XT2, e, f, h) ;
     }
 
-  if (1) niceShow (XT2) ;
+  if (1) mxNiceShow (XT2) ;
   
   mxValues (XT2, 0, 0, &xx) ;
   for (m1 = 0 ; m1 < d*d ; m1++)
@@ -9538,7 +8572,7 @@ static void GhostKasimirOperatorR16 (KAS *kas)
 
   mxSet (XT2, zz) ;
   printf ("\nSUCCESS Ghost Casimir operator R16 computed\n") ;
-  if (1) niceShow (XT2) ;
+  if (1) mxNiceShow (XT2) ;
 
 
   ac_free (h) ;
@@ -9818,25 +8852,25 @@ static void KasimirR16 (void)
 
 
   
-  niceShow (chi) ;
-  niceShow (xi) ;
-  niceShow (Rmu[0]) ;
+  mxNiceShow (chi) ;
+  mxNiceShow (xi) ;
+  mxNiceShow (Rmu[0]) ;
   for (ii = 1 ; ii < 4 ; ii++)
-    niceShow (Rmu[ii]) ;
+    mxNiceShow (Rmu[ii]) ;
   for (ii = 8 ; ii < 10 ; ii++)
-    niceShow (Rmu[ii]) ;
+    mxNiceShow (Rmu[ii]) ;
     
   M = KasCommut (Rmu[1], Rmu[2], -1, kas) ;
   M->name = "[1,2]" ;
-  niceShow (M) ;
+  mxNiceShow (M) ;
   
   M = KasCommut (Rmu[3], Rmu[1], -1, kas) ;
   M->name = "[3,1]" ;
-  niceShow (M) ;
+  mxNiceShow (M) ;
   
   M = KasCommut (Rmu[3], Rmu[2], -1, kas) ;
   M->name = "[3,2]" ;
-  niceShow (M) ;
+  mxNiceShow (M) ;
 
   KasCheckR16 (kas, Rmu[1], Rmu[2], Rmu[3], 2, -1) ;
   KasCheckR16 (kas, Rmu[2], Rmu[3], Rmu[1], 2, -1) ;
@@ -9878,11 +8912,11 @@ static void KasimirR16 (void)
 	}
     }
   mxSet (mu[6], zz) ;
-  niceShow (mu[6]) ;
+  mxNiceShow (mu[6]) ;
   Rmu[6] = mxMatMult (xi, mu[6], kas->h) ;
   Rmu[6]->name = "Rmu[6]" ;
-  niceShow (Rmu[6]) ;
-  niceShow (xi) ;
+  mxNiceShow (Rmu[6]) ;
+  mxNiceShow (xi) ;
   
   KasCheckR16 (kas, Rmu[6], Rmu[6], Rmu[9], -1, 1) ;
 
@@ -9895,10 +8929,10 @@ static void KasimirR16 (void)
   Rmu[5] = KasCommut (Rmu[3], Rmu[4], -1, kas) ;
   Rmu[5]->name = "Rmu[5]" ;
   
-  niceShow (Rmu[4]) ;
-  niceShow (Rmu[5]) ;
-  niceShow (Rmu[6]) ;
-  niceShow (Rmu[7]) ;
+  mxNiceShow (Rmu[4]) ;
+  mxNiceShow (Rmu[5]) ;
+  mxNiceShow (Rmu[6]) ;
+  mxNiceShow (Rmu[7]) ;
   
   KasCheckR16 (kas, Rmu[3], Rmu[6], Rmu[7], 1, -1) ;
   KasCheckR16 (kas, Rmu[3], Rmu[7], Rmu[6], -1, -1) ;
@@ -9965,7 +8999,7 @@ static void KasimirR16 (void)
       Tm = mxMatMult (xiM, Rmu[7], kas->h) ;
       Tmu[7] = mxAdd (Tmu[7], Tp, Tm, kas->h) ;
       
-      niceShow (Tmu[6]) ;
+      mxNiceShow (Tmu[6]) ;
       
       KasCheckR16 (kas, Tmu[6], Tmu[6], Rmu[9], -1, 1) ;
       KasCheckR16 (kas, Rmu[3], Tmu[6], Tmu[7], 1, -1) ;
@@ -10008,7 +9042,6 @@ complex float eps[4][4][4][4] ;
 complex float PP[4][4][4][4] ;
 complex float PM[4][4][4][4] ;
 
-static void niceShow (MX a) ;
 static int c3Mask = 0 ;
 static int SU3 = 0 ;
 static int myType = -1 ;
@@ -10100,13 +9133,13 @@ static void muStructure (void)
 	  if (0 && a == 2 && b == 7 && t == 7)
 	    {
 	      printf ("\n# mu(%d) type %d\n", a, t) ;
-	      niceShow  (neq[t][a]) ;
+	      mxNiceShow  (neq[t][a]) ;
 	      printf ("\n# mu(%d) type %d\n", b, t) ;
-	      niceShow  (neq[t][b]) ;
+	      mxNiceShow  (neq[t][b]) ;
 	      printf ("\n# [a,b] type %d\n", t) ;
-	      niceShow (mm3) ;
+	      mxNiceShow (mm3) ;
 	      printf ("\n# [a,b] should be equal to neq[%d][%d]\n", t,c) ;
-	      niceShow (neq[t][c]) ;
+	      mxNiceShow (neq[t][c]) ;
 	      printf ("\n# norm");
 	    }
 	  z = mxFNorm (mm4) ;
@@ -10118,8 +9151,8 @@ static void muStructure (void)
  
   if (1)
     {
-      niceShow (neq[6][6]) ;
-      niceShow (neq[6][7]) ;
+      mxNiceShow (neq[6][6]) ;
+      mxNiceShow (neq[6][7]) ;
     }
   ac_free (h) ;
   return ;
@@ -10193,22 +9226,22 @@ static void muSigma (AC_HANDLE h)
 	if (0)
 	  {
 	    printf ("###### sigma sbar : i=%d j=%d \n", i, j) ;
-	    niceShow (mm1) ;
+	    mxNiceShow (mm1) ;
 	  }
 
 	mmm[0] = SG[j] ;
 	mmm[1] = SB[i] ;
 	mmm[2] = 0 ;
 	mm2 = mxMatListMult (h, mmm) ;
-	if (0) niceShow (mm2) ;
+	if (0) mxNiceShow (mm2) ;
 	mm3 = mxLinearCombine (mm3, 1,mm1, 1, mm2, h) ; 
 	mm4 = mxLinearCombine (mm4, 1,mm3, -2*gg[i][j], SG[0], h) ; 
 	if (0)
 	  {
-	    niceShow (mm1) ;
-	    niceShow (mm2) ;	
-	    niceShow (mm3) ;	
-	    niceShow (mm4) ;
+	    mxNiceShow (mm1) ;
+	    mxNiceShow (mm2) ;	
+	    mxNiceShow (mm3) ;	
+	    mxNiceShow (mm4) ;
 	  }
 	z = mxFNorm(mm4) ;
 	if (z > .001)
@@ -10236,10 +9269,10 @@ static void muSigma (AC_HANDLE h)
 	mm4 = mxLinearCombine (mm4, 1,mm3, -2*gg[i][j], SG[0], h) ; 
 	if (0)
 	  {
-	    niceShow (mm1) ;
-	    niceShow (mm2) ;	
-	    niceShow (mm3) ;	
-	    niceShow (mm4) ;
+	    mxNiceShow (mm1) ;
+	    mxNiceShow (mm2) ;	
+	    mxNiceShow (mm3) ;	
+	    mxNiceShow (mm4) ;
 	  }
 	z = mxFNorm(mm4) ;
 	if (z > .001)
@@ -10325,7 +9358,7 @@ static void muSigma (AC_HANDLE h)
 	if (0)
 	  {
 	    printf ("## i=%d j=%d ::\n", i, j) ;
-	    niceShow (mm1) ;
+	    mxNiceShow (mm1) ;
 	  }
 	mm2 =  mxCreate (h, "ji", MX_COMPLEX, 2, 2, 0) ;
 
@@ -10340,7 +9373,7 @@ static void muSigma (AC_HANDLE h)
 	      mm2 = mm3 ;
 	    }
 	mm3 =  mxCreate (h, "zero", MX_COMPLEX, 2, 2, 0) ;
-	if (0) niceShow (mm2) ;
+	if (0) mxNiceShow (mm2) ;
 	mm3 = mxLinearCombine (mm3, 1,mm1, -1*gg[i][i]*gg[j][j], mm2, h) ;
 	z = mxFNorm(mm3) ;
 	if (z > minAbs)
@@ -10367,7 +9400,7 @@ static void muSigma (AC_HANDLE h)
 	if (0)
 	  {
 	    printf ("## i=%d j=%d ::\n", i, j) ;
-	    niceShow (mm1) ;
+	    mxNiceShow (mm1) ;
 	  }
 	mm2 =  mxCreate (h, "ji", MX_COMPLEX, 2, 2, 0) ;
 
@@ -10382,7 +9415,7 @@ static void muSigma (AC_HANDLE h)
 	      mm2 = mm3 ;
 	    }
 	mm3 =  mxCreate (h, "zero", MX_COMPLEX, 2, 2, 0) ;
-	if (0) niceShow (mm2) ;
+	if (0) mxNiceShow (mm2) ;
 	mm3 = mxLinearCombine (mm3, 1,mm1, -1*gg[i][i]*gg[j][j], mm2, h) ;
 	z = mxFNorm(mm3) ;
 	if (z > minAbs)
@@ -10858,29 +9891,29 @@ static void muInit (AC_HANDLE h)
     
   if (1) 
     {
-      niceShow (qq[1]) ;
-      niceShow (qq[2]) ;
-      niceShow (qq[3]) ;
+      mxNiceShow (qq[1]) ;
+      mxNiceShow (qq[2]) ;
+      mxNiceShow (qq[3]) ;
       
-      niceShow (ee[6]) ;
-      niceShow (ee[7]) ;
-      niceShow (ee[0]) ;
-      niceShow (qq[6]) ;
-      niceShow (qq[7]) ;
-      niceShow (qq[0]) ;
+      mxNiceShow (ee[6]) ;
+      mxNiceShow (ee[7]) ;
+      mxNiceShow (ee[0]) ;
+      mxNiceShow (qq[6]) ;
+      mxNiceShow (qq[7]) ;
+      mxNiceShow (qq[0]) ;
 
-      niceShow (marcu[0][0]) ;
-      niceShow (marcu[0][4]) ;
-      niceShow (marcu[0][5]) ;
-      niceShow (marcu[0][6]) ;
-      niceShow (marcu[0][7]) ;
+      mxNiceShow (marcu[0][0]) ;
+      mxNiceShow (marcu[0][4]) ;
+      mxNiceShow (marcu[0][5]) ;
+      mxNiceShow (marcu[0][6]) ;
+      mxNiceShow (marcu[0][7]) ;
 
 	    
       mm = mxMatMult (ee[4],ee[4],h) ;
-      niceShow (mm) ;
+      mxNiceShow (mm) ;
       
       mm2 = mxMatMult (ee[6],ee[6],h) ;
-      niceShow (mm2) ;
+      mxNiceShow (mm2) ;
     }
 } /* muInit */
 
@@ -11415,11 +10448,11 @@ static void muInit2 (AC_HANDLE h)
 	OF->name = "OF" ;
 	OH->name = "OH" ;
 
-	niceShow (OX) ;
-	niceShow (OY) ;
-	niceShow (OH) ;
-	niceShow (OE) ;
-	niceShow (OF) ;
+	mxNiceShow (OX) ;
+	mxNiceShow (OY) ;
+	mxNiceShow (OH) ;
+	mxNiceShow (OE) ;
+	mxNiceShow (OF) ;
 
 	/* Casimir  HH + 2 EF + 2 Fe + 2 XY - 2 YX */
 	MX K1 =  mxCreate (h, "KHH", MX_COMPLEX, 8, 8, 0) ;
@@ -11456,27 +10489,27 @@ static void muInit2 (AC_HANDLE h)
 	K4->name = "Q_Casimir XY - YX -1/2" ;
 	if (0)
 	  {
-	    niceShow (KHH) ;
-	    niceShow (K1) ;
-	    niceShow (K2) ;
-	    niceShow (K3) ;
+	    mxNiceShow (KHH) ;
+	    mxNiceShow (K1) ;
+	    mxNiceShow (K2) ;
+	    mxNiceShow (K3) ;
 	  }
-	niceShow (K4) ;
-	niceShow (KK) ;
+	mxNiceShow (K4) ;
+	mxNiceShow (KK) ;
 
 	printf ("Verify that the casimir commutes with X and Y 1\n") ;
 	MX CKX = mxMatMult (KK, OX, h) ;
 	MX CXK = mxMatMult (OX, KK, h) ;
 	MX Com =  mxCreate (h, "[casimir,X]", MX_COMPLEX, 8, 8, 0) ;
 	Com = mxSubstract (CKX, CXK, h) ;
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
 	
 	printf ("Verify that the S-simir anticommutes with X and Y 2\n") ;
 	MX SCKX = mxMatMult (K4, OX, h) ;
 	MX SCXK = mxMatMult (OX, K4, h) ;
 	MX SCom =  mxCreate (h, "{S-casimir,X}", MX_COMPLEX, 8, 8, 0) ;
 	SCom = mxAdd (SCom, SCKX, SCXK, h) ;
-	niceShow (SCom) ;
+	mxNiceShow (SCom) ;
 	
 	printf ("####### OSp(2/1) Lepton-Cabibbo representation done\n") ;
       }
@@ -11519,11 +10552,11 @@ static void muInit2 (AC_HANDLE h)
 	OF->name = "QF" ;
 	OH->name = "QH" ;
 
-	niceShow (OX) ;
-	niceShow (OY) ;
-	niceShow (OH) ;
-	niceShow (OE) ;
-	niceShow (OF) ;
+	mxNiceShow (OX) ;
+	mxNiceShow (OY) ;
+	mxNiceShow (OH) ;
+	mxNiceShow (OE) ;
+	mxNiceShow (OF) ;
 	
 	/* Casimir  HH + 2 EF + 2 Fe + 2 XY - 2 YX */
 	MX K1 =  mxCreate (h, "KHH", MX_COMPLEX, 8, 8, 0) ;
@@ -11564,47 +10597,47 @@ static void muInit2 (AC_HANDLE h)
 	K4->name = "Q_Casimir XY - YX -1/2" ;
 	if (0)
 	  {
-	    niceShow (KHH) ;
-	    niceShow (K1) ;
-	    niceShow (K2) ;
+	    mxNiceShow (KHH) ;
+	    mxNiceShow (K1) ;
+	    mxNiceShow (K2) ;
 	  }
-	niceShow (K3) ;
+	mxNiceShow (K3) ;
 
-	niceShow (K4) ;
-	niceShow (KK) ;
+	mxNiceShow (K4) ;
+	mxNiceShow (KK) ;
 
 	printf ("Verify that the casimir commutes with HHH\n") ;
 	MX CKXH = mxMatMult (KK, OH, h) ;
 	MX CXKH = mxMatMult (OH, KK, h) ;
 	MX ComH =  mxCreate (h, "[casimir,H]", MX_COMPLEX, 8, 8, 0) ;
 	Com = mxSubstract (CKXH, CXKH, h) ;
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
 	
 	printf ("Verify that the casimir commutes with XXX\n") ;
 	MX CKX = mxMatMult (KK, OX, h) ;
 	MX CXK = mxMatMult (OX, KK, h) ;
 	MX Com =  mxCreate (h, "[casimir,X]", MX_COMPLEX, 8, 8, 0) ;
 	Com = mxSubstract (CKX, CXK, h) ;
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
 	
 	printf ("Verify that the S-casimir anticommutes with X and Y 3\n") ;
 	MX SCKX = mxMatMult (K4, OX, h) ;
 	MX SCXK = mxMatMult (OX, K4, h) ;
 	MX SCom =  mxCreate (h, "{S-casimir,X}", MX_COMPLEX, 8, 8, 0) ;
 	SCom = mxAdd (SCom, SCKX, SCXK, h) ;
-	niceShow (SCom) ;
+	mxNiceShow (SCom) ;
 	
 	printf ("Compute the square of the S-casimir\n") ;
 	MX SC2 = mxMatMult (K4, K4, h) ;
 	SC2 = mxLinearCombine (SC2, 8/9.0, SC2, -1, KK, h) ;
 	SC2->name = "S-Casimir square" ;
-	niceShow (SC2) ;
+	mxNiceShow (SC2) ;
 	
 	printf ("Compute the product of the Casimir by the S-casimir Q^3 = Q\n") ;
 	MX SC3 = mxMatMult (KK, K4, h) ;
 	SC3 = mxLinearCombine (SC3, 1/2.00, SC3, -1, K4, h) ;
 	SC3->name = "S-Casimir cube" ;
-	niceShow (SC3) ;
+	mxNiceShow (SC3) ;
 	
 	printf ("####### OSp(2/1) Quark-Cabibbo representation done\n") ;
       }
@@ -11742,31 +10775,31 @@ static void muInitNMarcuOld (int a, int b, int NN)
 	MX CXKH = mxMatMult (qmuH, kasQ.kas2, h) ;
 	MX ComH =  mxCreate (h, "[casimir,X]", MX_COMPLEX, d, d, 0) ;
 	ComH = mxSubstract (CKXH, CXKH, h) ;
-	niceShow (ComH) ;
+	mxNiceShow (ComH) ;
 	
 	printf ("Verify that the casimir commutes with X  4\n") ;
 	MX CKX = mxMatMult (kasQ.kas2, qmuX, h) ;
 	MX CXK = mxMatMult (qmuX, kasQ.kas2, h) ;
 	MX Com =  mxCreate (h, "[casimir,X]", MX_COMPLEX, d, d, 0) ;
 	Com = mxSubstract (CKX, CXK, h) ;
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
 	
 	printf ("Verify that the S-casimir anticommutes with X and Y 5\n") ;
 	MX SCKX = mxMatMult (kasQ.CHI, qmuX, h) ;
 	MX SCXK = mxMatMult (qmuX, kasQ.CHI, h) ;
 	MX SCom =  mxCreate (h, "{S-casimir,X}", MX_COMPLEX, d, d, 0) ;
 	SCom = mxAdd (SCom, SCKX, SCXK, h) ;
-	niceShow (SCom) ;
+	mxNiceShow (SCom) ;
 	
 	printf ("Compute the square of the S-casimir\n") ;
 	MX SC2 = mxMatMult (kasQ.CHI,kasQ.CHI, h) ;
 	SC2->name = "S-Casimir square" ;
-	niceShow (SC2) ;
+	mxNiceShow (SC2) ;
 	
 	printf ("Compute the product of the Casimir by the S-casimir Q^3 = Q\n") ;
 	MX SC3 = mxMatMult (kasQ.kas2, kasQ.CHI, h) ;
 	SC3->name = "S-Casimir cube" ;
-	niceShow (SC3) ;
+	mxNiceShow (SC3) ;
 
 	if(1)
 	  {
@@ -11937,31 +10970,31 @@ static void muInitNMarcu (int a, int b, int NN)
 	MX CXKH = mxMatMult (qmuH, kasQ.kas2, h) ;
 	MX ComH =  mxCreate (h, "[casimir,X]", MX_COMPLEX, d, d, 0) ;
 	ComH = mxSubstract (CKXH, CXKH, h) ;
-	niceShow (ComH) ;
+	mxNiceShow (ComH) ;
 	
 	printf ("Verify that the casimir commutes with X  4\n") ;
 	MX CKX = mxMatMult (kasQ.kas2, qmuX, h) ;
 	MX CXK = mxMatMult (qmuX, kasQ.kas2, h) ;
 	MX Com =  mxCreate (h, "[casimir,X]", MX_COMPLEX, d, d, 0) ;
 	Com = mxSubstract (CKX, CXK, h) ;
-	niceShow (Com) ;
+	mxNiceShow (Com) ;
 	
 	printf ("Verify that the S-casimir anticommutes with X and Y 5\n") ;
 	MX SCKX = mxMatMult (kasQ.CHI, qmuX, h) ;
 	MX SCXK = mxMatMult (qmuX, kasQ.CHI, h) ;
 	MX SCom =  mxCreate (h, "{S-casimir,X}", MX_COMPLEX, d, d, 0) ;
 	SCom = mxAdd (SCom, SCKX, SCXK, h) ;
-	niceShow (SCom) ;
+	mxNiceShow (SCom) ;
 	
 	printf ("Compute the square of the S-casimir\n") ;
 	MX SC2 = mxMatMult (kasQ.CHI,kasQ.CHI, h) ;
 	SC2->name = "S-Casimir square" ;
-	niceShow (SC2) ;
+	mxNiceShow (SC2) ;
 	
 	printf ("Compute the product of the Casimir by the S-casimir Q^3 = Q\n") ;
 	MX SC3 = mxMatMult (kasQ.kas2, kasQ.CHI, h) ;
 	SC3->name = "S-Casimir cube" ;
-	niceShow (SC3) ;
+	mxNiceShow (SC3) ;
 
 	if(1)
 	  {
@@ -12247,9 +11280,9 @@ static void casimir2 (const char *title)
 	    continue ;
 	  casimir = mxLinearCombine (casimir, 1, casimir, z, mm1, h) ;
 	  if (0 && i == 3 && j == 3)
-	    niceShow (casimir) ;
+	    mxNiceShow (casimir) ;
 	}
-      niceShow (casimir) ;
+      mxNiceShow (casimir) ;
     }
   printf ("\n") ;
   ac_free (h) ;
@@ -12327,8 +11360,8 @@ static void casimir3 (const char *title, BOOL isHyper)
 	      mm1 =  mxLinearCombine (mm1, 1, mm1a, z, mm1b , h) ;
 	      if (0)
 		{
-		  niceShow (mm1) ;	
-		  niceShow (neq[t][i]) ;	
+		  mxNiceShow (mm1) ;	
+		  mxNiceShow (neq[t][i]) ;	
 		}
 	      mm2 = mxMatMult (neq[t][i], mm1, h) ;
 	      mm3 = mxMatMult (chi, mm2, h) ;
@@ -12338,7 +11371,7 @@ static void casimir3 (const char *title, BOOL isHyper)
 	      z /= 8 ;
 	      if (SU3 == 0) z *= 1 ;
 	      if (0) 
-		niceShow (mm3) ;	
+		mxNiceShow (mm3) ;	
 
 	      if (t%3 == 2) z *= 3 ; /* 3 quark colors */
 	      if (SU3 == 0 && i*j*k == 0 && ! isHyper) z = -z ;/* g^00 and (g^00)cube == -1 */
@@ -12350,7 +11383,7 @@ static void casimir3 (const char *title, BOOL isHyper)
 	      if (0)
 		{
 		  printf ("# mm1 Type %d [%d,%d,%d] %.2f %.2f\n", t,i,j,k, a,b) ;
-		  niceShow (mm2) ;
+		  mxNiceShow (mm2) ;
 		}
 	      mm4 = casimir ;
 	      casimir  = mxCreate (h,  "casimir3", MX_COMPLEX, ss[t], ss[t], 0) ;
@@ -12359,10 +11392,10 @@ static void casimir3 (const char *title, BOOL isHyper)
 	      if (SU3 == 1 && j==7 && k == 7)
 		{
 		  printf ("# Casimir3 Type %d [%d,%d,%d]\n", t,i,j,k) ;
-		  niceShow (casimir) ;
+		  mxNiceShow (casimir) ;
 		}
 	    }
-      niceShow (casimir) ;
+      mxNiceShow (casimir) ;
     }
   printf ("\n") ;
   ac_free (h) ;
@@ -12401,15 +11434,15 @@ static void mu2p (const char *title)
 	      else
 		chi = nchiL[t] ;
 
-	      if (debug) niceShow (neq[t][i]) ;
-	      if (debug) niceShow (neq[t][j]) ;
+	      if (debug) mxNiceShow (neq[t][i]) ;
+	      if (debug) mxNiceShow (neq[t][j]) ;
 	      mm1  = mxCreate (h,  "mm1", MX_COMPLEX, ss[t], ss[t], 0) ;
 	      mm2  = mxCreate (h,  "mm2", MX_COMPLEX, ss[t], ss[t], 0) ;
 
 	      mm1 = mxMatMult (chi, neq[t][i], h) ;
 	      mm2 = mxMatMult (mm1, neq[t][j], h) ;
-	      if (debug) niceShow (mm1) ;
-	      if (debug) niceShow (mm2) ;
+	      if (debug) mxNiceShow (mm1) ;
+	      if (debug) mxNiceShow (mm2) ;
 	      z = mxMatTrace (mm2) ;
 	      zz[t] = z ;
 
@@ -12491,8 +11524,8 @@ static void mu3p (const char *title, int type)
 		{
 		  float complex z = 0 ;
 		  float a, b ;
-		  if (debug) niceShow (neq[t][i]) ;
-		  if (debug) niceShow (neq[t][j]) ;
+		  if (debug) mxNiceShow (neq[t][i]) ;
+		  if (debug) mxNiceShow (neq[t][j]) ;
 		  switch (type)
 		    {
 		    case 0: /* f-abc symmetrize in mu-nu, skew in bc, use trace:  (L+R) (abc - acb) */
@@ -12549,8 +11582,8 @@ static void mu3p (const char *title, int type)
 		  mm1 = mxMatMult (chi1, neq[t][i], h) ;
 		  mm2 = mxMatMult (mm1, neq[t][j], h) ;
 		  mm3 = mxMatMult (mm2, neq[t][k], h) ;
-		  if (debug) niceShow (mm1) ;
-		  if (debug) niceShow (mm2) ;
+		  if (debug) mxNiceShow (mm1) ;
+		  if (debug) mxNiceShow (mm2) ;
 		  z = mxMatTrace (mm3) ;
 		  
 		  mm1 = mxMatMult (chi2, neq[t][i], h) ;
@@ -12740,9 +11773,9 @@ static void mu4p (const char *title, int type)
 /*************************************************************************************************/
 /*************************************************************************************************/
 
-static POLYNOME newSymbol (char *a)
+static POLYNOME newSymbol (char *a, AC_HANDLE h)
 {
-  POLYNOME p = newPolynome () ;
+  POLYNOME p = newPolynome (h) ;
   p->tt.type = 1 ;
   p->tt.z = 1.0 ;
   strcpy (p->tt.x, a) ;
@@ -12753,7 +11786,7 @@ static POLYNOME newSymbol (char *a)
 /*************************************************************************************************/
 
 /* check the non Abelian expansion exp(a)exp(b)exp(-b) = exp (b + [a,b] + [a,[a,b]]/2! + [a,[a[a,b]]]/3! ...) */
-static POLYNOME expPol (POLYNOME pp, int NN, int sign)
+static POLYNOME expPol (POLYNOME pp, int NN, int sign, AC_HANDLE h)
 {
   int i, fac = 1 ;
   POLYNOME ppp, p[NN+2] ;
@@ -12762,7 +11795,7 @@ static POLYNOME expPol (POLYNOME pp, int NN, int sign)
   if (1)
     {
       POLYNOME q2 ;
-      q2 = copyPolynome (pp) ;
+      q2 = copyPolynome (pp,h) ;
       if (0)
 	{
 	  printf (".Q2...... expPol") ;
@@ -12776,17 +11809,17 @@ static POLYNOME expPol (POLYNOME pp, int NN, int sign)
 	}
     }
 
-  p[0] = newScalar (1) ;
+  p[0] = newScalar (1,h) ;
   for (i = 1 ; i <= NN ; i++)
     {
       if (i==1)
-	p[i] = newProduct (p[i-1], pp) ;
+	p[i] = newProduct (p[i-1], pp,h) ;
       else
 	{
 	  POLYNOME q1, q2 ;
-	  q1 = copyPolynome (p[i-1]) ;
+	  q1 = copyPolynome (p[i-1],h) ;
 	  q1 = limitN (q1, NN-1) ;
-	  q2 = copyPolynome (pp) ;
+	  q2 = copyPolynome (pp,h) ;
 	  if (0)
 	    {
 	      printf (".Q2..... expPol") ;
@@ -12798,7 +11831,7 @@ static POLYNOME expPol (POLYNOME pp, int NN, int sign)
 	  printf (".QQ2..... expPol") ;
 	  showPol (q2) ;
 	}
-      p[i] = newProduct (q1, q2) ;
+      p[i] = newProduct (q1, q2,h) ;
 	}
       if (0)
 	{
@@ -12824,34 +11857,34 @@ static POLYNOME expPol (POLYNOME pp, int NN, int sign)
       fac *= sign * i ;
       p[i] = polynomeScale (p[i], 1.0/fac)  ;
     }
-  ppp = newMultiSum (p) ;
+  ppp = newMultiSum (h,p) ;
   ppp = expand (ppp) ;
   ppp = expand (ppp) ;
   return ppp ;
 }
 
-static POLYNOME superCommutator (POLYNOME p1, POLYNOME p2)
+static POLYNOME superCommutator (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
 {
   if (!p1 || !p2)
     return 0 ;
 
   if (p1 && p1->isSum)
     {
-      POLYNOME r1 = superCommutator (p1->p1, p2) ;
-      POLYNOME r2 = superCommutator (p1->p2, p2) ;
+      POLYNOME r1 = superCommutator (p1->p1, p2,h) ;
+      POLYNOME r2 = superCommutator (p1->p2, p2,h) ;
       
       return newSum (r1, r2) ;
     }
   if (p2 && p2->isSum)
     {
-      POLYNOME r1 = superCommutator (p1, p2->p1) ;
-      POLYNOME r2 = superCommutator (p1, p2->p2) ;
+      POLYNOME r1 = superCommutator (p1, p2->p1,h) ;
+      POLYNOME r2 = superCommutator (p1, p2->p2,h) ;
 
-      return newSum (r1, r2) ;
+      return newSum (r1, r2,h) ;
     }
 
-  POLYNOME r1 = newProduct (p1, p2) ;
-  POLYNOME r2 = newProduct (p2, p1) ;
+  POLYNOME r1 = newProduct (p1, p2,h) ;
+  POLYNOME r2 = newProduct (p2, p1,h) ;
   POLYNOME r3 ;
   
   int sign = -1 ;
@@ -12877,7 +11910,7 @@ static POLYNOME superCommutator (POLYNOME p1, POLYNOME p2)
   return expand (newSum (r1, r3)) ;
 } /* superCommutator */
 
-static POLYNOME repeatedSuperCommutator (POLYNOME p1, POLYNOME p2, int NN)
+static POLYNOME repeatedSuperCommutator (POLYNOME p1, POLYNOME p2, int NN, AC_HANDLE h)
 {
 
   POLYNOME p3 = p2 ;
@@ -12885,11 +11918,11 @@ static POLYNOME repeatedSuperCommutator (POLYNOME p1, POLYNOME p2, int NN)
   if (NN < 1)
     messcrash ("NN=%d < 1 in repeatedSuperCommutator", NN) ;
   if (NN > 1)
-    p3 = repeatedSuperCommutator (p1, p2, NN - 1) ;
-  return superCommutator (p1, p3) ;
+    p3 = repeatedSuperCommutator (p1, p2, NN - 1,h) ;
+  return superCommutator (p1, p3,h) ;
 } /* repeatedSuperCommutator */
 
-static void superExponential (int NN, int type, int typeb)
+static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
 {
   POLYNOME pp, ss, qa,  qb, qc, qa2, qb2,  rr, p[6], q[6], r[6], pa, pb, pc, pa2, pb2 ;
 
@@ -12909,9 +11942,9 @@ static void superExponential (int NN, int type, int typeb)
   
   if (0)
     {
-      qa = newScalar (2) ;
+      qa = newScalar (2,h) ;
       qb = newSymbol ("ii") ;
-      qa = newProduct (qa, qb) ;
+      qa = newProduct (qa, qb,h) ;
       showPol (qa) ;
       qb = expand (qa) ;
       showPol (qb) ;
@@ -12919,23 +11952,23 @@ static void superExponential (int NN, int type, int typeb)
     }
 
 
-  qa = newSymbol (a) ;
-  qb = newSymbol (b) ;
+  qa = newSymbol (a,h) ;
+  qb = newSymbol (b,h) ;
 
 
-  p[0] = expPol (qa, NN, 1) ;
+  p[0] = expPol (qa, NN, 1,h) ;
   printf (" exp(%s) = ", a) ;
   showPol (p[0]) ;
 
-  p[1] = expPol (qb, NN, 1) ;
+  p[1] = expPol (qb, NN, 1,h) ;
   printf (" exp(%s) = ", b) ;
   showPol (p[1]) ;
-  p[2] = expPol (qa, NN, -1) ;
+  p[2] = expPol (qa, NN, -1,h) ;
   printf (" exp(-%s) = ", a) ;
   showPol (p[2]) ;
   p[3]= 0 ;
 
-  pp = newMultiProduct (p) ;
+  pp = newMultiProduct (h,p) ;
   pp = expand (pp) ;
   pp = expand (pp) ;
   pp = limitN (pp, NN) ;
@@ -12944,7 +11977,7 @@ static void superExponential (int NN, int type, int typeb)
   showPol (pp) ;
 
   r[0] = qb ;
-  r[1] = superCommutator (qa, qb) ;
+  r[1] = superCommutator (qa, qb,h) ;
   printf ("\n\n[%s,%s] =", a, b) ;
   showPol (r[1]) ;
   r[1] = polynomeScale (r[1], 1) ;
@@ -12953,18 +11986,18 @@ static void superExponential (int NN, int type, int typeb)
   for (n = 2 ; n <  NN ; n++)
     {
       fac *= n ;
-      r[n] = repeatedSuperCommutator (qa, qb, n) ;
+      r[n] = repeatedSuperCommutator (qa, qb, n,h) ;
       printf ("\n\nn=%d [%s,.. [%s,%s]..] =", n, a, a, b) ;
       showPol (r[n]) ;
       r[n] = polynomeScale (r[n], 1.0/fac) ;
     }
 
   r[NN] = 0 ;
-  rr = newMultiSum (r) ;
+  rr = newMultiSum (h,r) ;
   printf (" %s + [%s,%s] =", b, a, b) ;  
   showPol (rr) ;
   
-  rr = expPol (rr, NN, 1) ;
+  rr = expPol (rr, NN, 1,h) ;
   rr = expand (rr) ;
   rr = limitN (rr, NN) ;
   rr = expand (rr) ;
@@ -12977,7 +12010,7 @@ static void superExponential (int NN, int type, int typeb)
 
 
   rr = polynomeScale (rr, -1) ;
-  ss = newSum (pp, rr) ;
+  ss = newSum (pp, rr,h) ;
   ss = expand (ss) ;
   ss = expand (ss) ;
 
@@ -13005,33 +12038,33 @@ static void superExponential (int NN, int type, int typeb)
     default: a="a" ; b = "b" ; c = "c" ; break ;
     }
 
-  qa = newSymbol (a) ;
-  qb = newSymbol (b) ;
-  qc = newSymbol (c) ;
+  qa = newSymbol (a,h) ;
+  qb = newSymbol (b,h) ;
+  qc = newSymbol (c,h) ;
   
-  pa = expPol (qa, NN, 1) ;
-  pb = expPol (qb, NN, 1) ;
-  pc = expPol (qc, NN, 1) ;
-  pa2 = expPol (qa, NN, -1) ;
-  pb2 = expPol (qb, NN, -1) ;
+  pa = expPol (qa, NN, 1,h) ;
+  pb = expPol (qb, NN, 1,h) ;
+  pc = expPol (qc, NN, 1,h) ;
+  pa2 = expPol (qa, NN, -1,h) ;
+  pb2 = expPol (qb, NN, -1,h) ;
 
-  pp = newProduct (pa2, pc) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pp, pa) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pb2, pp) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pp, pb) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pa2, pc,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pp, pa,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pb2, pp,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pp, pb,h) ;   pp = limitN (pp, NN) ;
 
-  pp = newProduct (pa, pp) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pp, pa2) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pb, pp) ;   pp = limitN (pp, NN) ;
-  pp = newProduct (pp, pb2) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pa, pp,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pp, pa2,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pb, pp,h) ;   pp = limitN (pp, NN) ;
+  pp = newProduct (pp, pb2,h) ;   pp = limitN (pp, NN) ;
 
   printf (".............Holonomy\n") ;
   showPol(pp) ;
 
-  p[0] = newProduct (qa, qb) ;
-  p[1] = newProduct (qb, qa) ;
+  p[0] = newProduct (qa, qb,h) ;
+  p[1] = newProduct (qb, qa,h) ;
   p[1] = polynomeScale (p [1], -1) ;
-  ss = newSum (p[0], p[1]) ; /* commutator [a,b] */
+  ss = newSum (p[0], p[1],h) ; /* commutator [a,b] */
   ss = expand(ss) ;
   printf (".............[%s,%s]\n",a,b) ;
   showPol (ss) ;
@@ -13042,7 +12075,7 @@ static void superExponential (int NN, int type, int typeb)
   for (n = 1 ; n <  NN ; n++)
     {
       fac *= -n ;
-      r[n] = repeatedSuperCommutator (ss, qc, n) ;
+      r[n] = repeatedSuperCommutator (ss, qc, n,h) ;
       printf ("\n\nn=%d [%s,.. [%s,%s]..] =", n, "[]","[[]]", c) ;
       r[n] = limitN (r[n], NN) ;
       r[n] = polynomeScale (r[n], 1.0/fac) ;
@@ -13050,15 +12083,15 @@ static void superExponential (int NN, int type, int typeb)
     }
 
   r[NN] = 0 ;
-  rr = newMultiSum (r) ;
+  rr = newMultiSum (h,r) ;
   printf ("............... iterated commutator\n") ;
   showPol (rr) ;
-  rr = expPol (rr, NN, 1) ;
+  rr = expPol (rr, NN, 1,h) ;
   printf ("...............exp (minus iterated commutator)\n") ;
   showPol (rr) ;
 
   rr = polynomeScale (rr, -1) ;
-  ss = newSum (pp, rr) ;
+  ss = newSum (pp, rr,h) ;
   ss = expand (ss) ;
   printf ("............... holonomy - exp (-[])\n") ;
   showPol (ss) ;
@@ -13073,23 +12106,23 @@ static void superExponential (int NN, int type, int typeb)
   exit (0) ;
   
   rr = polynomeScale (rr, -1) ;
-  ss = newSum (rr, pp) ;
+  ss = newSum (rr, pp,h) ;
   ss = expand (ss) ;
   showPol (ss) ;
   exit (0) ;
   
   printf (" exp(%s) = ", b) ;
   showPol (p[0]) ;
-  p[1] = expPol (qa, NN, 1) ;
+  p[1] = expPol (qa, NN, 1,h) ;
   printf (" exp(%s) = ", a) ;
   showPol (p[1]) ;
-  p[2] = expPol (qc, NN, 1) ;
+  p[2] = expPol (qc, NN, 1,h) ;
   printf (" exp(%s) = ", c) ;
   showPol (p[2]) ;
-  p[3] = expPol (qa2, NN, 1) ;
+  p[3] = expPol (qa2, NN, 1,h) ;
   printf (" exp(-%s) = ", a) ;
   showPol (p[3]) ;
-  p[4] = expPol (qb2, NN, 1) ;
+  p[4] = expPol (qb2, NN, 1,h) ;
   printf (" exp(-%s) = ", b) ;
   showPol (p[4]) ;
 
@@ -13102,19 +12135,19 @@ static void superExponential (int NN, int type, int typeb)
   q[1] = pp ;
 
 
-  p[0] = newProduct (qa,qb) ;
-  p[1] = newProduct (qb,qa) ;
+  p[0] = newProduct (qa,qb,h) ;
+  p[1] = newProduct (qb,qa,h) ;
   showPol (p[1]) ;
   p[1] = polynomeScale (p[1], -1) ;
   showPol (p[1]) ;
 
   p[2] = qc ;
   p[3] = 0 ;
-  q[2] = newMultiSum (p) ;
+  q[2] = newMultiSum (h,p) ;
   q[2] = expand (q[2]) ;
   showPol (q[2]) ;
 
-  q[2] = expPol(q[2], NN, 1) ;
+  q[2] = expPol(q[2], NN, 1,h) ;
   q[2] = expand (q[2]) ;
   showPol (q[2]) ;
 
@@ -13122,13 +12155,188 @@ static void superExponential (int NN, int type, int typeb)
   q[2] = polynomeScale (q[2], -1) ;
   q[3] = 0 ;
   
-  pp = newMultiSum (q) ;
+  pp = newMultiSum (h,q) ;
   pp = expand (pp) ;
   showPol (pp) ;
   
   
   return ;
 }
+
+/*************************************************************************************/
+/***************** Polynome Matrices *************************************************/
+typedef struct polynomeStruct *PMX ;
+typdef struct pmxStruct { int N ; char *title ; POLYNOME *pp, AC_HANDLE h} PMX ;
+static pmxShow (PMX pmx)
+{
+  int N = pmx ? pmx->N : 0 ;
+  printf("#### PolynomeMatrix %s\n", pmx->title) ;
+  for (int i = 0 ; i < N ; i++)
+    {
+      printf("###")  ;
+      for (int j = 0 ; j < N ; j++)
+	{
+	  printf("# i=%d j = %d\n", i, j)  ;
+	  showPol (pmx->pp[N*i+ j]) ;
+	}
+      printf("\n") ;
+    }
+} /* pmxShow */
+
+/*************************************************************************************/
+
+static PMX pmxCreate (int N, char *title, AC_HANDLE h)
+{
+  int n = sizeof (struct pmxStruct) ;
+  PMX pp = (PMX) halloc (n, h) ;
+  memset (pp, 0, n) ;
+  pp->h = h ;
+  pmx->N = N ;
+  pp->title = title ? strnew (title, h) : "mo_title" ;
+  return pp ;
+} /* pmxCeate () */
+
+/*************************************************************************************/
+/* Add a zero terminated set of PMX */
+static PMX pmxAdd (PMX *pmxs, char *title, AC_HANDLE h)
+{
+  int N = 0, nn++ ;
+  PMX pmx ;
+  for (pp = pmxs ; *pp ; pp++)
+    {
+      nn++ ;
+      if (!N)
+	N = pp->N ;
+      if (N != pp->N)
+	messcrash ("Inhomogenous call to pmxAdd N=%d != pp->N = %d in %s", N, pp->N, pp->title) ;
+    }
+  pmx = pmxCreate (N, title, h) ;
+  
+  for (int i = 0 ; i < N ; i++)
+    for (int j = 0 ; j < N ; j++)
+      {
+	int n = 0 ;
+	POLYNOME qq[nn+1] ;
+        for (px = pmxs ; *px ; px++)
+	  {
+	    POLYNOME p = px->pp[N*i + j] ;
+	    if (p)
+	      qq[n++] = copyPolynome(p, h) ;
+	  }
+	qq[n] = 0 ;
+	pmx->pp[N*i + j] = newMultiSum (h, qq) ;
+      }
+} /* pmxAdd */
+
+/*************************************************************************************/
+/* multiply a zero terminated set of PMX */
+static PMX pmxProduct (PMX *pmxs, char *title, AC_HANDLE h)
+{
+  int N = 0, nn++ ;
+  PMX pmx ;
+  for (pp = pmxs ; *pp ; pp++)
+    {
+      nn++ ;
+      if (!N)
+	N = pp->N ;
+      if (N != pp->N)
+	messcrash ("Inhomogenous call to pmxAdd N=%d != pp->N = %d in %s", N, pp->N, pp->title) ;
+    }
+  pmx = pmxCreate (N, title, h) ;
+  
+  for (int i = 0 ; i < N ; i++)
+    for (int j = 0 ; j < N ; j++)
+      {
+	int n = 0 ;
+	POLYNOME qq[nn+1] ;
+        for (px = pmxs ; *px ; px++)
+	  {
+	    POLYNOME p = px->pp[N*i + j] ;
+	    if (p)
+	      qq[n++] = copyPolynome(p, h) ;
+	  }
+	qq[n] = 0 ;
+	pmx->pp[N*i + j] = newMultiSum (h, qq) ;
+      }
+} /* pmxProduct */
+
+/*************************************************************************************/
+/*************************************************************************************/
+
+static void THETA (void)
+{
+  POLYNOME p1, p2, p3, p21a, p21b, p12a, p12b, p11, p22, p21, p12, det1, det2, det3 ;
+
+  fprintf (stderr, "### Formal calculations with Grassman variables\n") ;
+  fprintf (stderr, "### The hope is to show that det(supergroup SU(2/1)) = 1+alpha Tr(Y)\n") ;
+
+  p1 = newScalar (1) ;
+  p2 = newSymbol ("B") ;
+  strcpy (p2->tt.theta, "vu") ;
+  p3 = newSymbol ("B") ;
+  strcpy (p3->tt.theta, "uv") ;
+  p11 = newSum (p1, p2) ;
+  p22 = newSum (p1, p3) ;
+  printf("\n### p11 \n")  ;
+  showPol (p11) ;
+  printf("\n### p22 \n")  ;
+  showPol (p22) ;
+
+  p21a = newSymbol ("b") ;
+  p21a->tt.theta[0] = 'u' ;
+  p21a->tt.sqrti = 1 ;
+  p21a->tt.z = 1 ;
+
+  p21b = newSymbol ("b") ;
+  p21b->tt.theta[0] = 'v' ;
+  p21b->tt.sqrti = 1 ;
+  p21b->tt.z = I ;
+
+  p21 = newSum (p21a, p21b) ;
+  printf("\n### p21 \n")  ;
+  showPol (p21) ;
+
+  p12a = newSymbol ("b") ;
+  p12a->tt.theta[0] = 'u' ;
+  p12a->tt.sqrti = 1 ;
+  p12a->tt.z = 1 ;
+
+  p12b = newSymbol ("b") ;
+  p12b->tt.theta[0] = 'v' ;
+  p12b->tt.sqrti = 1 ;
+  p12b->tt.z = -I ;
+
+  p12 = newSum (p12a, p12b) ;
+  printf("\n### p12 \n")  ;
+  showPol (p12) ;
+
+  det1 = newProduct (p11, p22) ;
+  det2 = newProduct (p21, p12) ;
+  det2->tt.z *= -1 ;
+  printf("\n### det1 \n")  ;
+  showPol (det1) ;
+  printf("\n### det2 \n")  ;
+  showPol (det2) ;
+
+  det1 = expand (det1) ;
+  det1 = expand (det1) ;
+  det2 = expand (det2) ;
+  printf("\n### det1 \n")  ;
+  showPol (det1) ;
+  printf("\n### det2 \n")  ;
+  showPol (det2) ;
+  
+  det2 = expand(det2) ;
+  showPol (det2) ;
+
+
+  det3 = newSum (det1, det2) ;
+
+  printf("\n### determinant det(p11,p12)(p21,p22) \n")  ;
+  showPol (det3) ;
+
+  exit (0) ;
+} /* THETA */
 
 /*************************************************************************************/
 /***************************** Public interface **************************************/
@@ -13161,6 +12369,8 @@ static void usage (char *message)
 	    "//\n"
 	    "// B: Feynman diagrams\n"
 	    "//   Not documented, sorry: check the source code !\n"
+	    "//\n"
+	    "// THETA: -theta  SU(2/1) supergroup det = 1 ?\n"
 	    ) ;
   if (message)
     {
@@ -13204,6 +12414,12 @@ int main (int argc, const char **argv)
   if (getCmdLineBool (&argc, argv, "-bbb"))  /* self dual tensors potential */
     {
       BBB ();
+      return 0 ;
+    }
+
+  if (getCmdLineBool (&argc, argv, "-theta"))  /* su(2/1) group determinant */
+    {
+      THETA ();
       return 0 ;
     }
       
@@ -13353,7 +12569,7 @@ int main (int argc, const char **argv)
     {
       if (0)
 	{
-	  POLYNOME pp = newAG6 (0,0,0,0,0,0) ;
+	  POLYNOME pp = newAG6 (0,0,0,0,0,0,h) ;
 	  showPol (pp) ;
 	  firstDummyIndex = 'a' ;
 	  printf ("============t'Hooft, check some integrals\n") ;
@@ -13388,12 +12604,12 @@ int main (int argc, const char **argv)
 	    for (z = -1 ; z < 3 ; z++)
 	      {
 		printf ("\n\n\n@@@@@@@@@ Projector tests z = %d\n", z) ;
-		POLYNOME p1 = newAG (a, b, c, d, z) ;
-		POLYNOME p2 = newAG (c, d, e, f, z) ;
-		POLYNOME p3 = newAG (e, f, g, h, z) ;
-		POLYNOME p4 = newAG (g, h, i, j, z) ;
-		POLYNOME ppp[] = {p1, p2, p3, p4, 0} ;
-		POLYNOME pp = newMultiProduct (ppp) ;
+		POLYNOME p1 = newAG (a, b, c, d, z,h) ;
+		POLYNOME p2 = newAG (c, d, e, f, z,h) ;
+		POLYNOME p3 = newAG (e, f, g, h, z,h) ;
+		POLYNOME p4 = newAG (g, h, i, j, z,h) ;
+		POLYNOME ppp[] = {p1, p2, p3, p4, 0,h} ;
+		POLYNOME pp = newMultiProduct (h,ppp) ;
 		showPol (pp) ;
 		pp = expand (pp) ;
 		showPol (pp) ;
@@ -13404,15 +12620,15 @@ int main (int argc, const char **argv)
 	  if (1)  /* is the propagator the inverse f the lagrangian */
 	      {
 		printf ("\n\n\n@@@@@@@@@ Projector tests z = %d\n", z) ;
-		POLYNOME p1 = prop_BB_B (a, b, c, d, 99) ;
-		POLYNOME p2 = prop_BB_B (c, d, e, f, 0) ;
-		POLYNOME p3 = prop_BB_B (e, f, g, h, 99) ;
-		POLYNOME p4 = newScalar (1) ; /* compensate the values in the current propagators */
+		POLYNOME p1 = prop_BB_B (a, b, c, d, 99,h) ;
+		POLYNOME p2 = prop_BB_B (c, d, e, f, 0,h) ;
+		POLYNOME p3 = prop_BB_B (e, f, g, h, 99,h) ;
+		POLYNOME p4 = newScalar (1,h) ; /* compensate the values in the current propagators */
 		POLYNOME ppp[] = {p1, p2, p3, p4, 0} ;
 		showPol (p1) ;
 		showPol (p2) ;
 		showPol (p3) ;
-		POLYNOME pp = newMultiProduct (ppp) ;
+		POLYNOME pp = newMultiProduct (h,ppp) ;
 		showPol (pp) ;
 		pp = expand (pp) ;
 		showPol (pp) ;
@@ -13424,10 +12640,10 @@ int main (int argc, const char **argv)
 	  for (z = -1 ; z < 3 ; z++)
 	    {
 	      printf ("\n\n\n@@@@@@@@@ Projector tests z = %d\n", z) ;
-	      POLYNOME p1 = newAG (a, b, c, d, z) ;
-	      POLYNOME p2 = newScalar (1) ;
+	      POLYNOME p1 = newAG (a, b, c, d, z,h) ;
+	      POLYNOME p2 = newScalar (1,h) ;
 	      tcpy (p2->tt.sigma, "ecd") ;
-	      POLYNOME pp = newProduct (p1, p2) ;
+	      POLYNOME pp = newProduct (p1, p2,h) ;
 	      showPol (pp) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
@@ -13435,10 +12651,10 @@ int main (int argc, const char **argv)
 	  for (z = -1 ; z < 3 ; z++)
 	    {
 	      printf ("\n\n\n@@@@@@@@@ Projector tests z = %d\n", z) ;
-	      POLYNOME p1 = newAG (a, b, c, d, z) ;
-	      POLYNOME p2 = newScalar (1) ;
+	      POLYNOME p1 = newAG (a, b, c, d, z,h) ;
+	      POLYNOME p2 = newScalar (1,h) ;
 	      tcpy (p2->tt.sigB, "cd") ;
-	      POLYNOME pp = newProduct (p1, p2) ;
+	      POLYNOME pp = newProduct (p1, p2,h) ;
 	      showPol (pp) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
@@ -13448,10 +12664,10 @@ int main (int argc, const char **argv)
 	  for (z = -1 ; z < 3 ; z++)
 	    {
 	      printf ("\n\n\n@@@@@@@@@ Projector tests A_psiB_psi B under z = %d\n", z) ;
-	      POLYNOME p1 = newAG (a, b, c, d, z) ;
-	      POLYNOME p2 = newScalar (1) ;
+	      POLYNOME p1 = newAG (a, b, c, d, z,h) ;
+	      POLYNOME p2 = newScalar (1,h) ;
 	      tcpy (p2->tt.sigma, "abfefcd") ;
-	      POLYNOME pp = newProduct (p1, p2) ;
+	      POLYNOME pp = newProduct (p1, p2,h) ;
 	      showPol (pp) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
@@ -13460,12 +12676,12 @@ int main (int argc, const char **argv)
 	  for (z = -1 ; z < 3 ; z++)
 	    {
 	      printf ("\n\n\n@@@@@@@@@ Projector tests A_psiB_psi B under z = %d\n", z) ;
-	      POLYNOME p1 = newAG (a, b, e, h, z) ;
-	      POLYNOME p2 = newAG (c, d, g, h, -z) ;
-	      POLYNOME p3 = newScalar (1) ;
+	      POLYNOME p1 = newAG (a, b, e, h1, z,h) ;
+	      POLYNOME p2 = newAG (c, d, g, h1, -z,h) ;
+	      POLYNOME p3 = newScalar (1,h) ;
 	      tcpy (p3->tt.sigma, "abgfecd") ;
 	      POLYNOME ppp[] = {p1, p2, p3, 0} ;
-	      POLYNOME pp = newMultiProduct (ppp) ;
+	      POLYNOME pp = newMultiProduct (h,ppp) ;
 	      showPol (pp) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
@@ -13478,10 +12694,10 @@ int main (int argc, const char **argv)
 	    {
 	      POLYNOME pp, ppp[12] ;
 	      
-	      ppp[0] = newEpsilon(a,c,f,b) ;
-	      ppp[1] = newEpsilon(a,b,f,e) ;
+	      ppp[0] = newEpsilon(a,c,f,b,h) ;
+	      ppp[1] = newEpsilon(a,b,f,e,h) ;
 	      ppp[2] = 0 ;
-	      pp = newMultiProduct (ppp) ;
+	      pp = newMultiProduct (h,ppp) ;
 	      showPol (pp) ;
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
@@ -13492,20 +12708,20 @@ int main (int argc, const char **argv)
 	  
 	  if (0) /* verify the eps eps contractions */
 	    {
-	      POLYNOME pp = newEpsilon(a,b,i,f) ;
+	      POLYNOME pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.eps,"abefcdei") ;
 	      showPol (pp) ;
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
 	      exit (0) ;
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.eps,"abhfcdhi") ;
 	      showPol (pp) ;
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.g,"eh") ;
 	      tcpy(pp->tt.eps,"abefcdhi") ;
 	      showPol (pp) ;
@@ -13519,14 +12735,14 @@ int main (int argc, const char **argv)
 	      showPol (pp) ;
 	      
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.g,"ei") ;
 	      tcpy(pp->tt.eps,"abefcdhi") ;
 	      showPol (pp) ;
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.g,"eh") ;
 	      tcpy(pp->tt.mm[1],"if") ;
 	      tcpy(pp->tt.eps,"abefcdhi") ;
@@ -13534,7 +12750,7 @@ int main (int argc, const char **argv)
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.g,"ei") ;
 	      tcpy(pp->tt.mm[1],"hf") ;
 	      tcpy(pp->tt.eps,"abefcdhi") ;
@@ -13549,7 +12765,7 @@ int main (int argc, const char **argv)
 	      pp = expand (pp)  ;
 	      showPol (pp) ;
 	      
-	      pp = newEpsilon(a,b,i,f) ;
+	      pp = newEpsilon(a,b,i,f,h) ;
 	      tcpy(pp->tt.mm[1],"hf") ;
 	      tcpy(pp->tt.eps,"abefcdhe") ;
 	      showPol (pp) ;
@@ -13565,7 +12781,7 @@ int main (int argc, const char **argv)
 	  firstDummyIndex = 'a' ;
 	  if (0) /* verify the Pauli trace */
 	    {
-	      POLYNOME pp = newSigma('a') ;
+	      POLYNOME pp = newSigma('a',h) ;
 	      tcpy (pp->tt.sigma,"abcd") ;
 	      showPol (pp) ;
 	      pp = pauliTrace(pp) ;
@@ -14042,33 +13258,33 @@ int main (int argc, const char **argv)
 	      p3 = expand (p3) ;
 	      showPol (p3) ;
 	      
-	      p3 = newAG (a,b,a,b,1) ;
+	      p3 = newAG (a,b,a,b,1,h) ;
 	      showPol (p3) ;
 	      p3 = expand (p3) ;
 	      showPol (p3) ;
 	      
-	      p3 = newAG (a,b,c,b,0) ;
+	      p3 = newAG (a,b,c,b,0,h) ;
 	      showPol (p3) ;
 	      p3 = expand (p3) ;
 	      showPol (p3) ;
 	      
-	      p1 = newPQR (0, a) ;
-	      p2 = newPQR (0, b) ;
-	      p3 = newPQR (0, c) ;
-	      POLYNOME p4 = newPQR (0, d) ;
+	      p1 = newPQR (0, a,h) ;
+	      p2 = newPQR (0, b,h) ;
+	      p3 = newPQR (0, c,h) ;
+	      POLYNOME p4 = newPQR (0, d,h) ;
 	      p1->tt.denom[0] = 2 ;
 	      p1->tt.denom[1] = 1 ;
 	      POLYNOME ppp3[] = {p1, p2, p3, p4, 0} ;
-	      p3 = newMultiProduct (ppp3) ;
+	      p3 = newMultiProduct (h,ppp3) ;
 	      showPol (p3) ;
 	      p3 = dimIntegral (p3) ;
 	      p3 = expand (p3) ;
 	      showPol (p3) ;
 	      
-	      p1 = newAG (a,c,e,f,1) ;
-	      p2 = newAG (b,d,e,f,-1) ;
+	      p1 = newAG (a,c,e,f,1,h) ;
+	      p2 = newAG (b,d,e,f,-1,h) ;
 	      POLYNOME ppp4[] = {p1, p3, p2, 0} ;
-	      p3 = newMultiProduct (ppp4) ;
+	      p3 = newMultiProduct (h,ppp4) ;
 	      showPol (p3) ;
 	      p3 = expand (p3) ;
 	      p3 = squareMomentaCleanUp (p3) ;

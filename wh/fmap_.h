@@ -59,6 +59,7 @@ struct LookStruct {
   int   selectBox, zoneBox, originBox, segBox ;
   int   lastTrueSeg ;
   int   dnaWidth, dnaStart, dnaSkip ;		  /* set in makeSartSkip, used in virtualDna */
+  float mrnaOffset ;
   char  originBuf[24], zoneBuf[24], oligoNameBuffer [16] ;
   char  segNameBuf[64], segTextBuf[512] ;
   Graph graph ;

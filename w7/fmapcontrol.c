@@ -991,6 +991,7 @@ void fMapDraw (LOOK look, KEY from)
 
   graphClear () ;
   look->summaryBox = 0 ;
+  look->mrnaOffset = 0 ;
   graphFitBounds (&mapGraphWidth, &mapGraphHeight) ;
   graphMenu (fMapMenu) ;
   if (!look->isOspSelecting)
@@ -1851,11 +1852,13 @@ int fMapOrder (const void *a, const void *b)
       if (seg1->source < seg2->source) return -1 ;
       if (seg1->source > seg2->source) return 1 ;
 
+      if (seg1->key < seg2->key) return -1 ;
+      if (seg1->key > seg2->key) return 1 ;
+
       if (seg1->x1 < seg2->x1) return -1 ;
       if (seg1->x1 > seg2->x1) return 1 ;
 
-      if (seg1->key < seg2->key) return -1 ;
-      if (seg1->key > seg2->key) return 1 ;
+      return 0 ;
     }
   if ((seg1->type | 0x1) == TRANSCRIBEDGENE_UP ||
       (seg1->type | 0x1) == TRANSCRIPT_UP ||
@@ -3257,7 +3260,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	  BSunit *uu ;
 	  KEYSET testKs = 0 ;
 	  testKs = queryKey (seg->key, ">product ; mRNA_5p_complete && best_product && !at_position_1") ; 
-	  if (!testKs) 
+	  if (! keySetMax(testKs)) 
 	    for (i = 0 ; i < arrayMax (units) ; i += 3)
 	      { 
 		if (arrayMax (units) < i + 1)
