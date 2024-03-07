@@ -3128,8 +3128,8 @@ static void mrnaSaveMatchQuality (KEY gene, Array hits, KEYSET ignoredClones)
          
           gh = arrayp (gHits, iGhits++, HIT) ;          
           gh->est = est ;
-          gh->a1 = lengthEst ;
-          gh->a2 = offset ;
+          gh->a1 = minx ;  /* was lengthEst */
+          gh->a2 = maxx ;  /* was offset */
           gh->x1 = nmatch ;
           gh->nerrAll = nerrAll ;
           gh->x2 = quality ;
@@ -3138,8 +3138,8 @@ static void mrnaSaveMatchQuality (KEY gene, Array hits, KEYSET ignoredClones)
           if ((Est = bsUpdate (est)))
             {
               bsAddKey (Est, _From_gene, gene) ;
-              bsAddData (Est, _bsRight, _Int, &lengthEst) ;
-              bsAddData (Est, _bsRight, _Int, &offset) ;
+              bsAddData (Est, _bsRight, _Int, &minx) ; /* was lengthEst */
+	      bsAddData (Est, _bsRight, _Int, &maxx) ; /* was offset */
               bsAddData (Est, _bsRight, _Int, &nmatch) ;
               bsAddData (Est, _bsRight, _Int, &nerrAll) ;
               bsAddData (Est, _bsRight, _Int, &quality) ;

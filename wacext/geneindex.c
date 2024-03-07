@@ -6328,8 +6328,9 @@ static void gxRuns2geneGetBest (GX *gx, COMPARE *compare, int isPm)
   nMax = n ;
   arraySort (pp, pcSigOrder) ;
 
-  for (n = 0, pc = arrp (pp, 0, PC) ; n < nMax ; n++, pc++)
-    keySet (genePlus, n) = pc->gene ;
+  if (n)
+    for (n = 0, pc = arrp (pp, 0, PC) ; n < nMax ; n++, pc++)
+      keySet (genePlus, n) = pc->gene ;
 
   ac_free (h) ;
   return ;
@@ -6835,6 +6836,8 @@ static Array gxDoCompare (GX *gx, COMPARE *compare
   
   rc2 = arrayp (gx->runs, run2, RC) ;
   aa2 = rc2->aa ;
+  if (!aa1 || ! aa2)
+    return 0 ;
 
   minIndex = rc1->NA_crossover_index ;
   if (minIndex < rc2->NA_crossover_index)
@@ -8362,30 +8365,35 @@ static int bigGeneOrder (const void *a, const void *b)
 
 static void gxBigGenesDo (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL isAce, BOOL isCapture)
 {
-  int i ;
-  BG *bg ;
-  AC_HANDLE h = ac_new_handle () ;
   KEYSET bigG = isCapture ?  rc->capturedBigGenes : rc->bigGenes ;
-  arraySort (bigG, bigGeneOrder) ;
-  arrayCompress (bigG) ;
-  for (i = 0, bg = arrp (bigG, i, BG) ; i < arrayMax (bigG) ; bg++, i++)
+
+  if (bigG && keySetMax (bigG))
     {
-      if (! bg->gene) continue ;
-      if (isAce)
-	aceOutf (ao, "High_genes %s%s \t%s %.2f Mb\n"
-		 , isCapture ? "Captured_" : ""
-		 , target
-		 , ac_protect (noX__ (dictName (gx->geneDict, bg->gene), !gx->isINTRON), h)
-		 , bg->kb/1000 
-		 ) ;
-      else
-	aceOutf (ao, "%s%s (%.2f Mb)"
-		 , (i ? ", " : "")
-		 , noX__ (dictName (gx->geneDict, bg->gene), !gx->isINTRON)
-		 ,  bg->kb/1000 
-		 ) ;
+      AC_HANDLE h = ac_new_handle () ;
+      int i ;
+      BG *bg ;
+  
+      arraySort (bigG, bigGeneOrder) ;
+      arrayCompress (bigG) ;
+      for (i = 0, bg = arrp (bigG, i, BG) ; i < arrayMax (bigG) ; bg++, i++)
+	{
+	  if (! bg->gene) continue ;
+	  if (isAce)
+	    aceOutf (ao, "High_genes %s%s \t%s %.2f Mb\n"
+		     , isCapture ? "Captured_" : ""
+		     , target
+		     , ac_protect (noX__ (dictName (gx->geneDict, bg->gene), !gx->isINTRON), h)
+		     , bg->kb/1000 
+		     ) ;
+	  else
+	    aceOutf (ao, "%s%s (%.2f Mb)"
+		     , (i ? ", " : "")
+		     , noX__ (dictName (gx->geneDict, bg->gene), !gx->isINTRON)
+		     ,  bg->kb/1000 
+		     ) ;
+	}
+      ac_free (h) ;
     }
-  ac_free (h) ;
 }  /* gxBigGenes */
 
 /********/

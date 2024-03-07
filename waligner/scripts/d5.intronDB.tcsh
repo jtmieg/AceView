@@ -66,7 +66,7 @@ parseGenes:
 # parse in INTRON_DB/$chrom the introns/genes/mRNA/chromosomes
 
 if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done) then
-  cat tmp/METADATA/*.introns.info.ace  tmp/METADATA/gtf.*.[fr].intron.ace | gawk '/^Intron/{ok=0;split($2,aa,"__");if(aa[1]==chrom)ok=1;}{if(ok==1)print;}' chrom=$chrom > tmp/INTRON_DB/$chrom/d5.parse_genes.ace
+  cat tmp/METADATA/*.introns.info.ace  tmp/METADATA/gtf.*.[fr].intron.ace tmp/METADATA/*.[fr].mrna2intron.ace | gawk '/^Intron/{ok=0;split($2,aa,"__");if(aa[1]==chrom)ok=1;}{if(ok==1)print;}' chrom=$chrom > tmp/INTRON_DB/$chrom/d5.parse_genes.ace
   pushd tmp/INTRON_DB/$chrom
   ../../../bin/tace . <<EOF
       read-models

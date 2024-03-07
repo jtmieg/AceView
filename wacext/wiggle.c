@@ -1167,7 +1167,7 @@ int main (int argc, const char **argv)
     case BG:
     case AF:  /* allele frequency */
     case COUNT:
-      sx.out_step = 0 ;
+      sx.out_step = 10 ;
       break ;
     default: /* BF, BV, AM, AG, AW,  TABIX */
       sx.out_step = 10 ;

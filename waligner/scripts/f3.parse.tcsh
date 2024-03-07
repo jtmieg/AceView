@@ -546,7 +546,7 @@ EOF
 end
 
 
-# les inrons mangent 10% de leur soutient sur les zones inclues des XH sur les 2 brins
+# les introns mangent 10% de leur soutien sur les zones inclues des XH sur les 2 brins
 
   touch tmp/X.$MAGIC/XH$chrom/f3.parse.done
 

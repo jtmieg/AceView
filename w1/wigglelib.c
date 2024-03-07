@@ -822,8 +822,8 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
   BOOL debug = FALSE ;
 
   if (ratio < 2) ratio = 2 ;
-  if (minCover < 10)
-    minCover = 10 ;
+  if (minCover < 1)
+    minCover = 1 ;
   if (! ao)
     ao = sx->aoPeaks = aceOutCreate (sx->outFileName, ".multiPeaks", sx->gzo, sx->h) ;
   if (! ao)
@@ -866,7 +866,7 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
 		  if (wq->x > x + step)
 		    y = 0 ;
 		  x = wq->x ;
-		  if (y >= level && y < level2)
+		  if (y >= level && y < level2) 
 		    {
 		      ln++ ;
 		      cover += y ;
@@ -878,7 +878,7 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
 		}
 	      if (ln > 0)
 		{
-		  if (cover > 1.5 * minCover) /* avoid fluctuations just around minCover */
+		  if (level == 1 || cover > 1.5 * minCover) /* avoid fluctuations just around minCover */
 		    {
 		      mp = arrayp (mmm, imm++, MPK) ;
 		      mp->x1 = wp->x - step/2 ; 
@@ -896,6 +896,7 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
 		  level = level2 ; level2 = level * ratio ;
 		}
 	    }
+	  /* This system allows multi valued XH exon support */
 	  if (y >= level2)
 	    { 
 	      while (y >= level2)
@@ -1363,6 +1364,7 @@ static void sxWiggleExportOne (WIGGLE *sx, int remap, Array aa, int *limits, lon
   WIGGLEPOINT *wp ;
   int ii, stepOut, spanOut, x, oldx = 0, x1, iy, jBuf = 0, nn = 0 ;
   int i, *limitp ;
+  int iiMax = arrayMax (aa) ;
 
   float y, dy ;
   int bufferSize = 32*1024 ;
@@ -1383,7 +1385,7 @@ static void sxWiggleExportOne (WIGGLE *sx, int remap, Array aa, int *limits, lon
 	  }
     }
 
-  for (ii = 0, wp = arrp (aa, ii, WIGGLEPOINT) ; wp->y == 0 && ii < arrayMax (aa) ; ii++, wp++) ;
+  for (ii = 0, wp = arrp (aa, ii, WIGGLEPOINT) ; wp->y == 0 && ii < iiMax  ; ii++, wp++) ;
   x1 = (wp)->x ;
   /* export some header */
   switch (sx->out)

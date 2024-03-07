@@ -65,6 +65,7 @@ echo $mytmp/$run
 
 set isIlm=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/^Illumina/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
 set isNanopore=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/anopore/{if(ok==1)okk=1;}/PacBio/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
+set noPartial=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/Entry_adaptor/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
 if ($isIlm == 1) then
   set maxWigErr=3
   set maxWigErrRate=3
@@ -83,7 +84,7 @@ endif
    if ($uu == nu) set filter="-non_unique"
    if ($uu == pp) set filter="-partial"
    if ($isNanopore == 1 && $uu == pp) continue
-   if ($isNanopore == 1) set filter="$filter -noPartial"
+   if ($isNanopore == 1 || $noPartial == 1) set filter="$filter -noPartial"
   ## split recursivelly the hits so we scan once the big file and split it per chromosome or per target
   ## ATTENTION do nor -gzo: there would be to many gzip pipes generated on the computer
     # if we set -minErrRate 7, we obtain in addition a second set of K7 wiggle using only error rich reads

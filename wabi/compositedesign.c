@@ -305,7 +305,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
       a1 = isDown ? up->a1 - sc->a1 + 1 : sc->a1 - up->a2 + 1 ;
       a2 = isDown ? up->a2 - sc->a1 + 1 : sc->a1 - up->a1 + 1 ;
       /* identify the introns in the intron table */
-      if (up->type & gI)
+      if (arrayMax (ds->introns) &&  (up->type & gI))
 	{
 	  if (up->x1 < 8 || up->x2 > up->clipEnd - 8)
 	    continue ;
@@ -678,14 +678,16 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
       fprintf (stderr, "mrnaDesignGetSupport phase 1 done\n") ;
       showDs (sc, ss) ;
     }
-  if (1)
+  if (arrayMax (ds->introns))
     {
       float intronBonus = 3.0 ;
       for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < arrayMax (ds->introns) ; jj++, vp++)
-	if (! (vp->type & gSuspect))
-	  vp->cover *= intronBonus ;
-	else
-	  vp->cover /= 2 ;
+	{
+	  if (! (vp->type & gSuspect))
+	    vp->cover *= intronBonus ;
+	  else
+	    vp->cover /= 2 ;
+	}
     }
    
   /*  register all boundaries */
@@ -745,7 +747,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 
   /* look for weak introns donor/acceptor */
    ii = 0 ; ssp = arrp (ss2, 0, DSX) ; ssMax = arrayMax (ss2) ;
-   if (1)
+   if (arrayMax(ds->introns))
      for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; ii < ssMax && jj < arrayMax (ds->introns) ; jj++, vp++)
        {
 	 DSX* vp2 ;
@@ -784,92 +786,93 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 	 if (ii) { ii-- ; ssp-- ; }
        }
   
-
-  /* compute the average support of each exon fragment */
-  ii = 0 ; ssp = arrp (ss2, 0, DSX) ; ssMax = arrayMax (ss2) ;
-  for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
-    {
-      long int nn, nnn ;
-      nnn = nn = 0 ;
-      a1 = vp->a1 ;
-      a2 = vp->a2 ;
-      while (ii > 0 && ssp->a1 > a1) { ii-- ; ssp-- ; }
-      u1 = a1 ; if (u1 < ssp->a1) u1 = ssp->a1 ; nn = ssp->cover ; 
-
-      for ( ; ii < ssMax && ssp->a1 < a1 ; ii++, ssp++) 
-	{
-	  nn = ssp->cover ; 
-	}
-
-      for ( ; ii < ssMax && ssp->a1 < a2 ; ii++, ssp++)
-	{
-	  nnn += nn * (ssp->a1 - u1) ;
-	  if (ssp->a1 >= u1) u1 = ssp->a1 ; 
-	  nn = ssp->cover ;
-	}
-      if (0 && ii < ssMax && a2 == ssp->a1)
-	vp->type |= (ssp->type & gFin) ; 
-      if (a2 >= u1) 
-	nnn += nn * (a2 - u1 + 1) ;
-
-      vp->cover = nnn / (a2 - a1 + 1) ;
-      if (nnn >= 0 && vp->cover < 1) vp->cover = 1 ;
-    }
-
-  if (debug)
-    {
-      fprintf (stderr, "mrnaDesignGetSupport phase 2 done\n") ;
-      showDs (sc, ss) ;
-    }
-
-  if (1) /* Xcds is used to mask Xends */
-    for (jj = 0, vp = arrp (ss, 0, DSX) ; jj < arrayMax (ss) ; jj++, vp++)
-      if (vp->type & gCompleteCDS)
-	for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
-	  {
-	    if (
-		ssp->a1 >= vp->a1 &&
-		ssp->a1 <= vp->a2
-		)
-	      {
-		ssp->type |=  gCompleteCDS ;
-		ssp->type &= ~gReal3p ;  /* Xcds is used to mask Xends */
-		ssp->type &= ~gA ;  /* Xcds is used to mask Xends */
-	      }
-	  }
-
-  if (debug)
-    {
-      fprintf (stderr, "mrnaDesignGetSupport phase 3 done\n") ;
-      showDs (sc, ss2) ;
-    }
-
- if (1) /* reestablish the polyA flags */
-    for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
-      {
-	for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
-	  {
-	    if ((ssp->type & gCompleteCDS) &&
-		ssp->a2 <= vp->a2 &&
-		ssp->a2 >= vp->a1
-		)
-	      vp->type |= gCompleteCDS ;
-	    if ((ssp->type & gS) &&
-		ssp->a2 < vp->a2 &&
-		ssp->a2 >= vp->a1
-		)
-	      vp->type |= gS ;
-	    if ((ssp->type & (gA | gReal3p)) &&
-		ssp->a1 > vp->a1 &&
-		 ssp->a1 <= vp->a2
-		)
-	      {
-		vp->type |= (ssp->type & (gA | gCompleteCDS | gReal3p)) ;
-		if (vp->type & gCompleteCDS &  gReal3p) vp->type &= ~gReal3p ;
-		if (vp->type & gCompleteCDS &  gA) vp->type &= ~gA ;
-	      }
-	  }
+   
+   /* compute the average support of each exon fragment */
+   ii = 0 ; ssp = arrp (ss2, 0, DSX) ; ssMax = arrayMax (ss2) ;
+   if (arrayMax (ds->exons) )
+     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
+       {
+	 long int nn, nnn ;
+	 nnn = nn = 0 ;
+	 a1 = vp->a1 ;
+	 a2 = vp->a2 ;
+	 while (ii > 0 && ssp->a1 > a1) { ii-- ; ssp-- ; }
+	 u1 = a1 ; if (u1 < ssp->a1) u1 = ssp->a1 ; nn = ssp->cover ; 
+	 
+	 for ( ; ii < ssMax && ssp->a1 < a1 ; ii++, ssp++) 
+	   {
+	     nn = ssp->cover ; 
+	   }
+	 
+	 for ( ; ii < ssMax && ssp->a1 < a2 ; ii++, ssp++)
+	   {
+	     nnn += nn * (ssp->a1 - u1) ;
+	     if (ssp->a1 >= u1) u1 = ssp->a1 ; 
+	     nn = ssp->cover ;
+	   }
+	 if (0 && ii < ssMax && a2 == ssp->a1)
+	   vp->type |= (ssp->type & gFin) ; 
+	 if (a2 >= u1) 
+	   nnn += nn * (a2 - u1 + 1) ;
+	 
+	 vp->cover = nnn / (a2 - a1 + 1) ;
+	 if (nnn >= 0 && vp->cover < 1) vp->cover = 1 ;
+       }
+   
+   if (debug)
+     {
+       fprintf (stderr, "mrnaDesignGetSupport phase 2 done\n") ;
+       showDs (sc, ss) ;
      }
+   
+   if (1) /* Xcds is used to mask Xends */
+     for (jj = 0, vp = arrp (ss, 0, DSX) ; jj < arrayMax (ss) ; jj++, vp++)
+       if (vp->type & gCompleteCDS)
+	 for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
+	   {
+	     if (
+		 ssp->a1 >= vp->a1 &&
+		 ssp->a1 <= vp->a2
+		 )
+	       {
+		 ssp->type |=  gCompleteCDS ;
+		 ssp->type &= ~gReal3p ;  /* Xcds is used to mask Xends */
+		 ssp->type &= ~gA ;  /* Xcds is used to mask Xends */
+	       }
+	   }
+   
+   if (debug)
+     {
+       fprintf (stderr, "mrnaDesignGetSupport phase 3 done\n") ;
+       showDs (sc, ss2) ;
+	}
+   
+   if (1) /* reestablish the polyA flags */
+     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
+       {
+	 for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
+	   {
+	     if ((ssp->type & gCompleteCDS) &&
+		 ssp->a2 <= vp->a2 &&
+		 ssp->a2 >= vp->a1
+		 )
+	       vp->type |= gCompleteCDS ;
+	     if ((ssp->type & gS) &&
+		 ssp->a2 < vp->a2 &&
+		 ssp->a2 >= vp->a1
+		 )
+	       vp->type |= gS ;
+	     if ((ssp->type & (gA | gReal3p)) &&
+		 ssp->a1 > vp->a1 &&
+		 ssp->a1 <= vp->a2
+		 )
+	       {
+		 vp->type |= (ssp->type & (gA | gCompleteCDS | gReal3p)) ;
+		 if (vp->type & gCompleteCDS &  gReal3p) vp->type &= ~gReal3p ;
+		 if (vp->type & gCompleteCDS &  gA) vp->type &= ~gA ;
+	       }
+	   }
+       }
    if (debug)
      {
        fprintf (stderr, "mrnaDesignGetSupport  done\n") ;
@@ -877,7 +880,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
      }
  done:
    ac_free (h) ;
-  return ;
+   return ;
 } /* mrnaDesignGetSupport */
 
 /**********************************************************************************/
@@ -1293,212 +1296,220 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 
   /* group exons/introns */
   segs = arrayHandleCreate (eeMax + iiMax +1, DSX, ds->h) ;
-  for (ii = jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < eeMax ; ii++, jj++, vp++)
-    {	    
-      up =  arrayp (segs,ii, DSX) ;
-      *up = *vp ; up->score = vp->cover ; up->nn = ii ;
-    }
-  for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < iiMax ; ii++, jj++, vp++)
-    {	    
-      up =  arrayp (segs,ii, DSX) ;
-      *up = *vp ; up->score = vp->cover ; up->nn = ii ;
-      if (up->score < vp->donor) up->score = vp->donor ;
-      if (up->score < vp->acceptor) up->score = vp->acceptor ;
-      up->score <<= 1 ;
-      if (0 && ! up->score) up->score = 1 ;
-    }
+  if (arrayMax (ds->exons))
+    for (ii = jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < eeMax ; ii++, jj++, vp++)
+      {	    
+	up =  arrayp (segs,ii, DSX) ;
+	*up = *vp ; up->score = vp->cover ; up->nn = ii ;
+	}
+  if (arrayMax (ds->introns))
+    for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < iiMax ; ii++, jj++, vp++)
+      {	    
+	up =  arrayp (segs,ii, DSX) ;
+	*up = *vp ; up->score = vp->cover ; up->nn = ii ;
+	if (up->score < vp->donor) up->score = vp->donor ;
+	if (up->score < vp->acceptor) up->score = vp->acceptor ;
+	up->score <<= 1 ;
+	if (0 && ! up->score) up->score = 1 ;
+      }
   arraySort (segs, dsA1Order) ;
   eeMax = arrayMax (segs) ; 
-
+  
   if (0)
     showDs (sc, segs) ;
-
-  /* kill the non extremal exon extensions which are below 15 bp and do not hook onto an intron */
-  for (ii = a2Max = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-    if (a2Max < vp->a2) a2Max = vp->a2 ;
- 
-  for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-    {
-      if (! (vp->type & (gDebut | gFin)) && (vp->type & gX) && vp->a2 < vp->a1 + 15)
-	{
-	  int ok1 = 0, ok2 = 0, ok3 = 0, ok4 = 0 ;
-	  int a1 = vp->a2 + 1, a2 = vp->a1 - 1 ;
-	  if (vp->a1 == 1)
-	    ok1++ ;
-	  else
-	    for (jj = ii - 1, vp2 = vp - 1 ; ok1 == 0 && jj >= 0 ; jj--, vp2--)
-	      {
-		if (vp2->a2 == a2)
-		  {
-		    if (1 || (vp2->type & gI) ||
-			(vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score))
-		      ok1 = 1 ;
-		  }
-		if (0 &&  (vp2->type & gI) && vp2->a2 == vp->a2 &&  vp->a2 < vp->a1 + 8)
-		  {
+  
+      /* kill the non extremal exon extensions which are below 15 bp and do not hook onto an intron */
+  if (arrayMax (segs))
+    for (ii = a2Max = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+      if (a2Max < vp->a2) a2Max = vp->a2 ;
+  
+  if (arrayMax (segs))
+    for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+      {
+	if (! (vp->type & (gDebut | gFin)) && (vp->type & gX) && vp->a2 < vp->a1 + 15)
+	  {
+	    int ok1 = 0, ok2 = 0, ok3 = 0, ok4 = 0 ;
+	    int a1 = vp->a2 + 1, a2 = vp->a1 - 1 ;
+	    if (vp->a1 == 1)
+	      ok1++ ;
+	    else
+	      for (jj = ii - 1, vp2 = vp - 1 ; ok1 == 0 && jj >= 0 ; jj--, vp2--)
+		{
+		  if (vp2->a2 == a2)
+		    {
+		      if (1 || (vp2->type & gI) ||
+			  (vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score))
+			ok1 = 1 ;
+		    }
+		  if (0 &&  (vp2->type & gI) && vp2->a2 == vp->a2 &&  vp->a2 < vp->a1 + 8)
+		    {
 		      ok3 = 1 ;
-		  }
-	      }
-	  if (vp->a2 == a2Max) 
-	    ok2 = 1 ;
-	  else
-	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 <= a1 ; jj++, vp2++)
-	      {
-		if (vp2->a1 == a1)
-		  {
-		    if (1 || (vp2->type & gI) ||   /* vp2 intron sticcking to vp exon */
-			(vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score)) /* vp2 exon with similar score directly sticking to vp exon */
-		      ok2 = 1 ;
-		  }
-		if (0 &&  (vp2->type & gI) && vp2->a1 == vp->a1 &&  vp->a2 < vp->a1 + 8)
-		  {
+		    }
+		}
+	    if (vp->a2 == a2Max) 
+	      ok2 = 1 ;
+	    else
+	      for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 <= a1 ; jj++, vp2++)
+		{
+		  if (vp2->a1 == a1)
+		    {
+		      if (1 || (vp2->type & gI) ||   /* vp2 intron sticcking to vp exon */
+			  (vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score)) /* vp2 exon with similar score directly sticking to vp exon */
+			ok2 = 1 ;
+		    }
+		  if (0 &&  (vp2->type & gI) && vp2->a1 == vp->a1 &&  vp->a2 < vp->a1 + 8)
+		    {
 		      ok4 = 1 ;
-		  }
-
-	      }
-	  if (ok1 + ok2 < 2) 
-	    vp->score = -1 ;
-	  else if (0 && ok3 + ok4) /* disfavor intron leaks below 10bp, the wiggle resolution */
-	    vp->score /= 5 ; /* already done, grep for 'disfavor'  */
-	}
-    }
+		    }
+		  
+		}
+	    if (ok1 + ok2 < 2) 
+	      vp->score = -1 ;
+	    else if (0 && ok3 + ok4) /* disfavor intron leaks below 10bp, the wiggle resolution */
+	      vp->score /= 5 ; /* already done, grep for 'disfavor'  */
+	  }
+      }
   /* if we have   2 introns with same acceptor    XXXXXXXX=====----XXXX and a matching === bit of exon, the ===  should have the support of the short intron */
-  for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-    {
-      if (vp->type & gI)
-	{
-	  int ok2 = 0 ;
-	  for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 < vp->a2 ; jj++, vp2++)
-	    if ((vp2->type & gI) && vp2->a2 <= vp->a2)
-	      {
-		/* search for the === exon */
-		int kk ;
-		DSX *vp3 ;
-		for (kk = ii - 1, vp3 = vp - 1 ; ok2 == 0 && kk >= 0 && vp3->a1 < vp->a2 ; kk--, vp3--)
-		  if ((vp3->type & gX) && vp3->a1 == vp->a1 && vp3->a2 == vp2->a1 - 1)
-		    {
-		      if (vp3->score < vp2->score)
-			vp3->score = vp2->score ;
-		      ok2 = 1 ;
-		    }
-	      }
-	}
-      /* same problem single donor 2 acceptors */
-      if (vp->type & gI)
-	{
-	  int ok2 = 0 ;
-	  for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
-	    if ((vp2->type & gI) && vp2->a2 > vp->a2)
-	      {
-		/* search for the === exon */
-		int kk ;
-		DSX *vp3 ;
-		for (kk = ii + 1, vp3 = vp + 1 ; ok2 == 0 && kk < eeMax && vp3->a1 <= vp->a2 + 1 ; kk++, vp3++)
-		  if ((vp3->type & gX) && vp3->a1 == vp->a2 + 1 && vp3->a2 == vp2->a2 - 1)
-		    {
-		      if (vp3->score < vp->score)
-			vp3->score = vp->score ;
-		      ok2 = 1 ;
-		    }
-	      }
-	}
-
-      /* a retained intron which is over 50% of the neighbouring exon
-       * should have a score higher than the corrsponding intron
-       * otherwise if it is below 10% it should be dropped
-       * otherwise it should be flagged and not extended
-       */
-       if (vp->type & gX)
-	 {
-	  int ok2 = 0 ;
-	  DSX *wp = 0 ;
-	  for (jj = ii + 1, vp2 = vp + 1 ; ok2 < 2 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
-	    if ((vp2->type & gI) && vp2->a2 >= vp->a2)
-	      { wp = vp2 ; ok2 =  (vp2->a2 == vp->a2 ? 2 : 1) ; }
-	  for (jj = ii - 1, vp2 = vp - 1 ; ok2 < 2 && jj >= 0 ; jj--, vp2--)
-	    if ((vp2->type & gI) && vp2->a2 == vp->a2)
-	      { wp = vp2 ;  ok2 = (vp2->a1 == vp->a1 ? 2 : 1) ; }
-	  if (ok2) 
-	    {
-	      int score1 = 0, score2 = 0 ;
-	      /* search for highest sore of neighbouring exon */
-	      for (jj = ii + 1, vp2 = vp + 1 ; jj < eeMax && vp2->a1 <= vp->a2 + 1 ; jj++, vp2++)
-		if (vp2->a1 == vp->a2 + 1 && vp2->score > score1)
-		  {
-		    if (vp2->a1 >= wp->a1 + 1 || (vp2->type & gI))
-		       score1 = vp2->score ;
-		    if ((vp2->a2 <= wp->a2 || vp2->a2 - vp2->a1 < 10) && jj + 1 < eeMax)
+  if (arrayMax (segs))
+    for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+      {
+	if (vp->type & gI)
+	  {
+	    int ok2 = 0 ;
+	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 < vp->a2 ; jj++, vp2++)
+	      if ((vp2->type & gI) && vp2->a2 <= vp->a2)
+		{
+		  /* search for the === exon */
+		  int kk ;
+		  DSX *vp3 ;
+		  for (kk = ii - 1, vp3 = vp - 1 ; ok2 == 0 && kk >= 0 && vp3->a1 < vp->a2 ; kk--, vp3--)
+		    if ((vp3->type & gX) && vp3->a1 == vp->a1 && vp3->a2 == vp2->a1 - 1)
 		      {
-			DSX *vp3 = vp2 + 1 ;
-			if (vp3->a1 == vp2->a2 + 1 && vp3->score > score1 &&
-			    vp3->a1 >= wp->a1 + 1)
-			   score1 = vp3->score ;
+			if (vp3->score < vp2->score)
+			  vp3->score = vp2->score ;
+			ok2 = 1 ;
 		      }
-		  }
-	      for (jj = ii - 1, vp2 = vp - 1 ; jj >= 0 ; jj--, vp2--)
-		if ((vp2->type) && vp2->a2 == vp->a1 - 1 && vp2->score > score2)
-		  {
-		    if (vp2->a2 <= wp->a1 - 1 || (vp2->type & gI))
-		      score2 = vp2->score ; 
-		    if ((vp2->a1 >= wp->a1 || vp2->a2 - vp2->a1 < 10) && jj > 0)
+		}
+	  }
+	/* same problem single donor 2 acceptors */
+	if (vp->type & gI)
+	  {
+	    int ok2 = 0 ;
+	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
+	      if ((vp2->type & gI) && vp2->a2 > vp->a2)
+		{
+		  /* search for the === exon */
+		  int kk ;
+		  DSX *vp3 ;
+		  for (kk = ii + 1, vp3 = vp + 1 ; ok2 == 0 && kk < eeMax && vp3->a1 <= vp->a2 + 1 ; kk++, vp3++)
+		    if ((vp3->type & gX) && vp3->a1 == vp->a2 + 1 && vp3->a2 == vp2->a2 - 1)
 		      {
-			DSX *vp3 = vp2 - 1 ;
-			if (vp3->a2 == vp2->a1 - 1 && vp3->score > score2 &&
-			    vp3->a2 <= wp->a1 - 1)
-			   score2 = vp3->score ;
+			if (vp3->score < vp->score)
+			  vp3->score = vp->score ;
+			ok2 = 1 ;
 		      }
-		  }
-	      if (vp->a2 < vp->a1 + 8 && score1 * score2 == 0)  /* disfavor intron leaks below 10bp, the wiggle resolution */
-		vp->score /= 5 ;
-	      if ((! score1 || 20 * vp->score < score1) && (!score2 || 20 * vp->score < score2))
-		vp->score = -1 ; /* drop very low retained introns */
-	      else if (
-		       ((score1 && 2 * vp->score > score1) || (score2 && 2 * vp->score > score2)) &&
-		       vp->score <= wp->score
-		       )
-		{ vp->score = wp->score + 1 ; vp->type &= (~gB) ; }
-	      else if (vp->score >= wp->score)
-		{ }
-	      else
-		{ vp->type |= gB ; vp->type &=(~ gCompleteCDS) ; }
+		}
+	  }
+	
+	/* a retained intron which is over 50% of the neighbouring exon
+	 * should have a score higher than the corrsponding intron
+	 * otherwise if it is below 10% it should be dropped
+	 * otherwise it should be flagged and not extended
+	 */
+	if (vp->type & gX)
+	  {
+	    int ok2 = 0 ;
+	    DSX *wp = 0 ;
+	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 < 2 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
+	      if ((vp2->type & gI) && vp2->a2 >= vp->a2)
+		{ wp = vp2 ; ok2 =  (vp2->a2 == vp->a2 ? 2 : 1) ; }
+	    for (jj = ii - 1, vp2 = vp - 1 ; ok2 < 2 && jj >= 0 ; jj--, vp2--)
+	      if ((vp2->type & gI) && vp2->a2 == vp->a2)
+		{ wp = vp2 ;  ok2 = (vp2->a1 == vp->a1 ? 2 : 1) ; }
+	    if (ok2) 
+	      {
+		int score1 = 0, score2 = 0 ;
+		/* search for highest sore of neighbouring exon */
+		for (jj = ii + 1, vp2 = vp + 1 ; jj < eeMax && vp2->a1 <= vp->a2 + 1 ; jj++, vp2++)
+		  if (vp2->a1 == vp->a2 + 1 && vp2->score > score1)
+		    {
+		      if (vp2->a1 >= wp->a1 + 1 || (vp2->type & gI))
+			score1 = vp2->score ;
+		      if ((vp2->a2 <= wp->a2 || vp2->a2 - vp2->a1 < 10) && jj + 1 < eeMax)
+			{
+			  DSX *vp3 = vp2 + 1 ;
+			  if (vp3->a1 == vp2->a2 + 1 && vp3->score > score1 &&
+			      vp3->a1 >= wp->a1 + 1)
+			    score1 = vp3->score ;
+			}
+		    }
+		for (jj = ii - 1, vp2 = vp - 1 ; jj >= 0 ; jj--, vp2--)
+		  if ((vp2->type) && vp2->a2 == vp->a1 - 1 && vp2->score > score2)
+		    {
+		      if (vp2->a2 <= wp->a1 - 1 || (vp2->type & gI))
+			score2 = vp2->score ; 
+		      if ((vp2->a1 >= wp->a1 || vp2->a2 - vp2->a1 < 10) && jj > 0)
+			{
+			  DSX *vp3 = vp2 - 1 ;
+			  if (vp3->a2 == vp2->a1 - 1 && vp3->score > score2 &&
+			      vp3->a2 <= wp->a1 - 1)
+			    score2 = vp3->score ;
+			}
+		    }
+		if (vp->a2 < vp->a1 + 8 && score1 * score2 == 0)  /* disfavor intron leaks below 10bp, the wiggle resolution */
+		  vp->score /= 5 ;
+		if ((! score1 || 20 * vp->score < score1) && (!score2 || 20 * vp->score < score2))
+		  vp->score = -1 ; /* drop very low retained introns */
+		else if (
+			 ((score1 && 2 * vp->score > score1) || (score2 && 2 * vp->score > score2)) &&
+			 vp->score <= wp->score
+			 )
+		  { vp->score = wp->score + 1 ; vp->type &= (~gB) ; }
+		else if (vp->score >= wp->score)
+		  { }
+		else
+		  { vp->type |= gB ; vp->type &=(~ gCompleteCDS) ; }
 	      }
-	 }
-    }
+	  }
+      }
   
   /* keep happy few */
-  for (ii = jj = 0, vp = vp2 = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+  if (arrayMax (segs))
     {
-      if (vp->score <= 0)
-	continue ;
-      if (vp2 < vp)
-	*vp2 = *vp ;
-      vp2++ ; jj++ ;
+      for (ii = jj = 0, vp = vp2 = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+	{
+	  if (vp->score <= 0)
+	    continue ;
+	  if (vp2 < vp)
+	    *vp2 = *vp ;
+	  vp2++ ; jj++ ;
+	}
+      arrayMax (segs) = eeMax = jj ;
+    
+      /* flag  gCompleteCDS introns: those linking gCompleteCDS exons */
+      for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+	{
+	  if ((vp->type & gX) && (vp->type & gCompleteCDS))
+	    {
+	      int a21 = vp->a2 + 1 ;
+	      for (jj = ii + 1, vp2 = vp +1 ; jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
+		if ((vp2->type & gI) && vp2->a1 == a21)
+		  vp2->type |= gCompleteCDS ; /* flag, the donor is in a CDS */
+	    }
+	  if ((vp->type & gI) && (vp->type & gCompleteCDS))
+	    {
+	      int ok = 0, a21 = vp->a2 + 1 ;
+	      for (jj = ii + 1, vp2 = vp +1 ; !ok && jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
+		if ((vp2->type & gX) && (vp2->type & gCompleteCDS) && vp2->a1 == a21)
+		  ok = 1 ;
+	      if (! ok) /* kill the flag, the intron acceptor does not hook to a CDS */
+		vp2->type &= (~ gCompleteCDS) ;
+	    }
+	}
+      
+      for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+	vp->nn = ii ;
     }
-  arrayMax (segs) = eeMax = jj ;
-
-  /* flag  gCompleteCDS introns: those linking gCompleteCDS exons */
-   for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-     {
-       if ((vp->type & gX) && (vp->type & gCompleteCDS))
-	 {
-	   int a21 = vp->a2 + 1 ;
-	   for (jj = ii + 1, vp2 = vp +1 ; jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
-	     if ((vp2->type & gI) && vp2->a1 == a21)
-	       vp2->type |= gCompleteCDS ; /* flag, the donor is in a CDS */
-	 }
-       if ((vp->type & gI) && (vp->type & gCompleteCDS))
-	 {
-	   int ok = 0, a21 = vp->a2 + 1 ;
-	   for (jj = ii + 1, vp2 = vp +1 ; !ok && jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
-	     if ((vp2->type & gX) && (vp2->type & gCompleteCDS) && vp2->a1 == a21)
-	       ok = 1 ;
-	   if (! ok) /* kill the flag, the intron acceptor does not hook to a CDS */
-	     vp2->type &= (~ gCompleteCDS) ;
-	 }
-     }
-
-  for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-    vp->nn = ii ;
 
  /* sort a copy by score */
   segs2 = arrayHandleCopy (segs, ds->h) ;
@@ -1674,12 +1685,14 @@ void mrnaDesignSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrna
       smrna = arrp (smrnas, iii, SMRNA) ;
       
       /* search the flags of the first exon */
-      for (j = 0, up = arrp (smrna->hits, 0, HIT) ; j < 1 && j < arrayMax(smrna->hits);  up++, j++)
-        mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, TRUE) ;
+      if (arrayMax (smrna->hits))
+	for (j = 0, up = arrp (smrna->hits, 0, HIT) ; j < 1 && j < arrayMax(smrna->hits);  up++, j++)
+	  mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, TRUE) ;
 
        /* search the polyA flags of the last exon */
-      for (j = arrayMax(smrna->hits) - 1 ; j >= 0 && (up = arrp (smrna->hits, j, HIT)) ; j = -1)
-        mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, FALSE) ;
+      if (arrayMax (smrna->hits))
+	for (j = arrayMax(smrna->hits) - 1 ; j >= 0 && (up = arrp (smrna->hits, j, HIT)) ; j = -1)
+	  mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, FALSE) ;
     }
   return ;
 } /*  mrnaDesignSetCompletenessFlags */
@@ -1700,9 +1713,10 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
     return FALSE; 
 
   /* check if we are using composite reads */
-  for (i = 0, up = arrp (s2m->geneHits, 0, HIT), ok = FALSE ; !ok && i < arrayMax (s2m->geneHits) ; i++, up++)
-    if (keyFindTag (up->est, _Composite))
-      ok = TRUE ;
+  if (arrayMax (s2m->geneHits))
+    for (i = 0, up = arrp (s2m->geneHits, 0, HIT), ok = FALSE ; !ok && i < arrayMax (s2m->geneHits) ; i++, up++)
+      if (keyFindTag (up->est, _Composite))
+	ok = TRUE ;
   if (! ok)
     return FALSE ;
 
