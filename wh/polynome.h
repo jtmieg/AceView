@@ -10,8 +10,8 @@
 #define SMAX (256*sizeof(short))
 typedef struct termStruct {
   int type ;
-  double complex z ;/* complex scalar multiplier. If zero, the whole TT is NULL */
-  int sqrt1,sqrt2 ;
+  double complex z ;   /* complex scalar multiplier. If zero, the whole TT is NULL */
+  int sqrt1,sqrt2 ;        /* holds rational sqrt to avoid rounding errors,    sqrt1=2,  sqrt2=3   => z = sqrt(2/3) exactly */
   short sigma[GMAX] ; /* sigma     matrices : non-commutative list of index "ab" means sigma_a sigma-bar_b */
   short sigB[GMAX] ;  /* sigma-bar matrices : non-commutative list of index "ab" means sigma-bar_a sigma_b */
   char x[GMAX]  ; /* a,b,  i,j  x(meaning chi)  symbol to exponentiate */
