@@ -294,7 +294,7 @@
             FBsn  // strain i.e. oregon 
             FBtc  // tissue/cell culture
 
- 
+  
 ?Ali  Run ?Run XREF Ali @Title
       Counts Raw_data  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Accepted  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 

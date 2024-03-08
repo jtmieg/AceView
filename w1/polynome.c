@@ -29,6 +29,40 @@
  */
 
 #include "polynome.h"
+static int POLMAGIC = 153724322 ;
+static int TTMAGIC = 0 ;                    /* zero means we did not overwrite, but no need to set it */
+static int PMXMAGIC = 871537243 ;
+
+/***********************************************************************************************************************************************/
+/***************************************************************** security     ******************************************************************/
+/***********************************************************************************************************************************************/
+
+static void polCheck (POLYNOME pp)
+{
+  if (pp)
+    {
+      if  (pp->magic != POLMAGIC)
+	messcrash ("Bad POLMAGIC") ;
+      if (pp->tt.magic != TTMAGIC)
+	messcrash ("Bad TTMAGIC") ;  
+    }
+} /* polCheck */
+
+/***********************************************************************************************************************************************/
+static void pmxCheck (PMX px)
+{
+  if (px)
+    {
+      int iMax = px->N * px->N ;
+
+      if  (px->magic != PMXMAGIC)
+	messcrash ("Bad PMXMAGIC") ;
+      if (px->N <= 0)
+	messcrash ("Bad pmx N=%d in %s", px->N, px->title) ;
+      for (int i = 0 ; i < iMax ; i++)
+	polCheck (px->pp[i]) ;
+    }
+} /* pmxCheck */
 
 /***********************************************************************************************************************************************/
 /***************************************************************** Utilities  ******************************************************************/
@@ -70,6 +104,7 @@ static void reduceIndicesTtDo (short *cp, KEYSET ks, BOOL edit)
 
 static void reduceIndicesTt (POLYNOME pp, KEYSET ks, BOOL edit)
 {
+  polCheck (pp) ;
   reduceIndicesTtDo (pp->tt.g, ks, edit) ;
   reduceIndicesTtDo (pp->tt.gg, ks, edit) ;
   reduceIndicesTtDo (pp->tt.sigma, ks, edit) ;
@@ -79,6 +114,7 @@ static void reduceIndicesTt (POLYNOME pp, KEYSET ks, BOOL edit)
   reduceIndicesTtDo (pp->tt.mm[1], ks, edit) ;
   reduceIndicesTtDo (pp->tt.mm[2], ks, edit) ;
   reduceIndicesTtDo (pp->tt.mm[3], ks, edit) ;
+  polCheck (pp) ;
 } /* reduceIndicesTt */
 
 /***********************************************************************************************************************************************/
@@ -87,6 +123,7 @@ static void reduceIndicesDo (POLYNOME pp, KEYSET ks, BOOL edit)
 {
   if (! pp) 
     return ;
+  polCheck (pp) ;
   reduceIndicesDo (pp->p1, ks, edit) ;
   reduceIndicesDo (pp->p2, ks, edit) ;
   if (pp->tt.type)
@@ -102,6 +139,7 @@ static int reduceIndicesIsProduct (POLYNOME pp)
   KEYSET ks2 = keySetCreate () ;
   KEYSET ks3 = keySetCreate () ;
 
+  polCheck (pp) ;
   /* count the occurence of all indices */
   reduceIndicesDo (pp, ks, FALSE) ;
   /* contract the list by dropping unused values */
@@ -152,6 +190,7 @@ POLYNOME reduceIndices (POLYNOME pp)
 {
   static int level = 0 ;
 
+  polCheck (pp) ;
   level++ ;
   if (0 && level == 1)
     {
@@ -189,6 +228,9 @@ static int polOrder (const void *va, const void *vb)
   int id1 = p1->tt.Id2 ;
   int id2 = p2->tt.Id2 ;
   int s ;
+
+  polCheck (p1) ;
+  polCheck (p2) ;
   p1->tt.z = 0 ;       
   p2->tt.z = 0 ;
   p1->tt.Id2 = 0 ;
@@ -1369,6 +1411,7 @@ POLYNOME contractProducts (POLYNOME pp)
   static int nn= 0 ;
   if (!pp)
     return 0 ;
+  polCheck (pp) ;
   nn++ ;
   p1 = pp->p1 ;
   p2 = pp->p2 ;
@@ -1476,6 +1519,7 @@ POLYNOME contractProducts (POLYNOME pp)
       if (pp->tt.z == 0)
 	pp = 0 ;
     }
+  polCheck (pp) ;
   return pp ;
 }
   
@@ -1491,6 +1535,7 @@ static void checkPolynome (POLYNOME pp)
 
   if (! pp)
     return ;
+  polCheck (pp) ;
   if (level == 0)
     {
       if (! polynomeKs)
@@ -1523,6 +1568,7 @@ static POLYNOME expandDo (POLYNOME pp, int force)
   
   if (!pp)
     return 0 ;
+  polCheck (pp) ;
 
   if (force) pp->isFlat = FALSE ;
   p1 = pp->p1 ;
@@ -1690,6 +1736,7 @@ static POLYNOME expandDo (POLYNOME pp, int force)
       return 0 ;
     }
   pp->isFlat = TRUE ;
+  polCheck (pp) ;
   if (debug) checkPolynome (pp) ;
   return pp ;
 } /* expandDo */
@@ -1699,6 +1746,7 @@ static POLYNOME expandDo (POLYNOME pp, int force)
 POLYNOME expand (POLYNOME pp)
 {
   int force = 1 ;
+  polCheck (pp) ;
 
   pp = sortPol (pp) ;
   if (pp)
@@ -1714,6 +1762,7 @@ POLYNOME expand (POLYNOME pp)
 	  force = FALSE ;
 	}
     }
+  polCheck (pp) ;
   return pp ;
 }
 
@@ -1737,6 +1786,7 @@ static void gprintf (char *prefix, short *sp)
   
   if (!pp) 
     return ;
+  polCheck (pp) ;
   tt = pp->tt ;  
   if (!tt.type)
     return ;
@@ -1795,6 +1845,7 @@ void showPol (POLYNOME pp)
   POLYNOME p1, p2 ;
   static int nn = 0, level = 0 ;
 
+  polCheck (pp) ;
    if (!pp)
      {
        if (level == 0) printf ("(NULL) #### zero term ###\n") ;
@@ -1822,30 +1873,33 @@ void showPol (POLYNOME pp)
 /***********************************************************************************************************************************************/
 /******************************************* New Polynomes of all types ************************************************************************/
 /***********************************************************************************************************************************************/
-#ifdef JUNK
+
 static void polFinalise (void *vp)
 {
   POLYNOME pp = (POLYNOME) vp ;
   if (pp && pp->id)
     {
       pp->id = 0 ;
-      ac_free (pp->p1) ;
-      ac_free (pp->p2) ;
-      /* do NOT       ac_free (pp->h) ; pp may be a component of a larger pp with same h */
+      pp->magic = 0 ;
+      /* ac_free (pp->p1) ;
+       *  ac_free (pp->p2) ;
+       * do NOT       ac_free (pp->h) ; pp may be a component of a larger pp with same h 
+       */
     }
   return ;
 }
-#endif
+
 /***********************************************************************************************************************************************/
 
 POLYNOME newPolynome (AC_HANDLE h)
 {
   static int id = 0 ;
   int n = sizeof (struct polynomeStruct) ;
-  POLYNOME pp = (POLYNOME) handleAlloc (0, h, n) ;
+  POLYNOME pp = (POLYNOME) handleAlloc (polFinalise, h, n) ;
   memset (pp, 0, n) ;
   pp->id = ++id ;
   pp->h = h ;
+  pp->magic = POLMAGIC ;
   return pp ;
 }
 
@@ -1855,6 +1909,7 @@ POLYNOME polCopy (POLYNOME p1, AC_HANDLE h)
 {
   POLYNOME pp = 0 ; 
 
+  polCheck (p1) ;
   if (p1 && ! p1->isSum && ! p1->isProduct && ! p1->tt.z) p1 = 0 ;
   if (p1)
     {
@@ -2133,6 +2188,8 @@ POLYNOME newSymbol (char *cp, AC_HANDLE h)
 static POLYNOME polDoSum (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
 {
   POLYNOME p = newPolynome (h) ;
+  polCheck (p1) ;
+  polCheck (p2) ;
   p->p1 = p1 ;
   p->p2 = p2 ;
   if (p1->tt.type && p2->tt.type && p1->tt.Id2 + p2->tt.Id2 == 1)
@@ -2147,6 +2204,8 @@ POLYNOME polSum (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
 {
   if (p1 && ! p1->isSum && ! p1->isProduct && ! p1->tt.z) p1 = 0 ;
   if (p2 && ! p2->isSum && ! p2->isProduct && ! p2->tt.z) p2 = 0 ;
+  polCheck (p1) ;
+  polCheck (p2) ;
   if (p1)
     p1 = polCopy (p1, h) ;
   if (p2)
@@ -2168,6 +2227,8 @@ static POLYNOME polDoProduct (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
   p->p1 = p1 ;
   p->p2 = p2 ;
   p->isProduct = TRUE ;
+  polCheck (p1) ;
+  polCheck (p2) ;
   return p ;
 } /* polProduct */
 
@@ -2177,6 +2238,8 @@ POLYNOME polProduct (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
 {
   if (p1 && ! p1->isSum && ! p1->isProduct && ! p1->tt.z) p1 = 0 ;
   if (p2 && ! p2->isSum && ! p2->isProduct && ! p2->tt.z) p2 = 0 ;
+  polCheck (p1) ;
+  polCheck (p2) ;
   if (p1)
     p1 = polCopy (p1, h) ;
   if (p2)
@@ -2193,6 +2256,7 @@ POLYNOME polScale (POLYNOME pp, double complex z)
   if (! pp)
     return 0 ;
 
+  polCheck (pp) ;
   pp = polCopy (pp, pp->h) ;
   if (pp->isSum)
     {
@@ -2214,18 +2278,20 @@ POLYNOME polScale (POLYNOME pp, double complex z)
 
 POLYNOME polMultiSum (AC_HANDLE h, POLYNOME ppp[])
 {
-  POLYNOME pp, p1, p2 ;
+  POLYNOME pp = 0, p1, p2 ;
   int i = -1 ;
 
   while (i++, ppp[i])
     ppp[i] = polCopy(ppp[i], h) ;
-
-  pp = ppp[--i] ;
-  while (i > 0) 
+  if (i > 0)
     {
-      p2 = pp ;
-      p1 = ppp[--i] ;
-      pp = polDoSum (p1, p2, h) ;
+      pp = ppp[--i] ; 
+      while (i > 0) 
+	{
+	  p2 = pp ;
+	  p1 = ppp[--i] ;
+	  pp = polDoSum (p1, p2, h) ;
+	}
     }
   return pp ;
 } /* polMultiSum */
@@ -2237,7 +2303,11 @@ POLYNOME polMultiProduct (AC_HANDLE h, POLYNOME ppp[])
   POLYNOME pp, p1, p2 ;
   int i = 0 ;
 
-  while (ppp[i]) i++ ;
+  while (ppp[i]) 
+    {
+      polCheck (ppp[i]) ;
+      i++ ;
+    }
   if (i <= 1) return polCopy (ppp[0], h) ;
 
   pp = ppp[--i] ;
@@ -2267,6 +2337,7 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
   short *sb = tt.sigB ;
   int parity = 1 ; 
 
+  polCheck (pp) ;
   pp->isFlat = FALSE ;
 
   if (s[0] && sb[0])
@@ -2417,6 +2488,7 @@ POLYNOME pauliTrace (POLYNOME pp)
   static int level = 0 ;
   if (!pp)
     return 0 ;
+  polCheck (pp) ;
 
   if (level == 0)
     pp = expand (pp) ;
@@ -2462,7 +2534,7 @@ POLYNOME pauliTrace (POLYNOME pp)
 
 static POLYNOME killMomenta (POLYNOME pp)
 {
-
+  polCheck (pp) ;
   if (pp->p1) pp->p1 = killMomenta (pp->p1) ;
   if (pp->p2) pp->p2 = killMomenta (pp->p2) ;
   if (pp->isProduct)
@@ -2505,6 +2577,7 @@ static POLYNOME newDeriveDenom (POLYNOME p0, int pqr, int mu, AC_HANDLE h)
   int j, nn = 0 ;
   BOOL debug = FALSE ;
 
+  polCheck (p0) ;
   memset (ppp, 0, sizeof(ppp)) ;
   
   for (j = pqr ; j < 4 ; j++)
@@ -2552,6 +2625,7 @@ static POLYNOME derivePdo (POLYNOME pp, int pqr, int mu, AC_HANDLE h)
   BOOL debug = FALSE ;
 
   if (! pp) return 0 ;
+  polCheck (pp) ;
   if (debug) checkPolynome (pp) ;  
   if (pp->isSum)
     { /* linearity */
@@ -2695,6 +2769,7 @@ static POLYNOME deriveP (POLYNOME pp, int pqr, int mu, AC_HANDLE h)
 {
   BOOL debug = FALSE ;
 
+  polCheck (pp) ;
   pp = derivePdo (pp, pqr, mu,h) ;
   if (0 && pp) pp = killMomenta (pp) ;
   pp = expand (pp) ;
@@ -2718,6 +2793,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
   BOOL debug = FALSE ;
 
   if (! pp) return 0 ;
+  polCheck (pp) ;
   AC_HANDLE h = pp->h ;
 		  
   if (debug) checkPolynome (pp) ;  
@@ -2973,6 +3049,7 @@ static POLYNOME dimIntegrateByPart (POLYNOME pp)
   static int level = 0 ;
   BOOL debug = FALSE ;
 
+  polCheck (pp) ;
   level++ ;
   for (j = 1 ; j <= 3 ; j++)
     {
@@ -3169,6 +3246,7 @@ POLYNOME momentaCleanUp (POLYNOME pp, short alpha)
   int nn = 0 ;
   POLYNOME ppp[4] ;
   POLYNOME p1, p2, p3, p4, p5 ;
+  polCheck (pp) ;
   pp = expand (pp) ;
   p1 = polCopy (pp, h) ;
   p2 = deriveP (p1, 1, alpha, h) ;
@@ -3205,6 +3283,7 @@ POLYNOME dimIntegral (POLYNOME p0)
   POLYNOME pp ;
   BOOL debug = FALSE ;
   
+  polCheck (p0) ;
   pp = polCopy (p0, h) ;
   pp = expand (pp) ;
     if (debug) showPol(pp) ;
@@ -3272,6 +3351,8 @@ static POLYNOME bbCleanUpDo (POLYNOME pp, short a, short b, short c, short d, BO
   if (!pp)
     return 0 ;
   
+  polCheck (pp) ;
+
   if (pp->tt.type && cabs (pp->tt.z) < minAbs)
     { return 0 ; }
   
@@ -3396,6 +3477,7 @@ static POLYNOME bbCleanUpDo (POLYNOME pp, short a, short b, short c, short d, BO
 	}
     }
   
+  polCheck (pp) ;
   return pp ;
 } /* bbCleanUpDo */
 
@@ -3407,6 +3489,7 @@ POLYNOME bbCleanUp (POLYNOME pp, short a, short b, short c, short d)
   
   if (!pp)
     return 0 ;
+  polCheck (pp) ;
   while (pp && ! ok)
     {
       ok = TRUE ;
@@ -3442,6 +3525,7 @@ BOOL freeIndex (POLYNOME pp)
   
   if ( !pp)
     return TRUE ; /* no problem */ ;
+  polCheck (pp) ;
   p1 = pp->p1 ;
   p2 = pp->p2 ;
 
@@ -3528,12 +3612,10 @@ BOOL freeIndex (POLYNOME pp)
 /*************************************************************************************/
 /***************** Polynome Matrices *************************************************/
 
-static int PMXMAGIC = 871537243 ;
 void pmxShow (PMX pmx)
 {
   int N = pmx ? pmx->N : 0 ;
-  if (pmx && pmx->magic != PMXMAGIC)
-    messcrash ("bad call to pmxShow") ;
+  pmxCheck (pmx) ;
   printf("#### PolynomeMatrix %s\n", pmx->title) ;
   for (int i = 0 ; i < N ; i++)
     {
@@ -3553,25 +3635,16 @@ void pmxShow (PMX pmx)
 } /* pmxShow */
 
 /*************************************************************************************/
-/*
+
 static void pmxFinalize (void *vp)
 {
-PMX pmx = (PMX) vp ;
-if (pmx && pmx->id)
-{
-int N = pmx->N ;
-pmx->id = 0 ;
-if (pmx->magic != PMXMAGIC)
-messcrash ("bad call to pmxFinalize") ;
-for (int i = 0 ; i < N ; i++)
-	for (int j = 0 ; j < N ; j++)
-	{
-	POLYNOME p = pmx->pp[N*i + j] ;
-	ac_free (p) ;
-	}
-	}
-	}
-*/
+  PMX pmx = (PMX) vp ;
+  if (pmx && pmx->id)
+    {
+      pmx->magic = 0 ;
+      pmx->id = 0 ;
+    }
+}
 
 /*************************************************************************************/
 
@@ -3579,7 +3652,7 @@ PMX pmxCreate (int N, char *title, AC_HANDLE h)
 {
   static int id = 0 ;
   int n = sizeof (struct pmxStruct) ;
-  PMX pmx = (PMX) handleAlloc (0, h, n) ;
+  PMX pmx = (PMX) handleAlloc (pmxFinalize, h, n) ;
   memset (pmx, 0, n) ;
   pmx->h = h ;
   pmx->N = N ;
@@ -3597,8 +3670,7 @@ PMX pmxCopy (PMX pmx, char *title, AC_HANDLE h)
 {
   int N = pmx->N ;
   PMX px = pmxCreate (pmx->N, title, h) ;
-  if (pmx->magic != PMXMAGIC)
-    messcrash ("bad call to pmxCopy") ;
+  pmxCheck (pmx) ;
   for (int i = 0 ; i < N ; i++)
     for (int j = 0 ; j < N ; j++)
       {
@@ -3614,8 +3686,7 @@ PMX pmxExpand (PMX pmx)
 {
   int N = pmx->N ;
 
-  if (pmx->magic != PMXMAGIC)
-    messcrash ("bad call to pmxCopy") ;
+  pmxCheck (pmx) ;
   for (int i = 0 ; i < N ; i++)
     for (int j = 0 ; j < N ; j++)
       {
@@ -3635,8 +3706,7 @@ PMX pmxMultiSum (PMX *pmxs, char *title, AC_HANDLE h)
   for (pmx = pmxs ; *pmx ; pmx++)
     {
       PMX px = *pmx ;
-      if (px->magic != PMXMAGIC)
-	messcrash ("bad call to pmxMultiSum") ;
+      pmxCheck (px) ;
       nn++ ;
       if (!N)
 	N = px->N ;
@@ -3694,8 +3764,7 @@ PMX pmxScalar (int N, char *title, POLYNOME p,  AC_HANDLE h)
  */
 PMX pmxSet (PMX pmx, POLYNOME p,  complex *zz)
 {
-  if (! pmx || pmx->magic != PMXMAGIC)
-    messcrash ("bad call to pmxSet") ;
+  pmxCheck (pmx) ;
   int N = pmx->N ;
   
   for (int i = 0 ; i < N ; i++)
@@ -3722,10 +3791,9 @@ PMX pmxProduct (PMX pmx1, PMX pmx2,  char *title, AC_HANDLE h)
   
   if (!pmx1 || ! pmx2)
     messcrash ("Bad call to pmxProduct, null pmx") ;
-  if (pmx1->magic != PMXMAGIC)
-	messcrash ("bad call to pmxProduct") ;
-  if (pmx2->magic != PMXMAGIC)
-	messcrash ("bad call to pmxProduct") ;
+  pmxCheck (pmx1) ;
+  pmxCheck (pmx2) ;
+
   N = pmx1->N ;
   if (N != pmx2->N)
     messcrash ("Bad call to pmxProduct, unequal dimensions N1=%d N2=%2 %s %s", N, pmx2->N, pmx1->title, pmx2->title) ;
@@ -3761,8 +3829,7 @@ PMX pmxMultiProduct (PMX *pmxs, char *title, AC_HANDLE h)
   for (ppx = pmxs ; *ppx ; ppx++)
     {
       PMX px = *ppx ;
-      if (px->magic != PMXMAGIC)
-	messcrash ("bad call to pmxMultiProduct") ;
+      pmxCheck (px) ;
       nn++ ;
       if (!N)
 	N = px->N ;
@@ -3799,8 +3866,7 @@ PMX pmxExponential (PMX pmx, char *title, int level, AC_HANDLE h)
   PMX pmxs[level+2] ;
   double z = 1 ;
 
-  if (pmx->magic != PMXMAGIC)
-    messcrash ("bad call to pmxExponential") ;
+  pmxCheck (pmx) ;
   p = newScalar (1, h1) ;
   px0 = pmxScalar (N, title, p, h1) ;
   pmxs[0] =  pmxCopy (px0, title, h1) ;
@@ -3832,6 +3898,7 @@ static PMX pmxMinor (PMX pmx, int ii, AC_HANDLE h)
 {
   int N = pmx->N ;
   PMX px = pmxCreate (N-1, "minor", h) ;
+  pmxCheck (pmx) ;
   for (int i = 0, i1 = 0 ; i < N ; i++)
     {
       if (i != ii)
@@ -3851,38 +3918,76 @@ static PMX pmxMinor (PMX pmx, int ii, AC_HANDLE h)
 
 /*************************************************************************************/
 
-POLYNOME pmxDeterminant (PMX pmx, AC_HANDLE h) 
+static POLYNOME pmxDeterminantDo (PMX pmx, POLYNOME pAbove, AC_HANDLE h) 
 {
-  POLYNOME det = 0 ;
+  POLYNOME p1, p2, p3, det = 0 ;
   int N = pmx->N, n = 0 ; 
-  AC_HANDLE h1 = ac_new_handle () ;
   POLYNOME pp[N+1] ;
+  static int pass = 0 ;
 
-  if (pmx->magic != PMXMAGIC)
-	messcrash ("bad call to pmxDeterminant") ;
+  pass++ ;
+  pmxCheck (pmx) ;
   switch (N)
   {
-  case 0:  break ;
-  case 1:  det = polCopy (pmx->pp[0], h)  ; break ;
+  case 1:
+    p1 = pmx->pp[0] ;
+    if (p1)
+      {
+	p2 = polProduct (pAbove, p1, h) ;
+	det = expand (p2) ;
+      }
+    break ;
   default:
     for (int i = 0 ; i < N ; i++)
       {
 	POLYNOME p1 = pmx->pp[N * i] ;
-	if (p1)
+	p2 = polProduct (pAbove, p1, h) ;
+	p3 = expand (p2) ;
+	if (p3)
 	  {
-	    PMX px = pmxMinor (pmx, i, h1) ;
-	    POLYNOME p2 = pmxDeterminant (px, h1) ;
-	    pp[n] = polProduct (p1, p2, h1) ;
-	    if (i % 2)
-	      pp[n] = polScale (pp[n], -1) ; 
-	    n++ ;
+	    PMX px = pmxMinor (pmx, i, h) ;
+	    POLYNOME p4 = pmxDeterminantDo (px, p3, h) ;
+	    if (p4)
+	      {
+		if (i % 2)
+		  p4 = polScale (p4, -1) ; 
+		if (p4)
+		  pp[n++] = p4 ;
+	      }
 	  }
       }
-    pp[n] = 0 ;
-    det = polMultiSum (h, pp) ;
+    if (n)
+      {
+	pp[n] = 0 ;
+	p1 = polMultiSum (h, pp) ;
+	det = expand (p1) ;
+      }
   }
-  if (0)   ac_free (h1) ;
+
   return det ;
+} /* pmxDeterminantDo */
+
+/*************************************************************************************/
+
+POLYNOME pmxDeterminant (PMX pmx, AC_HANDLE h)
+{
+  POLYNOME det = 0 ;
+  pmxCheck (pmx) ;
+  int N = pmx->N ;
+  switch (N)
+    {
+    case 1:
+      det = polCopy (pmx->pp[0], h) ;
+      break ;
+    default:
+      {  
+	AC_HANDLE h1 = ac_new_handle () ;
+	POLYNOME pAbove = newScalar (1, h1) ;
+	POLYNOME p1 = pmxDeterminantDo (pmx, pAbove, h1) ;
+	det = polCopy (p1, h) ;
+      }
+    }
+  return  det ;
 } /* pmxDeterminant */
 
 /*************************************************************************************/

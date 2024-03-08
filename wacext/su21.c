@@ -3695,7 +3695,7 @@ static MX *KasimirConstructAtypicMatrices (KAS *kas)
   int i, j ;
   int a = kas->a ;
   AC_HANDLE h = kas->h ;
-  
+  int s = 1 ;
   mu = kas->mu = (MX *) halloc (12 * sizeof (MX), kas->h) ;
   kas->chi = 1 ;
   
@@ -3721,8 +3721,8 @@ static MX *KasimirConstructAtypicMatrices (KAS *kas)
   muX = mxCreate (h,  "muX", MX_INT, d, d, 0) ;
   muK1 = mxCreate (h,  "muK1", MX_INT, d, d, 0) ;
   muK2 = mxCreate (h,  "muK2", MX_INT, d, d, 0) ;
-  muUb = mxCreate (h,  "muK1", MX_INT, d, d, 0) ;
-  muWb = mxCreate (h,  "muK2", MX_INT, d, d, 0) ;
+  muUb = mxCreate (h,  "muUb", MX_INT, d, d, 0) ;
+  muWb = mxCreate (h,  "muWb", MX_INT, d, d, 0) ;
   
   int xx[d*d] ;
 
@@ -4131,7 +4131,8 @@ static MX *KasimirConstructTypicMatrices (KAS *kas, BOOL show)
   
   /* odd Cartan operator K1 = diag (a,...2,1,/ a,...2,1,0) */
   /* odd Cartan operator K2 = diag (1,2,...a/0,1,2...a) */
-  memset (xx, 0, sizeof (xx)) ;
+  memset (xx, 0, sizeof (xx1)) ;
+  memset (xx, 0, sizeof (xx2)) ;
   mxValues (muY, &xx1, 0, 0) ;
   mxValues (muH, &xx2, 0, 0) ;
 
@@ -4678,6 +4679,144 @@ static void  SuperGroup (KAS *kas)
 
 /***********************************************************************************************************************************************/
 
+static void  SuperGroupExpMap (KAS *kas)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int d = kas->d ;
+  int b = kas->b ;
+  
+   /****** U ******/
+  /* grab the matrix */
+  MX muU1 = kas->mu[6] ;
+  MX muUb = kas->mu[10] ;
+  const int *xxU1 ;
+  const int *xxUb ;
+  mxValues (muU1, &xxU1, 0, 0) ;
+  mxValues (muUb, &xxUb, 0, 0) ;
+
+  mxShow (muU1) ;
+  mxShow (muUb) ;
+  /* create a Polynome Matrix */
+  complex zU1[d*d] ;
+  complex zUb[d*d] ;
+  for (int i = 0 ; i < d*d ; i++)
+    {
+      zU1[i] = xxU1[i] - b * xxUb[i] ;
+      zUb[i] = xxUb[i] ;
+    }
+  PMX pU1 = pmxCreate (d, "pU1", h) ;
+  PMX pUb = pmxCreate (d, "pUb", h) ;
+  POLYNOME pu1 = newTheta ("u", h) ;
+  POLYNOME pub = newSymbol ("b", h) ;
+  pu1->tt.theta[0] = 'u' ;
+  pub->tt.theta[0] = 'u' ;
+  pmxSet (pU1, pu1, zU1) ;
+  pmxSet (pUb, pub, zUb) ;
+  pmxShow (pU1) ;
+  pmxShow (pUb) ;
+  PMX U = pmxSum (pU1, pUb, "U", h) ;
+  pmxShow (U) ;
+  
+
+   /****** W ******/
+  /* grab the matrix */
+  MX muW1 = kas->mu[4] ;
+  MX muWb = kas->mu[11] ;
+  const int *xxW1 ;
+  const int *xxWb ;
+  mxValues (muW1, &xxW1, 0, 0) ;
+  mxValues (muWb, &xxWb, 0, 0) ;
+
+  mxShow (muW1) ;
+  mxShow (muWb) ;
+  /* create a Polynome Matrix */
+  complex zW1[d*d] ;
+  complex zWb[d*d] ;
+  for (int i = 0 ; i < d*d ; i++)
+    {
+      zW1[i] = xxW1[i] - b * xxWb[i] ;
+      zWb[i] = xxWb[i] ;
+    }
+  PMX pW1 = pmxCreate (d, "pW1", h) ;
+  PMX pWb = pmxCreate (d, "pWb", h) ;
+  POLYNOME pw1 = newTheta ("w", h) ;
+  POLYNOME pwb = newSymbol ("b", h) ;
+  pw1->tt.theta[0] = 'w' ;
+  pwb->tt.theta[0] = 'w' ;
+  pmxSet (pW1, pw1, zW1) ;
+  pmxSet (pWb, pwb, zWb) ;
+  pmxShow (pW1) ;
+  pmxShow (pWb) ;
+  PMX W = pmxSum (pW1, pWb, "W", h) ;
+  pmxShow (W) ;
+  
+
+   /****** V ******/
+  /* grab the matrix */
+  MX muV1 = kas->mu[7] ;
+  const int *xxV1 ;
+  mxValues (muV1, &xxV1, 0, 0) ;
+
+  mxShow (muV1) ;
+  /* create a Polynome Matrix */
+  complex zV1[d*d] ;
+  for (int i = 0 ; i < d*d ; i++)
+    {
+      zV1[i] = xxV1[i] ;
+    }
+  PMX V = pmxCreate (d, "V", h) ;
+  POLYNOME pv1 = newTheta ("v", h) ;
+  pv1->tt.theta[0] = 'v' ;
+  pmxSet (V, pv1, zV1) ;
+  pmxShow (V) ;
+  
+   /****** X ******/
+  /* grab the matrix */
+  MX muX1 = kas->mu[5] ;
+  const int *xxX1 ;
+  mxValues (muX1, &xxX1, 0, 0) ;
+
+  mxShow (muX1) ;
+  /* create a Polynome Matrix */
+  complex zX1[d*d] ;
+  for (int i = 0 ; i < d*d ; i++)
+    {
+      zX1[i] = xxX1[i] ;
+    }
+  PMX X = pmxCreate (d, "X", h) ;
+  POLYNOME px1 = newTheta ("x", h) ;
+  px1->tt.theta[0] = 'x' ;
+  pmxSet (X, px1, zX1) ;
+  pmxShow (X) ;
+  
+  /****** det exp UVWX ******/
+
+  PMX uvwxSet[] = {U, V, W, X, 0} ;
+
+  PMX uvwx = pmxMultiSum (uvwxSet, "u+v+w+x", h) ;
+  pmxShow (uvwx) ;
+
+  PMX uvexp = pmxExponential (uvwx, "exp(u+v+w+x)", 6, h) ;
+  pmxShow (uvexp) ;
+
+ 
+  printf ("Matrix determinant\n") ;
+  POLYNOME dd = pmxDeterminant (uvexp, h) ;
+  showPol (dd) ;
+  dd = expand (dd) ; 
+  dd = expand (dd) ;
+  dd = expand (dd) ;
+  dd = expand (dd) ;
+  showPol (dd) ;
+      
+
+  exit (0) ;
+
+  ac_free (h) ;
+} /* SuperGroupExpMap */
+
+/***********************************************************************************************************************************************/
+
 static void  KasimirLowerMetric (KAS *kas)
 {
   MX gg ;
@@ -4687,7 +4826,7 @@ static void  KasimirLowerMetric (KAS *kas)
   AC_HANDLE h = ac_new_handle () ;
   static BOOL firstPass = TRUE ;
   BOOL isAdjoint = (firstPass && kas->NN == 0 && kas->a == 1 && kas->b == 1) ? TRUE : FALSE ;
-
+ 
   firstPass = FALSE ;
   
   gg = kas->gg = mxCreate (kas->h,  "gg", MX_FLOAT, 10, 10, 0) ;
@@ -6206,6 +6345,8 @@ static void Kasimirs (int a, int b, BOOL show)
   if (show)
     KasimirOperatorK3 (&kas) ;
   SuperGroup (&kas) ;
+  if (show)
+    SuperGroupExpMap (&kas) ;
 
 } /* Kasimirs */
 
@@ -9973,7 +10114,7 @@ static void THETA (void)
   printf("\n##########Test the matrix system\n") ;
 
   BOOL test = FALSE ;
-  /****** U ******/
+   /****** U ******/
   complex zu1a[] = {0, 1, 0, 0,   1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
   complex zu1b[] = {0, 1, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
   PMX u1 = pmxCreate (4, "u1", h) ;
@@ -10065,11 +10206,11 @@ static void THETA (void)
   PMX x = pmxSum (x1, x2, "x", h) ;
   pmxShow (x) ;
  
-  /****** U+V+W+X ******/
+  /****** UVWX ******/
 
   PMX uvwxSet[] = {u, v, w, x, 0} ; /* {u,v,w,x,0} ; */
   PMX uvwxSet1[] = {u1, v1, w1, x1, 0} ; /* {u,v,w,x,0} ; */
-  PMX uvwxSet2[] = {u2, v2, w2, x2, 0} ; /* {u,v,w,x,0} ; */
+  PMX uvwxSet2[] = {u2, v2, w2, x2, 0} ; /* {u,v,w,x,0} ; */ 
 
   PMX uvwx1 = pmxMultiSum (uvwxSet1, "u1+v1+w1+x1", h) ;
   PMX uvwx2 = pmxMultiSum (uvwxSet2, "u2+v2+w2+x2", h) ;

@@ -263,7 +263,7 @@ static void sxVentilate (WIGGLE *sx)
 	  lastScore = lastAli = lastToAli = 0 ;
 	  strcpy (probeBuf, ccp) ;
 	  
-	  oldtc = gBuf[0] = 0 ;
+	  oldtc = oldMap = gBuf[0] = 0 ;
  
 #ifdef JUNK
 	  mateAli = mateToAli = 0 ; 
@@ -312,23 +312,7 @@ static void sxVentilate (WIGGLE *sx)
       /* newMrna =   newGene ? TRUE : strcmp (ccp, mBuf) ; */
       strncpy (mBuf, ccp, 1000) ;
 
-      /* keep tags only one mrna per gene */
-      if (hierarchic &&
-	  ! newProbe &&
-	  tc != oldtc	   
-	  )
-	continue ;
-
-      /* mieg before 2017_06_15 we use to keep only one exon per ali
-       * the new idea is to trust bestali to having chosen the correct hierarchy
-       *
-      if (! newProbe && hierarchic && tc != tcGenome && tc == oldtc && ! newMrna)
-	continue ;
-      */
-
       /* ok, ccp == the chromosome or the mRNA */
-      oldtc = tc ;
-      oldMap = map ;
       map = tc2 = 0 ;	  
 
       if (0 && target_class != 'B') /* hack to do just the rrna */
@@ -376,17 +360,6 @@ static void sxVentilate (WIGGLE *sx)
       if (! aceInStep (ai, '\t') || ! aceInInt (ai, &nN)) continue ;
       if (! aceInStep (ai, '\t') || ! aceInInt (ai, &nErr)) continue ;
 
-      /* 2024_01_12: in non stranded case, trust the strand of the annotated gene */
-      if (! firstRead) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
-      if (inTranscript && sx->ventilate && ! sx->strand && ! sx->antistrand)
-	{
-	  if (firstRead && a1 > a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
-	  if (!firstRead && a1 < a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
-	}
-
-      if (sx->maxErr && nErr > sx->maxErr && 100 * nErr > sx->maxErrRate * ali)
-	continue ;
-
       /************* restore natural order ******************/
       /* x1<x2 is the convention, this should never be necessary, do it just in case */
       if (x1 > x2)  
@@ -394,8 +367,9 @@ static void sxVentilate (WIGGLE *sx)
 
       /************* remove exon overlap *********************/
       /* hierarchic clean up before we map to the wiggles */
-      if (map != oldMap && score < oldScore)
+      if (oldtc && target_class != oldtc)
 	continue ;
+
       /* clip exon overlap when both exon leak in the intron */
       if (0 && oldX1 && map == oldMap)  
 	{
@@ -420,19 +394,34 @@ static void sxVentilate (WIGGLE *sx)
 	      else  a1 -= dx ;
 	    }
 	}
-      oldX1 = x1 ; oldX2 = x2 ; oldA1 = a1; oldA2 = a2 ; oldScore = score ;
+      /* memorize BEFORE rejecting on the basis of the starnd */ 
+      oldX1 = x1 ; oldX2 = x2 ; oldA1 = a1; oldA2 = a2 ; oldScore = score ; oldMap = map ; oldtc = target_class ;
 
-      /************** ENDS ***************/
+      /***********************************/
       /* e1 e2 will be used to position the start of the reads on the template */
       e1 = e2 = 0 ;
       if (strcmp (probeBuf, oldProbeBuf) &&
 	  (x1 < 10  || ali == toali)
 	  ) 
 	{
-	  e1 = a1 ; 
+	  e1 = a1 ; e2 = a2 ; 
 	  if (e1 < e2 && e2 > e1 + EndLength) e2 = e1 + EndLength ;
 	  if (e1 > e2 && e2 < e1 - EndLength) e2 = e1 - EndLength ;
 	}
+      /***********************************/
+      /* 2024_01_12: in non stranded case, trust the strand of the annotated gene */
+      if (! firstRead) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
+      if (sx->strand && a1 > a2) continue ;
+      if (sx->antistrand && a1 < a2) continue ;
+      if (inTranscript && sx->ventilate && ! sx->strand && ! sx->antistrand)
+	{
+	  if (a1 > a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
+	}
+
+      if (sx->maxErr && nErr > sx->maxErr && 100 * nErr > sx->maxErrRate * ali)
+	continue ;
+
+      /************** ENDS ***************/
       strcpy (oldProbeBuf, probeBuf) ;
 
       /*  2015_06_12 : getting this right is amazingly difficult !
@@ -442,19 +431,20 @@ static void sxVentilate (WIGGLE *sx)
        *  for reads mappaed to a gene, the names stay if the gene maps to the plus strand
        *  both letters LR  and FR are exchanged if the gene maps to the negative starnd 
        */
-      if (a1 < a2) 
+      if (e1 < e2) 
 	{
 	  iEfr = 0 ; Efr = "EL" ;
-	  if (firstRead)  { iEfr = 0 ; Efr = "ELF" ; }
+	  if (a1<a2)  { iEfr = 0 ; Efr = "ELF" ; }
 	  else            { iEfr = 1 ; Efr = "ELR" ; }
 	}
       else
 	{ 
+	  int e0 = e1 ; e1 = e2 ; e2 = e0 ;
 	  iEfr = 2 ; Efr = "ER" ; 
-	  if (firstRead)  { iEfr = 3 ; Efr = "ERR" ; }
+	  if (a1>a2)  { iEfr = 3 ; Efr = "ERR" ; }
 	  else            { iEfr = 2 ; Efr = "ERF" ; }
 	}
- 
+      
 
       /* missmatches and overhangs, reported in col 14 to 21 are ignored in this program */
 
@@ -535,7 +525,6 @@ static void sxVentilate (WIGGLE *sx)
       else
 	{ 
 	  int a0 = a1 ; a1 = a2 ; a2 = a0 ; ifr = 1 ; fr = "r" ; 
-	  int e0 = e1 ; e1 = e2 ; e2 = e0 ; 
 	  int p0 = p1 ; p1 = p2 ; p2 = p0 ; 
 	}
 	  
@@ -570,7 +559,7 @@ static void sxVentilate (WIGGLE *sx)
 					   , (tc2  ? "remapped" : "mapped")
 					   , dictName(sx->remapDict, chrom)
 					   , Efr, (pass ? sx->minErrRate : 0)
-					   , (unique ? "u" : "nu") 
+					   , (non_unique ? "nu" : "u")               /* by defult they are calld .u */ 
 					   , (sx->out == BHIT ? "hits" : "BG")
 					   )
 			      , sx->gzo, h
@@ -623,13 +612,13 @@ static void sxVentilate (WIGGLE *sx)
 	{
 	  /* a1 in BG is zero based */
 	  a1-- ;
-	  if (ao && a1 > 0) aceOutf (ao, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), a1, a2, weight) ; 
+	  if (ao && a1 >= 0) aceOutf (ao, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), a1, a2, weight) ; 
 	  
 	  e1-- ;
-	  if (eo && e1 > 0) aceOutf (eo, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), e1, e2, weight) ; 
+	  if (eo && e1 >= 0) aceOutf (eo, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), e1, e2, weight) ; 
 	  
 	  p1-- ;
-	  if (po && p1 > 1) aceOutf (po, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), p1, p2, weight) ; 
+	  if (po && p1 >= 0) aceOutf (po, "%s\t%d\t%d\t%f\n",  dictName(sx->mapDict, map), p1, p2, weight) ; 
 	}
     }
   /* close the multiple output files */

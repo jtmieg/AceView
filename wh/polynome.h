@@ -16,7 +16,7 @@ typedef struct termStruct {
   short sigB[GMAX] ;  /* sigma-bar matrices : non-commutative list of index "ab" means sigma-bar_a sigma_b */
   char x[GMAX]  ; /* a,b,  i,j  x(meaning chi)  symbol to exponentiate */
   short sqrti ; /* exp(i pi/4) */
-  char theta[GMAX] ; /* grassman indices, they anticommute ans quare to zero */
+  char theta[GMAX] ; /* grassman indices, they anticommute and square to zero */
   short g[GMAX] ;     /* Lorentz metric */
   short gg[GMAX] ;    /* group metric */
   short eps[GMAX] ; /* espislon anti symmetric set of n times 4 indices */ 
@@ -26,6 +26,7 @@ typedef struct termStruct {
   int Id2 ; /* Pauli identity matrix, needed its value is 2 when we trace */
   short freeIndex[GMAX] ;
   int N ; /* Taylor degree in x  symbol */
+  int magic ;
 } TT ;
 
 typedef struct polynomeStruct *POLYNOME ;
