@@ -11786,7 +11786,7 @@ phasef5:
 if ($Strategy != RNA_seq) goto phaseLoop
 
 foreach chrom ($chromSetAll)
-  if (1 || (-e tmp/X.$MAGIC/XH$chrom/f4.assemble.done && (! -e tmp/X.$MAGIC/XH$chrom/f5.dump.done) then
+  if (1 || (-e tmp/X.$MAGIC/XH$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/XH$chrom/f5.dump.done)) then
     scripts/submit tmp/X.$MAGIC/XH$chrom/f5.export  "scripts/f5.export_new_genes.tcsh  $chrom"
   endif
 end

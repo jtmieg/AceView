@@ -151,14 +151,14 @@ if (-e tmp/X.$MAGIC/XH$chrom/f5.rename.done) then
      dna  -noClassName tmp/X.$MAGIC/XH$chrom/f5.mrnas.fasta
      quit
 EOF
-gzip tmp/X.$MAGIC/XH$chrom/f5.mrnas.fasta tmp/X.$MAGIC/XH$chrom/f5.genes.gtf
+  gzip tmp/X.$MAGIC/XH$chrom/f5.mrnas.fasta tmp/X.$MAGIC/XH$chrom/f5.genes.gtf
 
 endif
 
 ##################################################
 ## Export the good mRNA for an iteration
 
-if (-e tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta) then
+if (! -e tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta.gz) then
   bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
      query find product good_product ; > mrna ; gt_ag
      spush
@@ -168,7 +168,9 @@ if (-e tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta) then
      dna  -noClassName tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta
      quit
 EOF
-
+  cat tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta | sed -e 's/>G_t_/Magic_/' | gzip >  tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta.gz
+  \rm  tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta
+endif
 
 ##################################################
 
