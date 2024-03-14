@@ -89,7 +89,7 @@ echo "collate ace       "
  
 echo "collate fasta"
 
-cat   tmp/X.$MAGIC/EHITS/$chrom/f1.txts  | gawk -F '\t' '/^#/{next}/^\/\//{next}{chrom=$1;gsub(/CHROMOSOME_/,"",chrom);u1=$6;u2=$11;typeb=$4;if(typeb == "Exon") { next;xx="XJ_" ;} else {xx="XI_" ; }nam=xx group "_" chrom "__" u1 "_" u2 ; names[nam]++; n = names[nam] ;nam = nam "." n ; printf(">%s\n%s%s%s\n",nam, $12,$13,$14) ;}' group=$MAGIC  > tmp/X.$MAGIC/EHITS/$chrom/f1.fasta
+cat   tmp/X.$MAGIC/EHITS/$chrom/f1.txts  | gawk -F '\t' '/^#/{next}/^\/\//{next}{chrom=$1;gsub(/CHROMOSOME_/,"",chrom);u1=$8;u2=$9;typeb=$4;if(typeb == "Exon") { next;xx="XJ_" ;} else {xx="XI_" ; }nam=xx group "_" chrom "__" u1 "_" u2 ; names[nam]++; n = names[nam] ;nam = nam "." n ; printf(">%s\n%s%s%s\n",nam, $12,$13,$14) ;}' group=$MAGIC  > tmp/X.$MAGIC/EHITS/$chrom/f1.fasta
 
 gzip  tmp/X.$MAGIC/EHITS/$chrom/f1.ace
 gzip  tmp/X.$MAGIC/EHITS/$chrom/f1.fasta

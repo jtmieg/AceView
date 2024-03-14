@@ -226,7 +226,6 @@ static void sxVentilate (WIGGLE *sx)
   BOOL inTranscript = FALSE ;
   BOOL hasPair = sx->pair ? TRUE : FALSE ;  /* we also autodetect the pairs */
   BOOL goodPair = TRUE ;
-  BOOL isPartial = FALSE ;
   int lastScore = 0, lastAli = 0, lastToAli = 0 ;
   int EndLength = 30 ;
   int chainNumber, chainFrom, chainTo, mateScore, mateAli , mateToAli ;
@@ -401,7 +400,7 @@ static void sxVentilate (WIGGLE *sx)
       /* e1 e2 will be used to position the start of the reads on the template */
       e1 = e2 = 0 ;
       if (strcmp (probeBuf, oldProbeBuf) &&
-	  (x1 < 10  || ali == toali)
+	  (x1 < 10  || (wall1[0] && wall1[0] == ace_upper(wall1[0])))
 	  ) 
 	{
 	  e1 = a1 ; e2 = a2 ; 
@@ -492,34 +491,31 @@ static void sxVentilate (WIGGLE *sx)
  
       /************** partials ***************/
       /* check partial */
-      isPartial = FALSE ;
       p1 = p2 = 0 ;
       
-      if (hasPair && ! goodPair)
-	isPartial = TRUE ;
-   
       /* quality control */
       lastAli = ali ; lastToAli = toali ; lastScore = score ;
       if (newProbe) firstX1 = x1 ;
       if (x1 < 30) toali -= x1 ;
-      if ( (ali > 25 || ali > sx->minAliLength || 100 * ali > toali * sx->minAliRate) && 
-	   ali < toali - 30 &&  
-	   (
-	    (! chainTo || x2 == chainTo) ||
-	    (! chainFrom || x1 == chainFrom) 
-	    )
-	   )
-	isPartial = TRUE ;
-      if (isPartial && x2 == chainTo && ali + firstX1 < toali)
-	{ p2 = a2 ; p1 = p2 - (a1 < a2 ? 30 : -30) ; }
-      else if (isPartial && x1 == chainFrom && x1 > 30)
-	{ p1 = a1 ; p2 = p1 + (a1 < a2 ? 30 : -30) ; }
-      if (! p1) 
-	isPartial = FALSE ;
-      if (noPartial)
-	isPartial = FALSE ;
-      if (0 && isPartial && ! partial) /* the partial are just a supplementary info */
-	continue ;
+      if (partial && ! noPartial)  /* may happen, the partial option also serves to export the ends */
+	{                        /* the partial are just a supplementary info */
+	  if ( (ali > 25 || ali > sx->minAliLength || 100 * ali > toali * sx->minAliRate) &&  ali < toali - 30)
+	    {
+	      if (
+		  (! chainTo || x2 == chainTo) &&
+		  ! (wall2[0] && wall2[0] == ace_upper(wall2[0])) &&
+		  (ali + firstX1 < toali -30) 
+		  )
+		{ p2 = a2 ; p1 = p2 - (a1 < a2 ? 30 : -30) ; }
+	      if (
+		  (! chainFrom || x1 == chainFrom) &&
+		  ! (wall1[0] && wall1[0] == ace_upper(wall1[0])) &&
+		  x1 > 30
+		  )
+		{ p1 = a1 ; p2 = p1 + (a1 < a2 ? 30 : -30) ; }
+	    }
+	}
+
       if (a1 < a2)
 	{ ifr = 0 ; fr = "f" ; }
       else
@@ -548,10 +544,10 @@ static void sxVentilate (WIGGLE *sx)
 	     aceOutf (ao,"# %s\n", timeShowNow()) ;
 	   }
        }
-      if (e1)
+      if (partial && e1)
 	{
 	  eo = array (eos, iEfr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ; 
-	  if (partial && ! eo)
+	  if (! eo)
 	    {
 	      eo = 
 		aceOutCreate (sx->outFileName
@@ -569,10 +565,10 @@ static void sxVentilate (WIGGLE *sx)
 	      aceOutf (eo, "trackName type=bedGraph\n") ;
 	    }
 	}
-      if (p1)
+      if (partial && p1)
 	{
 	  po = array (pos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ;
-	  if (partial &&  !po)
+	  if (!po)
 	    {
 	      po = 
 		aceOutCreate (sx->outFileName
@@ -1193,7 +1189,7 @@ int main (int argc, const char **argv)
     usage ("option -partial is only compatible with -o BG") ;
   if (sx.unique && sx.non_unique)
     usage ("Sorry: options -unique and -non_unique are incompatible") ;
-  if (sx.partial && sx.noPartial)
+  if (0 && sx.partial && sx.noPartial)
     usage ("Sorry: options -partial and -noPartial are incompatible") ;
   if (sx.partial && sx.non_unique)
     usage ("Sorry: options -partial and -non_unique are incompatible") ;

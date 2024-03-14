@@ -1,19 +1,18 @@
 #!bin/tcsh -f
 
-set XYH=$1
-set chrom=$2
+set chrom=$1
 
 set target=magic
 source scripts/target2target_class.txt
 set ici=`pwd`
-if (! -d  tmp/$XYH$chrom) exit 1
+if (! -d  tmp/X.$MAGIC/XH$chrom) exit 1
 
 
 
 echo -n 'Start of phase f5 create the gene boxes '
 date
 
-printf "Clone Main_clone\nAceview_release_suffix May7\nname_by_gene\n\n" >  tmp/X.$MAGIC/XH$chrom/f5.main_clone.ace
+printf "Clone Main_clone\nAceview_release_suffix March13\nname_by_gene\n\n" >  tmp/X.$MAGIC/XH$chrom/f5.main_clone.ace
 
 bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
       parse tmp/X.$MAGIC/XH$chrom/f5.main_clone.ace 
@@ -150,11 +149,25 @@ if (-e tmp/X.$MAGIC/XH$chrom/f5.rename.done) then
   bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
      find mrna
      dna  -noClassName tmp/X.$MAGIC/XH$chrom/f5.mrnas.fasta
+     quit
 EOF
 gzip tmp/X.$MAGIC/XH$chrom/f5.mrnas.fasta tmp/X.$MAGIC/XH$chrom/f5.genes.gtf
 
 endif
 
+##################################################
+## Export the good mRNA for an iteration
+
+if (-e tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta) then
+  bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
+     query find product good_product ; > mrna ; gt_ag
+     spush
+     query find mrna gt_ag > 1
+     sor
+     spop
+     dna  -noClassName tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta
+     quit
+EOF
 
 
 ##################################################
@@ -173,7 +186,7 @@ EOF
   popd
 endif 
 
-# expprt the good products, they are used to beautify the SNP file
+# export the good products, they are used to beautify the SNP file
    
 bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
      bql -o tmp/X.$MAGIC/XH$chrom/f5.good_product.txt select m,p,x1,x2,vg  from m in ?mRNA where m#from_gene, p in m->product where (p#good_product AND p#best_product) OR p#very_good_product, x1 in p[1], x2 in p[2]

@@ -65,7 +65,11 @@ echo $mytmp/$run
 
 set isIlm=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/^Illumina/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
 set isNanopore=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/anopore/{if(ok==1)okk=1;}/PacBio/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
-set noPartial=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/Entry_adaptor/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
+
+# BAD: no partial blocks the export of the read-ends  2024-03-12
+# set noPartial=`cat  MetaDB/$MAGIC/runs.ace | gawk '/^Run /{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;}/Entry_adaptor/{if(ok==1)okk=1;}END{print 0+okk;}' run=$run`
+set noPartial=""
+
 if ($isIlm == 1) then
   set maxWigErr=3
   set maxWigErrRate=3
@@ -189,7 +193,7 @@ if ($Strategy == RNA_seq) set frs="f r ELF ELR ERF ERR"
 gzip  $mytmp/$lane/K.mapped.*.BV
 mv $mytmp/$lane/K.*.gz tmp/WIGGLELANE/$lane
 # optionally
-# mv $mytmp/$lane/* tmp/WIGGLELANE/$lane
+mv $mytmp/$lane/* tmp/WIGGLELANE/$lane
 
 end  # chrom/target
 

@@ -11744,11 +11744,10 @@ phasef3:
  date
 
 if (0 && $Strategy != RNA_seq) goto phaseLoop
-if (! -e tmp/X.$MAGIC/EHITS/f2.done) goto phaseLoop
 
 foreach chrom ($chromSetAll)
   if (! -d tmp/X.$MAGIC/XH$chrom)  mkdir tmp/X.$MAGIC/XH$chrom
-  if (-e  tmp/X.$MAGIC/EHITS/f2.done && -e tmp/X.$MAGIC/EHITS/$chrom/f1.done && ! -e tmp/X.$MAGIC/XH$chrom/f3.parse.done ) then
+  if (-e tmp/X.$MAGIC/EHITS/$chrom/f1.done && ! -e tmp/X.$MAGIC/XH$chrom/f3.parse.done ) then
     scripts/submit tmp/X.$MAGIC/XH$chrom/f3.parse "scripts/f3.parse.tcsh $chrom"
   endif
 end
@@ -11784,14 +11783,11 @@ phasef5:
  echo -n "Export the new transcriptome "
  date
 
-set XYH=YH
-set XYH=XH
-
 if ($Strategy != RNA_seq) goto phaseLoop
 
 foreach chrom ($chromSetAll)
-  if (1 || (-e tmp/$XYH$chrom/f4.assemble.done && (! -e tmp/$XYH$chrom/f5.mrna.done || ! -e tmp/$XYH$chrom/f5.cds.done || ! -e tmp/$XYH$chrom/f5.unspliced.done || ! -e tmp/$XYH$chrom/f5.dump.done) )) then
-    scripts/submit tmp/$XYH$chrom/f5.export  "scripts/f5.export_new_genes.tcsh $XYH $chrom"
+  if (1 || (-e tmp/X.$MAGIC/XH$chrom/f4.assemble.done && (! -e tmp/X.$MAGIC/XH$chrom/f5.dump.done) then
+    scripts/submit tmp/X.$MAGIC/XH$chrom/f5.export  "scripts/f5.export_new_genes.tcsh  $chrom"
   endif
 end
 

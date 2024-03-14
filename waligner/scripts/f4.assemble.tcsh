@@ -29,9 +29,11 @@ EOF
   
   endif
 
+zcat   tmp/X.$MAGIC/EHITS/$chrom/f1.txts.gz  | gawk -F '\t' '/^#/{next}/^\/\//{next}{chrom=$1;gsub(/CHROMOSOME_/,"",chrom);u1=$8;u2=$9;typeb=$4;if(typeb == "Exon") { next;xx="XJ_" ;} else {xx="XI_" ; }nam=xx group "_" chrom "__" u1 "_" u2 ; names[nam]++; n = names[nam] ;nam = nam "." n ; printf(">%s\n%s%s%s\n",nam, $12,$13,$14) ;}' group=$MAGIC  | gzip > tmp/X.$MAGIC/EHITS/$chrom/f1.fasta.gz
 
   bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
     read-models
+    parse tmp/X.$MAGIC/EHITS/$chrom/f1.fasta.gz
     query find sequence Is_read && ! cdna_clone
     acembly
       cdna_80
