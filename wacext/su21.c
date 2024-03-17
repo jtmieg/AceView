@@ -10803,7 +10803,7 @@ int main (int argc, const char **argv)
 	}
 
       /* verify the B propagator */
-      if (0)
+      if (1)
 	{
 	    char a = newDummyIndex () ;
 	    char b = newDummyIndex () ;
