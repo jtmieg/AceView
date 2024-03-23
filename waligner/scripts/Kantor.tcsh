@@ -48,6 +48,36 @@ goto phaseLoop
 ############################################################
 ## Phase k1 : recover the available kantor and parse them in the kantor database
 
+# Hack, recover in the trace DB edited interactivelly the kantor precomputed in magic
+set myZH=ZHabi_traces
+tace $myZH <<EOF
+  query find kantor product
+  list -a -f $myZH/kantor.list
+  quit
+EOF
+
+foreach chrom ($chromSetAll)
+   tace Kantor/$chrom/KantorDB << EOF
+      key $myZH/kantor.list
+      show -a -f $myZH/kantor.$chrom.ace
+      quit
+EOF
+end
+
+cat $myZH/kantor.*.ace > $myZH/all.kantor.ace
+tacembly $myZH <<EOF
+  parse $myZH/all.kantor.ace
+    query  > product ; >mrna 
+    acembly
+      cdna_kantor // kantorizes active mrna set
+      quit
+      // dna mmMrna.$chrom.dna
+    save
+  quit
+EOF
+
+
+
 phasek1:
 echo -n "Start of phase k1 chrom=$chrom "
 date
@@ -90,7 +120,7 @@ set KDB=Kantor/$chrom/KantorDB
     if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
     mv Kantor/$chrom/tmp/*  Kantor/$chrom/done
   endif
-  \rm $db/k1.start
+ if (-e $db/$phase.start) \rm $db/$phase.start
   touch $db/k1.done
 endif
 
@@ -121,6 +151,9 @@ EOF
     show -a -f $db/k2.ace
     quit
 EOF
+
+echo "\n\n-R Method Pfam.v32 Pfam\n\n" >> $db/k2.ace
+
   tacembly $db << EOF
     query find pfam IS Pox_polyA_pol
     kill
@@ -139,7 +172,7 @@ EOF
 endif
 
  if (-e $db/k9.done) \rm $db/k9.done
-\rm $db/k2.start
+ if (-e $db/$phase.start) \rm $db/$phase.start
 touch $db/k2.done
 goto phaseLoop
 
@@ -156,7 +189,7 @@ date
 
 setenv ici `pwd`
 set KDB=Kantor/$chrom/KantorDB
-if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then 
+if (-d $KDB && -d $KDB/database &&  ! -e $db/k9.megaRun.done) then 
 
     setenv megaRun ~/MEGA3/scripts/megaRun
     echo -n 'starting MEGA3/scripts/megaRun :'
@@ -166,8 +199,8 @@ if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then
     pushd Kantor/$chrom/tmp
       # if (! -d tmp/$species_kantor.data) mkdir tmp/$species_kantor.data
        $megaRun $ici/$db  psort $species_kantor
-      # $megaRun $ici/$db  acekog $species_kantor  
-      # $megaRun $ici/$db  pfam $species_kantor  
+       $megaRun $ici/$db  acekog $species_kantor  
+       $megaRun $ici/$db  pfam $species_kantor  
       # $megaRun $ici/$db blastp $species_kantor  
       # $megaRun $ici/$db oligo $species_kantor   
       # $megaRun $ici/$db acekog_n $species_kantor  
@@ -176,7 +209,7 @@ if (-d $KDB && -d $db/database &&  ! -e $db/k9.megaRun.done) then
     
     if (-e $db/k1.done) \rm $db/k1.done
     if (-e $db/k2.done) \rm $db/k2.done
-    \rm $db/k9.start
+    if (-e $db/$phase.start) \rm $db/$phase.start
     touch  $db/k9.done
 endif
 
@@ -281,7 +314,7 @@ EOF
       $megaRun a:localhost:$port  psort $species_kantor
       # $megaRun a:localhost:$port acekog $species_kantor  
       # $megaRun a:localhost:$port   pfam $species_kantor  
-      # $megaRun a:localhost:$port blastp $species_kantor  
+      $megaRun a:localhost:$port blastp $species_kantor  
       # $megaRun a:localhost:$port oligo $species_kantor   
       # $megaRun a:localhost:$port acekog_n $species_kantor  
       date

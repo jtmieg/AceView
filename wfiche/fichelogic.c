@@ -9909,6 +9909,7 @@ static BOOL ficheNewGeneExpressionTissueIsBaddy (const char *ccp)
   const char *baddies[] =
     { 
       "syntheti*"
+      , "partial"
       , "pooled"
       , "pcr*"
       , "mixed"

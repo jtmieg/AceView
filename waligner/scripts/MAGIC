@@ -1500,7 +1500,7 @@ echo "f6:    Collate the new mrna structure and fasta sequence"
 
 echo "k0:    initialize Kantor"
 echo "k1:    shops for kantors in Kantor"
-echo "k2:    integrate kantor results"
+echo "k2:    integrate kantor results in the Products"
 echo "k9:    linear launch megaRun all on a chromosome"
 
 
@@ -11804,16 +11804,15 @@ phasef6:
  date
 # YH is in SEQC_2013/tmp/OK
 
-set XYH=YH
-set XYH=XH
+set XYH=X.$MAGIC
 
 if ($Strategy != RNA_seq) goto phaseLoop
 
 if (! -d TARGET/GTF) mkdir TARGET/GTF
-cat tmp/$XYH*/f5.genes.gtf.gz  > TARGET/GTF/$species.magic.gtf.gz
-cat tmp/$XYH*/f5.mrnas.fasta.gz > TARGET/Targets/$species.magic.fasta.gz 
-# bin/dna2dna -getTm -i TARGET/Targets/$species.magic.fasta.gz -gzo -o  tmp/METADATA/$species.magic
-cat tmp/$XYH*/f5.good_product.ace.gz | gzip > TARGET/GTF/$species.magic.good_product.ace.gz
+zcat tmp/$XYH/*/f5.genes.gtf.gz         | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.gtf.gz
+ # zcat tmp/$XYH/*/f5.mrnas.fasta.gz    | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/Targets/$species.magic.fasta.gz 
+zcat tmp/$XYH/*/f5.goodMrnas.fasta.gz   | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/Targets/$species.magic.fasta.gz 
+zcat tmp/$XYH/*/f5.good_product.ace.gz  | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.good_product.ace.gz
 
   if (-e tmp/METADATA/gtf.magic.done) \rm  tmp/METADATA/*magic*
   if (-e TARGET/Targets/$species.magic.mask.txt) \rm TARGET/Targets/$species.magic.mask.txt
@@ -11844,26 +11843,28 @@ else
 
   if (! -d Kantor) mkdir Kantor
   foreach chrom ($chromSetAll)
+    if ($chrom == Scaffold008Z) continue    
+    if ($chrom == Scaffold009Z) continue
 echo "a1 $chrom"
     set fDB=tmp/X.$MAGIC/XH$chrom
     if (! -e $fDB/f4.assemble.done) continue
 echo "a2 $chrom"
 ls -ls $fDB/k?.done
-    if (! -d Kantror/$chrom && ! -e $fDB/k0.done) \rm $fDB/k?.done
+    if (! -d Kantor/$chrom && ! -e Kantor/$chrom/k0.done) \rm $fDB/k?.done
 echo "a3 $chrom"
 ls -ls $fDB/k?.done
     if ( -d Kantror/$chrom/done && ! -e $fDB/k0.done) touch $fDB/k0.done
 echo "a4 $chrom"
     if (! -d Kantor/$chrom) mkdir Kantor/$chrom
     if (! -d Kantor/$chrom/tmp) mkdir Kantor/$chrom/tmp
-echo "a5 $chrom"
+echo "a5 $chrom phase=$phase"
     if ($phase == k2 && ! -e $fDB/k1.done) continue
     if ($phase == k9 && ! -e $fDB/k2.done) continue
 echo "a6 $chrom"
     if (! -e $fDB/$phase.done && ! -e $fDB/$phase.start) then
 echo "a7 $chrom"
       touch $fDB/$phase.start
-      scripts/submit Kantor/$chrom/$phase  "scripts/Kantor.tcsh $phase $chrom $fDB"
+      scripts/submit $fDB/$phase  "scripts/Kantor.tcsh $phase $chrom $fDB"
     endif
 
   end

@@ -2745,9 +2745,10 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 {
   PNX *pnx ;
+  Array w0 = pnx0->signal ;
   Array w1 = 0, w2 = 0, w3 = 0, w4 = 0 ;
   unsigned int flag1 = 0, flag2 = 0, flag3 = 0, flag4 = 0 ;
-  int i, ns1, ns2, ns3, ns4 ;
+  int i, ns1 = 0, ns2 = 0, ns3 = 0, ns4 = 0 ;
   
   if ((pnx0->flag &  PGG_endRatioLF) ==  PGG_endRatioLF)
     { flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
@@ -2767,77 +2768,35 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
     if ((pnx->flag & flag4) == flag4) { w4 = pnx->signal ; ns4 = ns - i ; break ; }
 
-  if (w1 && w2 && w3 && w4)
+  if (ns1 && ns2)
     {
       unsigned int iMax =  arrayMax (look->map->solexa) ;
-      SLX *slx, *slx1, *slx2 ;
-      int ii, NN = 5 ; 
-      float uu[NN], median = 0 ;
-      memset (uu, 0, sizeof (uu)) ;
+      SLX *slx, *slx1, *slx2, *slx3, *slx4 ;
 
-      for (ii = 3, slx = arrayp (look->map->solexa, ii, SLX), slx1 = slx - 1, slx2 = slx + 1 ; ii < iMax - 1 ; ii++, slx++, slx1++, slx2++)
+      for (int ii = 6 ; ii < iMax - 6 ; ii++)
 	{
-	  float x, y, z, t, u ;
-	  x = slx1->signal[ns1] + 2 * slx->signal[ns1] + slx2->signal[ns1] ;
-	  y = slx1->signal[ns2] + 2 * slx->signal[ns2] + slx2->signal[ns2] ;
-	  /* substract leak from other strand */
-	  z = slx1->signal[ns3] + 2 * slx->signal[ns3] + slx2->signal[ns3] ;
-	  t = slx1->signal[ns4] + 2 * slx->signal[ns4] + slx2->signal[ns4] ;
+	  float x = 0, y = 0, z=0, t=0, u=0 ;
+	  int damper = 10 ;
+	  slx = arrayp (look->map->solexa, ii, SLX) ;
 
-	  x = x - .04 * z ; if (x < 0) x = 0 ; x /= 4 ; 
-	  y = y - .04 * t ; if (y < 0) y = 0 ; y /= 4 ;
-	  /* old code damper = 5 ; u =  damper * (x + damper) / (y + damper) - damper ;  */
-	  u = x / (100 * y + x + 20) ; /* 2017_08_01 */
-
-	  if (u < 0) u = 0 ;
-	  slx->signal[ns] = 10000 * u * u ;
-	  
-	  /* take the median of the last 3 points */
-	  if (0) /* rolling median */
+	  for (int j = -5 ; j < 6 ; j++)
 	    {
-	      float x, old, new ;
-	      int i, j, jj = ii % NN ;
-	      new =  slx->signal[ns] ;
-	      old = uu[jj] ;
-	      uu[jj] = new ;
-	      if (old != new) 
-		{
-		  /* delete old */
-		  if (ii >= NN)
-		    for (i = 0 ; i < NN ; i++)
-		      {
-			x = uu[i] ;
-			if (x == old)
-			  {
-			    for (j = i ; j < NN - 1 ; j++)
-			      uu[j] = uu[j+1] ;
-			    break ;
-			  }
-		      }
-		  /* insert */
-		  if (new >= uu[NN-2])
-		    uu[NN-1] = new ;
-		  else
-		    for (i = 0 ; i < NN - 1 ; i++)
-		      {
-			x = uu[i] ;
-			if (x > new)
-			  {
-			    for (j = NN - 1 ; j > i ; j--)
-			      uu[j] = uu[j-1] ;
-			    uu[j] = new ;
-			    break ;
-			  }
-		      }
-		  if (ii >= NN)
-		    median  = uu[NN/2] ;
-		}
-	      if (1 && ii > (NN-1)/2) (slx - (NN-1)/2)->signal[ns] = median ;
+	      slx1 = arrayp (look->map->solexa, ii+j, SLX) ;
+	      x += slx1->signal[ns1] ;
+	      y += slx1->signal[ns2] ;
+	      if (ns3) z += slx1->signal[ns3] ; 
+	      if (ns4) t += slx1->signal[ns4] ; 
 	    }
+	  x = x + .9 * z ; if (x < 0) x = 0 ; x /= 11 ; 
+	  y = y + .9 * t ; if (y < 0) y = 0 ; y /= 11 ;
+	  u =  (x + damper) / (x + y + 2 * damper) - .7 ;
+	  if (u < 0) u = 0 ;
+	  slx->signal[ns] = 40 * u * x ;
 	}
-      look->isClosed[ns] = look->isSolexaClosed[ns] = 2 ;
-      pnx0->signal = w1 ;
     }
+  look->isClosed[ns] = look->isSolexaClosed[ns] = 2 ;  
+  pnx0->signal = w1 ;
+
 } /* htileSolexaEndRatios */
 
 /************************************************************/
@@ -6470,7 +6429,7 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
       firstPass = FALSE ;
       look0->smoothing = 0 ;
       look0->ratio = 0 ;
-      look0->showDot = 3 ;
+      look0->showDot = 0 ;  /* 0: line , 1: line, 2: bar, 3: stack */
       look0->showExtrema = FALSE ;
       look0->rejectAmbiguous = 0 ;
       look0->romainSmoothing = 0 ;

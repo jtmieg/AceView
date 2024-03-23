@@ -13,7 +13,7 @@ typedef enum {Zero = 0
 	      , LIKE2, LIKEREGEXP, LIKE, EQ, NEQ, LEQ, SEQ, LT, ST, LLK, SLK
 	      , ISA
 	      , MODULO, PLUS, MINUS, MULT, DIVIDE, POWER
-	      , DNA, PEPTIDE, CODING, DATEDIFF
+	      , DNA, PEPTIDE, PEP, CODING, DATEDIFF
 	      , COUNT, MIN, MAX, SUM, AVERAGE, STDEV
 	      , CLNAM, NAM, TIMESTAMP
 	      , TTAG, TAG, HASTAG, MERGETAG
@@ -39,7 +39,7 @@ static const char *bqlName[] = {
   , "like", "=~", "~", "==", "!=", ">=", "<=", ">", "<", ">~", "<~"
   , "ISA"
   , "modulo", "+", "-", "*", "/", "^"
-  , "DNA", "PEPTIDE", "CODING", "DATEDIFF"
+  , "DNA", "PEPTIDE", "PEP", "CODING", "DATEDIFF"
   , "count", "min", "max", "sum", "average", "stdev"
   , ".class", ".name", ".timestamp"
   , ">>", "->", "#", "=>", ":"
@@ -69,7 +69,7 @@ static const int bqlSide[] = {
   /* , ISA */ , 1
   /* , "like", "=~", "~", "==", "!=", ">=", "<=", ">", "<", ">~", "<~" */ , 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10
   /* , "modulo" , "+", "-", "*", "/", "^" */ , 10 , 10, 9, 10, 10, 10
-  /* , "DNA", "PEPTIDE", "CODING", "DATEDIFF" */  , 8, 8, 8, 8
+  /* , "DNA", "PEPTIDE", "PEP", "CODING", "DATEDIFF" */  , 8, 8, 8, 8, 8
   /* , "count", "min", "max", "sum", "average", "stdev" */ , 5, 5, 5, 5, 5
   /* , ".class", ".name", ".timestamp" */ , 0, 0, 0
   /* , ">>", "->", "#", "=>", ":" */ , 8, 8, 8, 8, 8
@@ -381,6 +381,7 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 		if (! strcasecmp (cp, *nam) &&
 		    (strcasecmp (cp, "TITLE") || ! strcmp (cp, "TITLE")) &&
 		    (strcasecmp (cp, "DNA") || ! strcmp (cp, "DNA")) &&
+		    (strcasecmp (cp, "PEP") || ! strcmp (cp, "PEP")) &&
 		    (strcasecmp (cp, "PEPTIDE") || ! strcmp (cp, "PEPTIDE")) &&
 		    (strcasecmp (cp, "CODING") || ! strcmp (cp, "CODING")) &&
 		    (strcasecmp (cp, "DATEDIFF") || ! strcmp (cp, "DATEDIFF"))
@@ -392,6 +393,7 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 		    if (node->type == OR2) node->type = OR ;
 		    if (node->type == XOR2) node->type = XOR ;
 		    if (node->type == NOT2) node->type = NOT ;
+		    if (node->type == PEP) node->type = PEPTIDE ;
 
 		    if (0)
 		      { /* 2022-03-04, remove this clause bqltest: see the example : tom where ! p->parent && p->papers

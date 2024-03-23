@@ -8968,7 +8968,10 @@ static BOOL mrnaDoAddKantorInfo (KEY mrna, KEY product)
           
       if (pep)
 	{
-	  weight = ((int)( (pepWeight (pep) + 49.0)/100.0))/10.0 ;
+	  int w = pepWeight (pep) ;
+	  w = (w + 49.0)/100.0 ; 
+	  w = 100 * w ;
+	  weight = w/10.0 ;
 	  pI = pepPI (pep) ;
 	  if (bsIsTagInClass (class(kantor), str2tag("Michel")))
 	    {
@@ -9048,20 +9051,28 @@ static BOOL mrnaDoAddKantorInfo (KEY mrna, KEY product)
         { /* AceKog */
           units = arrayReCreate (units, 800, BSunit) ;
           bsRemoveTag (Product, str2tag("AKG")) ;
-	  if (bsGetArray (Kantor, str2tag ("AKG"), units, 2)) /* AceKogHuman Worm Mouse... */
+	  if (bsGetArray (Kantor, str2tag ("AKG"), units, 4)) /* AceKogHuman Worm Mouse... */
 	     {
 	       int i ;
 	       KEY ka, kb ;
 	       ka = str2tag("AceKog") ;
 	       kb = str2tag("AceKog_Date") ;
-	       for (i = 0 ; i < arrayMax (units) ; i += 2)
+	       for (i = 0 ; i < arrayMax (units) ; i += 4)
 		 {
                   uu = arrp (units, i, BSunit) ;
                   if (uu[0].k != ka && uu[0].k != kb &&
 		      bsAddTag (Product, uu[0].k)
 		      )
-		    if (uu[1].s)
-		      bsAddData (Product, _bsRight, _Text, uu[1].s) ;
+		    if (1 && uu[1].s)
+		      {
+			bsAddData (Product, _bsRight, _Text, uu[1].s) ;
+			if (uu[2].s)
+			  {
+			    bsAddData (Product, _bsRight, _Text, uu[2].s) ;
+			    if (uu[3].s)
+			      bsAddData (Product, _bsRight, _Text, uu[3].s) ;
+			  }
+		      }
                 }
 	     }
           if (bsGetArray (Kantor, str2tag ("AceKog"), units, 8)) /* the homols */

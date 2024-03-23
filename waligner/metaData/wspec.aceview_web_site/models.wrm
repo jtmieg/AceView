@@ -701,10 +701,13 @@
                To_resequence ?cDNA_clone
                Targeted
        AKGN   AceKogN_Date UNIQUE DateType 
-              AceKogNHuman Text UNIQUE   Text  // Text, because this is an external reference
-              AceKogNMouse Text UNIQUE   Text  // Text, because this is an external reference
-              AceKogNWorm Text UNIQUE   Text  // Text, because this is an external reference
-              AceKogNAra Text UNIQUE   Text  // Text, because this is an external reference
+              AceKog Text Text Float Int UNIQUE Int Int UNIQUE Int Text 
+              AceKogHuman Text  Text  UNIQUE Text   // Text, because this is an external reference
+              AceKogMouse Text  Text  UNIQUE Text   // Text, because this is an external reference
+              AceKogRat Text  Text  UNIQUE Text   // Text, because this is an external reference
+              AceKogWorm Text  Text  UNIQUE Text   // Text, because this is an external reference
+              AceKogAra Text Text UNIQUE Text  // Text, because this is an external reference
+              AceKogTardigrade Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
        Homol AceKogN Text ?Method UNIQUE Float Int Int Int Int Text
        Colour  #Colour 
        Expression_profile Int REPEAT   // sum of expression profile, each clone adds to 100
@@ -955,11 +958,12 @@
                    Included_in_partial ?Product  XREF Partial 
                    Same_stop_as ?Product XREF  Same_stop_as
                    Same_stop_as_model ?Sequence XREF  Same_stop_as_product
-           Homol AKG AceKogHuman Text UNIQUE  Text // Gene NewName_or_GeneId Text, because this is an external reference
-                     AceKogWorm Text UNIQUE   Text  // Text, because this is an external reference
-                     AceKogMouse Text UNIQUE   Text  // Text, because this is an external reference
-                     AceKogRat Text UNIQUE   Text  // Text, because this is an external reference
-                     AceKogAra Text UNIQUE   Text  // Text, because this is an external reference
+           Homol AKG AceKogHuman Text UNIQUE  Text UNIQUE  Text // Gene NewName_or_GeneId Text, because this is an external reference
+                     AceKogWorm Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
+                     AceKogMouse Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
+                     AceKogRat Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
+                     AceKogAra Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
+                     AceKogTardigrade Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
                      AceKog Text Text Float Int UNIQUE Int Int UNIQUE Int Text 
                  Pfam ?Pfam  XREF Product ?Method Float Int UNIQUE Int Int UNIQUE Int Text Text
                  Blastp ?Protein ?Method Float Int UNIQUE Int Int UNIQUE Int Text  // ?may be costly  
@@ -1122,11 +1126,12 @@
              Title_hints Text
          AKG AceKog_Date UNIQUE DateType 
              AceKog Text Text Float Int UNIQUE Int Int UNIQUE Int Text 
-             AceKogHuman Text  Text   // Text, because this is an external reference
-             AceKogMouse Text  Text   // Text, because this is an external reference
-             AceKogRat Text  Text   // Text, because this is an external reference
-             AceKogWorm Text  Text   // Text, because this is an external reference
-             AceKogAra Text Text // Text, because this is an external reference
+             AceKogHuman Text  Text  UNIQUE Text   // Text, because this is an external reference
+             AceKogMouse Text  Text  UNIQUE Text   // Text, because this is an external reference
+             AceKogRat Text  Text  UNIQUE Text   // Text, because this is an external reference
+             AceKogWorm Text  Text  UNIQUE Text   // Text, because this is an external reference
+             AceKogAra Text Text UNIQUE Text  // Text, because this is an external reference
+             AceKogTardigrade Text UNIQUE   Text  UNIQUE  Text // Text, because this is an external reference
          PSR Psort_Date UNIQUE DateType 
              Psort Localization ?Psort UNIQUE Float
              Domain ?Motif ?Method Float Int UNIQUE Int Int UNIQUE Int Text    
@@ -1146,6 +1151,7 @@
                                                                                 Protostomia      Mollusca
                                                                                                  Panarthropoda  Anopheles_gambiae_str_PEST
                                                                                                                 Drosophila_melanogaster 
+                                                                                                                Tardigrada Ramazzottius_varieornatus   
                                                                                 Deuterostomia    Echinodermata
                                                                                                  Chordata   Vertebrata   Teleostomi  Teleostei  Takifugu_rubripes
                                                                                                                                                 Danio_rerio
@@ -1177,8 +1183,10 @@
                              NProtostomia UNIQUE Int
                              NMollusca UNIQUE Int
                              NPanarthropoda UNIQUE Int
+                             NTardigrada UNIQUE Int
                              NAnopheles_gambiae_str_PEST   UNIQUE Int  ?Method ?Protein Float
                              NDrosophila_melanogaster   UNIQUE Int  ?Method ?Protein Float
+                             NRamazzottius_varieornatus  UNIQUE Int  ?Method ?Protein Float
                              NDeuterostomia UNIQUE Int
                              NEchinodermata UNIQUE Int
                              NChordata UNIQUE Int   

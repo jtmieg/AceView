@@ -85,6 +85,8 @@ endif
 if ($species == worm) then
   set date=2019_08_24
   set ff='/home/mieg/ACEVIEWHELP/Worm_DATA/20190828_SRA_RNA_runinfo.txt'
+  set date=2024_03_21
+  set ff='/home/mieg/ACEVIEWHELP/Worm_DATA/20230321_26255_RNAinSRA_Celegans_SraRunInfo.txt'
 endif
 if ($species == mm) then
   set date=2016_11_04

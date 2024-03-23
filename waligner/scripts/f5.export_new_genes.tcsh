@@ -168,7 +168,7 @@ if (! -e tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta.gz) then
      dna  -noClassName tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta
      quit
 EOF
-  cat tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta | sed -e 's/>G_t_/Magic_/' | gzip >  tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta.gz
+  cat tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta | sed -e 's/G_t_/Magic_/g' | gzip >  tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta.gz
   \rm  tmp/X.$MAGIC/XH$chrom/f5.goodMrnas.fasta
 endif
 

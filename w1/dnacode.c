@@ -245,7 +245,7 @@ static char Se_atoms[27] =
 int pepWeight (Array pep)  /* encoded array */
 {
   char *cp ;
-  int i, residue, w = -1 ;
+  int residue, w = -1 ;
 
   int Ccnt = 0;  /* initialize counters */
   int Hcnt = 2;  /* always start with water */
@@ -255,22 +255,24 @@ int pepWeight (Array pep)  /* encoded array */
   int Secnt = 0;
   
   
-  if (pep && (i = arrayMax(pep)))
-  {
-    cp = arrp (pep, 0, char) - 1 ;
-    while (cp++, i--)
-      {
-	residue = *cp ;
-
-	if (H_atoms[residue] == 0)  /* unsupported AA */
-	  return w ;                /* bail out */
-	Ccnt += C_atoms[residue];
-	Hcnt += H_atoms[residue];
-	Ncnt += N_atoms[residue];
-	Ocnt += O_atoms[residue];
-	Scnt += S_atoms[residue];
-	Secnt += Se_atoms[residue];
-      }
+  if (pep)
+    {
+      int i = arrayMax(pep) ;
+      cp = arrp (pep, 0, char) - 1 ;
+      while (cp++, i--)
+	{
+	  residue = *cp ;
+	  if (residue == 22)
+	    break ;
+	  if (H_atoms[residue] == 0)  /* unsupported AA */
+	    return w ;                /* bail out */
+	  Ccnt += C_atoms[residue];
+	  Hcnt += H_atoms[residue];
+	  Ncnt += N_atoms[residue];
+	  Ocnt += O_atoms[residue];
+	  Scnt += S_atoms[residue];
+	  Secnt += Se_atoms[residue];
+	}
     }
   
   w = (12.01115 * Ccnt) + (1.0079 * Hcnt) +
