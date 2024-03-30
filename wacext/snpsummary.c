@@ -972,7 +972,7 @@ static BOOL snpBrsParseCounts (TSNP *tsnp, SNP *snp)
 } /*  snpBrsParseCounts */
 
 /*************************************************************************************/
-/* parse the actual count of a snp, and cumulate in tsnp->coers/count for equivalent snp */
+/* parse the actual count of a snp, and cumulate in tsnp->cover/count for equivalent snp */
 
 static int snpBrsParseTrueCounts (TSNP *tsnp, SNP *snp)
 {
@@ -1869,7 +1869,7 @@ static BOOL snpFilter (TSNP *tsnp, SNP *snp)
 
 /*************************************************************************************/
 
-static const char *allMethods = "VIQSgrGR" ;
+static const char *allMethods = "VIQSgGrR" ;
 /* VIQSgd   */
 /* VIQSDGR     */
 /* VIQSG2   */
@@ -2161,7 +2161,7 @@ static int snpGetSnpsRunsGroups (TSNP *tsnp)
 	      }
 	  }
 
-      qq = hprintf (h, "select g, r from p in ?project where p == \"%s\", g in p->run where g#union_of, r in g>>union_of where ! r#union_of, p2 in r->project where p2 == p", tsnp->project) ;
+      qq = hprintf (h, "select g, r from p in ?project where p == \"%s\", g in p->run where g#union_of && g#snp_add_counts, r in g>>union_of where ! r#union_of, p2 in r->project where p2 == p", tsnp->project) ;
       tt = ac_bql_table (tsnp->db
 			 , qq
 			 , 0

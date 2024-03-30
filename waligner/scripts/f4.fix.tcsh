@@ -3,7 +3,10 @@
 set chrom=$1
 
 bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
+  query find predicted_gene IS magic.*
+  kill
   read-models
+  parse metaData/methods.ace
   query find gene capture == A2
   edit Colour YELLOW
   query find gene capture == R3
@@ -11,19 +14,20 @@ bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
   query capture == A2
   edit Colour ORANGE
   query find est XI_*
+  edit COLOUR BLUE1
   query Composite > 1
   edit COLOUR BLUE2
-  query Composite > 2
+  query Composite > 4
   edit COLOUR BLUE3
-  query Composite > 5
+  query Composite > 16
   edit COLOUR BLUE4
-  query Composite > 10
+  query Composite > 64
   edit COLOUR BLUE5
-  query Composite > 20
+  query Composite > 256
   edit COLOUR BLUE6
-  query Composite > 50
+  query Composite > 1024
   edit COLOUR BLUE7
-  query Composite > 100
+  query Composite > 4048
   edit COLOUR BLUE8
   save
   quit
@@ -96,7 +100,7 @@ EOF
     cat f4.fix.in_gtag.txt f4.fix.no_gtag.txt | gawk -F '\t' '{chr=$1;a1=$2;a2=$3;if(a1>a2){if($4=="good"){$2+=30;$3-=30};print;}}' | sort -k 1,1 -k 3,3n > f4.fix.gt_ag.r.txt
 
   cat f4.fix.gt_ag.f.txt | gawk  '{c=$1;a1=$2;a2=$3;n=$6;if($4=="good"){if(c== iC && a1<i2){if (i2<a2)a2=i2;g=$5;next}iC=c;i1=a1;i2=a2;g=$5;next;}if(c == iC && a1>i1-30 && a2<i2+30){printf("Sequence %s\nFrom_gene %s\n\n",$6,g);}}' > f4.gt_ag.ace
-  cat f4.fix.gt_ag.f.txt | gawk  '{c=$1;a1=$3;a2=$2;n=$6;if($4=="good"){if(c== iC && a1<i2){if (i2<a2)a2=i2;g=$5;next}iC=c;i1=a1;i2=a2;g=$5;next;}if(c == iC && a1>i1-30 && a2<i2+30){printf("Sequence %s\nFrom_gene  %s\n\n",$6,g);}}' >> f4.gt_ag.ace
+  cat f4.fix.gt_ag.r.txt | gawk  '{c=$1;a1=$3;a2=$2;n=$6;if($4=="good"){if(c== iC && a1<i2){if (i2<a2)a2=i2;g=$5;next}iC=c;i1=a1;i2=a2;g=$5;next;}if(c == iC && a1>i1-30 && a2<i2+30){printf("Sequence %s\nFrom_gene  %s\n\n",$6,g);}}' >> f4.gt_ag.ace
 
   ../../../bin/tacembly .  << EOF
     parse f4.gt_ag.ace
@@ -114,6 +118,12 @@ EOF
     acem
       cdna_73 -locally
       quit
+    query find est Xends_* Flipped
+    spush
+    follow cdna_clone
+    sor
+    spop 
+    kill
     save
     quit
 EOF

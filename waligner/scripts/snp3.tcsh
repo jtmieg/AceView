@@ -112,6 +112,20 @@ EOF
   goto done
 endif
 
+if ($phase == G) then
+  bin/tace tmp/TSNP_DB/$zone -no_prompt <<EOF 
+    query find run union_of && project == $MAGIC
+    edit -D project $MAGIC
+    edit -D union_of
+    pparse MetaDB/$MAGIC/runs.ace
+    pparse MetaDB/$MAGIC/groups.ace
+    save
+    quit
+EOF
+  bin/tsnp --db_group_count  --db tmp/TSNP_DB/$zone --project $MAGIC 
+  goto done
+endif
+
 if ($phase == R) then 
     set remap2g=remap2genome
 # if -o filename is not provided, tsnp directly edits the database
@@ -294,7 +308,7 @@ done:
 
   
   foreach zone (`cat tmp/SNP_ZONE/ZoneList `)
-    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh R $zone"
+    scripts/submit tmp/TSNP_DB/$zone "scripts/snp3.tcsh G $zone"
   end
  qusage 1
 

@@ -1702,50 +1702,54 @@ void sxWiggleFloor (WIGGLE *sx, float mini)
 
 /*************************************************************************************/
 /*************************************************************************************/
-/* the 'ratio' is between 0 and 200, a value above 100 indicates
- * less than 1% r/f and if r = 0 then f is at least 20
+/* the 'ratio' 
+ * ATTENTION  synchronize with htileSolexaEndRatios 
  */
-static void sxWiggleRatioOne (WIGGLE *sx, Array aa, Array bb)
+static void sxWiggleEndRatioOne (WIGGLE *sx, Array aa, Array bb)
 { 
   int ii, iiMax = aa ? arrayMax (aa) : 0 ;
   int jjMax = aa ? arrayMax (bb) : 0 ;
   WIGGLEPOINT *wp, *zp ;
   
+  /* if iiMax > jjMax, do not touch the large ii values */
   if (iiMax > jjMax) iiMax = jjMax ;
+
   if (aa)
     {
-      for (ii = 0, wp = arrp (aa, ii, WIGGLEPOINT), zp = arrp (bb, ii, WIGGLEPOINT) ; ii < iiMax ; ii++, wp++, zp++) 
+      float *rp ;
+      Array rr = arrayCreate (iiMax, float) ;
+      array (rr, iiMax, float) = 0 ;
+
+      for (ii = 6, wp = arrp (aa, ii, WIGGLEPOINT), zp = arrp (bb, ii, WIGGLEPOINT), rp = arrp (rr,ii, float) ; ii < iiMax - 6 ; ii++, wp++, zp++, rp++) 
 	{
-	  /* compute the contrast, normalize the saturation at 350 
-	   * so that we will retain 1/5 of the saturation as our threshold of 100
-	   */
-	  float u = wp->y / (100.0 * zp->y + wp->y + 20) ;
-	  wp->y = 500 * u * u ; /* the squares crushes the low values */
-	}
-      /* take the 50 bp median */
-      if (1)
-	{
-	  int i, NN = 2 ;
-	  Array cc = arrayCopy (aa) ; /* because we update aa */
-	  Array zz = arrayCreate (2*NN + 1, float) ; 
-	   
-	  array (zz, 2*NN, float) = 0 ; /* make room */
-	  for (ii = NN, wp = arrp (aa, ii, WIGGLEPOINT), zp = arrp (cc, ii, WIGGLEPOINT) ; ii < iiMax - NN ; ii++, wp++, zp++) 
+	  float x = 0, y = 0, u ;
+	  int damper = 10 ;
+	  float seuil = .7 ;
+	  float zoom = 40 ;
+
+	  /* average over 11 steps (generally 100 bases */
+	  for (int j = -5 ; j < 6 ; j++)
 	    {
-	      for (i = -NN ; i <= NN ; i++)
-		arr (zz, NN + i, float) = (zp - i)->y ;
-	      arraySort (zz, floatOrder) ;
-	      wp->y = arr (zz, 2, float) ;
+	      x += wp[j].y ;
+	      y += zp[j].y ;
 	    }
-	  arrayDestroy (cc) ;
+	  x /= 11 ;
+	  y /= 11 ;
+	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
+	  if (u < 0) u = 0 ;
+	  *rp = zoom * u * x ;
 	}
+    
+      for (ii = 0, wp = arrp (aa, ii, WIGGLEPOINT), rp = arrp (rr, ii, float) ; ii < iiMax ; ii++, wp++, rp++) 
+	wp->y = *rp ; 
+      arrayDestroy (rr) ;
     }
   return ;
-} /* sxWiggleRatioOne */
+} /* sxWiggleEndRatioOne */
 
 /*************************************************************************************/
 
-void sxWiggleRatio (WIGGLE *sx)
+void sxWiggleEndRatio (WIGGLE *sx)
 {
   Array aa, bb ; 
   int remap ;
@@ -1758,9 +1762,9 @@ void sxWiggleRatio (WIGGLE *sx)
 	aa =  arr (sx->aaa, remap, Array) ;
 	bb =  arr (sx->aaaCopy, remap, Array) ;
 	if (arrayExists (aa) && arrayMax (bb))
-	  sxWiggleRatioOne (sx, aa, bb) ;
+	  sxWiggleEndRatioOne (sx, aa, bb) ;
       }
-} /* sxWiggleRatio */
+} /* sxWiggleEndRatio */
 
 /*************************************************************************************/
 /*************************************************************************************/

@@ -649,7 +649,7 @@ void pickGetDisplayTypes(void)
 		if (!freefloat(&x))
 		  messcrash("Missing float width value in line %d of wspec/displays.wrm at %s",
 			    line,  freepos()) ;
-		if (x < 0 || x > 1.3)
+		if (x < 0 || x > 1.99)
 		  messout ("In wsepc/displays.wrm, line %d, width value %f out of range .0 1.3",
 			   line, x ) ;
 		else
@@ -716,7 +716,7 @@ void pickSetGraphTypes (void)
   pickSetGraphType ("DtUpdate", TEXT_SCROLL) ;
   pickSetGraphType ("DtLongText", TEXT_FULL_SCROLL) ;
   pickSetGraphType ("DtQuery", TEXT_SCROLL) ;
-  pickSetGraphType ("DtBqlDisplay", TEXT_FULL_SCROLL) ;
+  pickSetGraphType ("DtBqlDisp", TEXT_FULL_SCROLL) ;
   pickSetGraphType ("DtQueryBuilder", TEXT_FULL_SCROLL) ;
   pickSetGraphType ("DtQueryByExample", TEXT_FULL_SCROLL) ;
   pickSetGraphType ("DtSpreadSheet", TEXT_FULL_SCROLL) ;

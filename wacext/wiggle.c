@@ -224,8 +224,6 @@ static void sxVentilate (WIGGLE *sx)
   BOOL hierarchic = sx->hierarchic ;
   BOOL firstRead ;
   BOOL inTranscript = FALSE ;
-  BOOL hasPair = sx->pair ? TRUE : FALSE ;  /* we also autodetect the pairs */
-  BOOL goodPair = TRUE ;
   int lastScore = 0, lastAli = 0, lastToAli = 0 ;
   int EndLength = 30 ;
   int chainNumber, chainFrom, chainTo, mateScore, mateAli , mateToAli ;
@@ -447,7 +445,6 @@ static void sxVentilate (WIGGLE *sx)
 
       /* missmatches and overhangs, reported in col 14 to 21 are ignored in this program */
 
-      goodPair = TRUE ; 
       if (1)
 	{
 	  int mateAliDirect  = 0, mateToAliDirect  = 0,  mateScoreDirect = 0 ; /* in case they are available in cols 23 24 */
@@ -465,10 +462,6 @@ static void sxVentilate (WIGGLE *sx)
 	    int deltaPair = 0 ;
 	    aceInStep (ai, '\t') ;  aceInInt (ai, &deltaPair) ; aceInStep (ai, '-') ; 
 	      
-	    if (deltaPair > 30 || deltaPair < -30) hasPair = TRUE ; /* at least one correctly annotated pair was found */
-	    if (hasPair &&  deltaPair >  NON_COMPATIBLE_PAIR && deltaPair < 0 && deltaPair != -2 && deltaPair != -5)  /* synchronize to hack these reserved values with bestali.c */
-	      goodPair = FALSE ;
-	    
 	    /*                synchronize with snp.c */
 	    aceInStep (ai, '\t') ; aceInInt (ai, &mateScore) ; aceInStep (ai, '-') ; 
 	    aceInStep (ai, '\t') ; aceInInt (ai, &mateAli) ; aceInStep (ai, '-') ; 
@@ -1101,8 +1094,10 @@ int main (int argc, const char **argv)
   if (getCmdLineFloat(&argc, argv, "-stranding", &(sx.wiggleScale2)))
     {
       float x = sx.wiggleScale2 ;
-      if (x < 120 && x > 50) x = 100.0 - x ;
-      sx.wiggleScale2 = 2.0 * x / 100.0 ;
+      if (x > 20 && x < 80)
+	sx.wiggleScale2 = 1 ; /* add up the 2 strand */
+      else
+	sx.wiggleScale2 = -2 * (100 - x) / 100.0 ;
     }
 
   /* strand shift */
@@ -1254,6 +1249,7 @@ int main (int argc, const char **argv)
       sxGetSelection (&sx) ;
       sxGetMap (&sx) ;
       
+      ac_free (sx.ai) ;
       if (sx.transcriptsEndsFileName)  /* transcriptsEnds */
 	{
 	  int pass ;
@@ -1284,15 +1280,20 @@ int main (int argc, const char **argv)
 		  break ;
 		}
 	      sx.aoPeaks = aceOutCreate (hprintf (h, "%s.%s", sx.outFileName, elf), ".transcriptsEnds", sx.gzo, h) ;
-	      /* remove the scaled opposite strand "other end"*/
-	      sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, err, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
-	      if (sx.ai)
+	      /* add or remove the scaled opposite strand "other end"*/
+	      if (sx.wiggleScale2)
 		{
-		  aceInSpecial (sx.ai,"\t\n") ;
-		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
-		  ac_free (sx.ai) ;
+		  sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, err, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
+		  if (sx.ai)
+		    {
+		      aceInSpecial (sx.ai,"\t\n") ;
+		      sxWiggleParse (&sx, 0, 0) ;      /* parse x */
+		      ac_free (sx.ai) ;
+
+		      if (sx.wiggleScale2 != 1)
+			sxWiggleScale (&sx,  sx.wiggleScale2) ;
+		    }
 		}
-	      sxWiggleScale (&sx,  -sx.wiggleScale2/sx.wiggleScale1) ;
 
 	      /* add the good strand "other end" */
 	     sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, erf, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
@@ -1302,23 +1303,29 @@ int main (int argc, const char **argv)
 		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
 		  ac_free (sx.ai) ;
 		}
-	      sxWiggleScale (&sx,  sx.wiggleScale1) ;
-	      sxWiggleFloor (&sx, 0) ;
+	      if (sx.wiggleScale1 != 1)
+		sxWiggleScale (&sx,  sx.wiggleScale1) ;
+	      if (sx.wiggleScale2 < 0)
+		sxWiggleFloor (&sx, 0) ;
 	      /* sxWiggleShift (&sx, sx.wiggleRatioDamper) ; */
 	      sxWiggleCopy (&sx) ;    /* push the "other end" on the wiggle stack */
 	      sx.aaa = 0 ;  sx.aaa = arrayHandleCreate (100, Array, h) ; sxGetMap (&sx) ;
 
-	      /* remove the scaled "good end" opposite strand */
-	      sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, elr, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
-	      if (sx.ai)
+	      /* add or remove the scaled "good end" opposite strand */
+	      if (sx.wiggleScale2)
 		{
-		  aceInSpecial (sx.ai,"\t\n") ;
-		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
-		  ac_free (sx.ai) ;
+		  sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, elr, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
+		  if (sx.ai)
+		    {
+		      aceInSpecial (sx.ai,"\t\n") ;
+		      sxWiggleParse (&sx, 0, 0) ;      /* parse x */
+		      ac_free (sx.ai) ;
+		    }
+		  if (sx.wiggleScale2 != 1)
+		    sxWiggleScale (&sx,  sx.wiggleScale2) ;
 		}
-	      sxWiggleScale (&sx,  -sx.wiggleScale2/sx.wiggleScale1) ;
 
-	      /* add the good end good stand */
+	      /* add the good end good strand */
 	     sx.ai = aceInCreate (hprintf(h,"%s.%s.%s%s",sx.transcriptsEndsFileName, elf, iType, sx.gzi ? ".gz" : ""), sx.gzi, h) ;
 	      if (sx.ai)
 		{
@@ -1326,24 +1333,16 @@ int main (int argc, const char **argv)
 		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
 		  ac_free (sx.ai) ;
 		}
-	      sxWiggleScale (&sx,  sx.wiggleScale1) ;
-	      sxWiggleFloor (&sx, 0) ;
-
-	      /*
-	      sxWiggleShift (&sx, sx.wiggleRatioDamper) ;
-	      sxWiggleRatio (&sx) ; // divide "goodEnd" by "badEnd" stored in the wiggleCopyBuffer 
-	      sxWiggleScale (&sx,  sx.wiggleRatioDamper) ;
-	      sxWiggleShift (&sx,  -sx.wiggleRatioDamper) ;
-	      sxWiggleFloor (&sx, 0) ;
-	      */
+	      if (sx.wiggleScale1 != 1)
+		sxWiggleScale (&sx,  sx.wiggleScale1) ;
+	      if (sx.wiggleScale2 < 0)
+		sxWiggleFloor (&sx, 0) ;
 	      
-	      sxWiggleRatio (&sx) ; /* compute: 200 * f / (100 * r + f + 20) */
+	      sxWiggleEndRatio (&sx) ;
 
 	      sxWiggleExport (&sx) ;
 	    }
- 
-	  sx.ai = old ;
-	}
+ 	}
       else /* if (!sx.transcriptends)  multiPeaks */
 	{
 	  /* z = ax + by   ==   b (a/b x + y) */
@@ -1424,18 +1423,19 @@ int main (int argc, const char **argv)
 		  sxWiggleParse (&sx, 0, 0) ;      /* parse x2 -> x1+x2 */
 		  ac_free (sx.ai) ;    
 		}
-	      if (1) /* compute x' = alpha * zadd y */
+	      if (1) /* compute x' */
 		{
+		  /* x' = alpha*(x1+x2) OR x1 if (alpha undefined) */
 		  sxWiggleMultiplyLocally (&sx, Alpha, aaa1) ;      /* ratio */
 		}
 	      sxWiggleExport (&sx) ;
 	   
-	      sx.ai = old ; sx.aaa = 0 ;
+	      sx.aaa = 0 ;
 	      ac_free (h) ;
 	    }
 	  else if (sx.wiggleFileName1)
 	    { 
-	      ACEIN old = sx.ai ;
+	      ac_free (sx.ai) ;
 	      sx.ai = aceInCreate (sx.wiggleFileName1, sx.gzi, h) ;
 	      aceInSpecial (sx.ai,"\t\n") ;
  
@@ -1446,16 +1446,19 @@ int main (int argc, const char **argv)
 		  float scale2 = sx.wiggleScale2 ;
 		  
 		  if (sx.wiggleScale2) 
-		    scale1 /= -sx.wiggleScale2 ;   
-		  sxWiggleScale (&sx, scale1) ;   /* obtain -a/b x */
+		    scale1 /= sx.wiggleScale2 ;   
+		  if (scale1 != 1)
+		    sxWiggleScale (&sx, scale1) ;   /* obtain a/b x */
 		  ac_free (sx.ai) ;
 		  sx.ai = aceInCreate (sx.wiggleFileName2, sx.gzi, h) ;
 		  aceInSpecial (sx.ai,"\t\n") ;
-		  sxWiggleParse (&sx, 0, 0) ;     /* add y, obtain -a/b x + y */
-		  sxWiggleScale (&sx, -scale2) ; /* scale again, obtain ax - by */
+		  sxWiggleParse (&sx, 0, 0) ;     /* add y, obtain a/b x + y */
+		  if (scale2 != 1)
+		    sxWiggleScale (&sx, scale2) ; /* scale again, obtain ax + by */
+		  if (scale2 < 0)
+		    sxWiggleFloor (&sx, 0) ;
 		}
 	      ac_free (sx.ai) ;
-	      sx.ai = old ;
 	    }
 	  else  /* single wiggle */
 	    { 

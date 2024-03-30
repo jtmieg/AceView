@@ -2745,34 +2745,34 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 {
   PNX *pnx ;
-  Array w0 = pnx0->signal ;
-  Array w1 = 0, w2 = 0, w3 = 0, w4 = 0 ;
   unsigned int flag1 = 0, flag2 = 0, flag3 = 0, flag4 = 0 ;
   int i, ns1 = 0, ns2 = 0, ns3 = 0, ns4 = 0 ;
-  
+  float seuil = .7 ;
+  float zoom = 40 ;
   if ((pnx0->flag &  PGG_endRatioLF) ==  PGG_endRatioLF)
-    { flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
+    { zoom = 40 ; flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
   if ((pnx0->flag &  PGG_endRatioRF) ==  PGG_endRatioRF)
-    { flag1 = PGG_ERF ; flag2 = PGG_ELF ;  flag3 = PGG_ERR ; flag4 = PGG_ELR ; }
+    { zoom = 40 ; flag1 = PGG_ERF ; flag2 = PGG_ELF ;  flag3 = PGG_ERR ; flag4 = PGG_ELR ; }
   if ((pnx0->flag &  PGG_endRatioLR) ==  PGG_endRatioLR)
-    { flag1 = PGG_ELR ; flag2 = PGG_ERR ; flag3 = PGG_ELF ; flag4 = PGG_ERF ; }
+    { zoom = 40 ; flag1 = PGG_ELR ; flag2 = PGG_ERR ; flag3 = PGG_ELF ; flag4 = PGG_ERF ; }
   if ((pnx0->flag &  PGG_endRatioRR) ==  PGG_endRatioRR)
-    { flag1 = PGG_ERR ; flag2 = PGG_ELR ; flag3 = PGG_ERF ; flag4 = PGG_ELF ; }
+    { zoom = 40 ; flag1 = PGG_ERR ; flag2 = PGG_ELR ; flag3 = PGG_ERF ; flag4 = PGG_ELF ; }
 
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
-    if ((pnx->flag & flag1) == flag1) { w1 = pnx->signal ; ns1 = ns - i ; break ; }
+    if ((pnx->flag & flag1) == flag1) { pnx0->signal = pnx->signal ; ns1 = ns - i ; break ; }
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
-    if ((pnx->flag & flag2) == flag2) { w2 = pnx->signal ; ns2 = ns - i ; break ; }
+    if ((pnx->flag & flag2) == flag2) { ns2 = ns - i ; break ; }
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
-    if ((pnx->flag & flag3) == flag3) { w3 = pnx->signal ; ns3 = ns - i ; break ; }
+    if ((pnx->flag & flag3) == flag3) { ns3 = ns - i ; break ; }
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
-    if ((pnx->flag & flag4) == flag4) { w4 = pnx->signal ; ns4 = ns - i ; break ; }
+    if ((pnx->flag & flag4) == flag4) { ns4 = ns - i ; break ; }
 
   if (ns1 && ns2)
     {
       unsigned int iMax =  arrayMax (look->map->solexa) ;
-      SLX *slx, *slx1, *slx2, *slx3, *slx4 ;
+      SLX *slx, *slx1 ;
 
+      /* ATTENTION synchronize with sxWiggleEndRatioOne */
       for (int ii = 6 ; ii < iMax - 6 ; ii++)
 	{
 	  float x = 0, y = 0, z=0, t=0, u=0 ;
@@ -2787,15 +2787,15 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	      if (ns3) z += slx1->signal[ns3] ; 
 	      if (ns4) t += slx1->signal[ns4] ; 
 	    }
-	  x = x + .9 * z ; if (x < 0) x = 0 ; x /= 11 ; 
-	  y = y + .9 * t ; if (y < 0) y = 0 ; y /= 11 ;
-	  u =  (x + damper) / (x + y + 2 * damper) - .7 ;
+	  x = x + z ; if (x < 0) x = 0 ; x /= 11 ; 
+	  y = y + t ; if (y < 0) y = 0 ; y /= 11 ;
+	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
 	  if (u < 0) u = 0 ;
-	  slx->signal[ns] = 40 * u * x ;
+	  slx->signal[ns] = zoom * u * x ;
 	}
     }
   look->isClosed[ns] = look->isSolexaClosed[ns] = 2 ;  
-  pnx0->signal = w1 ;
+  /*   pnx0->signal = w1 ; */
 
 } /* htileSolexaEndRatios */
 
@@ -6159,7 +6159,17 @@ static void htileDraw (void)
       int a2 = ac_table_int (tbl, 0, 2, 0) ;
       int a0, centre ;
 
-      if (!strcasecmp (ac_class (Gene), "Gene") || !strcasecmp (ac_class (Gene), "PBS"))
+      if (! Gene)
+	{
+	  int da = 3000 ;  /* initial zone-widht of the wiggle */
+	  centre = look->from + look->map->min - look->map->a1 ;
+	  look->map->mag = (3.0 * look->map->graphWidth) / (7.0 * da) ;
+	  /* center the center */
+	  a0 = TGRAPH2MAP(look->map, look->map->graphWidth/2.0) ;
+	  look->map->offset += centre - a0 ;
+	  a0 = TGRAPH2MAP(look->map, look->map->graphWidth/2.0) ;
+	}
+      else if (!strcasecmp (ac_class (Gene), "Gene") || !strcasecmp (ac_class (Gene), "PBS"))
 	{
 	  if (a1 > a2) { int a3 = a1 ; a1 = a2 ; a2 = a3 ; }
 	  if (a1 && a2 && a2 > look->map->a1 && a1 < look->map->a2)

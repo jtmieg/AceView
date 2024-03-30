@@ -289,10 +289,12 @@ endif
 set WGR=toto
 echo "grab the XG/XH"
 foreach XGH (XG XH)
+  if ($XGH == XG) set stranding=98
   if ($XGH == XG && $ggS == toto) continue 
   if ($XGH == XH && $ggNS == toto) continue 
   set ggs=$ggS
   if ($XGH == XH) set ggs=$ggNS
+  if ($XGH == XH) set stranding=50
   if ($XGH == XH && $ggNS == $ggS) continue
 
   if (-d  tmp/WIGGLEGROUP/$ggs) set WGR=WIGGLEGROUP
@@ -321,8 +323,8 @@ foreach XGH (XG XH)
 # transcriptsEnds :  
 
     echo "Construct the transcriptsEnds  $WGR/$ggs"
-    echo "  bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -I BF -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding 98 -minCover 100 -wiggleRatioDamper 5"
-                bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -I BF -gzi -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding 98 -minCover 100 -wiggleRatioDamper 5
+    echo "  bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5"
+            bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5
 
   foreach fr (ELF ELR ERF ERR)
     cat tmp/X.$MAGIC/XH$chrom/f3.Xends.*.$fr.transcriptsEnds >> tmp/X.$MAGIC/XH$chrom/f3.Xends.$fr.transcriptsEnds
@@ -334,17 +336,17 @@ foreach fr (ELF ELR ERF ERR)
   if (-e  $ff) then
 
      if ($fr == ELF) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite 100\nForward\n\n", $1, $1,$4,$5,$6);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$6);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite %d\nForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ERF) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite 100\nForward\n\n", $1, $1,$4,$5,$6);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$6);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite %d\nReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ERR) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<2)$1=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite 100\nForward\n\n", $1, $1,$4,$5,$6);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<2)$1=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$6);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite %d\nForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ELR) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite 100\nForward\n\n", $1, $1,$4,$5,$6);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$6);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite %d\nReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      endif
 
      bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow $ff.shadow > $ff.fasta
@@ -362,13 +364,13 @@ end
 ls -ls   tmp/SLpA/$ggNS.SLpA.gz tmp/SLpA/$ggS.SLpA.gz
 if ((-e tmp/SLpA/$ggNS.SLpA.gz || -e tmp/SLpA/$ggS.SLpA.gz) && ! -e tmp/X.$MAGIC/XH$chrom/f3.XA.fasta)  then
   echo "Grab the XA_"
-  gunzip -c tmp/SLpA/$ggNS.SLpA.gz tmp/SLpA/$ggS.SLpA.gz | gawk -F '\t' '/^pA/{if($2 == chrom && $5 > 10) {a1=$3;if($4=="Forward")a2=a1-30;else a2=a1+30;support=$5;printf("Sequence XA_%s__%s_%d\ncDNA_clone XA_%s__%s_%d\nIntMap %s %d %d\nIs_read\nColour LIGHTORANGE\nComposite %d\nReverse\nmReverse\nPolyA_after_base 9\n\n",chrom,a1,a2,chrom,a1,a2,chrom,a1,a2,support);}}' chrom=$chrom >  tmp/X.$MAGIC/XH$chrom/f3.XA.ace
+  gunzip -c tmp/SLpA/$ggNS.SLpA.gz tmp/SLpA/$ggS.SLpA.gz | gawk -F '\t' '/^pA/{if($2 == chrom && $5 > 0) {a1=$3;if($4=="Forward")a2=a1-30;else a2=a1+30;support=$5;printf("Sequence XA_%s__%s_%d\ncDNA_clone XA_%s__%s_%d\nIntMap %s %d %d\nIs_read\nColour LIGHTORANGE\nComposite %d\nReverse\nmReverse\nPolyA_after_base 9\n\n",chrom,a1,a2,chrom,a1,a2,chrom,a1,a2,support);}}' chrom=$chrom >  tmp/X.$MAGIC/XH$chrom/f3.XA.ace
   cat tmp/X.$MAGIC/XH$chrom/f3.XA.ace | gawk '/^Sequence/{split($2,aa,"__");chrom=substr(aa[1],4);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/XH$chrom/f3.XA.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/XH$chrom/f3.XA.shadow | gawk '/^>/{print;next;}{printf("AAAAAAAA%s\n",$1);}' >  tmp/X.$MAGIC/XH$chrom/f3.XA.fasta
 ls -ls  tmp/X.$MAGIC/XH$chrom/f3.XA.ace
 
   echo "Grab the XSL_"
-  gunzip -c tmp/SLpA/$ggNS.SLpA.gz tmp/SLpA/$ggS.SLpA.gz | gawk -F '\t' '/^SL/{if($2 == chrom && $5 > 4) {a1=$3;if($4=="Forward")a2=a1+30;else a2=a1-30;support=$5;printf("Sequence X%s_%s__%s_%d\ncDNA_clone X%s_%s__%s_%d\nIntMap %s %d %d\nIs_read\nColour BLACK\nComposite %d\nForward\nmForward\n\n",$1,chrom,a1,a2,$1,chrom,a1,a2,chrom,a1,a2,support);}}' chrom=$chrom >  tmp/X.$MAGIC/XH$chrom/f3.XSL.ace
+  gunzip -c tmp/SLpA/$ggNS.SLpA.gz tmp/SLpA/$ggS.SLpA.gz | gawk -F '\t' '/^SL/{if($2 == chrom && $5 > 0) {a1=$3;if($4=="Forward")a2=a1+30;else a2=a1-30;support=$5;printf("Sequence X%s_%s__%s_%d\ncDNA_clone X%s_%s__%s_%d\nIntMap %s %d %d\nIs_read\nColour BLACK\nComposite %d\nForward\nmForward\n\n",$1,chrom,a1,a2,$1,chrom,a1,a2,chrom,a1,a2,support);}}' chrom=$chrom >  tmp/X.$MAGIC/XH$chrom/f3.XSL.ace
   cat tmp/X.$MAGIC/XH$chrom/f3.XSL.ace | gawk '/^Sequence/{split($2,aa,"__");i=index(aa[1],"_");chrom=substr(aa[1],i+1);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/XH$chrom/f3.XSL.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/XH$chrom/f3.XSL.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/XH$chrom/f3.XSL.fasta
 else
@@ -404,8 +406,6 @@ laba:
     pparse tmp/X.$MAGIC/XH$chrom/f3.XA.fasta
     pparse tmp/X.$MAGIC/XH$chrom/f3.XSL.ace
     pparse tmp/X.$MAGIC/XH$chrom/f3.XSL.fasta
-    // pparse tmp/X.$MAGIC/XH$chrom/f3.XLRFR.ace
-    // pparse tmp/X.$MAGIC/XH$chrom/f3.XLRFR.fasta
     pparse tmp/X.$MAGIC/EHITS/$chrom/f3.introns.ace
     pparse tmp/X.$MAGIC/EHITS/$chrom/f3.transcriptsIntronSupport.ace
     query find Run IS $ggs && ! W_colour_plus
@@ -520,6 +520,7 @@ EOF
 
 foreach target ($RNAtargets)
   if ($target == av) continue
+  if ($target == magic) continue
   if ($target == rrna) continue
   if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz) then
     bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF  
@@ -535,11 +536,7 @@ foreach target ($RNAtargets)
       sminus
       spop
       kill
-      find method $target
-      edit Colour GREEN
-      edit Show_up_strand
-      edit Bumpable
-      edit Right_priority 1.6
+      parse metaData/methods.ace
       save
       quit
 EOF

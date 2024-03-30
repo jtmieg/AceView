@@ -72,6 +72,7 @@
                Recons Recons_str
       Origin Date_received UNIQUE DateType  Text    
              Submission_date UNIQUE DateType    
+             Release_date UNIQUE DateType    
       Taxonomy Archea      Text Text UNIQUE Float
                Bacteria    Text Text UNIQUE Float
                Eukaryota   Text Text UNIQUE Float
@@ -108,7 +109,9 @@
                             Nervous_and_sense_organ   UNIQUE ?Systm XREF Nervous_and_sense_organ    UNIQUE ?Text
                             Respiratory   UNIQUE ?Systm XREF Respiratory    UNIQUE ?Text
                             Urogenital   UNIQUE ?Systm XREF Urogenital   UNIQUE ?Text
-                     Stage  Embryo UNIQUE ?Text
+                     Stage  Early_embryo UNIQUE ?Text
+                            Embryo UNIQUE ?Text
+                            Late_embryo UNIQUE ?Text
                             Any_larva UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
@@ -116,7 +119,9 @@
                             L4 UNIQUE ?Text
                             Dauer UNIQUE ?Text
                             Pupa UNIQUE ?Text
+                            Young_adult UNIQUE  ?Text
                             Adult UNIQUE  ?Text
+                            Old_adult UNIQUE  ?Text
                             Mixed_stages UNIQUE   UNIQUE ?Text
                             Age UNIQUE Text 
                             No_stage  // non applicable, example in Cell lines samples
@@ -133,14 +138,15 @@
                          Strain ?Strain
       Author_builder Center_name ?Author
       Reference ?Paper XREF SRR
-      Nucleic_Acid_Extraction RNA Unspecified_RNA  UNIQUE ?Text
+      Nucleic_Acid_Extraction RNA Total_RNA  UNIQUE ?Text 
                                   polyA  UNIQUE ?Text // good 
-                                  Nascent_RNA  UNIQUE  ?Text 
-                                  Total_RNA  UNIQUE ?Text 
+                                  scRNA UNIQUE ?Text // single cell
                                   Small_RNA  UNIQUE ?Text
+                                  Nascent_RNA  UNIQUE  ?Text 
                                   Cap_CAGE_RACE  UNIQUE ?Text
                                   DGE  UNIQUE ?Text
                                   RNA_modification   UNIQUE  ?Text  //for methylation or other analyses  
+                                  Unspecified_RNA  UNIQUE ?Text
                               Targeted    RIP_CLIP UNIQUE ?Text
                                           Ribosome_profiling  UNIQUE ?Text
                                           Gene_selection  UNIQUE ?Text
@@ -157,14 +163,15 @@
                               Nucleic_prep_author ?Author
                               Normalized UNIQUE ?Text  // seem to belong to Library Danielle 
       Annotation_problem ?Text
-      sraNucleic_Acid_Extraction  sraRNA sraUnspecified_RNA ?Text
+      sraNucleic_Acid_Extraction  sraRNA sraTotal_RNA ?Text 
                                          sraPolyA  UNIQUE ?Text // good 
-                                         sraNascent_RNA  UNIQUE ?Text 
-                                         sraTotal_RNA ?Text 
+                                         sraScRnaPolyA  UNIQUE ?Text // good 
                                          sraSmall_RNA ?Text
+                                         sraNascent_RNA  UNIQUE ?Text 
                                          sraCap_CAGE_RACE ?Text
                                          sraDGE ?Text
                                          sraRNA_modification   ?Text  //for methylation or other analyses  
+                                         sraUnspecified_RNA ?Text
                                   sraTargeted       sraRIP_CLIP UNIQUE ?Text
                                                     sraRibosome_profiling  UNIQUE ?Text
                                                     sraGene_selection ?Text
@@ -220,38 +227,6 @@
       Annotated_strandedness UNIQUE Stranded UNIQUE Forward UNIQUE Text // f1 forward, f2-3 reverse
                                                     Reverse UNIQUE Text // f1 reverse, f2-3 forward
                                     nonStranded
-      ZhenXia Z_Total_reads UNIQUE Float                 // special paragraph to integrate the ZhenXia data for the Brian Oliver droso project june 2016
-              Z_mapping  Z_unmapped_reads    UNIQUE Float 
-                         Z_non_unique        UNIQUE Float 
-                         Z_unique            UNIQUE Float 
-                         Z_spliced           UNIQUE Float 
-                         Z_unspliced         UNIQUE Float 
-                         Z_sponge ?Target    UNIQUE Float // ambiguous no_feature genes intergenic
-                         Z_nh_Ali ?Target    UNIQUE Float // ERCC mRNA ncRNA pseudogenes rRNA snoRNA snRNA tRNA
-              Z_expressed_genes UNIQUE Int
-              Z_strand  UNIQUE Float // failed f r " reprt f /f+r  ignoring the failed
-	      Z_TIN UNIQUE Float  // then jump 5 columns
-              Z_correl  UNIQUE Float  // correlation of gene expression relative to groups
-              Z_annot Z_sex UNIQUE Text       // column 27
-                      Z_dev_stage UNIQUE Text // column 28
-                      Z_tissue UNIQUE Text    // column 29
-                      Z_genotype UNIQUE Text  // column 30
-                      Z_cell_type UNIQUE Text  // column 31
-                      Z_sample_type  UNIQUE Text  // column 34
-                      Z_center_name  UNIQUE Text  // column 25
-      Brian_annot     B_sex UNIQUE Text       // column 27
-                      B_dev_stage UNIQUE Text // column 28
-                      B_age_stage UNIQUE Text // column 28
-                      B_tissue UNIQUE Text    // column 29
-                      B_background_genotype UNIQUE Text  // column 30
-                      B_treatment_perturbagen UNIQUE Text
-                      B_treatment_conditions UNIQUE Text
-                      B_sample_focus UNIQUE Text
-                      B_cell_type UNIQUE Text  // column 31
-                      B_sample_type  UNIQUE Text  // column 34
-                      B_tissue_position UNIQUE Text
-                      B_FBbt UNIQUE Text
-                      B_notes_flags UNIQUE Text
       FB FBcv ?FBvoc @Title
          FBbt ?FBvoc @Title
          FBdv ?FBvoc @Title

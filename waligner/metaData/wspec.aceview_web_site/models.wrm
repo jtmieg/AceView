@@ -3468,19 +3468,21 @@
                  Nervous_and_sense_organ ?Systm  ?Text
                  Respiratory ?Systm  ?Text
                  Urogenital ?Systm  ?Text
-          Stage             Embryo UNIQUE ?Text
-                            Fetal  UNIQUE ?Text
+                 Stage      Early_embryo UNIQUE ?Text
+                            Embryo UNIQUE ?Text
+                            Late_embryo UNIQUE ?Text
+                            Any_larva UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
                             Dauer UNIQUE ?Text
-                            Larva UNIQUE ?Text
                             Pupa UNIQUE ?Text
-                            Juvenile UNIQUE ?Text
+                            Young_adult UNIQUE  ?Text
                             Adult UNIQUE  ?Text
+                            Old_adult UNIQUE  ?Text
                             Mixed_stages UNIQUE   UNIQUE ?Text
-                            Age UNIQUE Text
+                            Age UNIQUE Text 
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
@@ -3576,14 +3578,18 @@
              SRA_title UNIQUE ?Text                     
              Date_received UNIQUE DateType  Text    
              Submission_date UNIQUE DateType      
-      Nucleic_Acid_Extraction RNA Unspecified_RNA UNIQUE Text
+      Nucleic_Acid_Extraction RNA Unspecified_RNA ?Text
                                   polyA  UNIQUE ?Text // good 
-                                  Nascent_RNA UNIQUE   ?Text 
-                                  Total_RNA UNIQUE Text   // -> Total_RNA remove total
-                                  Small_RNA UNIQUE Text
-                                  Cap_CAGE_RACE UNIQUE Text // modified
-                                  DGE  UNIQUE Text
-                                  RNA_modification  UNIQUE   Text  //for methylation or other analyses  
+                                  Nascent_RNA  UNIQUE ?Text 
+                                  Total Total_RNA ?Text 
+                                        Total_RNA_Ribo_depleted UNIQUE ?Text
+                                  Small_RNA ?Text
+                                  Cap  // oligo_capped_selected Sugano's protocol // obsolete
+                                  CAGE_or_5p_capture ?Text // obsolete
+                                  Cap_CAGE_RACE ?Text
+                                  DGE ?Text
+                                  RIP UNIQUE ?Text // obsolete
+                                  RNA_modification   ?Text  //for methylation or other analyses  
                               Targeted    RIP_CLIP UNIQUE Text
                                           Ribosome_profiling  UNIQUE ?Text
                                           Gene_selection  UNIQUE Text

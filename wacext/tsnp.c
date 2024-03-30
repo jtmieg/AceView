@@ -139,6 +139,7 @@ typedef struct tsnpCallerTable {
   BOOL dbReport ;
   BOOL dbSnpProfile ;
   BOOL dbTranslate ;
+  BOOL dbGroupCount ;
   BOOL dbGGG ;
   BOOL dropMonomodal ;
   const char *dbName ;
@@ -4035,6 +4036,110 @@ static void tsnpDbTranslate (TSNP *tsnp)
   
 /*************************************************************************************/
 /*************************************************************************************/
+/* count per group */
+static void tsnpDbGroupCount (TSNP *tsnp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  AC_DB db = tsnp->db ;
+  AC_ITER iter ;
+  ACEOUT ao = tsnp->outFileName ? aceOutCreate (tsnp->outFileName, ".group_count.ace", tsnp->gzo, h) : 0 ;
+  int nn = 0, nnn = 0 ;
+  AC_OBJ Snp = 0 ;
+  vTXT txt = vtxtHandleCreate (h) ;
+  KEYSET gCounts = 0 ;
+  const char *errors = 0 ;
+  int runClass = 0 ;
+  Array r2gs = arrayHandleCreate (200, KEYSET, h) ;
+  int minSnpCover = tsnp->minSnpCover ;
+
+  
+  char *qq = "select r,g from r in ?runs, g in r >> group where g#SNP_add_counts" ;
+  AC_TABLE tbl = ac_bql_table (db, qq, 0, 0, &errors, h) ;
+  if (tbl)
+    for (int ir = 0 ; ir < tbl->rows ; ir++)
+      {
+	KEY r = ac_table_key (tbl, ir, 0, 0) ;
+	if (r)
+	  runClass = class (r) ;
+	r = KEYKEY (r) ;
+	KEYSET r2g = array (r2gs, r, KEYSET) ;
+	if (! r2g)
+	  r2g = array (r2gs, r, KEYSET) = keySetHandleCreate (h) ;
+	keySet (r2g, keySetMax (r2g)) = KEYKEY (ac_table_key (tbl, ir, 1, 0)) ;
+      }
+  if (! tbl)
+    { ac_free (h) ; return ; }
+
+  if (tsnp->select)
+    iter = ac_query_iter (db, TRUE, hprintf (h, "find variant BRS_counts && IS  \"%s\" ", tsnp->select), 0, h) ;
+  else
+    iter = ac_query_iter (db, TRUE, "Find Variant BRS_counts", 0, h) ;
+
+  /* NOT DONE: split the 729 multi sub and force create the individual pieces */
+  while (ac_free (Snp), Snp = ac_iter_obj (iter))
+    {
+      AC_TABLE tbl = 0 ;
+      AC_HANDLE h1 = ac_new_handle () ;
+      nn++ ;
+      vtxtPrintf (txt, "\nVariant \"%s\"\n", ac_name (Snp)) ;
+
+      gCounts = keySetHandleCreate (h1) ;
+      tbl = ac_tag_table (Snp, "BRS_counts", h1) ;
+      if (tbl)
+	{
+	  for (int ir = 0 ; ir < tbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (tbl, ir, 0, 0) ;
+	      KEYSET r2g = array (r2gs, KEYKEY (run), KEYSET) ;
+	      if (r2g)
+		for (int ig = 0 ; ig < keySetMax (r2g) ; ig++)
+		  {
+		    KEY g = keySet (r2g, ig) ;
+		    for (int ic = 1 ; ic <= 7 ; ic++)
+		      {
+			int x = ac_table_int (tbl, ir, ic, 0) ;
+			keySet (gCounts, 8*g + ic) += x ;
+		      }
+		  }
+	    }
+	}
+      for (int ig = 0 ; ig < keySetMax (gCounts) ; ig += 8)
+	{
+	  int m ; /* cover , mutant */
+	  float f = 0 ;
+	  int c = keySet (gCounts, ig + 1) ;
+	  KEY gr = KEYMAKE (runClass, ig/8) ;
+	  
+	  if (c < minSnpCover)
+	    continue ;
+
+	  vtxtPrintf (txt, "BRS_counts %s", name (gr)) ;
+	  for (int ic = 1 ; ic <= 7 ; ic++)
+	    vtxtPrintf (txt, " %d ", keySet (gCounts, ig + ic)) ;
+	  m = keySet (gCounts, ig + 2) ;
+	  f = c ? 100.0 * m/c : 0 ;
+	  vtxtPrintf (txt, " Frequency %.2f\n", f) ;
+	  nnn++ ;
+	}
+      ac_free (h1) ;
+    }
+  vtxtPrint (txt,"\n") ;
+  if (ao)
+    aceOutf (ao, "%s\n", vtxtPtr (txt)) ;
+  else
+    {
+      ac_parse (db, vtxtPtr (txt), &errors, 0, h) ; 
+      if (errors && *errors)
+	fprintf(stderr, "tsnpDbTranslate parsing error %s\n", errors) ;
+    }
+
+  fprintf (stderr, "Found %d SNPs, exported %d counts\n", nn, nnn) ;
+
+  ac_free (h) ;
+} /* tsnpDbGroupCount */
+  
+/*************************************************************************************/
+/*************************************************************************************/
 /* look for snp in geneBox but not in transcript */
 static int tsnpPotential_splice_disruption (TSNP *tsnp, ACEOUT ao)
 {
@@ -6241,6 +6346,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "//   --db_translate --db ACEDB [--select snp_name]\n"
 	   "//      Translate all [matching] mRNA variants (or genome variants remapped to mRNAs) if they map to a protein coding exon\n"
 	   "//   --db_count_types  --db ACEDB  : count per run the number of SNP passing the cover/count/frquency thresholds of each type sub/indels/transition ...\n"
+	   "//   --db_group_count  --db ACEDB  : add up the counts per group\n"
 	   "// GENE FUSION\n"
 	   "//   --target_class : target class (KT_RefSeq ET_av...) [default ET_av]\n"
 	   "//   --min_GF integer : [default 5]  filter geneFusionFile on min support \n" 
@@ -6385,6 +6491,7 @@ int main (int argc, const char **argv)
   tsnp.dbReport = getCmdLineBool (&argc, argv, "--db_report") ;
   tsnp.dbSnpProfile = getCmdLineBool (&argc, argv, "--db_snp_profile") ;
   tsnp.dbTranslate = getCmdLineBool (&argc, argv, "--db_translate") ;
+  tsnp.dbGroupCount = getCmdLineBool (&argc, argv, "--db_group_count") ;
   tsnp.dbGGG = getCmdLineBool (&argc, argv, "--db_GGG") ;
   tsnp.dropMonomodal = getCmdLineBool (&argc, argv, "--dropMonomodal") ;
   if (tsnp.dbName)
@@ -6426,6 +6533,19 @@ int main (int argc, const char **argv)
       if (! tsnp.db)
 	{
 	  fprintf (stderr, "-db_translate requires -db SnpMetaDataDB, sorry, try -help\n") ;
+	  exit (1) ;
+	}
+    }
+  if (tsnp.dbGroupCount)
+    {
+      if (! tsnp.project)
+	{
+	  fprintf (stderr, "-db_group_count requires -project $MAGIC, sorry, try -help\n") ;
+	  exit (1) ;
+	}
+      if (! tsnp.db)
+	{
+	  fprintf (stderr, "-db_group_count requires -db SnpMetaDataDB, sorry, try -help\n") ;
 	  exit (1) ;
 	}
     }
@@ -6483,6 +6603,10 @@ int main (int argc, const char **argv)
       if (1) tsnpDbTranslate (&tsnp) ;
       if (0) tsnpCodingModif (&tsnp) ; /* probably obsolete */
       if (0) tsnpExportProfile (&tsnp) ; /* export tsf file for this section */
+    }
+  if (tsnp.dbGroupCount)
+    {
+      if (1) tsnpDbGroupCount (&tsnp) ;
     }
   if (tsnp.dbSnpProfile)
     {

@@ -138,6 +138,7 @@ set ff1=$dd/runInfo.tsv
 
 if ($phase == SRR) goto phaseSRR
 if ($phase == SRP) goto phaseSRP
+if ($phase == PRJ) goto phasePRJ
 if ($phase == GEO) goto phaseGEO
 if ($phase == Sample) goto phaseSample
 if ($phase == SRX) goto phaseSRX
@@ -152,7 +153,7 @@ if ($phase == sraDownload) goto phase_sraDownload
 if ($phase == sraDownloadTest) goto phase_sraDownload
 
 
-echo "usage: SRX_import.tcsh SRR SRP GEO Sample SRX Files Papers  Sublibs Titles  srr2srx srr2run |  sraDownload sraDownloadTest"
+echo "usage: SRX_import.tcsh SRR PRJ (SRP) GEO Sample SRX Files Papers  Sublibs Titles  srr2srx srr2run |  sraDownload sraDownloadTest"
 goto phaseLoop
 
 ############
@@ -218,6 +219,40 @@ bin/tacembly SRX_DB <<EOF
 EOF
 goto phaseLoop
 
+####### Parse the PRJ objects i.e. title and abstracts for the runs
+phasePRJ:
+if (! -d $dd/PRJ) mkdir $dd/PRJ
+bin/tacembly SRX_DB <<EOF
+  query find srp srr && ! title
+  select -o $dd/prj.list select srp from srp in class srp where srp#srr and not srp#title
+  quit
+EOF
+
+if (-e  $dd/PRJ/_wget) \rm  $dd/PRJ/_wget
+
+ls  $dd/PRJ | gawk '/html/{gsub(".html","",$1);print $1;}' >   $dd/prj.list2
+cat $dd/prj.list $dd/prj.list2 $dd/prj.list2 | gawk '{n[$1]++;}END{for (k in n) if (n[k]==1)print k}' >  $dd/prj.list3
+
+cat $dd/prj.list3 | gawk '{printf("wget -O %s/PRJ/%s.html \"https://ncbi.nlm.nih.gov/bioproject/%s\"\n",dd,$1,$1);}' dd=$dd >  $dd/PRJ/_wget
+
+if (-e  $dd/PRJ/_wget) then
+  wc  $dd/PRJ/_wget
+  source  $dd/PRJ/_wget
+endif
+
+if (-e  $dd/prj.ace) \rm  $dd/prj.ace
+foreach prj (`cat $dd/prj.list`)
+   if (! -e  $dd/PRJ/$prj.html) continue 
+   cat  $dd/PRJ/$prj.html | gawk '{printf(" %s",$0);}' | gawk -f scripts/SRX_import.PRJ.awk prj=$prj | sed -e 's/\\\"//g' -e s'/\\//g'  >> $dd/prj.ace
+end
+
+bin/tacembly SRX_DB <<EOF
+  read-models
+  parse $dd/prj.ace
+  save
+EOF
+goto phaseLoop
+
 ####### Parse the GEO to find the geo->contibutors and affiliations
 phaseGEO:
 if (! -d $dd/GEO) mkdir $dd/GEO
@@ -231,13 +266,6 @@ foreach geo (`cat $dd/geo.list`)
    if ( -e  $dd/GEO/$geo.html) continue 
    echo "wget -O "$dd"/GEO/"$geo".html  "'"https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc='$geo'"' >>  $dd/GEO/_wget
 end
-
-
-if (-e $dd/GEO/_wget) \rm $dd/GEO/_wget
-ls  $dd/GEO | gawk '/html/{gsub(".html","",$1);print $1;}' >   $dd/geo.list2
-cat $dd/geo.list $dd/geo.list2 $dd/geo.list2 | gawk '{n[$1]++;}END{for (k in n) if (n[k]==1)print k}' >  $dd/geo.list3
-
-cat $dd/geo.list3 | gawk '{printf("wget -O %s/GEO/%s.html \"https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=%s\"\n",dd,$1,$1);}' dd=$dd >  $dd/GEO/_wget
 
 wc $dd/GEO/_wget
 source  $dd/GEO/_wget
@@ -411,7 +439,7 @@ goto phaseLoop
 #############
 ## get the papers
 phasePapers:
-
+setenv CVSROOT /home/mieg/VV/CODE/CVSROOT
 if (! -d $dd/PAPERS) then
   mkdir $dd/PAPERS
   pushd  $dd/PAPERS
