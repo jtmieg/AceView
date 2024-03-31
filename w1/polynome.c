@@ -2324,7 +2324,7 @@ POLYNOME polMultiProduct (AC_HANDLE h, POLYNOME ppp[])
 /******************************* t'hooft integral **************************************************/
 static POLYNOME dimIntegralDo (POLYNOME pp, int pass, AC_HANDLE h) ;
 
-/* incomplet, this only works for pairs of sigma, we need the cases4,6,8 ...
+/* incomplete, this only works for pairs of sigma, we need the cases4,6,8 ...
  * which create polynomes in gg, not monomes 
  */
 static POLYNOME pauliTraceTT (POLYNOME pp)
@@ -2482,8 +2482,9 @@ static POLYNOME pauliTraceTT (POLYNOME pp)
 
 /*******************************************************************************************/
 
-POLYNOME pauliTrace (POLYNOME pp)
+POLYNOME pauliTrace (POLYNOME pp, AC_HANDLE h0)
 {
+  AC_HANDLE h = ac_new_handle () ;
   POLYNOME p1, p2 ;
   static int level = 0 ;
   if (!pp)
@@ -2491,15 +2492,18 @@ POLYNOME pauliTrace (POLYNOME pp)
   polCheck (pp) ;
 
   if (level == 0)
-    pp = expand (pp) ;
+    {
+      pp = polCopy (pp, h) ;
+      pp = expand (pp) ;
+    }
   level++ ;
 
   if (pp->isSum)
     {
       p1 = pp->p1 ;
       p2 = pp->p2 ;
-      if (p1) p1 = pp->p1 = pauliTrace (p1) ;
-      if (p2) p2 = pp->p2 = pauliTrace (p2) ;
+      if (p1) p1 = pp->p1 = pauliTrace (p1, h) ;
+      if (p2) p2 = pp->p2 = pauliTrace (p2, h) ;
     }
 
   if (pp->tt.type)
@@ -2525,8 +2529,10 @@ POLYNOME pauliTrace (POLYNOME pp)
     }
 
   level-- ;
-  if (pp && level == 0)
+  if (pp && level >= 0)
     pp = expand (pp) ;
+  pp = polCopy (pp, h0) ;
+  ac_free (h) ;
   return pp ;
 } /* pauliTrace */
   

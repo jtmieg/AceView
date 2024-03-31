@@ -446,7 +446,7 @@ static POLYNOME vertex_B_PsiR_PsiLB (short a, short b, AC_HANDLE h)
   short mu = newDummyIndex() ;
   short nu = newDummyIndex() ;
   POLYNOME p1 = newSigB (mu,h) ;
-POLYNOME projector = newAG(a,b,mu,nu,X,h) ;
+  POLYNOME projector = newAG(a,b,mu,nu,X,h) ;
   p1->tt.sigB[1] = nu ;
   p1->tt.z = .5 ;
   p1->tt.z *= I ;
@@ -635,7 +635,7 @@ static POLYNOME pauliCleanUp (POLYNOME pp, short w)
       POLYNOME p1 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigB (w,h) : newSigma (w,h) ;
       POLYNOME p11 = pp->tt.sigma[0] || (pp->p1 && pp->p1->tt.sigma[0]) ? newSigma (w,h) : newSigB (w,h) ;
       POLYNOME p2 = polProduct (p1, pp,h) ;
-      POLYNOME p4 = pauliTrace (p2) ;
+      POLYNOME p4 = pauliTrace (p2, 0) ;
       POLYNOME p6 = contractIndices (p4) ;
       POLYNOME p7 = polProduct (p11, p6,h) ;
       POLYNOME p8 = expand (p7) ;
@@ -809,7 +809,7 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  pp = pauliTrace (pp) ;
+  pp = pauliTrace (pp, 0) ;
   showPol (pp) ;
   pp = squareMomentaCleanUp (pp) ;
   pp = reduceIndices (pp) ;
@@ -857,7 +857,7 @@ static POLYNOME Z2_HH__loopPsi  (const char *title)
   printf ("integrate\n") ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  pp = pauliTrace (pp) ;
+  pp = pauliTrace (pp, 0) ;
   showPol (pp) ;
   pp = squareMomentaCleanUp (pp) ;
   pp = reduceIndices (pp) ;
@@ -901,7 +901,7 @@ static POLYNOME Z2_AA__loopPsi  (const char *title)
 
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-  pp = pauliTrace (pp) ;
+  pp = pauliTrace (pp, 0) ;
   showPol (pp) ;
   pp = squareMomentaCleanUp (pp) ;
   showPol (pp) ;
@@ -1957,7 +1957,7 @@ static POLYNOME Z3_AHH__loopPsiL (const char *title)
   PP = dimIntegral (PP) ;
   if (0) showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   if (0) showPol (PP) ;
   PP = expand(PP) ;
   PP = reduceIndices (PP) ;
@@ -2002,7 +2002,7 @@ POLYNOME PP = contractIndices(polMultiProduct (h,pppP)) ;
   PP = dimIntegral (PP) ;
   if (0) showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   if (0) showPol (PP) ;
   PP = expand(PP) ;
   PP = reduceIndices (PP) ;
@@ -2061,7 +2061,7 @@ static POLYNOME Z3_ABB__loopPsiL (const char *title)
   if (1) showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
 
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   if (0) showPol (PP) ;
   PP = expand(PP) ;
   if (1) PP = reduceIndices (PP) ;
@@ -2133,7 +2133,7 @@ static POLYNOME Z3_ABB__loopPsiR (const char *title)
   PP = expand(PP) ;
   if (1) showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   if (0) showPol (PP) ;
   PP = expand(PP) ;
   PP = reduceIndices (PP) ;
@@ -2178,7 +2178,7 @@ static POLYNOME Z3_AAA__loopPsiL (const char *title)
   PP = dimIntegral (PP) ;
   showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   showPol (PP) ;
   PP = momentaCleanUp (PP, n) ;
   PP = expand (PP) ;
@@ -2227,7 +2227,7 @@ static POLYNOME Z3_AAA__loopH (const char *title)
   PP = dimIntegral (PP) ;
   showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   showPol (PP) ;
   PP = momentaCleanUp (PP, n) ;
   PP = expand (PP) ;
@@ -2272,7 +2272,7 @@ static POLYNOME Z3_AAA__loopGhost (const char *title)
   PP = dimIntegral (PP) ;
   showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   showPol (PP) ;
   PP = momentaCleanUp (PP, n) ;
   PP = expand (PP) ;
@@ -2333,7 +2333,7 @@ static POLYNOME Z3_AAA__loopA (const char *title)
   PP = dimIntegral (PP) ;
   showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   showPol (PP) ;
   PP = momentaCleanUp (PP, 'n') ;
   PP = expand (PP) ;
@@ -2378,7 +2378,7 @@ static POLYNOME Z3_AAA__loopB (const char *title)
   PP = dimIntegral (PP) ;
   showPol (PP) ;
   printf ("# trace the pauli matrix :\n ") ;
-  PP = pauliTrace (PP) ;
+  PP = pauliTrace (PP, 0) ;
   showPol (PP) ;
   PP = momentaCleanUp (PP, n) ;
   PP = expand (PP) ;
@@ -3211,7 +3211,7 @@ p1 = polSum (sga, sgb,h) ;
   if (debug) showPol (p4) ;
   contractIndices (p4) ;
   if (debug) showPol (p4) ;
-  pauliTrace (p4) ;
+  pauliTrace (p4, 0) ;
   if (debug) showPol (p4) ;
   contractIndices (p4) ;
 
@@ -3294,7 +3294,7 @@ p4 = polCopy(p1,h) ;
   p1->tt.sigma[1] = 'b' ;
 
   showPol (p1) ;
-  p2 = pauliTrace (p1) ;
+  p2 = pauliTrace (p1, 0) ;
   showPol (p2) ;
 
   p1 = newSigma ('a',h) ;
@@ -3304,7 +3304,7 @@ p4 = polCopy(p1,h) ;
   p1->tt.sigma[3] = 'd' ;
 
   showPol (p1) ;
-  p2 = pauliTrace (p1) ;
+  p2 = pauliTrace (p1, 0) ;
   showPol (p2) ;
 
   p1 = newSigma ('a',h) ;
@@ -3316,7 +3316,7 @@ p4 = polCopy(p1,h) ;
   p1->tt.sigma[5] = 'f' ;
 
   showPol (p1) ;
-  p2 = pauliTrace (p1) ;
+  p2 = pauliTrace (p1, 0) ;
   showPol (p2) ;
   
 
@@ -4695,7 +4695,7 @@ static void PolyDeterminant (PMX uvexp)
 	{
 	  if ((j-i) == 0)
 	    continue ;
-	  nn[1] = j ;
+	  nn[1] = j ; 
 	  for (int k = 0 ; k < 4 ; k++)
 	    {
 	      if ((k-i) * (k-j) == 0)
@@ -10733,17 +10733,17 @@ int main (int argc, const char **argv)
 	      POLYNOME pp = newSigma('a',h) ;
 	      tcpy (pp->tt.sigma,"abcd") ;
 	      showPol (pp) ;
-	      pp = pauliTrace(pp) ;
+	      pp = pauliTrace(pp, 0) ;
 	      showPol (pp) ;
 	      pp = newSigma('a',h) ;
 	      tcpy (pp->tt.sigma,"abcdef") ;
 	      showPol (pp) ;
-	      pp = pauliTrace(pp) ;
+	      pp = pauliTrace(pp, 0) ;
 	      showPol (pp) ;
 	      pp = newSigma('a',h) ;
 	      tcpy (pp->tt.sigma,"abcdefgh") ;
 	      showPol (pp) ;
-	      pp = pauliTrace(pp) ;
+	      pp = pauliTrace(pp, 0) ;
 	      showPol (pp) ;
 	      exit (0) ;
 	    }
@@ -10759,12 +10759,12 @@ int main (int argc, const char **argv)
 	      pp = expand (pp) ;
 	      showPol (pp) ;
 	      printf ("Tr (g_ab s_abcdef)\n") ;
-	      pp = pauliTrace(pp) ;
+	      pp = pauliTrace(pp, 0) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
 
 	      printf ("Tr (s_abcdef)\n") ;
-	      p1 = pauliTrace(p1) ;
+	      p1 = pauliTrace (p1, 0) ;
 	      showPol (p1) ;
 	      POLYNOME ppp2[] = {p1,p2,0} ;
 	      pp = polMultiProduct (h,ppp2) ;
@@ -10786,12 +10786,12 @@ int main (int argc, const char **argv)
 	      pp = expand (pp) ;
 	      showPol (pp) ;
 	      printf ("Tr (g_cd s_abcdefgh)\n") ;
-	      pp = pauliTrace(pp) ;
+	      pp = pauliTrace (pp, 0) ;
 	      pp = expand (pp) ;
 	      showPol (pp) ;
 
 	      printf ("\n\nTr (s_abcdefgh)\n") ;
-	      p1 = pauliTrace(p1) ;
+	      p1 = pauliTrace (p1, 0) ;
 	      showPol (p1) ;
 	      p2 = newG ('a','b',h) ;
 	      p2->tt.z *= -1 ;
@@ -10800,7 +10800,7 @@ int main (int argc, const char **argv)
 	      printf ("g_cd Tr(s_abcdefgh)\n") ;
 	      pp2 = expand (pp2) ;
 	      showPol (pp2) ;
-	      pp2 = pauliTrace(pp2) ;
+	      pp2 = pauliTrace (pp2, 0) ;
 	      printf ("pp2\n") ;
 	      showPol (pp2) ;
 	      printf ("pp\n") ;
@@ -10851,7 +10851,7 @@ int main (int argc, const char **argv)
 	}
 
       /* verify the B propagator */
-      if (1)
+      if (0)
 	{
 	    char a = newDummyIndex () ;
 	    char b = newDummyIndex () ;
@@ -11000,7 +11000,7 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
       
-      if (1)
+      if (0)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators, Boson loops */\n") ;
@@ -11084,7 +11084,7 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
       /* vector interactions with the scalar-vector-tensor in the presence of a Fermion loop */
-      if (1)
+      if (0)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Vector-Boson vertex, Fermion loops */\n") ;
@@ -11104,7 +11104,7 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
       /* triple vector interactions with boson loops */
-      if (1)
+      if (0)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Triple Vector vertex, Boson loops */\n") ;
@@ -11238,11 +11238,85 @@ int main (int argc, const char **argv)
 	      p3 = expand (p3) ;
 	      p3 = squareMomentaCleanUp (p3) ;
 	      showPol (p3) ;
+	       
+	    }
+	  exit (0) ;
+	}
+
+      if (1)
+	{
+	  printf ("\n\n\n@@@@@@@@@ 4-tensor vertex, hoping to find zero to match the *F F lagrangian 2024_03\n") ;
+	  if (1)
+	    {
+	      firstDummyIndex = 'a' ;
+	      /* external tensor indices (circular trace or B^2 C^2 */
+	      char a = newDummyIndex () ;
+	      char b = newDummyIndex () ;
+	      char c = newDummyIndex () ;
+	      char d = newDummyIndex () ;
+	      /* pauli tensor indices */
+	      char m = newDummyIndex () ;
+	      char n = newDummyIndex () ;
+	      char o = newDummyIndex () ;
+	      char p = newDummyIndex () ;
+	      char q = newDummyIndex () ;
+	      char r = newDummyIndex () ;
+	      char s = newDummyIndex () ;
+	      char t = newDummyIndex () ;
+	      POLYNOME B1 = newAG (a,b,m,n,0,h) ;
+	      POLYNOME C1 = newAG (b,c,o,p,0,h) ;
+	      POLYNOME B2 = newAG (c,d,q,r,0,h) ;
+	      POLYNOME C2 = newAG (d,a,s,t,0,h) ;
+
+	      POLYNOME BB1 = newAG (a,b,m,n,0,h) ;
+	      POLYNOME CC1 = newAG (c,d,o,p,0,h) ;
+	      POLYNOME BB2 = newAG (a,b,q,r,0,h) ;
+	      POLYNOME CC2 = newAG (c,d,s,t,0,h) ;
+
+	      /* internal lines */
+	      char i = newDummyIndex () ;
+	      char j = newDummyIndex () ;
+
+	      /* Loop with crossing internal lines */
+	      printf ("\n.... BCBC circular trace\n");
+	      POLYNOME loop = newSigma (m, h) ;
+	      int ii, *ip, idx[] = {m,n,i,o,p,j,q,r,i,s,t,j,0} ;
+	      for (ii = 0, ip = idx ; *ip ; ii++, ip++)
+		loop->tt.sigma[ii] = *ip ;
+	      showPol (loop) ;
 	      
+	      POLYNOME ppp[] = {B1,C1,B2,C2,loop, 0} ;
+	      POLYNOME p1 = polMultiProduct (h,ppp) ;
+	      showPol (p1) ;
+	      p1 = expand (p1) ;
+	      showPol (p1) ;
+	      p1 = pauliTrace (p1, 0) ;
+	      showPol (p1) ;
+	      p1 = expand (p1) ;
+	      showPol (p1) ;
+
+	      printf ("\n.... BCBC : BB CC trace\n");
+	      POLYNOME loop2 = newSigma (m, h) ;
+	      
+	      int idx2[] = {m,n,i,o,p,j,q,r,i,s,t,j,0} ;
+	      for (ii = 0, ip = idx2 ; *ip ; ii++, ip++)
+		loop2->tt.sigma[ii] = *ip ;
+	      showPol (loop2) ;
+	      
+	      POLYNOME ppp2[] = {BB1,CC1,BB2,CC2,loop2, 0} ;
+	      p1 = polMultiProduct (h,ppp2) ;
+	      showPol (p1) ;
+	      p1 = expand (p1) ;
+	      showPol (p1) ;
+	      p1 = pauliTrace (p1, 0) ;
+	      showPol (p1) ;
+	      p1 = expand (p1) ;
+	      showPol (p1) ;
 	      
 	    }
 	  exit (0) ;
 	}
+    
     }
 #ifdef JUNK
   

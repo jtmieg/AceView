@@ -93,7 +93,7 @@ POLYNOME polMultiSum (AC_HANDLE h, POLYNOME ppp[]) ;
 POLYNOME polMultiProduct (AC_HANDLE h, POLYNOME ppp[]) ;
 
 POLYNOME dimIntegral (POLYNOME pp) ;
-POLYNOME pauliTrace (POLYNOME pp) ;
+POLYNOME pauliTrace (POLYNOME pp, AC_HANDLE h) ;
 POLYNOME momentaCleanUp (POLYNOME pp, short alpha)  ;
 POLYNOME bbCleanUp (POLYNOME pp, short a, short b, short c, short d) ;
 POLYNOME contractIndices (POLYNOME pp) ;
