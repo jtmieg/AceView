@@ -21,7 +21,7 @@
 
 #include "acedb.h"
 void bqldCreate (void) ;
-BOOL *bqlDisplay (KEY new, KEY old, BOOL isOldGraph) ;
+BOOL bqlDisplay (KEY new, KEY old, BOOL isOldGraph) ;
 
 #endif /* DEF_BQLDISP_H */
  

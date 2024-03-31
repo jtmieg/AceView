@@ -29,13 +29,20 @@
 #include "display.h"
 #include "bqldisp.h"
 
-
+magic_t GRAPH2BQLD_ASSOC = "BQLDISPLAY" ;
 #define BQLD_MAGIC  716512935 
 typedef struct bqldStruct {
   AC_HANDLE h ;
   Graph graph ;
   int magic ;
+  int line ;
+  BOOL syntaxHelp ;
+  Array vars ;
 } *BQLD ;
+
+typedef struc bqlVarStruct {} BqlVar ;
+static BQLD currentBqlDisp (char *caller) ;
+static void bqldDraw (BQLD bqld) ;
 
 #ifdef JUNK
 
@@ -1693,12 +1700,133 @@ static void bqldExportKeySet (void)
 
 #endif /* JUNK */
 
+/**********************************************************/
+/**************** Select **********************************/
+
+static void bqldSelect (BQLD bqld)
+{
+} /* bqldSelect */
+
+/**********************************************************/
+/**************** From **********************************/
+
+static void bqldNewVar (void)
+{
+  BQLD bqld = currentBqlDisp("bqldNewvar") ;
+  Array vars = bqld->vars ;
+  BqlVar *vp  = array (vars, arrayMax (vars), Bvar) ;
+
+  vp->type = 0 ; /* add a ne line */
+
+  return  ;  
+} /* bqldNewVar */
+  
+static void bqldFrom (BQLD bqld)
+{
+  int line = bqld->line ;
+  int ii ;
+  BqlVar *vp ;
+  Array vars = bqld->vars ;
+  
+  for (ii = 0 ; ii < arrayMax (vars) ; ii++)
+    {
+      vp = arrp (vars, ii, BqlVar) ;
+      graphTextEntry(vp->buf,8,40,line++,bqldNewVar) ;
+    }
+  
+  graphText ("Define a new variable (i.e. x, line++, title, gene)", 3, line) ;
+  graphTextEntry(vp->buf,8,40,line,bqldNewVar) ;
+  bqld->line = line ;
+} /* bqldFrom */
+
+/**********************************************************/
+/**************** Where **********************************/
+
+static void bqldWhere (BQLD bqld)
+{
+} /* bqldWhere */
+
+/**********************************************************/
+/***************** Syntax Help ****************************/
+
+static void bqldSyntaxHelpDisplay (BQLD bqld)
+{
+  int line = bqld->line ;
+  graphText ("hello from Select ... from ... where ..", 3, line++) ;
+  bqld->line = line ;
+} /* bqldSyntaxHelpDisplay */
+
+/**********************************************************/
+
+static void bqldSyntaxHelpOpen (void)
+{
+  BQLD bqld = currentBqlDisp("bqldSyntaxHelpOpen") ;
+    
+  bqld->syntaxHelp = TRUE ;
+  bqldDraw (bqld) ; 
+} /* bqldSyntaxHelpOpen */
+
+/**********************************************************/
+
+static void bqldSyntaxHelpClose (void)
+{
+  BQLD bqld = currentBqlDisp("bqldSyntaxHelpClose") ;
+
+  bqld->syntaxHelp = FALSE ;
+  bqldDraw (bqld) ; 
+} /* bqldSyntaxHelpClose */
+
+/**********************************************************/
+
+static void bqldSyntaxHelp (BQLD bqld)
+{
+  if (bqld->syntaxHelp)
+    {
+      graphButton("Close Help", bqldSyntaxHelpClose, 48, 1) ;
+      bqld->line += 2 ;
+      bqldSyntaxHelpDisplay (bqld) ;
+    }
+  else
+    {
+      graphButton("Help", bqldSyntaxHelpOpen, 48, 1) ;
+      bqld->line += 2 ;
+    }
+} /* bqldSyntaxHelp */
+
+/***********************************************************/
+
+  static void bqldSyntax (BQLD bqld)
+{
+  bqld->line = 1 ;
+
+  graphText ("Select ... from ... where ..", 3, 1) ;
+  graphText ("on the Acedb Query Language syntax", 54 + 6 * bqld->syntaxHelp, 1) ;
+  
+  bqldSyntaxHelp (bqld) ;
+
+  
+} /* bqldSyntax */
+
 /***********************************************************/
 /***********************************************************/
 
-magic_t GRAPH2BQLD_ASSOC = "BQLDISPLAY" ;
+static void bqldDraw (BQLD bqld)
+{
+  graphClear () ;
 
-BQLD currentBqlDisp (char *caller)
+  bqldSyntax (bqld) ;
+  bqldSelect (bqld) ;
+  bqldFrom (bqld) ;
+  bqldWhere (bqld) ;
+
+  graphRedraw () ;
+} /* bqldDraw */
+
+/***********************************************************/
+/************** Display Graph Creationand Destruction ******/
+/***********************************************************/
+
+static BQLD currentBqlDisp (char *caller)
 {
   /* find and verify BQLD struct on active graph */
   BQLD bqld = 0 ;
@@ -1734,7 +1862,7 @@ static void bqldDestroy (void)
 } /* bqldDestroy */
 
 /*****************************************/
-
+/******** public interface ***************/
 void bqldCreate (void)
 {
   BQLD bqld = 0 ;
@@ -1747,23 +1875,27 @@ void bqldCreate (void)
 
   bqld->magic = BQLD_MAGIC ;
   bqld->h = ac_new_handle () ;
-
+  bqld->vars = arrayHandleCreate (32, BqlVar, bqld->h) ;
+  array (bqld->vars, 0. BqlVar).type = 0 ;  /* make room */
   graphRegister (DESTROY, bqldDestroy) ;
   bqld->graph = graphActive() ;
   /*  if (oldGraph)
     graphAssRemove (&GRAPH2BQLD_ASSOC) ;
   */
   graphAssociate (&GRAPH2BQLD_ASSOC, bqld) ;
-
+  bqldDraw (bqld) ;
+  
   return;
 } /* bqldDispCreate */
 
 /*************** entry point ****************/
-BOOL *bqlDisplay (KEY new, KEY old, BOOL isOldGraph) 
+BOOL bqlDisplay (KEY new, KEY old, BOOL isOldGraph) 
 {
   bqldCreate () ;
   return 0 ;
-}
+} /* bqlDisplay */
+
+/**********************************************************/
 /**********************************************************/
 /**********************************************************/
 

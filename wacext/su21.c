@@ -4679,6 +4679,56 @@ static void  SuperGroup (KAS *kas)
 
 /***********************************************************************************************************************************************/
 
+static void PolyDeterminant (PMX uvexp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int nn[4] ;
+  int N = uvexp->N ;
+  PMX zz = 0 ;
+  POLYNOME dd = 0 ;
+  char *title = 0 ;
+  printf ("Poly determinant\n") ;
+  for (int i = 0 ; i < 4 ; i++)
+    {
+      nn[0] = i ;
+      for (int j = 0 ; j < 4 ; j++)
+	{
+	  if ((j-i) == 0)
+	    continue ;
+	  nn[1] = j ;
+	  for (int k = 0 ; k < 4 ; k++)
+	    {
+	      if ((k-i) * (k-j) == 0)
+		continue ;
+	      nn[2] = k ;
+	      for (int l = 0 ; l < 4 ; l++)
+		{
+		  if ((l-i) * (l-j) * (l-k)  == 0)
+		    continue ;
+		  nn[3] = l ;
+		  title = hprintf (h, "...Poly determinant [%d%d%d%d]",i,j,k,l) ;
+		  zz = pmxCopy (uvexp, title, h) ;
+		  for (int m = 0 ; m < 4 ; m++)
+		    for (int n = 0 ; n < 4 ; n++)
+		      {
+			/* we can exchange the lines but NOT hyte columns becuase we compute 
+			 * the determinant by expanding column by column
+			 */
+			zz->pp[N*m + n] = polCopy (uvexp->pp[N*nn[m] + n], h) ;
+		      }
+		  printf ("...... polyDeterminant[%s]\n", title) ;
+		  dd = pmxDeterminant (zz, h) ;
+		  showPol (dd) ;
+		}
+	    }
+	}
+    }
+  
+  ac_free (h) ;
+} /* PolyDeterminant */
+
+/***********************************************************************************************************************************************/
+
 static void  SuperGroupExpMap (KAS *kas)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -4774,6 +4824,7 @@ static void  SuperGroupExpMap (KAS *kas)
   /* grab the matrix */
   MX muX1 = kas->mu[5] ;
   const int *xxX1 ;
+  
   mxValues (muX1, &xxX1, 0, 0) ;
 
   mxShow (muX1) ;
@@ -4799,14 +4850,11 @@ static void  SuperGroupExpMap (KAS *kas)
   PMX uvexp = pmxExponential (uvwx, "exp(u+v+w+x)", 6, h) ;
   pmxShow (uvexp) ;
 
- 
+
+  printf ("Matrix polyodering determinant\n") ;
+  PolyDeterminant (uvexp) ;
   printf ("Matrix determinant\n") ;
   POLYNOME dd = pmxDeterminant (uvexp, h) ;
-  showPol (dd) ;
-  dd = expand (dd) ; 
-  dd = expand (dd) ;
-  dd = expand (dd) ;
-  dd = expand (dd) ;
   showPol (dd) ;
       
 
