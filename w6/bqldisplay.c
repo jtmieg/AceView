@@ -40,7 +40,11 @@ typedef struct bqldStruct {
   Array vars ;
 } *BQLD ;
 
-typedef struc bqlVarStruct {} BqlVar ;
+typedef struct bqlVarStruct {
+  char buf[128] ; 
+  int type ;
+  int box ;
+} BqlVar ;
 static BQLD currentBqlDisp (char *caller) ;
 static void bqldDraw (BQLD bqld) ;
 
@@ -1708,34 +1712,141 @@ static void bqldSelect (BQLD bqld)
 } /* bqldSelect */
 
 /**********************************************************/
-/**************** From **********************************/
+/****************** From **********************************/
 
-static void bqldNewVar (void)
+static void bqldNewVar (char *cp)
 {
   BQLD bqld = currentBqlDisp("bqldNewvar") ;
   Array vars = bqld->vars ;
-  BqlVar *vp  = array (vars, arrayMax (vars), Bvar) ;
+  BqlVar *vp = 0 ;
+  int ii ;
 
-  vp->type = 0 ; /* add a ne line */
+  for (ii = 0 ; ii < arrayMax (vars) ; ii++)
+    {
+      vp = arrp (vars, ii, BqlVar) ;
+      if (cp == vp->buf)
+	break ;
+    }
+  vp->type = *cp ? 2 : 1 ; /* this var is defined or waiting */
+  if (ii == arrayMax (vars) - 1)
+    {
+      ii++ ;
+      vp = arrayp (vars, ii, BqlVar) ;
+      vp->type = 1 ;
+    }
+  bqldDraw (bqld) ; 
 
   return  ;  
 } /* bqldNewVar */
   
+/**********************************************************/
+
+static void bqldFromNewClass (void)
+{
+  BQLD bqld = currentBqlDisp("bqldSyntaxHelpOpen") ;
+    
+  /* bqld->type = 31 ; */
+  bqldDraw (bqld) ; 
+} /* bqldFromNewClass */
+
+/**********************************************************/
+
+static void bqldFromNewVar (void)
+{
+  BQLD bqld = currentBqlDisp("bqldFromNewVar") ;
+    
+  /* bqld->type = 41 ; */
+  bqldDraw (bqld) ; 
+} /* bqldFromNewVar */
+
+/**********************************************************/
+
+static void bqldFromNewConstant (void)
+{
+  BQLD bqld = currentBqlDisp("bqldFromNewConstant") ;
+    
+  /* bqld->type = 51 ; */
+  bqldDraw (bqld) ; 
+} /* bqldFromNewConstant */
+
+/**********************************************************/
+
+static void bqldFromNewEquation (void)
+{
+  BQLD bqld = currentBqlDisp("bqldFromNewEquation") ;
+    
+  /* bqld->type = 61 ; */
+  bqldDraw (bqld) ; 
+} /* bqldFromNewEquation */
+
+/**********************************************************/
+
+static void bqldFromNewClear (void)
+{
+  BQLD bqld = currentBqlDisp("bqldFromNewClear") ;
+    
+  /* bqld->type = 2 ; */
+  bqldDraw (bqld) ; 
+} /* bqldFromNewClear */
+
+/**********************************************************/
+
+static void bqldFromNewHelp (void)
+{
+  BQLD bqld = currentBqlDisp("bqldFromNewHelp") ;
+    
+  
+  bqldDraw (bqld) ; 
+} /* bqldFromNewHelp */
+
+/**********************************************************/
+
 static void bqldFrom (BQLD bqld)
 {
-  int line = bqld->line ;
-  int ii ;
+  int ii, line = bqld->line ;
   BqlVar *vp ;
   Array vars = bqld->vars ;
   
-  for (ii = 0 ; ii < arrayMax (vars) ; ii++)
+  for (ii = 0, vp = arrp (vars, 0, BqlVar) ; ii < arrayMax (vars) ; ii++, vp++)
     {
-      vp = arrp (vars, ii, BqlVar) ;
-      graphTextEntry(vp->buf,8,40,line++,bqldNewVar) ;
+      switch (vp->type)
+	{
+	case 1:
+	  graphText ("Name a new variable", 2, line ) ;
+	  graphTextEntry(vp->buf,8,24,line,bqldNewVar) ;
+	  line++ ;
+	  break ;
+	case 2:
+	  graphText ("Define variable", 4, line) ;
+	  graphText (vp->buf, 25, line) ;
+	  graphButton ("From class", bqldFromNewClass, 30, line) ;
+	  graphButton ("From previous variable", bqldFromNewVar, 30, line+1) ;
+	  graphButton ("As a constant", bqldFromNewConstant, 30, line+2) ;	  
+	  graphButton ("From equation", bqldFromNewEquation, 30, line+3) ;
+	  graphButton ("Clear", bqldFromNewClear, 60, line) ;
+	  graphButton ("Help", bqldFromNewHelp, 60, line+1) ;
+	  line += 6 ;
+	  break ;
+	case 31:
+	  graphText (messprintf ("For all %s in class ", vp->buf), 4, line) ;
+	  vp->box = graphButton ("Select a class...", 0, 40, line - .1);
+	  break ;
+	case 41:
+	  graphText (messprintf ("For all %s in %s->class ", vp->buf), 4, line) ;
+	  vp->box = graphButton ("Select a class...", 0, 40, line - .1);
+	  break ;
+	case 51:
+	  graphText (messprintf ("Constant %s in class ", vp->buf), 4, line) ;
+	  vp->box = graphButton ("Select a class...", 0, 40, line - .1);
+	  break ;
+	case 61:
+	  graphText (messprintf ("Equation %s in class ", vp->buf), 4, line) ;
+	  vp->box = graphButton ("Select a class...", 0, 40, line - .1);
+	  break ;
+	}
     }
-  
-  graphText ("Define a new variable (i.e. x, line++, title, gene)", 3, line) ;
-  graphTextEntry(vp->buf,8,40,line,bqldNewVar) ;
+
+
   bqld->line = line ;
 } /* bqldFrom */
 
@@ -1826,6 +1937,10 @@ static void bqldDraw (BQLD bqld)
 /************** Display Graph Creationand Destruction ******/
 /***********************************************************/
 
+static void bqldPick (int k)
+{
+  return ;
+}
 static BQLD currentBqlDisp (char *caller)
 {
   /* find and verify BQLD struct on active graph */
@@ -1876,13 +1991,17 @@ void bqldCreate (void)
   bqld->magic = BQLD_MAGIC ;
   bqld->h = ac_new_handle () ;
   bqld->vars = arrayHandleCreate (32, BqlVar, bqld->h) ;
-  array (bqld->vars, 0. BqlVar).type = 0 ;  /* make room */
+  array (bqld->vars, 0, BqlVar).type = 1 ;  /* make room */
   graphRegister (DESTROY, bqldDestroy) ;
   bqld->graph = graphActive() ;
   /*  if (oldGraph)
     graphAssRemove (&GRAPH2BQLD_ASSOC) ;
   */
   graphAssociate (&GRAPH2BQLD_ASSOC, bqld) ;
+  graphRegister (PICK, bqldPick) ;
+  graphRegister (RESIZE, bqldDraw) ;
+  graphRegister (DESTROY, bqldDestroy) ;
+  
   bqldDraw (bqld) ;
   
   return;

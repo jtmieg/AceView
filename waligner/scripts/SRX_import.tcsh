@@ -264,7 +264,7 @@ EOF
 if (-e $dd/GEO/_wget) \rm $dd/GEO/_wget
 foreach geo (`cat $dd/geo.list`)
    if ( -e  $dd/GEO/$geo.html) continue 
-   echo "wget -O "$dd"/GEO/"$geo".html  "'"https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc='$geo'"' >>  $dd/GEO/_wget
+   echo "wget -O "$dd"/GEO/"$geo".html  "'"https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc='$geo'"' | grep -v '(' | grep -v ')' >>  $dd/GEO/_wget
 end
 
 wc $dd/GEO/_wget

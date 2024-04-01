@@ -11263,15 +11263,15 @@ int main (int argc, const char **argv)
 	      char r = newDummyIndex () ;
 	      char s = newDummyIndex () ;
 	      char t = newDummyIndex () ;
-	      POLYNOME B1 = newAG (a,b,m,n,0,h) ;
-	      POLYNOME C1 = newAG (b,c,o,p,0,h) ;
-	      POLYNOME B2 = newAG (c,d,q,r,0,h) ;
-	      POLYNOME C2 = newAG (d,a,s,t,0,h) ;
+	      POLYNOME B1 = newAG (a,b,m,n,-1,h) ;
+	      POLYNOME C1 = newAG (b,c,o,p,1,h) ;
+	      POLYNOME B2 = newAG (c,d,q,r,-1,h) ;
+	      POLYNOME C2 = newAG (d,a,s,t,1,h) ;
 
-	      POLYNOME BB1 = newAG (a,b,m,n,0,h) ;
-	      POLYNOME CC1 = newAG (c,d,o,p,0,h) ;
-	      POLYNOME BB2 = newAG (a,b,q,r,0,h) ;
-	      POLYNOME CC2 = newAG (c,d,s,t,0,h) ;
+	      POLYNOME BB1 = newAG (a,b,m,n,-1,h) ;
+	      POLYNOME CC1 = newAG (c,d,o,p,1,h) ;
+	      POLYNOME BB2 = newAG (a,b,q,r,-1,h) ;
+	      POLYNOME CC2 = newAG (c,d,s,t,1,h) ;
 
 	      /* internal lines */
 	      char i = newDummyIndex () ;
