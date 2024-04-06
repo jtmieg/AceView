@@ -118,7 +118,7 @@ EOF
     acem
       cdna_73 -locally
       quit
-    query find est Xends_* Flipped
+    query find est IS Xends_* &&  Flipped
     spush
     follow cdna_clone
     sor

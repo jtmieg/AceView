@@ -679,7 +679,7 @@ static POLYNOME Z2_AA__loopH  (const char *title)
   printf ("integrate\n") ;
   pp = dimIntegral (pp) ;
   showPol (pp) ;
-pp = squareMomentaCleanUp (pp) ;
+  squareMomentaCleanUp (pp) ;
   printf ("### Z2 AA loop H expect ::  1/3 (p_ab - g_ab p^2)\n") ;
   showPol (pp) ;
 
@@ -728,7 +728,7 @@ static POLYNOME Z2_AA__loopA  (const char *title)
 
   printf ("integrate\n") ;
   pp = dimIntegral (pp) ;
-  pp = squareMomentaCleanUp (pp) ;
+  squareMomentaCleanUp (pp) ;
   showPol (pp) ;
   printf ("### Z2 AA loop A expect ::  3/2 (p_ab - g_ab p^2) : =3/2(vector) -1/6(ghost) = -5/3 (t'Hooft)\n") ;
   showPol (pp) ;
@@ -4747,8 +4747,10 @@ static void  SuperGroupExpMap (KAS *kas)
   mxShow (muU1) ;
   mxShow (muUb) ;
   /* create a Polynome Matrix */
-  complex zU1[d*d] ;
-  complex zUb[d*d] ;
+  complex zU1[d*d+1] ;
+  complex zUb[d*d+1] ;
+  zU1[d*d] = -1 ;  zUb[d*d] = -1 ; /* size check */
+
   for (int i = 0 ; i < d*d ; i++)
     {
       zU1[i] = xxU1[i] - b * xxUb[i] ;
@@ -4780,8 +4782,10 @@ static void  SuperGroupExpMap (KAS *kas)
   mxShow (muW1) ;
   mxShow (muWb) ;
   /* create a Polynome Matrix */
-  complex zW1[d*d] ;
-  complex zWb[d*d] ;
+  complex zW1[d*d+1] ;
+  complex zWb[d*d+1] ;
+  zW1[d*d] = -1 ;  zWb[d*d] = -1 ; /* size check */
+
   for (int i = 0 ; i < d*d ; i++)
     {
       zW1[i] = xxW1[i] - b * xxWb[i] ;
@@ -4809,7 +4813,9 @@ static void  SuperGroupExpMap (KAS *kas)
 
   mxShow (muV1) ;
   /* create a Polynome Matrix */
-  complex zV1[d*d] ;
+  complex zV1[d*d+1] ;
+  zV1[d*d] = -1 ; /* size check */
+
   for (int i = 0 ; i < d*d ; i++)
     {
       zV1[i] = xxV1[i] ;
@@ -4829,7 +4835,9 @@ static void  SuperGroupExpMap (KAS *kas)
 
   mxShow (muX1) ;
   /* create a Polynome Matrix */
-  complex zX1[d*d] ;
+  complex zX1[d*d+1] ;
+  zX1[d*d] = -1 ; /* size check */
+
   for (int i = 0 ; i < d*d ; i++)
     {
       zX1[i] = xxX1[i] ;
@@ -9726,7 +9734,7 @@ static POLYNOME expPol (POLYNOME pp, int NN, int sign, AC_HANDLE h)
   for (i = 1 ; i <= NN ; i++)
     {
       fac *= sign * i ;
-      p[i] = polScale (p[i], 1.0/fac)  ;
+      polScale (p[i], 1.0/fac)  ;
     }
   ppp = polMultiSum (h,p) ;
   ppp = expand (ppp) ;
@@ -9776,7 +9784,7 @@ static POLYNOME superCommutator (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
   r3 = r2 ;
   if (sign == -1)
     {
-      r3 = polScale (r3, -1) ;
+      polScale (r3, -1) ;
     }
   return expand (polSum (r1, r3,h)) ;
 } /* superCommutator */
@@ -9851,7 +9859,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   r[1] = superCommutator (qa, qb,h) ;
   printf ("\n\n[%s,%s] =", a, b) ;
   showPol (r[1]) ;
-  r[1] = polScale (r[1], 1) ;
+  polScale (r[1], 1) ;
 
   int fac = 1 ;
   for (n = 2 ; n <  NN ; n++)
@@ -9860,7 +9868,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
       r[n] = repeatedSuperCommutator (qa, qb, n,h) ;
       printf ("\n\nn=%d [%s,.. [%s,%s]..] =", n, a, a, b) ;
       showPol (r[n]) ;
-      r[n] = polScale (r[n], 1.0/fac) ;
+      polScale (r[n], 1.0/fac) ;
     }
 
   r[NN] = 0 ;
@@ -9880,7 +9888,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   printf ("\n\nexp(%s)exp(%s)exp(%s) - exp( %s + [%s,%s]) =", a, b, a, b, a, b) ;
 
 
-  rr = polScale (rr, -1) ;
+  polScale (rr, -1) ;
   ss = polSum (pp, rr,h) ;
   ss = expand (ss) ;
   ss = expand (ss) ;
@@ -9934,7 +9942,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
 
   p[0] = polProduct (qa, qb,h) ;
   p[1] = polProduct (qb, qa,h) ;
-  p[1] = polScale (p [1], -1) ;
+  polScale (p [1], -1) ;
   ss = polSum (p[0], p[1],h) ; /* commutator [a,b] */
   ss = expand(ss) ;
   printf (".............[%s,%s]\n",a,b) ;
@@ -9949,7 +9957,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
       r[n] = repeatedSuperCommutator (ss, qc, n,h) ;
       printf ("\n\nn=%d [%s,.. [%s,%s]..] =", n, "[]","[[]]", c) ;
       r[n] = limitN (r[n], NN) ;
-      r[n] = polScale (r[n], 1.0/fac) ;
+      polScale (r[n], 1.0/fac) ;
       showPol (r[n]) ;
     }
 
@@ -9961,7 +9969,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   printf ("...............exp (minus iterated commutator)\n") ;
   showPol (rr) ;
 
-  rr = polScale (rr, -1) ;
+  polScale (rr, -1) ;
   ss = polSum (pp, rr,h) ;
   ss = expand (ss) ;
   printf ("............... holonomy - exp (-[])\n") ;
@@ -9976,7 +9984,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   showPol (rr) ;
   exit (0) ;
   
-  rr = polScale (rr, -1) ;
+  polScale (rr, -1) ;
   ss = polSum (rr, pp,h) ;
   ss = expand (ss) ;
   showPol (ss) ;
@@ -10002,14 +10010,14 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   pp = expand (pp) ;
   pp = limitN (pp, NN) ;
   showPol(pp) ;
-  pp = polScale (pp, -1) ;
+  polScale (pp, -1) ;
   q[1] = pp ;
 
 
   p[0] = polProduct (qa,qb,h) ;
   p[1] = polProduct (qb,qa,h) ;
   showPol (p[1]) ;
-  p[1] = polScale (p[1], -1) ;
+  polScale (p[1], -1) ;
   showPol (p[1]) ;
 
   p[2] = qc ;
@@ -10023,7 +10031,7 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   showPol (q[2]) ;
 
 
-  q[2] = polScale (q[2], -1) ;
+  polScale (q[2], -1) ;
   q[3] = 0 ;
   
   pp = polMultiSum (h,q) ;
@@ -10071,7 +10079,7 @@ static void THETA (void)
   if (0)   /* check signs in determinants */
     {
       PMX px = pmxCreate (2, "test", h) ;
-      complex zz[] = {0,1, 1,0} ;
+      complex zz[] = {0,1, 1,0, -1} ;
       POLYNOME p = newScalar (1, h) ;
       pmxSet (px, p, zz) ;
       pmxShow (px) ;
@@ -10084,7 +10092,7 @@ static void THETA (void)
   if (0)   /* check signs in determinants */
     {
       PMX px = pmxCreate (4, "test", h) ;
-      complex zz[] = {0,1,0,0,  1,0,0,0, 0,0,0,1, 0,0,1,0} ;
+      complex zz[] = {0,1,0,0,  1,0,0,0, 0,0,0,1, 0,0,1,0,   -1} ;
       POLYNOME p = newScalar (1, h) ;
       pmxSet (px, p, zz) ;
       pmxShow (px) ;
@@ -10163,17 +10171,17 @@ static void THETA (void)
 
   BOOL test = FALSE ;
    /****** U ******/
-  complex zu1a[] = {0, 1, 0, 0,   1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
-  complex zu1b[] = {0, 1, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
+  complex zu1a[] = {0, 1, 0, 0,   1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,   -1} ;
+  complex zu1b[] = {0, 1, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,   -1} ;
   PMX u1 = pmxCreate (4, "u1", h) ;
   POLYNOME pu1 = newTheta ("u", h) ;
   if (! test) pu1->tt.x[0] = 'b' ; 
   pu1->tt.sqrti = 1 ;
-  pmxSet (u1, pu1, zu1a) ;
+  if (1) pmxSet (u1, pu1, zu1a) ;
   pmxShow (u1) ;
   
-  complex zu2a[] = {0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 1,   0, 0, 1, 0} ;
-  complex zu2b[] = {0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 1,   0, 0, 0, 0} ;
+  complex zu2a[] = {0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 1,   0, 0, 1, 0,    -1} ;
+  complex zu2b[] = {0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 1,   0, 0, 0, 0,    -1} ;
   PMX u2 = pmxCreate (4, "u2", h) ;
   POLYNOME pu2 = newTheta ("u", h) ;
   if (! test) pu2->tt.x[0] = 'c' ;
@@ -10186,8 +10194,8 @@ static void THETA (void)
   pmxShow (u) ;
   
   /****** V ******/
-  complex zv1a[] = {0, -1.I, 0, 0,   1.I, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
-  complex zv1b[] = {0, 0, 0, 0,   1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0} ;
+  complex zv1a[] = {0, -1.I, 0, 0,   1.I, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,     -1} ;
+  complex zv1b[] = {0, 0, 0, 0,   1, 0, 0, 0,   0, 0, 0, 0, 0, 0, 0, 0,     -1} ;
   PMX v1 = pmxCreate (4, "v1", h) ;
   POLYNOME pv1 = newTheta ("v", h) ;
   if (! test) pv1->tt.x[0] = 'b' ;
@@ -10195,8 +10203,8 @@ static void THETA (void)
   pmxSet (v1, pv1, zv1a) ;
   pmxShow (v1) ;
 
-  complex zv2a[] = {0, 0, 0, 0,  0, 0, 0, 0,   0, 0, 0, -1.I,   0, 0, 1.I, 0} ;
-  complex zv2b[] = {0, 0, 0, 0,  0, 0, 0, 0,   0, 0, 0, 0,      0, 0, 1, 0} ;
+  complex zv2a[] = {0, 0, 0, 0,  0, 0, 0, 0,   0, 0, 0, -1.I,   0, 0, 1.I, 0,    -1} ;
+  complex zv2b[] = {0, 0, 0, 0,  0, 0, 0, 0,   0, 0, 0, 0,      0, 0, 1, 0,      -1} ;
   PMX v2 = pmxCreate (4, "v2", h) ;
   POLYNOME pv2 = newTheta ("v", h) ;
   if (! test) pv2->tt.x[0] = 'c' ;
@@ -10209,8 +10217,8 @@ static void THETA (void)
   pmxShow (v) ;
 
   /****** W ******/
-  complex zw1a[] = {0, 0, -1, 0,   0, 0, 0, 0,  -1, 0, 0, 0,   0, 0, 0, 0} ;
-  complex zw1b[] = {0, 0, -1, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0} ;
+  complex zw1a[] = {0, 0, -1, 0,   0, 0, 0, 0,  -1, 0, 0, 0,   0, 0, 0, 0,      -1} ;
+  complex zw1b[] = {0, 0, -1, 0,   0, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,      -1} ;
   PMX w1 = pmxCreate (4, "w1", h) ;
   POLYNOME pw1 = newTheta ("w", h) ;
   if (!test) pw1->tt.x[0] = 'b' ;
@@ -10218,8 +10226,8 @@ static void THETA (void)
   pmxSet (w1, pw1, zw1a) ;
   pmxShow (w1) ;
   
-  complex zw2a[] = {0, 0, 0, 0,   0, 0, 0, 1,  0, 0, 0, 0,    0, 1, 0, 0} ;
-  complex zw2b[] = {0, 0, 0, 0,   0, 0, 0, 1,  0, 0, 0, 0,    0, 0, 0, 0} ;
+  complex zw2a[] = {0, 0, 0, 0,   0, 0, 0, 1,  0, 0, 0, 0,    0, 1, 0, 0,      -1} ;
+  complex zw2b[] = {0, 0, 0, 0,   0, 0, 0, 1,  0, 0, 0, 0,    0, 0, 0, 0,      -1} ;
   PMX w2 = pmxCreate (4, "w2", h) ;
   POLYNOME pw2 = newTheta ("w", h) ;
   if (!test) pw2->tt.x[0] = 'c' ;
@@ -10232,8 +10240,8 @@ static void THETA (void)
   pmxShow (w) ;
   
   /****** X ******/
-  complex zx1a[] = {0, 0, 1.I, 0,   0, 0, 0, 0,  -1.I, 0, 0, 0,   0, 0, 0, 0} ;
-  complex zx1b[] = {0, 0, 0, 0,   0, 0, 0, 0,       -1, 0, 0, 0,   0, 0, 0, 0} ;
+  complex zx1a[] = {0, 0, 1.I, 0,   0, 0, 0, 0,  -1.I, 0, 0, 0,   0, 0, 0, 0,      -1} ;
+  complex zx1b[] = {0, 0, 0, 0,   0, 0, 0, 0,       -1, 0, 0, 0,   0, 0, 0, 0,      -1} ;
   PMX x1 = pmxCreate (4, "x1", h) ;
   POLYNOME px1 = newTheta ("z", h) ;
   if (!test) px1->tt.x[0] = 'b' ;
@@ -10241,8 +10249,8 @@ static void THETA (void)
   pmxSet (x1, px1, zx1a) ;
   pmxShow (x1) ;
 
-  complex zx2a[] = {0, 0, 0, 0,   0, 0, 0, -1.I,  0, 0, 0, 0,  0, 1.I, 0, 0} ;
-  complex zx2b[] = {0, 0, 0, 0,   0, 0, 0, 0 ,    0, 0, 0, 0,  0, 1, 0, 0} ;
+  complex zx2a[] = {0, 0, 0, 0,   0, 0, 0, -1.I,  0, 0, 0, 0,  0, 1.I, 0, 0,      -1} ;
+  complex zx2b[] = {0, 0, 0, 0,   0, 0, 0, 0 ,    0, 0, 0, 0,  0, 1, 0, 0,      -1} ;
   PMX x2 = pmxCreate (4, "x2", h) ;
   POLYNOME px2 = newTheta ("z", h) ;
   if (!test) px2->tt.x[0] = 'c' ;

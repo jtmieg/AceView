@@ -33,7 +33,7 @@ typedef struct polynomeStruct *POLYNOME ;
 struct polynomeStruct {
   AC_HANDLE h ;
   BOOL isFlat, isSum, isProduct ;
-  POLYNOME p1, p2 ;
+  POLYNOME p1, p2 ;   /* p1, p2 are always allocated on p->h, so extracting p->p1 is not a public operation, so p1, p2 are really private */
   TT tt ;
   int id ;
   int magic ;
@@ -44,7 +44,7 @@ struct pmxStruct {
   AC_HANDLE h ;
   int N ;
   char *title ;
-  POLYNOME *pp ;
+  POLYNOME *pp ;   /* all pp polynomes are copied on pmx->h, extracting them i forbidden without a copy , the should be private */
   TT tt ;
   int id ;
   int magic ;
@@ -62,6 +62,7 @@ POLYNOME expand (POLYNOME pp) ;
 void showPol (POLYNOME pp) ;
 POLYNOME squareMomentaCleanUp (POLYNOME pp) ;
 BOOL freeIndex (POLYNOME pp) ;
+void polFree (POLYNOME pp) ;
 
 /**** New Polynomes of all types ***/
 POLYNOME newPolynome (AC_HANDLE h) ;
@@ -86,7 +87,7 @@ POLYNOME newSigB (short cc, AC_HANDLE h) ;
 POLYNOME newSymbol (char *cp, AC_HANDLE h) ;
 POLYNOME newTheta (char *cp, AC_HANDLE h) ;
 
-POLYNOME polScale (POLYNOME pp, double complex z) ;
+BOOL polScale (POLYNOME pp, double complex z) ;  /* en place */
 POLYNOME polSum (POLYNOME p1, POLYNOME p2, AC_HANDLE h) ;
 POLYNOME polProduct (POLYNOME p1, POLYNOME p2, AC_HANDLE h) ;
 POLYNOME polMultiSum (AC_HANDLE h, POLYNOME ppp[]) ;
@@ -109,12 +110,12 @@ PMX pmxMultiSum (PMX *pmxs, char *title, AC_HANDLE h) ;
 PMX pmxProduct (PMX pmx1, PMX pmx2, char *title, AC_HANDLE h) ;
 PMX pmxMultiProduct (PMX *pmxs, char *title, AC_HANDLE h) ;
 PMX pmxExponential (PMX pmx, char *title, int level, AC_HANDLE h) ;
-PMX pmxExpand (PMX pmx) ;
+BOOL pmxExpand (PMX pmx) ;   /* en place */
 
 POLYNOME pmxDeterminant (PMX pmx, AC_HANDLE h) ;
-PMX pmxSet (PMX pmx, POLYNOME p,  complex *zz) ;
+BOOL pmxSet (PMX pmx, POLYNOME p,  complex *zz) ;
 /* fill a pmx with a copy of a given polynome scaled according to the complex matrix zz 
- * the size of zz is not checked, be careful
+ * to weakly check that the size of pmx and zz are equal,  zz[pmx->N^2]=-1 is required
  */
 
 #endif

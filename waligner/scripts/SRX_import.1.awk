@@ -234,13 +234,13 @@ function parseDate(d) {
     if (length(z) > 0)
 	printf ("%s\n", z) ;
     
-    ####### column 21 Project (obsolete as of 2024_03)
+    ####### column 21 Project (obsolete as of 2024_03 but needed as a safegard)
     srp = $21 ;  # SRP number
-    if (0) printf ("-D Biosample\nSRP %s\n", srp) ;
+    if ($22=="") printf ("-D Biosample\nSRP %s\n", srp) ;
 
     ####### column 22 the newer PRJNA number
     prj = $22 ;  # PRJNA number
-    if (prj) printf ("-D Biosample\nSRP %s\n", prj) ;
+    if (prj) printf ("-D Biosample\n-D SRP\nSRP %s\n", prj) ;
 
     ####### column 26 biosample
     biosample = $26 ;

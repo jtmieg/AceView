@@ -1585,11 +1585,11 @@ static POLYNOME expandDo (POLYNOME pp, int force)
     p2 = pp->p2 = 0 ;
   
   if (pp->tt.type && cabs (pp->tt.z) < minAbs)
-    return 0 ;
+    { polFree (pp) ; return 0 ; }
   if (p1 && p1->tt.type && cabs (p1->tt.z) < minAbs)
-    p1 = pp->p1 = 0 ;
+    { polFree (p1) ; p1 = pp->p1 = 0 ; }
   if (p2 && p2->tt.type && cabs (p2->tt.z) < minAbs)
-    p2 = pp->p2 = 0 ;
+    { polFree (p2) ; p2 = pp->p2 = 0 ; }
   
   if (! pp)
     return 0 ;
@@ -1874,19 +1874,28 @@ void showPol (POLYNOME pp)
 /******************************************* New Polynomes of all types ************************************************************************/
 /***********************************************************************************************************************************************/
 
-static void polFinalise (void *vp)
+void polFree (POLYNOME pp)
 {
-  POLYNOME pp = (POLYNOME) vp ;
   if (pp && pp->id)
     {
       pp->id = 0 ;
       pp->magic = 0 ;
-      /* ac_free (pp->p1) ;
-       *  ac_free (pp->p2) ;
-       * do NOT       ac_free (pp->h) ; pp may be a component of a larger pp with same h 
-       */
+      /*
+	ac_free (pp->p1) ;
+	ac_free (pp->p2) ;
+      */
+       /* do NOT       
+	* ac_free (pp->h) ; 
+	* pp may be a component of a larger pp with same h 
+	*/
     }
   return ;
+}
+
+static void polFinalise (void *vp)
+{
+  POLYNOME pp = (POLYNOME) vp ;
+  polFree (pp) ;
 }
 
 /***********************************************************************************************************************************************/
@@ -1918,6 +1927,7 @@ POLYNOME polCopy (POLYNOME p1, AC_HANDLE h)
       id = pp->id ;
       memcpy (pp, p1, sizeof (struct polynomeStruct)) ;
       pp->id = id ;
+      pp->h = h ;
       if (pp->p1)
 	pp->p1 =  polCopy (pp->p1, h) ;
       if (pp->p2)
@@ -2251,27 +2261,27 @@ POLYNOME polProduct (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
 
 /*************************************************************************************************/
 
-POLYNOME polScale (POLYNOME pp, double complex z)
+BOOL polScale (POLYNOME pp, double complex z)
 {
   if (! pp)
     return 0 ;
 
   polCheck (pp) ;
-  pp = polCopy (pp, pp->h) ;
+
   if (pp->isSum)
     {
-      pp->p1 = polScale (pp->p1, z) ;
-      pp->p2 = polScale (pp->p2, z) ;
+      polScale (pp->p1, z) ;
+      polScale (pp->p2, z) ;
     }
   else if (pp->isProduct)
     {
       
-      pp->p1 = polScale (pp->p1, z) ;
+      polScale (pp->p1, z) ;
     }
   else
     pp->tt.z *= z ;
   
-  return pp ;
+  return TRUE ;
 } /* polScale */
 
 /*************************************************************************************************/
@@ -3649,8 +3659,9 @@ static void pmxFinalize (void *vp)
     {
       pmx->magic = 0 ;
       pmx->id = 0 ;
+      ac_free (pmx->h) ;
     }
-}
+} /* pmxFinalize */
 
 /*************************************************************************************/
 
@@ -3660,9 +3671,9 @@ PMX pmxCreate (int N, char *title, AC_HANDLE h)
   int n = sizeof (struct pmxStruct) ;
   PMX pmx = (PMX) handleAlloc (pmxFinalize, h, n) ;
   memset (pmx, 0, n) ;
-  pmx->h = h ;
+  pmx->h = ac_new_handle () ;
   pmx->N = N ;
-  pmx->title = title ? strnew (title, h) : "No_title" ;
+  pmx->title = title ? strnew (title, pmx->h) : "No_title" ;
   pmx->id = ++id ;
   pmx->magic = PMXMAGIC ;
   pmx->pp = halloc ((N*N+1)*sizeof(POLYNOME), h) ;
@@ -3681,26 +3692,33 @@ PMX pmxCopy (PMX pmx, char *title, AC_HANDLE h)
     for (int j = 0 ; j < N ; j++)
       {
 	POLYNOME p = pmx->pp[N*i + j] ;
-	px->pp[N*i + j] = polCopy (p, h)  ;
+	px->pp[N*i + j] = polCopy (p, pmx->h)  ;
      }
   return px ;  
 } /* pmxCopy */
 
 /*************************************************************************************/
 
-PMX pmxExpand (PMX pmx)
+BOOL pmxExpand (PMX pmx)
 {
   int N = pmx->N ;
-
+  AC_HANDLE h1 = ac_new_handle () ;
   pmxCheck (pmx) ;
+
+
   for (int i = 0 ; i < N ; i++)
     for (int j = 0 ; j < N ; j++)
       {
 	POLYNOME p = pmx->pp[N*i + j] ;
 	if (p)
-	  pmx->pp[N*i + j] = expand (p) ;
+	  {
+	    POLYNOME q = expand (p) ;  /* we can kill the previous p */
+	    pmx->pp[N*i + j] = polCopy (q, h1) ;
+	  }
      }
-  return pmx ;  
+  ac_free (pmx->h) ;
+  pmx->h = h1 ;
+  return TRUE ;
 } /* pmxExpand */
 
 /*************************************************************************************/
@@ -3731,12 +3749,12 @@ PMX pmxMultiSum (PMX *pmxs, char *title, AC_HANDLE h)
 	    PMX px = *pmx ;
 	    POLYNOME p = px->pp[N*i + j] ;
 	    if (p)
-	      qq[n++] = polCopy(p, h) ;
+	      qq[n++] = p ;
 	  }
 	if (n)
 	  {
 	    qq[n] = 0 ;
-	    pmx1->pp[N*i + j] = polMultiSum (h, qq) ;
+	    pmx1->pp[N*i + j] = polMultiSum (pmx1->h, qq) ;
 	  }
       }
   return pmx1 ;
@@ -3760,31 +3778,38 @@ PMX pmxScalar (int N, char *title, POLYNOME p,  AC_HANDLE h)
 {
   PMX pmx = pmxCreate (N, title, h) ;
   for (int i = 0 ; i < N ; i++)
-    pmx->pp[N*i + i] = polCopy (p, h) ;
+    pmx->pp[N*i + i] = polCopy (p, pmx->h) ;
   return pmx ;
 } /* pmxScalar */
 
 /*************************************************************************************/
 /* fill a pmx with a copy of a given polynome scaled according to the complex matrix zz 
- * the size of zz is not checked, be careful
+ * the size of zz is checked by requesting a magic value at last position
  */
-PMX pmxSet (PMX pmx, POLYNOME p,  complex *zz)
+BOOL pmxSet (PMX pmx, POLYNOME p,  complex *zz)
 {
   pmxCheck (pmx) ;
   int N = pmx->N ;
-  
+
+  ac_free (pmx->h) ;
+  pmx->h = ac_new_handle () ;
+  if (zz[N*N] != -1)
+    messcrash ("As a substitute to size checking, pmxSet requires zz[N*N] = -1") ;
   for (int i = 0 ; i < N ; i++)
     for (int j = 0 ; j < N ; j++)
       {
 	complex z = zz[N*i + j] ;
-	if (z != 0)
+	if (z != 0) 
 	  {
 	    POLYNOME q = polCopy (p, pmx->h) ;
-	    q->tt.z *= z ;
+	    polScale (q, z) ;
 	    pmx->pp[N*i + j] = q ;
 	  }
+	else
+	  pmx->pp[N*i + j] = 0 ;
       } 
-  return pmx ;
+  
+  return TRUE ;
 } /* pmxScalar */
 
 /*************************************************************************************/
@@ -3819,10 +3844,10 @@ PMX pmxProduct (PMX pmx1, PMX pmx2,  char *title, AC_HANDLE h)
 	  }
 	ab[kk] = 0 ;
 	if (kk)
-	  pp = polMultiSum (h, ab) ;
+	  pp = polMultiSum (pmx->h, ab) ;
 	pmx->pp [N*i + j] = pp ;
       }
-  if (0) ac_free (h1) ;
+  if (1) ac_free (h1) ;
   return pmx ;
 } /* pmxProduct */
 
@@ -3875,7 +3900,7 @@ PMX pmxExponential (PMX pmx, char *title, int level, AC_HANDLE h)
   pmxCheck (pmx) ;
   p = newScalar (1, h1) ;
   px0 = pmxScalar (N, title, p, h1) ;
-  pmxs[0] =  pmxCopy (px0, title, h1) ;
+  pmxs[0] =  px0 ;  /* unit matrix */
 
   for (int k = 1 ; k <= level ; k++)
     {
@@ -3883,17 +3908,16 @@ PMX pmxExponential (PMX pmx, char *title, int level, AC_HANDLE h)
 
       z /= k ;
       p = newScalar (z, h1) ;
-      px0 = pmxScalar (N, title, p, h1) ;
+      px0 = pmxScalar (N, title, p, h1) ; /* diag 1/k matrix */
       px  = pmxProduct (px0, px, title, h1) ;
-      px = pmxExpand (px) ;
+      if (1) pmxExpand (px) ;
       pmxs[k] = px ;
     }
   pmxs[level+1] = 0 ;
        
-  ppp = pmxMultiSum (pmxs, title, h1) ;
-  ppp = pmxExpand (ppp) ;
-  ppp= pmxCopy (ppp, title, h) ;
-  if (0) ac_free (h1) ;
+  ppp = pmxMultiSum (pmxs, title, h) ;
+  pmxExpand (ppp) ;
+  if (1) ac_free (h1) ;
   return ppp ;
 } /* pmxExponential */
 
@@ -3913,7 +3937,7 @@ static PMX pmxMinor (PMX pmx, int ii, AC_HANDLE h)
 	    {
 	      POLYNOME p = pmx->pp[N*i + j] ;
 	      if (p)
-		p = polCopy (p, h) ;
+		p = polCopy (p, px->h) ;
 	      px->pp[(N-1)*i1 + (j-1)] = p ; 
 	    }
 	  i1++ ;
@@ -3930,6 +3954,7 @@ static POLYNOME pmxDeterminantDo (PMX pmx, POLYNOME pAbove, AC_HANDLE h)
   int N = pmx->N, n = 0 ; 
   POLYNOME pp[N+1] ;
   static int pass = 0 ;
+  AC_HANDLE h1 = ac_new_handle () ;
 
   pass++ ;
   pmxCheck (pmx) ;
@@ -3947,29 +3972,29 @@ static POLYNOME pmxDeterminantDo (PMX pmx, POLYNOME pAbove, AC_HANDLE h)
     for (int i = 0 ; i < N ; i++)
       {
 	POLYNOME p1 = pmx->pp[N * i] ;
-	p2 = polProduct (pAbove, p1, h) ;
+	p2 = polProduct (pAbove, p1, h1) ;
 	p3 = expand (p2) ;
 	if (p3)
 	  {
-	    PMX px = pmxMinor (pmx, i, h) ;
-	    POLYNOME p4 = pmxDeterminantDo (px, p3, h) ;
+	    PMX px = pmxMinor (pmx, i, h1) ;
+	    POLYNOME p4 = pmxDeterminantDo (px, p3, h1) ;
 	    if (p4)
 	      {
 		if (i % 2)
-		  p4 = polScale (p4, -1) ; 
-		if (p4)
-		  pp[n++] = p4 ;
+		  polScale (p4, -1) ; 
+		pp[n++] = p4 ;
 	      }
 	  }
       }
     if (n)
       {
 	pp[n] = 0 ;
-	p1 = polMultiSum (h, pp) ;
-	det = expand (p1) ;
+	p1 = polMultiSum (h1, pp) ;
+	p2 = expand (p1) ;
+	det = polCopy (p2, h) ; 
       }
   }
-
+  ac_free (h1) ;
   return det ;
 } /* pmxDeterminantDo */
 
@@ -3991,6 +4016,7 @@ POLYNOME pmxDeterminant (PMX pmx, AC_HANDLE h)
 	POLYNOME pAbove = newScalar (1, h1) ;
 	POLYNOME p1 = pmxDeterminantDo (pmx, pAbove, h1) ;
 	det = polCopy (p1, h) ;
+	ac_free (h1) ;
       }
     }
   return  det ;

@@ -1653,7 +1653,7 @@ gunzip -c  /am/ftp-genomes/Rattus_norvegicus/RNA/rna.fa.gz
 gunzip -c rn5.NCBI_ftp_site.genomes.Rattus_norvegicus.RNA.2012_06_23.downloaded_2013_05_27.RefSeq2GeneId2Gene.txt.gz ZZZZZ.gz /am/ftp-genomes/Rattus_norvegicus/RNA/rna.fa.gz | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){g[$2]=$4;gid[$2]=$3;next;}}/^>/{split($1,aa,"|");nm=aa[4];printf(">%s|Gene|X__%s|GeneId|%s\n",nm,g[nm],gid[nm]);next;}{print}' | gzip > $f.clean.fasta.gz
 
 #########################################
-######### TARGET_CONSTRUCTION Human Rat and Mouse 2016_09_15, using NCBI gff3 file and genome CHROMS
+######### TARGET_CONSTRUCTION Human Rat and Mouse Worm 2016_09_15, using NCBI gff3 file and genome CHROMS
 #########  Rat rn6.0 2019_03
 if ($species == hs) then
   set ref=ref_GRCh38.p7
@@ -1835,7 +1835,7 @@ cat $species.genome.$ref.fasta | gawk '/^>/{ok=1;}/^>mito/{ok=0;}{if(ok==1)print
 ## sort the fasta files for mRNAH and desambiguate the gene names
 ## av mrna, use bql to sort by genes then by mrna
 if ($species == worm) then
-  bin/tace ~/yk <<EOF 
+  tace ~/yk <<EOF 
     bql -o toto.bql.dna select g,tg,m,dna from g in ?gene, tg in g->transcribed_gene, m in tg->mrna, dna in DNA(m) where dna
 EOF
   cat  toto.bql.dna | gawk '{printf (">%s|GENE|%s\n%s\n",$3,$1,$4);}' | gzip > worm.av.fasta.gz

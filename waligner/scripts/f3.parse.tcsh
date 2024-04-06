@@ -232,27 +232,21 @@ if (! -e tmp/X.$MAGIC/XH$chrom/f3.allDoubleIntronsGenomic.ace) then
 endif
 echo BBBB
 
-set ggNS="toto"
-if (-e MetaDB/$MAGIC/GroupW_new_exonList) then
-  set ggNS=` cat  MetaDB/$MAGIC/GroupW_new_exonList | gawk '{printf("%s",$1);exit;}'`
-endif
-
-
-if (-d GeneIndexDB) then
-  bin/tacembly GeneIndexDB << EOF
+if (-d tmp/INTRON_DB/$chrom) then
+  bin/tacembly tmp/INTRON_DB/$chrom << EOF
     key tmp/X.$MAGIC/EHITS/$chrom/f3.intron.list
     show -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace
     quit
 EOF
 
   if (-e tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace) then
-    cat  tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace | gawk '/^$/{print}{gsub(/\"/,"",$0);}/^Intron/{printf("Intron %s\n",$2);next;}/^Group/{if($2 == nx)print;}/Validated_u/{if($2 == "any")print}/de_[du][nu]o/{if($2 == "any")print}' nx=$ggNS  > tmp/X.$MAGIC/EHITS/$chrom/f3.introns.ace
+    cat tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace  | gawk '/^Magic/{next;}{print;}' >  tmp/X.$MAGIC/EHITS/$chrom/f3.introns.ace
     \rm   tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace 
   endif
 endif
 
 hello:
-set ggs=toto
+
 set ggNS="toto"
 if (-e MetaDB/$MAGIC/GroupW_new_exonList) then
   set ggNS1=` cat  MetaDB/$MAGIC/GroupW_new_exonList | gawk '{printf("%s",$1);exit;}'`  
@@ -266,21 +260,25 @@ if (-e MetaDB/$MAGIC/GroupW_strandedList) then
 endif
 
 set WGR="toto"
-# restranding the non stranded wiggle using the stranded wiggle
-  if (-d  tmp/WIGGLEGROUP/$ggS) set WGR=WIGGLEGROUP
-  if (-d  tmp/WIGGLERUN/$ggS) set WGR=WIGGLERUN
-echo "ggS=$ggs#"
-echo "WGR=$WGR#"
-if ($ggS != $ggNS && $ggS != toto && $ggNS != toto && $WGR != toto && ! -e  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz) then
+if (-d  tmp/WIGGLEGROUP/$ggNS) set WGR=WIGGLEGROUP
 
-  echo "restranding the non stranded wiggle using the stranded wiggle"
+# restore the original data
+if (-e tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz) then
+  \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u.f.BF.gz
+  \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u4.r.BF.gz
+endif
+
+# scripts/wiggle2tabix.tcsh $ggNS $chrom u $chrom
+# restranding the non stranded wiggle group using the stranded wiggle group
+# maybe not be a good idea because we already projected on the favorable strands
+if (0 && $ggS != $ggNS && $ggS != toto && $ggNS != toto && $WGR != toto && ! -e  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz) then
+
+  echo "restranding the non stranded wiggle $ggNS using the stranded wiggle $WGR/$ggS"
   mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u.f.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz
   mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz
 
-  scripts/wiggle2tabix.tcsh $ggs $chrom u $chrom
-
-  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.u.f
-  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.u.r
+  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.$ggNS.u.f
+  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.$ggNS.u.r
 
 endif
 
@@ -326,10 +324,13 @@ foreach XGH (XG XH)
     echo "  bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5"
             bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/XH$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5
 
-  foreach fr (ELF ELR ERF ERR)
-    cat tmp/X.$MAGIC/XH$chrom/f3.Xends.*.$fr.transcriptsEnds >> tmp/X.$MAGIC/XH$chrom/f3.Xends.$fr.transcriptsEnds
-  end
 end
+
+# cumulate X and XG ?  
+foreach fr (ELF ELR ERF ERR)
+    cat tmp/X.$MAGIC/XH$chrom/f3.Xends.*.$fr.transcriptsEnds >> tmp/X.$MAGIC/XH$chrom/f3.Xends.$fr.transcriptsEnds
+end
+
 
 foreach fr (ELF ELR ERF ERR)
   set ff=tmp/X.$MAGIC/XH$chrom/f3.Xends.$fr.transcriptsEnds

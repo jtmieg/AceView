@@ -10705,6 +10705,43 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
         if (Est && Clone)
           {
             int x = 0 ;
+	    int clip1 = 1, clip2 = 0 ;
+	    if (!keyFindTag (up->est, _DNA)) /* clip2 = dna length */
+	      { 
+                BSunit *uu ;
+                        
+                units = arrayReCreate (units, 8, BSunit) ;
+		if (bsGetArray (Est,  _DNA, units, 2))
+		  {
+		    uu = arrp (units, 0, BSunit) ;
+		    clip2 = uu[1].i ; 
+		  }
+	      }
+
+	    if (!keyFindTag (up->est, _Vector_Clipping)) /* clip1,clip2 = vector clipping */
+	      { 
+                BSunit *uu ;
+                        
+                units = arrayReCreate (units, 8, BSunit) ;
+		if (bsGetArray (Est,  _Vector_Clipping, units, 2))
+		  {
+		    uu = arrp (units, 0, BSunit) ;
+		    clip1 = uu[0].i ; 
+		    clip2 = uu[1].i ; 
+		  }
+	      }
+	    else if (!keyFindTag (up->est, _Clipping)) /* clip1,clip2 = vector clipping */
+	      { 
+                BSunit *uu ;
+                        
+                units = arrayReCreate (units, 8, BSunit) ;
+		if (bsGetArray (Est, _Clipping, units, 2))
+		  {
+		    uu = arrp (units, 0, BSunit) ;
+		    clip1 = uu[0].i ; 
+		    clip2 = uu[1].i ; 
+		  }
+	      }
 
             if (!keyFindTag (up->cDNA_clone, str2tag("Internal_capping")))
               {
@@ -10828,12 +10865,14 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                 
             if (bsFindTag (Est, str2tag ("Complete_mRNA")))
               {
-                if (a1 < 10)
+		int u1 = x1 < x2 ? x1 : x2 ;
+		int u2 = x1 < x2 ? x2 : x1 ;
+                if (a1 < 10 && u1 < clip1 + 10)
                   {
                     bsAddKey (Transcript, str2tag ("Submitted_as_5p_complete"), up->cDNA_clone) ;
                     complete5 = TRUE ;
                   }
-                if (a2 > mrnaLength - 10)
+                if (a2 > mrnaLength - 10 && u2 > clip2 - 10)
                   {
                     bsAddKey (Transcript, str2tag ("Submitted_as_3p_complete"), up->cDNA_clone) ;
                     complete3 = TRUE ;
@@ -10841,7 +10880,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
               }
             if (bsFindTag (Est, str2tag ("Real_5prime")))
               {
-                if (a1 < 10)
+		int u1 = x1 < x2 ? x1 : x2 ;
+                if (a1 < 10 && u1 < clip1 + 10)
                   {
                     bsAddKey (Transcript, str2tag ("Submitted_as_5p_complete"), up->cDNA_clone) ;
                     complete5 = TRUE ;
@@ -10849,7 +10889,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
               }
             if (bsFindTag (Est, str2tag ("Real_3prime")))
               {
-                if (a2 > mrnaLength - 10)
+		int u2 = x1 < x2 ? x2 : x1 ;
+                if (a2 > mrnaLength - 10 && u2 > clip2 - 10)
                   {
                     bsAddKey (Transcript, str2tag ("Submitted_as_3p_complete"), up->cDNA_clone) ;
                     complete3 = TRUE ;

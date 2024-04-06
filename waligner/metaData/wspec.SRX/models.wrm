@@ -261,15 +261,18 @@
      SRX ?SRX XREF SRP @Title
 
 ?GEO Author UNIQUE ?Author
-     Comment ?Text
+     T ?Text
      SRP ?SRP XREF GEO @Title
-     Reference ?Paper XREF GEO
-      
+     Sample ?Biosample XREF GEO
+     Reference ?Paper XREF GEO 
+     Comment ?Text
+     
 ?Medline Paper  ?Paper XREF Medline_acc
          Paper_PMID // ?Paper XREF PMID NO XREF in human
          Paper_CGCID  ?Paper XREF CGCID
 
 ?Biosample SRR ?SRR XREF Biosample @Title
+           GEO ?Geo XREF Sample
            Comment ?Text
            T Magic_sample UNIQUE ?Text
              Magic_sample2 UNIQUE ?Text

@@ -153,7 +153,7 @@ if ($phase == sraDownload) goto phase_sraDownload
 if ($phase == sraDownloadTest) goto phase_sraDownload
 
 
-echo "usage: SRX_import.tcsh SRR PRJ (SRP) GEO Sample SRX Files Papers  Sublibs Titles  srr2srx srr2run |  sraDownload sraDownloadTest"
+echo "usage: SRX_import.tcsh SRR PRJ SRP GEO Sample SRX Files Papers  Sublibs Titles  srr2srx srr2run |  sraDownload sraDownloadTest"
 goto phaseLoop
 
 ############
@@ -189,7 +189,7 @@ goto phaseLoop
 phaseSRP:
 if (! -d $dd/SRP) mkdir $dd/SRP
 bin/tacembly SRX_DB <<EOF
-  query find srp srr && ! title
+  query find srp srr && ! title && is srp*
   select -o $dd/srp.list select srp from srp in class srp where srp#srr and not srp#title
   quit
 EOF
@@ -199,7 +199,7 @@ if (-e  $dd/SRP/_wget) \rm  $dd/SRP/_wget
 ls  $dd/SRP | gawk '/html/{gsub(".html","",$1);print $1;}' >   $dd/srp.list2
 cat $dd/srp.list $dd/srp.list2 $dd/srp.list2 | gawk '{n[$1]++;}END{for (k in n) if (n[k]==1)print k}' >  $dd/srp.list3
 
-cat $dd/srp.list3 | gawk '{printf("wget -O %s/SRP/%s.html \"https://trace.ncbi.nlm.nih.gov/Traces/sra?study=%s\"\n",dd,$1,$1);}' dd=$dd >  $dd/SRP/_wget
+cat $dd/srp.list3 | gawk '{printf("wget -O %s/SRP/%s.html \"https://trace.ncbi.nlm.nih.gov/Traces/sra?acc=%s\"\n",dd,$1,$1);}' dd=$dd >  $dd/SRP/_wget
 
 if (-e  $dd/SRP/_wget) then
   wc  $dd/SRP/_wget
@@ -209,7 +209,7 @@ endif
 if (-e  $dd/srp.ace) \rm  $dd/srp.ace
 foreach srp (`cat $dd/srp.list`)
    if (! -e  $dd/SRP/$srp.html) continue 
-   cat  $dd/SRP/$srp.html | gawk -f scripts/SRX_import.2.awk srp=$srp | sed -e 's/\\\"//g' -e s'/\\//g'  >> $dd/srp.ace
+   cat  $dd/SRP/$srp.html | gawk -f scripts/SRX_import.SRP.awk srp=$srp | sed -e 's/\\\"//g' -e s'/\\//g'  >> $dd/srp.ace
 end
 
 bin/tacembly SRX_DB <<EOF
@@ -223,8 +223,8 @@ goto phaseLoop
 phasePRJ:
 if (! -d $dd/PRJ) mkdir $dd/PRJ
 bin/tacembly SRX_DB <<EOF
-  query find srp srr && ! title
-  select -o $dd/prj.list select srp from srp in class srp where srp#srr and not srp#title
+  query find srp srr && ! title && IS prj*
+  select -o $dd/prj.list @
   quit
 EOF
 
@@ -258,7 +258,7 @@ phaseGEO:
 if (! -d $dd/GEO) mkdir $dd/GEO
 
 bin/tacembly SRX_DB <<EOF
-  select -o $dd/geo.list select g from g in ?geo where g#srp && ! g#author
+  select -o $dd/geo.list g from g in ?geo 
 EOF
 
 if (-e $dd/GEO/_wget) \rm $dd/GEO/_wget
@@ -909,10 +909,10 @@ tbly SRX_DB <<EOF
 EOF
 
 echo ZZZZZ > ZZZZZ
-cat  srr2srx.txt  ZZZZZ  $MAGIC.srr.ace | gawk '/^ZZZZZ/{zz++;next;}{if(zz<1){r2x[$1]=$2;next;}}/^File/{next;}/^SRR /{printf("SRR %s\n",r2x[$2]);next;}/^Sublib/{next;}{print}' >  $MAGIC.srr2srx.ace
+cat  srr2srx.txt  ZZZZZ  $MAGIC.srr.ace | gawk '/^ZZZZZ/{zz++;next;}{if(zz<1){r2x[$1]=$2;next;}}/^File/{next;}/^SRR /{printf("SRR %s\n",r2x[$2]);next;}/^Sublib/{next;}/^Spots/{next;}{print}' >  $MAGIC.srr2srx.ace
 
 tbly SRX_DB <<EOF
-  // pparse $MAGIC.srr2srx.ace
+  pparse $MAGIC.srr2srx.ace
   save
   quit
 EOF
