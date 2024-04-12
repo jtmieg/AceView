@@ -225,10 +225,12 @@
              Reference ?Paper XREF Run
              SRA_title UNIQUE ?Text                     
              Date_received UNIQUE DateType  Text    
+             Collection_date UNIQUE DateType    
              Submission_date UNIQUE DateType      
              Release_date UNIQUE DateType    
       Nucleic_Acid_Extraction RNA Total_RNA  UNIQUE ?Text 
-                                  polyA  UNIQUE ?Text // good 
+                                  polyA  UNIQUE ?Text // good
+                                  dRNA  UNIQUE ?Text // good 
                                   scRNA UNIQUE ?Text // single cell
                                   Small_RNA  UNIQUE ?Text
                                   Nascent_RNA  UNIQUE  ?Text 
@@ -906,7 +908,8 @@
               Sample ?Sample XREF SRR @T
       Reference ?Paper XREF SRR
       Nucleic_Acid_Extraction RNA Unspecified_RNA ?Text
-                                  polyA  UNIQUE ?Text // good 
+                                  polyA  UNIQUE ?Text // good
+                                  dRNA  UNIQUE ?Text // good 
                                   Nascent_RNA  UNIQUE ?Text 
                                   Total Total_RNA ?Text 
                                         Total_RNA_Ribo_depleted UNIQUE ?Text
@@ -933,7 +936,8 @@
                               Nucleic_prep_author ?Author
                               Normalized UNIQUE ?Text  // seem to belong to Library Danielle 
       sraNucleic_Acid_Extraction  sraRNA sraTotal_RNA ?Text 
-                                         sraPolyA  UNIQUE ?Text // good 
+                                         sraPolyA  UNIQUE ?Text // good
+                                         sradRNA  UNIQUE ?Text // good 					 
                                          sraScRnaPolyA  UNIQUE ?Text // good 
                                          sraSmall_RNA ?Text
                                          sraNascent_RNA  UNIQUE ?Text 

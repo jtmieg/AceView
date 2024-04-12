@@ -1253,7 +1253,6 @@ int main (int argc, const char **argv)
       if (sx.transcriptsEndsFileName)  /* transcriptsEnds */
 	{
 	  int pass ;
-	  ACEIN old = sx.ai ;
 
 	  for (pass = 0 ; pass < 4 ; pass++)
 	    {
@@ -1350,7 +1349,6 @@ int main (int argc, const char **argv)
 	    {
 	      Array Aaaa = 0, Baaa = 0, Alpha = 0 ;
 	      Array aaa1 = 0 ;
-	      ACEIN old = sx.ai ;
 	      AC_HANDLE h = 0 ;
 
 	      if (! sx.swiggleFileName2)

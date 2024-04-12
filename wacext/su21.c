@@ -4851,7 +4851,6 @@ static void  SuperGroupExpMap (KAS *kas)
   /****** det exp UVWX ******/
 
   PMX uvwxSet[] = {U, V, W, X, 0} ;
-
   PMX uvwx = pmxMultiSum (uvwxSet, "u+v+w+x", h) ;
   pmxShow (uvwx) ;
 
@@ -6248,21 +6247,58 @@ static void KasimirOperatorK3 (KAS *kas)
 
 static void QFTscalar (KAS *kas)
 {
-  int i, j ;
+  int i, j, k, l ;
   if (! kas->show)
     return ;
 
   AC_HANDLE h = ac_new_handle () ;
-  const float *GG ;
-  const int *yy ;
   int d = kas->d ;
   float zz[d*d] ;
   float scale = kas->scale ;
-  MX K = kas->mu[4] ;
 
   if (scale == 0)
     scale = 1 ;
   memset (zz, 0, sizeof (zz)) ;
+  printf ("In the 4 scalar vertex we want to compute Tr(ijkl(1+chi)/2) symmetrized in ik and jl\n") ;
+  for (i = 4 ; i < 8 ; i++)
+    for (j = 4 ; j < 8 ; j++)
+      for (k = 4 ; k < 8 ; k++)
+	for (l = 4 ; l < 8 ; l++)
+	  {
+	    if (k<i) continue ;
+	    if (l<j) continue ;
+	    MX a = kas->mu[i] ;
+	    MX b = kas->mu[j] ;
+	    MX c = kas->mu[k] ;
+	    MX d = kas->mu[l] ;
+	    MX mm1[] = {a,b,c,d,0} ;
+	    MX mm2[] = {a,d,c,b,0} ;
+	    MX mm3[] = {c,b,a,d,0} ;
+	    MX mm4[] = {c,d,a,b,0} ;
+	    MX z1 = mxMatMultiProduct (h, mm1) ;
+	    MX z2 = mxMatMultiProduct (h, mm2) ;
+	    MX z3 = mxMatMultiProduct (h, mm3) ;
+	    MX z4 = mxMatMultiProduct (h, mm4) ;
+	    MX zz ;
+	    MX zz1[] = {z1,z2,z3,z4,0} ;
+	    MX zz2[] = {z1,z3,0} ;
+	    MX zz3[] = {z1,z2,0} ;
+	    if ((i-k)*(j-l) != 0) zz = mxMultiSum (h, zz1) ;
+	    else if ((i-k) != 0) zz = mxMultiSum (h, zz2) ;
+	    else if ((j-l) != 0) zz = mxMultiSum (h, zz3) ;
+	    else  zz = z1 ;
+	    float complex z = mxMatTrace (zz) ; 
+	    float y = creal(z)*creal(z) + cimag(z)*cimag(z) ;
+	    if (y > 1/1000) 
+	      {
+		float u = creal(z), v = cimag(z) ;
+		if (u*u < 0.01) u = 0 ;
+		if (v*v < 0.01) v = 0 ;
+		printf("%d %d %d %d -> %.2f + i %.2f\n", i,j,k,l,u, v) ;
+	      }
+	  }
+
+#ifdef JUNK
   printf(" In the scalar psi-psi diagram g^ij (i j) 4 + 4 g^{ji}{i j} should look like 4\n") ;
   
   MX w = mxCreate (h, "wave function", MX_FLOAT, kas->d, kas->d, 0) ;
@@ -6307,6 +6343,7 @@ static void QFTscalar (KAS *kas)
     mxSet (w, zz) ;
     mxNiceShow (K) ;
     mxNiceShow (w) ;
+#endif
     
     ac_free (h) ;
 } /* QFTscalar */
@@ -6351,7 +6388,11 @@ static void Kasimirs (int a, int b, BOOL show)
   GhostKasimirOperatorMinus (&kas) ;
   
   if (0) GhostKasimirOperatorXtilde3 (&kas) ;
-  if (0) QFTscalar (&kas) ;
+  if (1 && kas.show) 
+    {
+      QFTscalar (&kas) ;
+      exit (0) ;
+    }
   if (0) KasimirOperatorK4 (&kas) ;
   if (0) return ;
 

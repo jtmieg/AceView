@@ -165,6 +165,8 @@ MX mxAdd (MX a, MX b, MX c, AC_HANDLE h) ;       /* A = B + C */
 MX mxSubstract (MX b, MX c, AC_HANDLE h) ;       /* returns  B - C */
 /* general linear combination:   A = beta B + gamma C */
 MX mxLinearCombine (MX a, complex float beta, MX b, complex float gamma, MX c, AC_HANDLE h) ;
+
+MX mxMultiSum (AC_HANDLE h, MX *ms) ; /* returns A+B+...0 */
 /* Standard Matrix product 
  * returns a =  matrix multiply (b , c)
  *   if a == 0, a is created
@@ -176,6 +178,7 @@ MX mxLinearCombine (MX a, complex float beta, MX b, complex float gamma, MX c, A
  * the matrix product is as usual the contraction of second b index with the first c index
  */
 MX mxMatMult (MX b, MX c, AC_HANDLE h) ;
+MX mxMatMultiProduct (AC_HANDLE h, MX *ms) ; /* returns ABC...0 */
 MX mxMatTranspose (MX a, MX b, AC_HANDLE h) ; /* standard transposition of a rank2 matrix */
 MX mxMatTransposeConjugate (MX a, MX b, AC_HANDLE h) ; /* standard hermitian conjugate of a rank2 matrix */
 float complex  mxMatTrace (MX a) ;  /* standard trace of a rank2 square matrix */

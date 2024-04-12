@@ -117,6 +117,7 @@ EOF
     spop
     acem
       cdna_73 -locally
+      cdna_31
       quit
     query find est IS Xends_* &&  Flipped
     spush

@@ -1294,7 +1294,7 @@
                     Tested_by_EBI
                     Tested_by_Splign
           Alibaba ?Transcribed_gene XREF Alibaba
-          cDNA From_gene ?Transcribed_gene XREF Read  UNIQUE Int UNIQUE Int UNIQUE Int  UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Text // length offset lengthmatch nerrors quality maxexact section
+          cDNA From_gene ?Transcribed_gene XREF Read  UNIQUE Int UNIQUE Int UNIQUE Int  UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Text // minx maxx nmatch nerrors quality maxExact offSet clippedLength section
                From_gene_35f ?Transcribed_gene XREF Read  UNIQUE Int UNIQUE Int UNIQUE Int  UNIQUE Int UNIQUE Int UNIQUE Text // length offset lengthmatch nerors quality section
           From_cosmid ?Sequence Int  UNIQUE Int  UNIQUE Int  UNIQUE Int  UNIQUE Int  UNIQUE Int  UNIQUE Int  UNIQUE Int   UNIQUE Int  UNIQUE Text // cosmid a1 a2 x1 x2 lengthest ali nerr quality maxExact section
           From_cosmid_35f ?Sequence Int Int Int Int Int Int Int Int Text // cosmid a1 a2 x1 x2 lengthest ali nerr quality section
@@ -3577,9 +3577,12 @@
              Reference ?Paper XREF Run
              SRA_title UNIQUE ?Text                     
              Date_received UNIQUE DateType  Text    
+             Collection_date UNIQUE DateType    
              Submission_date UNIQUE DateType      
+             Release_date UNIQUE DateType    
       Nucleic_Acid_Extraction RNA Unspecified_RNA ?Text
-                                  polyA  UNIQUE ?Text // good 
+                                  polyA  UNIQUE ?Text // good
+                                  dRNA  UNIQUE ?Text // good 
                                   Nascent_RNA  UNIQUE ?Text 
                                   Total Total_RNA ?Text 
                                         Total_RNA_Ribo_depleted UNIQUE ?Text

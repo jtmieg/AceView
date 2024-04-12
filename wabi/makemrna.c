@@ -2578,7 +2578,7 @@ static KEY mrnaNameGeneByPhenotypicGene (SC *sc)
     return 0 ;
 
 
-  ks1 = queryKey (cosmid, "{IS *} $| {>Parts}") ; /* 1 cosmid OR 1 junction + 2 cosmids */
+  ks1 = queryKey (cosmid, "{IS *} $| {>Parts} $| {>Subsequence} ") ; /* 1 cosmid OR 1 junction + 2 cosmids */
   ks2 = query (ks1, "{IS *} $| {>Source} $| {>In_junction} ") ; /* 3 junctions and 2 cosmids OR 2 junctions + 2 cosmids */
   ks3 = query (ks2, "{IS *} $| {>Source} $| {>Parts}") ;  /* 2 junctions and 3 cosmids OR 3 junctions + 4 cosmids */
   ks = query (ks3, ">Genes") ;
@@ -3144,6 +3144,8 @@ static void mrnaSaveMatchQuality (KEY gene, Array hits, KEYSET ignoredClones)
               bsAddData (Est, _bsRight, _Int, &nerrAll) ;
               bsAddData (Est, _bsRight, _Int, &quality) ;
               bsAddData (Est, _bsRight, _Int, &maxExact) ;
+              bsAddData (Est, _bsRight, _Int, &offset) ;
+              bsAddData (Est, _bsRight, _Int, &lengthEst) ; /* to align */
               bsSave (Est) ;
             }
         }

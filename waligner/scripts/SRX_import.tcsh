@@ -355,20 +355,20 @@ goto phaseLoop
 
 phaseFiles:
 tbly SRX_DB <<EOF
-  query find SRR !File && !Solid && Paired_end && project == $MAGIC
-  list -a -f $dd/r2f.p
-  query find SRR !File && !Solid && !Paired_end && project == $MAGIC
-  list -a -f $dd/r2f.s
-  query find SRR !File && Solid && Paired_end && project == $MAGIC
-  list -a -f $dd/r2f.p.s
-  query find SRR !File && Solid && !Paired_end && project == $MAGIC
-  list -a -f $dd/r2f.s.s
+  query find SRR !File && !Solid && !Sublibraries && Paired_end && project == $MAGIC
+  select -o  $dd/r2f.p @
+  query find SRR !File && !Solid && !Sublibraries && !Paired_end && project == $MAGIC
+  select -o  $dd/r2f.s @
+  query find SRR !File && Solid && !Sublibraries && Paired_end && project == $MAGIC
+  select -o  $dd/r2f.p.s @
+  query find SRR !File && Solid && !Sublibraries && !Paired_end && project == $MAGIC
+  select -o  $dd/r2f.s.s @
 EOF
 
-cat $dd/r2f.p  | gawk  '/^SRR/{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta/1 %s/SRA/%s_1.fasta.gz\nFile fasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd > $dd/r2f.ace
-cat $dd/r2f.s  | gawk  '/^SRR/{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
-cat $dd/r2f.s.s  | gawk  '/^SRR/{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
-cat $dd/r2f.p.s  | gawk  '/^SRR/{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta/1 %s/SRA/%s_1.fasta.gz\nFile csfasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.p  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta/1 %s/SRA/%s_1.fasta.gz\nFile fasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd > $dd/r2f.ace
+cat $dd/r2f.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.s.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.p.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta/1 %s/SRA/%s_1.fasta.gz\nFile csfasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
 
 echo "pparse  $dd/r2f.ace" | tbly SRX_DB -no_prompt
 
@@ -391,10 +391,21 @@ tbly SRX_DB <<EOF
   date
   query find project IS $MAGIC ; > srr ; >biosample
   bql -a -o b2t.txt select b,t from b in @, t in b->title
-  query find project IS $MAGIC ; > srr ; >biosample
-  bql -a -o b2p.txt select b,t,t2 from b in @, t in b->biosample_attribute, t2 in t[1]
+  query find project IS $MAGIC ; > srr ; biosample
+  bql -a -o rb2p.txt select r,b,t,t2 from r in @, b in r->biosample, t in b->biosample_attribute, t2 in t[1]
   quit
 EOF
+
+cat rb2p.txt | gawk -F '\t' '/collection date/{z=$4;gsub("collection date","",z) ;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\nCollection_date %s\n\n",$1,z);}' > r2collection_date.ace
+cat rb2p.txt | gawk -F '\t' '/ENA-LAST-UPDATE/{print;}/last update/{printf("%s\t%s\n",$1,$4);}' | sort -V | gawk -F '\t' '{z=$2;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\nSubmission_date %s\n\n",$1,z);}' > r2submission_date.ace
+
+cut -f 4 | sort u | tags
+
+'collection date/{z=$4;gsub("collection date","",z) ;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\tCollection_date %s\n\n",$1,z);}' > 
+r2submission_date.ace
+
+
+cat rb2p.txt | gawk -F '\t' '/collection date/{print $4;}' | grep \- | grep -v "not collected" | sed -e 's/collection date//' | sort -u
 
 cat r2b2t.txt | gawk -F '\t' '{printf("SRR %s\nTitle %s\n\n", $1,$3);}' > r2b2t.ace
 tbly SRX_DB <<EOF

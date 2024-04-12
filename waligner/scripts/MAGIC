@@ -2217,8 +2217,13 @@ foreach run (`cat MetaDB/$MAGIC/Run2File | cut -f 1 | sort -u`)
     continue
   endif
   set UMI=""
+  set machine="no_machine"
   set umi=`cat MetaDB/$MAGIC/runs.ace | gawk '/^Run/{ok=0;gsub(/\"/,"",$2);if($2==run)ok=1;}/^UMI/{if(ok==1)umi=$2+0;}END{print umi+0;}' run=$run`
+  set machine=`cat MetaDB/$MAGIC/runs.ace | gawk '/^Run/{ok=0;gsub(/\"/,"",$2);if($2==run)ok=1;}/^PacBio/{if(ok==1)mm=$1;}/^Nanopore/{if(ok==1)mm=$1;}END{print mm;}' run=$run`
   if ($umi > 0) set UMI=UMI$umi
+  set isLong="short"
+  if ($format == fasta && ($machine == Nanopore || $machine == PacBio)) set isLong="long"
+  echo "$run $format $machine"
   if ($nn > 0) then
     if (-e fastc_count.ace) \rm fastc_count.ace
     if (-e Fastc/$run/f2.1.fastc.gz || -e Fastc/$run/f.1.fastc.gz) then
@@ -2228,8 +2233,8 @@ foreach run (`cat MetaDB/$MAGIC/Run2File | cut -f 1 | sort -u`)
       endif
     else
       if (! -d  Fastc/$run) mkdir Fastc/$run
-      scripts/submit Fastc/$run/a0 "scripts/makeFastc $run $format $files Fastc $UMI" 32G 
-      echo                         "scripts/makeFastc $run $format $files Fastc $UMI"
+      scripts/submit Fastc/$run/a0 "scripts/makeFastc $run $format $files Fastc $isLong $UMI" 32G 
+      echo                         "scripts/makeFastc $run $format $files Fastc $isLong $UMI"
       @ nMakeFastc = $nMakeFastc  + 1
     endif
   endif

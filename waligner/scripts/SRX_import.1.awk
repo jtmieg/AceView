@@ -33,7 +33,7 @@ function parseDate(d) {
     print "SRR \"" srr "\"" ;
     print "-D Nucleic_Acid_Extraction" ;
     print "-D sraNucleic_Acid_Extraction" ;
-    # The SRA file gives 2 different dates, we want the oldest one to reflect the experiment date
+    # The SRA file gives 2 different dates, reales and Load,  Load is meaningless
     doOk = 0 ;
     if ($3) { d1 = parseDate($3) ; printf ("Submission_date %s\n", d1) ; }
     if ($2) { d1 = parseDate($2) ; printf ("Release_date %s\n", d1) ; }

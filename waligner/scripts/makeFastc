@@ -95,18 +95,18 @@ set run=$1
 set format=$2
 set files=$3
 set outDir=$4"/"$run 
+set isLong=$5
 set UMI=0
-if ($?5) set UMI=`echo $5 | gawk '{if(substr($1,1,3)=="UMI")n=substr($1,4);print n+0;}'`
+if ($?6) set UMI=`echo $5 | gawk '{if(substr($1,1,3)=="UMI")n=substr($1,4);print n+0;}'`
 echo "UMI=$UMI"
 
 set filesQ=`echo $files| sed -e 's/_____/     /g'`
 set prefix="f2"
 set nFiles=`echo $files | gawk '{n=split($1,aa,"_____");if(aa[n]=="")n-=1;print n}'`
  
-# split the sequences usinga reasonable number of letters
+# split the sequences using a reasonable number of letters
 set prefixLength=`limit | gawk '/^descriptors/{n=$2;}END{n=n+0;if(n<64)n=64;x=4;for(i=1;i<=4 && x<n;i++)x=4*x;print i-1;}'`
 if ($prefixLength < 3) set prefixLength=3
-
 
 # treat the Solid formats exactly as if they were fasta/fastq since we wish to stay in color space
 
@@ -126,6 +126,13 @@ if (! -d  $outDir) mkdir $outDir
 set tmp=$outDir/tmp
 # set tmp=$TMPDIR/aceview.makeFastc.$run.$$
 if (! -d $tmp) mkdir $tmp
+
+# just split long reads
+if ($isLong == long) then
+  goto phase3
+endif
+
+
 
 if (! -e $tmp/c1.raw.done) then 
   echo " Splitting the original files : $files by prefix in directory $tmp/raw"
@@ -245,9 +252,13 @@ if (! -d $tmp/fastc) mkdir $tmp/fastc
 if (! -d $tmp/fastc/$run) mkdir $tmp/fastc/$run
 if (! -e $tmp/c3.fastc.done) then 
 
+if ($isLong == long && $format == fasta) then
+  echo "gunzip -c $filesQ | bin/dna2dna $keepName -I tc -O fastc -split $splitMs -splitMb $splitMb -gzo -o $tmp/fastc/$run/f2"
+        gunzip -c $filesQ | bin/dna2dna $keepName -I fasta -O fastc -split $splitMs -splitMb $splitMb -gzo -o $tmp/fastc/$run/f2
+else
   echo "cat $tmp/tc/*.tc | bin/dna2dna $keepName -I tc -O fastc -split $splitMs -splitMb $splitMb -gzo -o $tmp/fastc/$run/f2"
         cat $tmp/tc/*.tc | bin/dna2dna $keepName -I tc -O fastc -split $splitMs -splitMb $splitMb -gzo -o $tmp/fastc/$run/f2
-
+endif
 
   if ($isSolid == 1) then
     mv  $tmp/fastc  $tmp/ccfa

@@ -71,6 +71,7 @@
       Quality  Cov // genes  index_10 > 4000 AND index_18 < 800 (eliminate tiny runs, small RNAs, and targetted runs)
                Recons Recons_str
       Origin Date_received UNIQUE DateType  Text    
+             Collection_date UNIQUE DateType    
              Submission_date UNIQUE DateType    
              Release_date UNIQUE DateType    
       Taxonomy Archea      Text Text UNIQUE Float
@@ -139,7 +140,8 @@
       Author_builder Center_name ?Author
       Reference ?Paper XREF SRR
       Nucleic_Acid_Extraction RNA Total_RNA  UNIQUE ?Text 
-                                  polyA  UNIQUE ?Text // good 
+                                  polyA  UNIQUE ?Text // good
+                                  dRNA  UNIQUE ?Text // good 
                                   scRNA UNIQUE ?Text // single cell
                                   Small_RNA  UNIQUE ?Text
                                   Nascent_RNA  UNIQUE  ?Text 
@@ -164,7 +166,8 @@
                               Normalized UNIQUE ?Text  // seem to belong to Library Danielle 
       Annotation_problem ?Text
       sraNucleic_Acid_Extraction  sraRNA sraTotal_RNA ?Text 
-                                         sraPolyA  UNIQUE ?Text // good 
+                                         sraPolyA  UNIQUE ?Text // good
+                                         sradRNA  UNIQUE ?Text // good 
                                          sraScRnaPolyA  UNIQUE ?Text // good 
                                          sraSmall_RNA ?Text
                                          sraNascent_RNA  UNIQUE ?Text 

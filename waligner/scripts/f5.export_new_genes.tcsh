@@ -191,7 +191,7 @@ endif
 # export the good products, they are used to beautify the SNP file
    
 bin/tacembly tmp/X.$MAGIC/XH$chrom <<EOF
-     bql -o tmp/X.$MAGIC/XH$chrom/f5.good_product.txt select m,p,x1,x2,vg  from m in ?mRNA where m#from_gene, p in m->product where (p#good_product AND p#best_product) OR p#very_good_product, x1 in p[1], x2 in p[2]
+     bql -o tmp/X.$MAGIC/XH$chrom/f5.good_product.txt select m,p,x1,x2 from m in ?mRNA where m#from_gene, p in m->product where (p#good_product AND p#best_product) OR p#very_good_product, x1 in p[1], x2 in p[2]
 EOF
 wc  tmp/X.$MAGIC/XH$chrom/f5.good_product.txt
 cat  tmp/X.$MAGIC/XH$chrom/f5.good_product.txt  | gawk -F '\t' '{printf("mRNA \"%s\"\nProduct \"%s\" %d %d\n\n", $1, $2, $3, $4);}' | gzip > tmp/X.$MAGIC/XH$chrom/f5.good_product.ace.gz

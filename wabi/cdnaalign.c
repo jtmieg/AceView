@@ -11189,7 +11189,7 @@ static int cDNAFuseGeneKeySet (KEYSET tgs)
       else
 	{
 	  parts = query (ks2, ">Genomic_sequence ; {!parts} SETOR {>parts}") ;
-	  if (keySetMax (parts) > 2) /* i cannot fuse 3 subsections */
+	  if (keySetMax (parts) > 5) /* m2024_04_11, was : i cannot fuse 3 subsections */
 	    ks3 = queryKey (tg, ">Genomic_sequence ; >Transcribed_gene") ;
 	  else  /* ok i can fuse everybody */
 	    ks3 = keySetCopy (ks2) ;
@@ -14320,13 +14320,13 @@ static KEYSET assignOncecDNAKeySet (KEYSET originalKeySet)
           if ((Est = bsCreate (est)))
             {
               BOOL reverse = bsFindTag (Est, _Reverse) ;
-              if (bsGetArray(Est, _From_gene, aa, 6))  /* gene, nmatch, nerr */
-                for (i = 0 ; i < arrayMax(aa) ; i += 6)
+              if (bsGetArray(Est, _From_gene, aa, 9))  /* gene, nmatch, nerr */
+                for (i = 0 ; i < arrayMax(aa) ; i += 9)
                   {
                     hh = arrayp(hits, arrayMax(hits), HIT) ;
                     u = arrp (aa, i, BSunit) ;
                     hh->gene = u[0].k ;  hh->est = est ; 
-                    hh->x2 = u[1].i ; /* len to be aligned = nb of bp in the est between clips */
+                    hh->x2 = u[8].i ; /* len to be aligned = nb of bp in the est between clips */
                     hh->a1 = u[3].i ;  /* nb of bp aligned */
                     if (hh->a1 > hh->x2) hh->a1 = hh->x2 ; /* this occurs if many indels */
                     hh->nerr = u[4].i ;  /* nb of errors */
@@ -14352,7 +14352,7 @@ static KEYSET assignOncecDNAKeySet (KEYSET originalKeySet)
                     hh->reverse = reverse ;  /* strand */
                     if (reverse)
                       {
-                        hh->ex2 = u[2].i ; /* offset = nb of bp between cliptop and first aligne dbase */
+                        hh->ex2 = u[6].i ; /* offset = nb of bp between cliptop and first aligne dbase */
                         
                         hh->clipTop = u[5].i ; /* quality */
                         hh->clipEnd = 10000 ;

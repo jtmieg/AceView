@@ -355,6 +355,21 @@ MX mxAdd (MX a, MX b, MX c, AC_HANDLE h)
 
 /**********************************************************************/
 
+MX mxMultiSum (AC_HANDLE h, MX *mms)
+{
+  int ii ;
+  MX m = mms[0] ;
+
+  if (! m)
+    return 0 ;
+  for (ii = 1 ; mms[ii] ; ii++)
+    m = mxAdd (m, m, mms[ii], h) ;
+
+  return m ;
+} /* mxMultiSum */
+
+/**********************************************************************/
+
 MX mxSubstract (MX b, MX c, AC_HANDLE h)
 {
   MX a = 0 ;
@@ -847,6 +862,21 @@ MX mxMatMult (MX b, MX c, AC_HANDLE h)
 
   return mxContract (0, b, c, 1, 0, h) ;
 } /* mxMatMult */
+
+/**********************************************************************/
+
+MX mxMatMultiProduct (AC_HANDLE h, MX *mms)
+{
+  int ii ;
+  MX m = mms[0] ;
+
+  if (! m)
+    return 0 ;
+  for (ii = 1 ; mms[ii] ; ii++)
+    m = mxMatMult(m, mms[ii], h) ;
+
+  return m ;
+} /* mxMatMultiProduct */
 
 /**********************************************************************/
 /* mxMatListMult
