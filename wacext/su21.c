@@ -907,7 +907,7 @@ static POLYNOME Z2_AA__loopPsi  (const char *title)
   showPol (pp) ;
   pp = reduceIndices (pp) ;
   pp = expand (pp) ;
-  printf ("### Z2 Photon avec loop PsiB_L Psi_L expect :: 2/3 (p_ab - g_ab p^2 \n") ;
+  printf ("### Z2 Photon avec loop PsiB_L Psi_L expect :: 2/3 (p_ab - g_ab p^2) \n") ;
   showPol (pp) ;
   printf ("DONE %s\n", title) ;
 
@@ -11003,7 +11003,7 @@ int main (int argc, const char **argv)
 	}
       
       /* Boson propagators Fermion loops*/
-      if (0)
+      if (1)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators, Fermion loops */\n") ;
