@@ -124,10 +124,16 @@ foreach target ($allRNAtargets)
     if (-e TARGET/GTF/$species.$target.gtf.gz) then
       echo " bin/dna2dna -gtf TARGET/GTF/$species.$target.gtf.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target "
             (bin/dna2dna -gtf TARGET/GTF/$species.$target.gtf.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target ) >& tmp/METADATA/gtf.$target.err
+      \rm tmp/METADATA/gtf.$target.*gz
+      gzip  -f tmp/METADATA/gtf.$target.*
     else if (-e TARGET/GTF/$species.$target.gff.Bacteria.gz) then
       (bin/dna2dna -gff3 TARGET/GTF/$species.$target.gff.Bacteria.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target ) >& tmp/METADATA/gtf.$target.err
+      \rm tmp/METADATA/gtf.$target.*gz
+      gzip  -f tmp/METADATA/gtf.$target.*
     else if (-e TARGET/GTF/$species.$target.gff.gz) then
       (bin/dna2dna -gff3 TARGET/GTF/$species.$target.gff.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target ) >& tmp/METADATA/gtf.$target.err
+      \rm tmp/METADATA/gtf.$target.*gz
+      gzip  -f tmp/METADATA/gtf.$target.*
       if (! -e TARGET/Targets/$species.$target.fasta.gz && -e  TARGET/Targets/$species.genome.fasta.gz) then
         bin/dna2dna -gff3  TARGET/GTF/$species.$target.gff.gz -gtfGenome TARGET/Targets/$species.genome.fasta.gz -o TARGET/Targets/tutuy1
         bin/dna2dna -gff3  TARGET/GTF/$species.$target.gff.gz -gtfGenome TARGET/Targets/$species.mito.fasta.gz -o TARGET/Targets/tutuy2
@@ -145,7 +151,6 @@ foreach target ($allRNAtargets)
       endif
     endif
     # ATTENTION -gzo crashes on mouse (although it works on rat), we must gzip as a postpocessing, probbaly the files are too large
-    gzip  -f tmp/METADATA/gtf.$target.*
     if (-e  tmp/METADATA/gtf.$target.r.sponge.gz) then
       gunzip -c tmp/METADATA/gtf.$target.f.sponge.gz | gawk -F '\t' '{if($1==old)printf("Intron %s__%d_%d\n%s\nSupports %s\n\n",$3,a2+1,$4-1,target,$1);old=$1;a2=$5;}' target=$target > tmp/METADATA/gtf.$target.f.intron.ace
       gunzip -c tmp/METADATA/gtf.$target.r.sponge.gz | gawk -F '\t' '{if($1==old)printf("Intron %s__%d_%d\n%s\nSupports %s\n\n",$3,a2-1,$4+1,target,$1);old=$1;a2=$5;}' target=$target > tmp/METADATA/gtf.$target.r.intron.ace
@@ -182,7 +187,7 @@ set geneBoxMaxLn=1000000
 
   endif
 end
-
+gzip
 #######################################################################
 ## create a non redundant genebox sponge file
 ## Stranded
@@ -237,7 +242,7 @@ if ($gtf_active == 1 || ! -e tmp/METADATA/mrnaRemap.gz) then
        if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz) then
 	 zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{s=$2;next;}/^Title/{printf("Sequence %s\nTitle %s\n\n",s, substr($0,7));}' >>  tmp/METADATA/$target.MRNA.info.ace
 	 zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^$/{out=1;intron=0;next;}/^Intron/{if(out==1){out=0;intron=$2;}next;}/^Gene/{if(intron!=0){printf("Intron %s\nGene %s\n\n",intron, substr($0,5));}}' | gzip >   tmp/METADATA/toto.gz 
-         zcat tmp/METADATA/gtf.$target.gene_title.ace.gz ZZZZZ.gz  tmp/METADATA/toto.gz | gawk '/^ZZZZZ/{zz=1;next;}/^$/{intron=0;gene=0;title=0;next;}/^Gene /{gene=$2;gsub(/\"/,"",gene);if(intron==1){print;if(length(g2t[gene])>0)printf("Title %s\n",g2t[gene]);}}/^Title/{title=substr($0,6);if(zz<1 && gene!=0){g2t[gene]=title;next;}}/^Intron/{printf("\n");print;intron=1;gsub(/\"/,"",$2);n=split($2,aa,"_");if(n==4)printf("IntMap %s %s %s\n",aa[1],aa[3],aa[4]);}'  > tmp/METADATA/$target.introns.info.ace
+         zcat tmp/METADATA/gtf.$target.gene_title.ace.gz ZZZZZ.gz  tmp/METADATA/toto.gz | gawk '/^ZZZZZ/{zz=1;next;}/^$/{intron=0;gene=0;title=0;next;}/^Gene /{gene=$2;gsub(/\"/,"",gene);if(intron==1){print;if(length(g2t[gene])>0)printf("Title %s\n",g2t[gene]);}}/^Title/{title=substr($0,6);if(zz<1 && gene!=0){g2t[gene]=title;next;}}/^Intron/{printf("\n");print;intron=1;gsub(/\"/,"",$2);n1=split($2,aa,"__");n2=split(aa[2],bb,"_");if(n1+n2==4)printf("IntMap %s %s %s\n",aa[1],bb[1],bb[2]);}'  > tmp/METADATA/$target.introns.info.ace
          \rm   tmp/METADATA/toto.gz 
          zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{s=$2;next;}/^Title/{printf("mRNA %s\nTitle %s\n\n",s, substr($0,7));}/^Model_ofZZZ/{printf("mRNA %s\nModel_of %s\n\n",s, substr($0,10));}' >>  tmp/METADATA/$target.MRNA.info.ace
          # cat  tmp/METADATA/$target.GENE.info.ace | gawk '/Gene /{print; printf("Targeted\n\n");}' > tmp/METADATA/_x

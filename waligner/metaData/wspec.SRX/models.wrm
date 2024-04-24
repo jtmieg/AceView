@@ -21,6 +21,7 @@
          Compare ?Compare XREF Project
 
 ?SRR  Titles  Title UNIQUE ?Text
+              Manual_title UNIQUE ?Text
               Sorting_title  UNIQUE ?Text
               SRP ?SRP XREF SRR @T
               Magic_author UNIQUE ?Text

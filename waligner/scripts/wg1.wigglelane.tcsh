@@ -24,7 +24,7 @@ set ici=`pwd`
 
 set mytmp=$TMPDIR/aceview.wigglerun.$$
 # set mytmp=$TMPDIR/aceview.wigglerun.11702
-# set mytmp=tmp/WIGTMP
+set mytmp=tmp/WIGTMP
 
 echo  $mytmp
 mkdir $mytmp
@@ -93,17 +93,17 @@ endif
   ## ATTENTION do nor -gzo: there would be to many gzip pipes generated on the computer
     # if we set -minErrRate 7, we obtain in addition a second set of K7 wiggle using only error rich reads
     echo "$mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG"
-          $mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG
+          # $mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG
   end
 
 echo -n "splitting done tralala"
 date
-# exit 0
+exit 0
 laba:
 # RefSeq takes at lest 14Gb of memory
 # $chromSetAll
 
-foreach chrom ($DNAtargets $chromSetAll)
+foreach chrom ($chromSetAll)
   cd $ici
 # if ($chrom != 3) continue
   set tag="null"

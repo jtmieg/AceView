@@ -408,8 +408,9 @@ static void sxVentilate (WIGGLE *sx)
       /***********************************/
       /* 2024_01_12: in non stranded case, trust the strand of the annotated gene */
       if (! firstRead) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
-      if (sx->strand && a1 > a2) continue ;
-      if (sx->antistrand && a1 < a2) continue ;
+      if (inTranscript && sx->strand && a1 > a2) continue ;
+      if (inTranscript && sx->antistrand && a1 < a2) continue ;
+      if (sx->antistrand) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}
       if (inTranscript && sx->ventilate && ! sx->strand && ! sx->antistrand)
 	{
 	  if (a1 > a2) {int dummy = a1 ; a1 = a2 ; a2 = dummy ;}

@@ -296,6 +296,15 @@ One can also directly access a single object using
 \BL
   select OBJECT('Paper', 'p1')
 \end{lstlisting}
+
+Each object in the database has a name, belongs to a class
+and is time-stamped to the last time a value was modified.
+These fields can be accessed as methods
+\BL
+  select p in ?Paper, p.name, p.class, p.timestamp
+\end{lstlisting}
+ 
+
 We can get to a tag using $\#$, and get the value behind a tag using $-$$>$. For example the following query
 \BL
    select p in ?Paper, a in p->Author,prof in a#Professor, z in a->Affiliation
@@ -387,9 +396,9 @@ we obtain the silly combinatorial answer
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SECTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection{Sum, min, max and average}
+\subsection{COUNT, MIN, MAX, SUM, AVERAGE, STDDEV}
 
-The MIN, MAX, SUM or AVERAGE of any numerical variable,
+The MIN, MAX, SUM, AVERAGE or STDDEV of any numerical variable,
 for example a multi-valued numerical field, can be evaluated
 by interpolating in capitals the desired operator in front of its definition
 \BL
@@ -1138,25 +1147,23 @@ $https://github.com/jtmieg/AceView$
 
 To summarize, the full list of operators, in their order of precedence is
 \BL
-   ; order\_by
+   ; TITLE order\_by
    from select , where
-   in = 
+   in := = 
    || OR ^^ XOR &&  AND ! NOT
    like =~ ~ == != >= <= > < >~ <~
    ISA
-   + - * / ^ modulo
-   class
-   DNA PEPTIDE CODING DATEDIFF 
-   count
-   >> -> # => :
-   @
-   object
+   modulo + - * / ^
+   DNA PEPTIDE PEP CODING DATEDIFF 
+   COUNT MIN MAX SUM AVERAGE STDDEV
+   .class .name .timestamp
+   >> -> # => 
+   @ OBJECT
    () {} []
-   BACKQUOTE QUOTE DOUBLEQUOTE 
 \end{lstlisting}
 
 with the restriction that the 3 kinds of parentheses and 
-also the quotes must be nested correctly  (["bb"]) is correct but (x[y)] is illegal.
+also the quotes must be nested correctly  (["bb"]) is correct but (x[y)] is illegal. Operators written in capitals, i.e. DNA or AVERAGE, must be written in capitals (are case-sensitive)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SECTION

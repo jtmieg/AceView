@@ -591,6 +591,7 @@ BOOL isIdKosher (SX *sx, vTXT id)
       else
 	{
 	  char cc, *cp = strstr ( vtxtPtr (id), "|Gene|") ;
+	  if (!cp) cp = strstr ( vtxtPtr (id), "|GENE|") ;
 	  if (cp)
 	    {
 	      cc = *cp ; *cp = 0 ;
@@ -2254,7 +2255,7 @@ static DICT *gtf2ace (BOOL isGff3, DICT *dict, KEYSET ks, char *buf, AC_HANDLE h
       if (*cp)
 	{
 	  cr = ac_unprotect (cp, h) ;
-	  url_decode_inplace(cr) ;	
+	  if (0) url_decode_inplace(cr) ;	
 	  dictAdd (dict, cr, &n) ;
 	  keySet (ks, item) = n ;
 	}
@@ -2279,7 +2280,7 @@ static DICT *gtf2ace (BOOL isGff3, DICT *dict, KEYSET ks, char *buf, AC_HANDLE h
 	  if (*cp)
 	    {
 	      cr = ac_unprotect (cp, h) ;
-	      url_decode_inplace(cr) ;	
+	      if (0) url_decode_inplace(cr) ;	
 	      dictAdd (dict, cr, &n) ;
 	      keySet (ks, item) = n ;
 	    }
@@ -3052,7 +3053,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	{
 	  if (shadow->cds) continue ;
 	  isDown = shadow->isDown ;
-	  if (old && shadow->mrna == old)
+	  if (old && shadow->mrna == old && (shadow->a1 - a2 > 12 || shadow->a1 - a2 < -12))
 	    aceOutf (ao, "%s\t%s\t%s\t%d\t%d\t%s\t%09d\t%09d\t%s\n"
 		     , sx->gtfRemapPrefix ? sx->gtfRemapPrefix : "-"
 		     , dictName(dict, shadow->gene)

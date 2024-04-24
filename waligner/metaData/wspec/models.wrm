@@ -902,24 +902,22 @@
 
 
 ?SRR  Titles  SRP ?SRP XREF SRR  @T // SRR->SRP->Title[SRP]
+              Manual_title UNIQUE ?Text  
               Author UNIQUE ?Text          // SRR->Magic_author2
               Species ?Species  @Title 
               SRX ?SRX XREF SRR @T
               Sample ?Sample XREF SRR @T
       Reference ?Paper XREF SRR
-      Nucleic_Acid_Extraction RNA Unspecified_RNA ?Text
+      Nucleic_Acid_Extraction RNA Total_RNA  UNIQUE ?Text 
                                   polyA  UNIQUE ?Text // good
                                   dRNA  UNIQUE ?Text // good 
-                                  Nascent_RNA  UNIQUE ?Text 
-                                  Total Total_RNA ?Text 
-                                        Total_RNA_Ribo_depleted UNIQUE ?Text
-                                  Small_RNA ?Text
-                                  Cap  // oligo_capped_selected Sugano's protocol // obsolete
-                                  CAGE_or_5p_capture ?Text // obsolete
-                                  Cap_CAGE_RACE ?Text
-                                  DGE ?Text
-                                  RIP UNIQUE ?Text // obsolete
-                                  RNA_modification   ?Text  //for methylation or other analyses  
+                                  scRNA UNIQUE ?Text // single cell
+                                  Small_RNA  UNIQUE ?Text
+                                  Nascent_RNA  UNIQUE  ?Text 
+                                  Cap_CAGE_RACE  UNIQUE ?Text
+                                  DGE  UNIQUE ?Text
+                                  RNA_modification   UNIQUE  ?Text  //for methylation or other analyses  
+                                  Unspecified_RNA  UNIQUE ?Text
                               Targeted    RIP_CLIP UNIQUE ?Text
                                           Ribosome_profiling  UNIQUE ?Text
                                           Gene_selection ?Text

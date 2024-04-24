@@ -205,7 +205,7 @@ EOF
 
     cat d5.intron_feet.[FR].txt | grep -v NULL | gawk -F '\t' '{other="";f=$6"_"$7;if(f!="gt_ag" && f!= "gc_ag" && f!="ct_ac" && f!= "at_ac")other="Other";printf("Intron %s\nType %s %s_%s\n\n", $1,other,$6,$7);}' >  d5.intron_feet.ace
     cat d5.intron.no_length.txt | gawk -F '__' '{split ($2, aa, "_");a1=aa[1]+0;a2=aa[2]+0;da = a2-a1;if(da<0)da=-da;if(da>0){ln=da+1;printf("Intron \"%s\"\nLength %d\n\n",$0,ln);}}' > d5.intron_ln.ace
-    cat d5.nomap.txt | gawk -F '_' '{printf ("Intron %s\nIntMap %s %s %s\n\n",$0,$1,$3,$4);}' > d5.nomap.ace
+    cat d5.nomap.txt | gawk '{n1=split($1,aa,"__");n2=split(aa[2],bb,"_");if(n1+n2==4)printf("Intron %s\nIntMap %s %s %s\n\n",$1,aa[1],bb[1],bb[2]);}' > d5.nomap.ace
     
     ../../../bin/tace . <<EOF
       read-models

@@ -538,9 +538,11 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
   POLYNOME p3 = newPQR (pqrN, c,h) ;
   POLYNOME p4 = newG  (b, d,h) ;
   POLYNOME p5 = newAG (c,d,rho,sig, -z,h) ;
+  POLYNOME p31 = newG  (a, c,h) ;
+  POLYNOME p41 = newG  (b, d,h) ;
   if (0) p5 = newEpsilon (c,d,rho,sig,h) ;
   POLYNOME pp, ppp[] = {p1,p2,p3, p4, p5, 0} ; 
-  /*   POLYNOME pp, ppp[] = {p2,p3, p4, 0} ;  */
+  /* POLYNOME pp, ppp[] = {p1,p31,p41,p5, 0} ;  */
 
   p4->tt.denom[pqrD] = 2 ;
   p4->tt.z *= u*I ;
@@ -11008,8 +11010,8 @@ int main (int argc, const char **argv)
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators, Fermion loops */\n") ;
 
-	  if (1) Z2_HH__loopPsi ("######### Scalar propagator, Fermion loop\n") ;
-	  if (1) Z2_AA__loopPsi ("######### Vector propagator, Fermion loop\n") ;
+	  if (0) Z2_HH__loopPsi ("######### Scalar propagator, Fermion loop\n") ;
+	  if (0) Z2_AA__loopPsi ("######### Vector propagator, Fermion loop\n") ;
 	  if (1) Z2_BB__loopPsi ("######### Tensor propagator, Fermion loop\n") ; 
 
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators Fermion loops DONE\n") ;

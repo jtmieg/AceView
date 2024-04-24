@@ -61,7 +61,7 @@ EOF
   touch  tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.list
   ls -ls  tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.list
 
-  cat  tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.list | gawk '/^Intron/{z=$2;gsub(/\"/,"",z);split (z,aa,"_");printf("Intron %s\nIntMap %s %s %s\n\n",$2,aa[1],aa[3],aa[4]);}' > tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.ace
+  cat  tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.list | gawk '/^Intron/{z=$2;gsub(/\"/,"",z);n1=split (z,aa,"__");n2=split(aa[2],bb,"_") ;printf("Intron %s\nIntMap %s %s %s\n\n",$2,aa[1],bb[1],bb[2]);}' > tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.ace
   bin/tacembly  tmp/X.$MAGIC/XH$chrom << EOF
      pparse  tmp/X.$MAGIC/XH$chrom/f4.intron_nomap.ace
      save

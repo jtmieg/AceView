@@ -25,7 +25,7 @@ setenv LANG C
 unset noclobber
 
 if (0 && -e /var/lib/envs/facilities/bin/fac-switch.csh) then
-  source /var/lib/envs/facilities/bin/fac-switch.csh python 2.7
+  source /var/lib/envs/facilities/bin/fac-sbqwitch.csh python 2.7
 endif
 # set the UGE (normally already done by .ncbi_hints, option sge
 if (-e  /netmnt/gridengine/current/settings.csh) source /netmnt/gridengine/current/settings.csh
@@ -538,8 +538,7 @@ cat <<EOF > _x.awk
   if (tsnp > 0) ph = ph "wait tsnp1b wait tsnp2a " ;
   if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c " ;  ## make words, count words , collate word counts
   if (snp > 0) ph = ph "wait tsnp3 wait tsnp3 " ;  ## report snp_profile in ali, must be run twice
-  if (snp > 0) ph = ph "wait tsnp10 " ;  ## report qcsummary in RESULTS/SNV
-  if (tsnp > 0) ph = ph "wait tsnp10 " ;
+  if (snp + tsnp > 0) ph = ph "wait tsnp10 " ;  ## report qcsummary in RESULTS/SNV
   if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (snp > 0) ph = ph "wait snp4 " ;
   if (iv > 0) ph = ph " wait d6 wait d7 wait d8 " ;
@@ -4829,8 +4828,10 @@ EOF
     if (-e tmp/METADATA/c7.av.captured_genes.ace) echo "pparse tmp/METADATA/c7.av.captured_genes.ace" >> $toto
     if (-e TARGET/MRNAS/mrna2product.ace ) echo "pparse TARGET/MRNAS/mrna2product.ace" >> $toto
     if (-e TARGET/MRNAS/good_product.ace ) echo "pparse TARGET/MRNAS/good_product.ace" >> $toto
-    zcat TARGET/Targets/hs.av.fasta.gz | sed -e 's/^>/>mRNA:/' -e 's/|/ /' | gzip > tmp/TSNP_DB/Genes/mrna.fasta.gz
-    echo "pparse tmp/TSNP_DB/Genes/mrna.fasta.gz" > $toto
+    if (-e TARGET/MRNAS/very_good_product.ace ) echo "pparse TARGET/MRNAS/very_good_product.ace" >> $toto
+    if (-e TARGET/MRNAS/best_product.ace ) echo "pparse TARGET/MRNAS/best_product.ace" >> $toto
+    zcat TARGET/Targets/$species.av.fasta.gz | sed -e 's/^>/>mRNA:/' -e 's/|/ /' | gzip > tmp/TSNP_DB/Genes/mrna.fasta.gz
+    echo "pparse tmp/TSNP_DB/Genes/mrna.fasta.gz" >> $toto
     echo save >> $toto
     echo quit >> $toto
 
@@ -5037,7 +5038,7 @@ foreach rj (rejected notRejected)
     set toto=RESULTS/SNV/$MAGIC.triplet.$rj.$bac.txt
     echo -n "### $toto : " > $toto
     date >> $toto
-    echo "# Type\tLocus\tComptages\tSupport\tVariant+\tRefeference+\tVariant-\tReference-\tMonomodal?\tV+/V\tR+/R\t(V+/V)(R/R+)\tV+/(V+ R+)\tV-/(V- R-)" >> $toto
+    echo "# Type\tLocus\tComptages\tSupport\tVariant+\tReference+\tVariant-\tReference-\tMonomodal?\tV+/V\tR+/R\t(V+/V)(R/R+)\tV+/(V+ R+)\tV-/(V- R-)" >> $toto
     cat  tmp/TSNP_DB/tsnp2g.GGG.$rj.$bac.tsf | cut -f 1,4-11 | gawk -F '\t' '/^#/{next;}{mp=$5;wp=$6;mm=$7;wm=$8;m=mp+mm+0.0001;w=wp+wm+.0001;printf("%s",$1);for(i=2;i<=8;i++)printf("\t%s",$i);printf("\t%.2f\t%.2f\tZZ:%.2f\t%.2f\t%.2f\n",100*mp/m,100*wp/w,100*mp*w/(m*wp+.00001),100*mp/(mp+wp+.001),100*mm/(mm+wm+.001)) ;}' | sort >> $toto
   end
 end
@@ -5049,7 +5050,6 @@ goto phaseLoop
 ## create a TSNP_DB database and parse the tsf files and the gene data
 phaseSnp10:
 phaseTSnp10:
-
 
 if (! -d tmp/TSNP_DB) mkdir tmp/TSNP_DB
 
@@ -5892,54 +5892,9 @@ end
  
 
 ###############################################################################################
-## s20: Collect and Translate the SNPs
+## s20: Obsolete Collect and Translate the SNPs
 
 phases20: 
-if (! -d tmp/SNPH) goto phaseLoop
-
-echo -n  "phase s20:  parse the SNP into tmp/SNP_DB, Translate the SNPs using snp.parse_remap : start "
-date
-set n=`cat MetaDB/$MAGIC/RunsList  MetaDB/$MAGIC/GroupSnpAdditiveList  | wc | gawk '{print $1}'`
-if ($n < 1) then
-  echo "No run or group in this project has the tag SNP,  phase s20 cannot proceed"
-  goto phaseLoop
-endif
-
-#### prepare the data
-if (! -d tmp/SNP_DB) mkdir tmp/SNP_DB
-
-# grep the product qualities
-if (0 && $species == hs && ! -e TARGET/MRNAS/good_product.ace ) then
-  bin/tacembly ~/37lm5 <<EOF
-    query find gene transcribed_gene && ! cloud_gene
-    follow product very_good_product || (best_product && good_product)
-    show -a -f TARGET/MRNAS/good_product.ace best_product
-    show -a -f TARGET/MRNAS/very_good_product.ace very_good_product
-    quit
-EOF
-endif
-
-# retrofit the mRNA class name into the mRNA fasta file
-foreach target ( mito SpikeIn $Etargets $Ttargets)
-  if (-e TARGET/Targets/$species.$target.fasta.gz && ! -e tmp/SNP_DB/$species.$target.mrna.fasta.gz) then
-    gunzip -c TARGET/Targets/$species.$target.fasta.gz | gawk '/^>/{i=index($1,"|");if(i>0)s=substr($1,2,i-2);else s=substr($1,2);printf(">mRNA:%s\n",s);next;}{print}' | gzip >  tmp/SNP_DB/$species.$target.mrna.fasta.gz
-  endif
-end
-# grab the CDS location, should be done from the GTF file in metaData
-if (-e TARGET/MRNAS/RefSeqStructure.txt  && ! -e tmp/SNP_DB/RefSeq.cds.ace.gz) then
-  cat TARGET/MRNAS/RefSeqStructure.txt  | gawk -F '\t' '{gsub(/\"/,"",$0);m=$1;if(m!=old){if(x2>x1)printf("mRNA %s\nCDS %d %d\n\n", old, x1,x2);x1 = 1; x2 = 1 ; }old=m ;}/UTR_5prime/{x1 += $6-$5+1;x2=x1;next;}/Exon/{x2 += $6-$5+1;next;}END{if(x2>x1)printf("mRNA %s\nCDS %d %d\n\n", old, x1,x2);}' | gzip > tmp/SNP_DB/RefSeq.cds.ace.gz
-endif
-
-# grab the geometry of the mRNAs (exon/intron structure and IntMap)
-if (-e TARGET/MRNAS/mrnaStructure.txt && ! -e  TARGET/MRNAS/mrnaStructure.ace) then
-  cat TARGET/MRNAS/mrnaStructure.txt | gawk -F '\t' '{if ($1 != old){old=$1;printf ("\nmRNA %s\nGene %s\nIntMap %s %s %s\n",$1,$12,$2,$3,$4);}printf ("Splicing %s %s %s %s %s  %s\n",$5,$6,$7,$8,$9,$10);}END{printf("\n");}' >   TARGET/MRNAS/mrnaStructure.ace
-  cat TARGET/MRNAS/mrnaStructureCDS.txt | cut -f 1,2,10,11 | $tab_sort -u | gawk '{printf("mRNA %s\nProduct %s %s %s\n\n",$1,$2,$3,$4);}' >>  TARGET/MRNAS/mrnaStructure.ace
-endif
-
-### actual work
-
-
-echo "phase s20 done"
 goto phaseLoop
 
 ###############################################################################################
@@ -10973,10 +10928,13 @@ foreach run (`cat MetaDB/$MAGIC/RunsList`)
    if (! -e  tmp/OR/$run/d4.candidate_introns.ace.gz) then 
       if (! -d  tmp/OR/$run)  mkdir tmp/OR/$run
       scripts/submit tmp/OR/$run/d4.candidate_introns "scripts/d4.candidate_introns.tcsh $run"
+      echo $run
       set ok=1
-   endif 
-   zcat tmp/OR/$run/d4.candidate_introns.ace.gz  >> $toto
+   else
+     gunzip -c tmp/OR/$run/d4.candidate_introns.ace.gz  >> $toto
+   endif
 end
+echo "phase d4 ok=$ok"
 if ($ok == 1) goto phaseLoop
 
 set groupLevelMax=`cat  MetaDB/$MAGIC/g2r | cut -f 3 | sort -k 1n | tail -1`
@@ -10992,7 +10950,7 @@ echo level=$level
     endif 
     zcat tmp/OR/$group/d4.candidate_introns.ace.gz >> $toto
   end
-end
+ end
 
 echo "pparse $toto" | bin/tacembly MetaDB -noprompt
 #rm $toto
@@ -11067,7 +11025,8 @@ phased5:
 
 if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
 
-if (! -e tmp/introns/d5.$MAGIC.minS) then
+# do each time in case the groups have been modified
+if (! -e tmp/introns/d5.$MAGIC.minSZZZ) then
   bin/tacembly MetaDB <<EOF
     query find project $MAGIC ; >run ; CLASS runs
     spush

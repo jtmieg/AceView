@@ -378,15 +378,18 @@ goto phaseLoop
 ## add the super titles
 phaseTitles:
 
+echo "create the titles "
 bin/sra_metadata -db SRX_DB -a -dbEdit -p $MAGIC 
 bin/sra_metadata -db SRX_DB -s -dbEdit -p $MAGIC 
 
 tbly SRX_DB <<EOF
   date
   query find project IS $MAGIC ; > srr
-  bql -a -o r2b2t.txt select r,b,m from r in @, b in r->biosample, m in r->magic_sample2 where m
+  bql -a -o r2b2t.txt select r,b,m,T from r in @, b in r->biosample, m in r->magic_sample2 where m,T in r->Manual_title
   date
 EOF
+
+echo "list the attributes"
 tbly SRX_DB <<EOF
   date
   query find project IS $MAGIC ; > srr ; >biosample
@@ -396,18 +399,15 @@ tbly SRX_DB <<EOF
   quit
 EOF
 
+echo "establish the collection dates"
 cat rb2p.txt | gawk -F '\t' '/collection date/{z=$4;gsub("collection date","",z) ;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\nCollection_date %s\n\n",$1,z);}' > r2collection_date.ace
 cat rb2p.txt | gawk -F '\t' '/ENA-LAST-UPDATE/{print;}/last update/{printf("%s\t%s\n",$1,$4);}' | sort -V | gawk -F '\t' '{z=$2;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\nSubmission_date %s\n\n",$1,z);}' > r2submission_date.ace
 
-cut -f 4 | sort u | tags
-
-'collection date/{z=$4;gsub("collection date","",z) ;gsub("\"","",z);z=substr(z,1,10);i=index(z,"-");if (i>1)printf("SRR %s\tCollection_date %s\n\n",$1,z);}' > 
-r2submission_date.ace
-
-
 cat rb2p.txt | gawk -F '\t' '/collection date/{print $4;}' | grep \- | grep -v "not collected" | sed -e 's/collection date//' | sort -u
 
-cat r2b2t.txt | gawk -F '\t' '{printf("SRR %s\nTitle %s\n\n", $1,$3);}' > r2b2t.ace
+cat r2b2t.txt | gawk -F '\t' '{T=$3;if($4 != "NULL")t=$4;printf("SRR %s\nTitle %s\n\n", $1,$3,$4);}' > r2b2t.ace
+echo "parse file r2b2t.ace "
+tags r2b2t.ace
 tbly SRX_DB <<EOF
   pparse r2b2t.ace
   save
@@ -417,13 +417,17 @@ EOF
 #############
 ## count the SRX spots cumulating the spots of the SRR sublibraries
 
+echo "count the spots in sublibs "
 if (! -e ZZZZZ) echo ZZZZZ > ZZZZZ
 
 tace SRX_DB <<EOF
-  select -a -o $dd/SRX_count_spots.txt srx,r,s1,s2,s3,s4,s5,s6,s7,s8,s9 from srx in ?srr, r in srx->sublibraries where r,s in r#spots where s,s1 in s[1],s2 in s[2],s3 in s[3],s4 in s[4],s5 in s[5],s6 in s[6],s7 in s[7],s8 in s[8],s9 in s[9]
+  query find project IS $MAGIC
+  select -a -o $dd/SRX_count_spots.txt srx,r,s1,s2,s3,s4,s5,s6,s7,s8,s9 from p in @, srx in ?srr, r in srx->sublibraries where r,s in r#spots where s,s1 in s[1],s2 in s[2],s3 in s[3],s4 in s[4],s5 in s[5],s6 in s[6],s7 in s[7],s8 in s[8],s9 in s[9]
 EOF
 cat  $dd/SRX_count_spots.txt ZZZZZ | gawk -F '\t' '{gsub(/\"/,"",$0);}{if($1 != srx) {if(ns>0){printf("SRX %s\nSpots %d ",srx,ns); if(nb>0) { printf(" bases_in_SRA %d ", nb); if(nA >0){printf(" Average_length %d ",nA); if (nSize > 0){printf(" Insert_size %s ", nSize); if( nMates > 0) printf(" spots_with_mate %d ", nMates);}}} printf("\n\n");} ns = 0 ; nb = 0 ; nA = 0 ; nSize = 0 ; nMates = 0 ;} srx =$1;if ($3 > 0) { ns += $3;nb += $5; nMates += $11; nA = (nA * (ns - $3) + $7 * $3)/(ns); nSize = (nSize * (ns - $3) + $9 * $3)/(ns);}}' >  $dd/SRX_count_spots.ace
 
+
+echo "parse the spots counts"
 tbly SRX_DB <<EOF
   parse  $dd/SRX_count_spots.ace
   save
@@ -563,7 +567,7 @@ tbly SRX_DB <<EOF
   show -a -f  $dd/longtext.ace
   quit
 EOF
- cat $dd/geo2srp2ref.txt | gawk '/^"/{printf ("SRP %s\nReference %s\n\n",$2,$3);}' > $dd/geo2srp2ref.ace
+ cat $dd/geo2srp2ref.txt | gawk '/^"/{printf ("SRP %s\nReference \"%s\"\n\n",$2,$3);}' > $dd/geo2srp2ref.ace
  echo "pparse $dd/geo2srp2ref.ace " | tbly  SRX_DB -no_prompt
 
 tbly SRX_DB <<EOF
@@ -693,86 +697,9 @@ EOF
 cat  $dd/srr2run.preace | gawk -f $dd/srr2run.awk >  $dd/srr2run.ace
 
 cat <<EOF > $dd/srr2srr.awk
-/^Adult/{next;}
-/^Annotation_problem/{next;}
-/^Biosample/{next;}
-/^Body_site/{next;}
-/^Cap_CAGE_RACE/{next;}
-/^Cell_line/{next;}
-/^Center_name/{next;}
-/^Control/{next;}
-/^Date_received/{next;}
-/^Digestive/{next;}
-/^ERROR/{next;}
-/^Embryo/{next;}
-/^Female/{next;}
-/^File/{next;}
-/^Forward/{next;}
-/^Gene_selection/{next;}
-/^Germline_and_development/{next;}
-/^Group/{next;}
-/^Head/{next;}
-/^Helicos/{next;}
-/^Illumina/{next;}
-/^Ion_Torrent/{next;}
-/^L1/{next;}
-/^L2/{next;}
-/^L3/{next;}
-/^L4/{next;}
-/^Any_larva/{next;}
-/^Larva/{next;}
-/^Library_name/{next;}
-/^Magic_author2/{next;}
-/^Male/{next;}
-/^Mixed_sex/{next;}
-/^Microbiome/{next;}
-/^Nascent_RNA/{next;}
-/^Nerve/{next;}
-/^Nanopore/{next;}
-/^Oxford_nanopore/{next;}
-/^PacBio/{next;}
-/^Paired_end/{next;}
-/^Project/{next;}
-/^Pupa/{next;}
-/^RIP_CLIP/{next;}
-/^RNA/{next;}
-/^Reference/{next;}
-/^Roche_454/{next;}
-/^Run/{next;}
-/^SNP/{next;}
-/^SOLiD/{next;}
-/^SRP/{next;}
-/^SRR_download/{next;}
 /^SRR/{printf("\n");print;next;}
-/^SRX/{next;}
-/^Sample_name/{next;}
-/^Small_RNA/{next;}
-/^SOLiD/{next;}
-/^Sorting_title/{next;}
 /^Species/{print;next;}
-/^Spots/{next;}
 /^Stranded/{print;next;}
-/^Sublibraries/{next;}
-/^Sublibrary_of/{next;}
-/^Submission_date/{next;}
-/^Title/{next;}
-/^Treatment/{next;}
-/^Total_RNA/{next;}
-/^Total/{next;}
-/^Union_of/{next;}
-/^Unspecified_RNA/{next;}
-/^Warning/{next;}
-/^Whole_genome/{next;}
-/^Whole_organism/{next;}
-/^nonStranded/{next;}
-/^polyA/{next;}
-/^sraUnspecified_RNA/{next;}
-/^sraGenesraGene_selection/{next;}
-/^sraGenesraGenesraPolyA/{next;}
-/^sraRIP_CLIP/{next;}
-/^sraSmall_RNA/{next;}
-/^sraUnspecified_RNA/{next;}
-
 END {printf("\n");}
 EOF
 cat  $dd/srr2run.preace | gawk -f $dd/srr2srr.awk >  $dd/srr2srr.ace
@@ -846,27 +773,6 @@ EOF
 cat $dd/srr.biosample.preace ZZZZZ  $dd/srr.sample_builder.preace | gawk '{line++;}/^ZZZZZ/{zz++;inside=0;next;}/^$/{inside=0;print;next;}/^Biosample_/{next;}/^Sample_name/{next;}/^Biosample/{bio=$2;if(length(bio)>0){printf("Sample %s\n-D T \n",$2);inside=1;}next;}/^Magic_sample2/{gsub("Magic_sample2","Title", $0);if(inside==1)print;next;}/^SRR/{if(zz<1){print; srr2bio[$2]=bio;}next;}{if(zz==1 && inside==1)print;next;}' > $dd/srr.sample.ace
 
 echo "pparse  $dd/srr.sample.ace" | tbly MetaDB -no_prompt
-
-
-time tbly MetaDB <<EOF
-  query find project IS $MAGIC ; >run ; >sublibrary_of ; NOT project == $MAGIC
-  // edit project $MAGIC
-  save
-
-  query find project IS $MAGIC ; >run
-  bql -a -o $dd/r2s2t.txt  select r,srr,s,t from r in @ , srr in r->srr, s in srr->sample, t in s->title 
-  query find project IS $MAGIC ; >run
-  bql -a -o $dd/r2s2t2.txt  select r,srr,s,t from r in @ , sub in r->sublibraries, srr in sub->srr, s in srr->sample, t in s->title 
-
-  query find project IS $MAGIC ; >run
-  bql -a -o $dd/r2s2t.txt1  select r,srr,s,t from r in @ , srr in r->srr, s in srr->sample, t in s->title 
-  query find project IS $MAGIC ; >run
-  bql -a -o $dd/r2s2t2.txt1  select r,srr,s,t from r in @ , sub in r->sublibraries, srr in sub->srr, s in srr->sample, t in s->title 
-
-EOF
-
-cat $dd/r2s2t.txt  $dd/r2s2t2.txt | gawk -F '\t' '{gsub(/SRR:/,"",$2);gsub(/Sample:/,"",$3);gsub(/Text:/,"",$4);printf("Run %s\nSample %s\nTitle %s\n\n", $1, $3, $4);}' | grep -v NULL > $dd/r2s2t.ace
-echo "pparse  $dd/r2s2t.ace" | tbly MetaDB -no_prompt
 
 tbly MetaDB <<EOF
   query find project IS $MAGIC ; >run ; sublibrary_of && Group

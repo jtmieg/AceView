@@ -254,6 +254,7 @@ static int snpParseFastaFile (SNP *snp)
 		  return FALSE ;
 		}
 	      cq = strstr (cp, "|Gene|") ; if (cq) *cq = 0 ;
+	      cq = strstr (cp, "|GENE|") ; if (cq) *cq = 0 ;
 	      if (! strncmp (cp, ">MRNA:",6)) cp += 6 ;
 	      if (! strncmp (cp, ">",1)) cp += 1 ;
 	      /* in case -select, only collect the relevant sequences in the fasta file */

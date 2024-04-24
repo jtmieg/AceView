@@ -14,7 +14,7 @@ typedef enum {Zero = 0
 	      , ISA
 	      , MODULO, PLUS, MINUS, MULT, DIVIDE, POWER
 	      , DNA, PEPTIDE, PEP, CODING, DATEDIFF
-	      , COUNT, MIN, MAX, SUM, AVERAGE, STDEV
+	      , COUNT, MIN, MAX, SUM, AVERAGE, STDDEV
 	      , CLNAM, NAM, TIMESTAMP
 	      , TTAG, TAG, HASTAG, MERGETAG
 	      , RIGHTOF   /* square brackets x[2], meaning right of */
@@ -40,7 +40,7 @@ static const char *bqlName[] = {
   , "ISA"
   , "modulo", "+", "-", "*", "/", "^"
   , "DNA", "PEPTIDE", "PEP", "CODING", "DATEDIFF"
-  , "count", "min", "max", "sum", "average", "stdev"
+  , "COUNT", "MIN", "MAX", "SUM", "AVERAGE", "STDDEV"
   , ".class", ".name", ".timestamp"
   , ">>", "->", "#", "=>", ":"
   , "class"  /* , ".class" */
@@ -70,9 +70,9 @@ static const int bqlSide[] = {
   /* , "like", "=~", "~", "==", "!=", ">=", "<=", ">", "<", ">~", "<~" */ , 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10
   /* , "modulo" , "+", "-", "*", "/", "^" */ , 10 , 10, 9, 10, 10, 10
   /* , "DNA", "PEPTIDE", "PEP", "CODING", "DATEDIFF" */  , 8, 8, 8, 8, 8
-  /* , "count", "min", "max", "sum", "average", "stdev" */ , 5, 5, 5, 5, 5
+  /* , "COUNT", "MIN", "MAX", "SUM", "AVERAGE", "STDDEV" */ , 5, 5, 5, 5, 5, 5
   /* , ".class", ".name", ".timestamp" */ , 0, 0, 0
-  /* , ">>", "->", "#", "=>", ":" */ , 8, 8, 8, 8, 8
+  /* , ">>", "->", "#", "=>", ":" (: means x[3]) */ , 8, 8, 8, 8, 8
   /* , "class"*/ , 1
   /*, "number", "$", "var", "key", "@" */ , 1, 1, 1, 1, 1
   /* , "object" */ , 1
@@ -380,12 +380,26 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 	      for (type = 0 ; *nam ; nam++, type++)
 		if (! strcasecmp (cp, *nam) &&
 		    (strcasecmp (cp, "TITLE") || ! strcmp (cp, "TITLE")) &&
+
 		    (strcasecmp (cp, "DNA") || ! strcmp (cp, "DNA")) &&
 		    (strcasecmp (cp, "PEP") || ! strcmp (cp, "PEP")) &&
 		    (strcasecmp (cp, "PEPTIDE") || ! strcmp (cp, "PEPTIDE")) &&
 		    (strcasecmp (cp, "CODING") || ! strcmp (cp, "CODING")) &&
-		    (strcasecmp (cp, "DATEDIFF") || ! strcmp (cp, "DATEDIFF"))
+		    (strcasecmp (cp, "DATEDIFF") || ! strcmp (cp, "DATEDIFF")) &&
+
+		    (strcasecmp (cp, "OBJECT") || ! strcmp (cp, "OBJECT")) &&
+
+		    /* (strcasecmp (cp, "COUNT") || ! strcmp (cp, "COUNT")) && */
+		    (strcasecmp (cp, "MIN") || ! strcmp (cp, "COUNT")) &&
+		    (strcasecmp (cp, "MAX") || ! strcmp (cp, "COUNT")) &&
+		    (strcasecmp (cp, "SUM") || ! strcmp (cp, "COUNT")) &&
+		    (strcasecmp (cp, "AVERAGE") || ! strcmp (cp, "COUNT")) &&
+		    (strcasecmp (cp, "STDDEV") || ! strcmp (cp, "STDDEV")) 
+
+
 		    )
+
+
 		  { 
 		    node->type = type ; ok = TRUE ; 
 		    if (node->type == LIKE2) node->type = LIKE ;
@@ -1316,7 +1330,7 @@ static BOOL bqlCheckVariableDeclarations (BQL *bql, NODE *node, int pass)
 	{
 	  if (fromNode->right && ! bqlCheckVariableDeclarations (bql, fromNode->right, pass))
 	    {
-	      vtxtPrintf (bql->errTxt, "// ... BQL ERROR 12: Each variable in the from clause must be declared and initialised before it is used\n") ;
+	      vtxtPrintf (bql->errTxt, "// ... BQL ERROR 12: Each variable in the from clause must be declared and initialised before it is used, maybe you forgot a coma between definitions\n") ;
 	      bqlShowNode (bql, fromNode->right, 0, 0) ;
 	      return FALSE ;      
 	    }
@@ -2038,7 +2052,7 @@ static BOOL bqlAtomizeWhere (BQL *bql, Array froms, NODE *node)
 	  case MAX:
 	  case SUM:
 	  case AVERAGE:
-	  case STDEV:
+	  case STDDEV:
 	    break ;
 	  default:
 	    if (1)
@@ -4995,6 +5009,7 @@ static BOOL bqlExpandTag (BQL *bql, NODE *node, NODE *coma)
 	  if (var->dclNode->nCol >= 0)
 	    {
 	      var->bsMark = bsHandleMark (obj, var->bsMark, bql->h) ;  
+	      var->timeStamp = bsGetTimeStamp (obj) ;
 	      var->myBsmark = TRUE ; 
 	    }
 	  var->parent = tagVar->dclNode ;
