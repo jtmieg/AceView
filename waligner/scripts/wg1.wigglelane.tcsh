@@ -93,7 +93,7 @@ endif
   ## ATTENTION do nor -gzo: there would be to many gzip pipes generated on the computer
     # if we set -minErrRate 7, we obtain in addition a second set of K7 wiggle using only error rich reads
     echo "$mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG"
-          # $mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG
+          $mytmp/wiggle -strategy $Strategy -ventilate $filter $stranded $remapon -i tmp/COUNT/$lane.hits.gz -o $mytmp/$lane -minErrRate 0  -minAliRate 70 -minAliLength 70 -maxErr $maxWigErr -maxErrRate $maxWigErrRate $pair -I BHIT -O BG
   end
 
 echo -n "splitting done tralala"

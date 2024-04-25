@@ -60,6 +60,21 @@ int randint (void)
   return (zrand) ;
 }
 #endif
+
+#ifdef JUNK
+/* 2024_04: alternative code found on the web, not tested */
+
+KEY randKey (KEY *ks)
+{
+  KEY x ;
+  ks[0] += 1111111111;
+  x = ks[0] ^ ((ks[1] << 21) | (ks[1] >> 11));
+  ks[1] = ((ks[2] << 13) | (ks[2] >> 19)) + x ;
+  ks[2] = ks[0] + x ;
+  return ks[2];
+}
+#endif
+
 /*******************************/
 
 double randgauss (void)
