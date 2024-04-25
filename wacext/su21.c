@@ -517,6 +517,7 @@ static POLYNOME vertex_HB_PsiL_PsiRB (AC_HANDLE h)
   return p ;
 }
 
+/***********************************************************************************************************************************************/
 
 static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC_HANDLE h)
 {
@@ -532,12 +533,12 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
     { z = 0 ; pqrD = pqrN = 0 ; u = 1 ; }
   if (pqr == 20)
     { pqrD = 2 ; pqrN = 0 ; }
-  POLYNOME p1 = newAG (mu,nu,a,b, z,h) ;
+  POLYNOME p1 = newAG (mu,nu,a,b, 0,h) ; /* z */
   if (0) p1 = newEpsilon (mu, nu, a,b,h) ;
   POLYNOME p2 = newPQR (pqrN, a,h) ;
   POLYNOME p3 = newPQR (pqrN, c,h) ;
   POLYNOME p4 = newG  (b, d,h) ;
-  POLYNOME p5 = newAG (c,d,rho,sig, -z,h) ;
+  POLYNOME p5 = newAG (c,d,rho,sig, 2,h) ; /* -z */
   POLYNOME p31 = newG  (a, c,h) ;
   POLYNOME p41 = newG  (b, d,h) ;
   if (0) p5 = newEpsilon (c,d,rho,sig,h) ;
