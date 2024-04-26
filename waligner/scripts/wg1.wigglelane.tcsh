@@ -24,12 +24,13 @@ set ici=`pwd`
 
 set mytmp=$TMPDIR/aceview.wigglerun.$$
 # set mytmp=$TMPDIR/aceview.wigglerun.11702
-set mytmp=tmp/WIGTMP
+# set mytmp=tmp/WIGTMP
 
 echo  $mytmp
 mkdir $mytmp
 mkdir $mytmp/$run
 mkdir $mytmp/$lane
+if (! -d tmp/WIGGLELANE/$run) mkdir  tmp/WIGGLELANE/$run
 if (! -d tmp/WIGGLELANE/$lane) mkdir  tmp/WIGGLELANE/$lane
 
 cp bin/wiggle $mytmp
@@ -98,14 +99,14 @@ endif
 
 echo -n "splitting done tralala"
 date
-exit 0
+
+#exit 0
 laba:
 # RefSeq takes at lest 14Gb of memory
 # $chromSetAll
-
+# setenv chromSetAll CHROMOSOME_III
 foreach chrom ($chromSetAll)
   cd $ici
-# if ($chrom != 3) continue
   set tag="null"
   setenv target $chrom
   foreach chrom2 ($chromSetAll)

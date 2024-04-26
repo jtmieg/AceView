@@ -2007,7 +2007,7 @@ POLYNOME newAG (short a, short b, short c, short d, int parity, AC_HANDLE h)
       ppp[0]->tt.z /= 2 ;
       ppp[1]->tt.z /= 2 ;
 
-      pp = ppp[2] = newEpsilon (a, b, c, d, h) ;
+      pp = ppp[2] = newEpsilon (a, b, d, c, h) ;
       pp->tt.z = (parity ) / 4.0 ;             /* I * parity,  in Minkovski */
       if (parity == 2 || parity == -2)
 	return pp ;
@@ -3452,6 +3452,20 @@ static POLYNOME bbCleanUpDo (POLYNOME pp, short a, short b, short c, short d, BO
 	  int pass = 0 ;
 	  int i1, j1, i2, j2 ;
 
+	  if (n == 4)
+	    {
+	      short A = a, B = b ;
+	      short C = c, D = d ;
+	      int k = 0 ;
+	      for (i1 = 0 ; i1 < n ; i1 ++)
+		{
+		  short x = s[i1] ;
+		  if (x == A || x == B || x == C || x == D)
+		    k++ ;
+		}
+	      if (k == 4)
+		return 0 ;
+	    }
 	  for (pass = 0 ; pass < 2 ; pass++)
 	    {
 	      short A = a, B = b ;

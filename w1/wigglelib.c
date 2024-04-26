@@ -122,6 +122,7 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
   memset (tagName, 0, sizeof(tagName)) ;
   memset (oldTagName, 0, sizeof(oldTagName)) ;
 
+  aceInSpecial (ai,"\t\n") ;
   if (! sx->remapDict)
     {
       sx->remapDict = dictHandleCreate (1000, sx->h) ;

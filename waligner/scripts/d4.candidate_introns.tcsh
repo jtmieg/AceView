@@ -22,7 +22,7 @@ set group=$1
 if(! -e  tmp/OR/$group/d4.de_uno.txt.gz) then
   echo ' ' > tmp/OR/$group/d4.de_uno.txt.1
   set ok=0
-  foreach run (`cat MetaDB/$MAGIC/g2r MetaDB/$MAGIC/r2sublib |  gawk -F '\t' '{if($1==g)print $2;}' g=$group  | sort -u`) 
+  foreach run (`cat MetaDB/$MAGIC/g2r MetaDB/$MAGIC/r2sublib |  gawk -F '\t' '{if($1==g)print $2;}END{print g}' g=$group  | sort -u`) 
     if (-e  tmp/OR/$run/d1.$run.de_uno.txt.gz) then
       gunzip -c tmp/OR/$run/d1.$run.de_uno.txt.gz | gawk -F '\t' '/^INTRON/{a1=$5;a2=$7;if(a1<a2){a1++;a2--;}else{a1--;a2++;}z=$1 "\t" $2 "\t" $3 "\t0\t" a1 "\t" $6 "\t" a2 "\t0\t" $9"\t" $10 ; n11[z] += 0+$11 ; n12[z] += 0+$12;}END{for (z in n11)printf ("%s\t%d\t%d\n",z,n11[z],n12[z]) ;}' | gawk -F '\t' '{printf("%s\t%09d\t%09d\t%d\t%s\t%d\n",$3,$5,$7,$11,$9, $10)}' >>  tmp/OR/$group/d4.de_uno.txt.1
       set ok=1
@@ -38,7 +38,7 @@ if(! -e  tmp/OR/$group/d4.de_uno.txt.gz) then
 endif
   
 ## run case
-if (-e  tmp/OR/$group/d1.$group.de_uno.txt.gz && ! -e  tmp/OR/$group/d4.de_uno.txt.gz) then
+if (0 && -e  tmp/OR/$group/d1.$group.de_uno.txt.gz && ! -e  tmp/OR/$group/d4.de_uno.txt.gz) then
     gunzip -c tmp/OR/$group/d1.$group.de_uno.txt.gz | gawk -F '\t' '/^INTRON/{a1=$5;a2=$7;if(a1<a2){a1++;a2--;} else{a1--;a2++;} z=$1 "\t" $2 "\t" $3 "\t0\t" a1 "\t" $6 "\t" a2 "\t0\t" $9"\t" $10 ; n11[z] += 0+$11 ; n12[z] += 0+$12;}END{for (z in n11)printf ("%s\t%d\t%d\n",z,n11[z],n12[z]) ;}' | gawk -F '\t' '{printf("%s\t%09d\t%09d\t%d\t%s\t%d\n",$3,$5,$7,$11,$9, $10)}' | gzip >  tmp/OR/$group/d4.de_uno.txt.gz
 endif
 
@@ -48,7 +48,7 @@ if(! -e  tmp/OR/$group/d4.known.txt.gz) then
   echo ' ' > tmp/OR/$group/d4.known.txt.1
   set ok=0
   if ($USEMAGICBLAST == 1) set ok=1  
-  foreach run (`cat MetaDB/$MAGIC/g2r MetaDB/$MAGIC/r2sublib |  gawk -F '\t' '{if($1==g)print $2;}' g=$group  | sort -u`) 
+  foreach run (`cat MetaDB/$MAGIC/g2r MetaDB/$MAGIC/r2sublib |  gawk -F '\t' '{if($1==g)print $2;}END{print g}' g=$group  | sort -u`) 
     if (-e  tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz) then
       gunzip -c tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz >>  tmp/OR/$group/d4.known.txt.1
       set ok=1

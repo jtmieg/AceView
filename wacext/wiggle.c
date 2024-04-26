@@ -1461,6 +1461,8 @@ int main (int argc, const char **argv)
 	    }
 	  else  /* single wiggle */
 	    { 
+	      sx.ai = aceInCreate (sx.inFileName, sx.gzi, h) ;
+	      aceInSpecial (sx.ai,"\t\n") ;
 	      sxWiggleParse (&sx, 0, 0) ;
 	      ac_free (sx.ai) ;
 	    }

@@ -184,7 +184,7 @@ static void qcShowPercent (QC *qc, RC *rc, long int z, BOOL p)
 	    aceOutPercent (qc->ao, z1) ;
 	}
       else 
-	aceOutf (qc->ao, "\t-") ;
+	aceOutf (qc->ao, "\t") ;
     }
   else
     {
@@ -1759,7 +1759,7 @@ static void qcDoPair (QC *qc, RC *rc, BOOL doPercent)
 		  break ;
 		}
 	      else
-		aceOutf (qc->ao, "\t-\t-\t-\t-\t-\t-\t-\t-") ;
+		aceOutf (qc->ao, "\t\t\t\t\t\t\t\t") ;
 	    }
 	}
       else
@@ -2479,8 +2479,10 @@ static void qcMainResults5 (QC *qc, RC *rc)
     { "Compute", "Supported known exon-exon junctions", 10, 0, 0} ,
     { "Compute", "Candidate new exon-exon junctions", 20, 0, 0} ,
     { "Compute", "Supports of known exon-exon junctions", 30, 0, 0} ,
-    { "Compute2", "Supported known exon-exon junctions per Megabase uniquely aligned in genes", 40, 0, 0} ,
+    /*
+    { "Compute2", "Supports of known exon-exon junctions per Megabase uniquely aligned in genes", 40, 0, 0} ,
     { "Compute2", "AceView genes significantly expressed per Megabase uniquely aligned in main protein coding genes", 50, 0, 0} ,
+    */
     { "Compute2", "Supports of known exon-exon junction per kilobase uniquely aligned in genes", 60, 0, 0} ,
     {  0, 0, 0, 0, 0}
   } ; 
@@ -4918,6 +4920,7 @@ static void qcCandidateIntrons (QC *qc, RC *rc)
 			  {
 			    float u17 = ac_table_float (ttCI, ir, ti->col - 100, 0) ;
 			    int u05 = ac_table_int (ttCI, ir,  ti->col - 110, 1) ;
+			    if (u05 == 0) u05 = 1 ;
 			    aceOutf (qc->ao, "%.1f", u17/u05) ;
 			  }
 			else

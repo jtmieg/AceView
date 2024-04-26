@@ -2318,7 +2318,7 @@ if (! -e TARGET/Targets/$species.genome_length.txt && -e  tmp/METADATA/$species.
 endif
 
 foreach run (`cat MetaDB/$MAGIC/RunList`)
-  # echo "... decompression errors $run"
+  echo "... decompression errors $run"
   # report decompression errors
   if (-e Fastc/$run/a0.out) grep expected Fastc/$run/a0.out
   if (! -e Fastc/$run/original_counts.ace) then
@@ -2329,11 +2329,17 @@ end
 
 set ok=0
 foreach run (`cat MetaDB/$MAGIC/RunNoCountList`)
-    # force recount but not on new runs never processed before
-    if (-e Fastc/$run/fastc_counts.ace && -e Fastc/$run/fastc.count) \rm Fastc/$run/fastc.count
-    if (-e Fastc/$run/fastc_counts.ace) \rm  Fastc/$run/fastc_counts.ace
-    if (! -e Fastc/$run/fastc.count) then
-      scripts/submit Fastc/$run/a0C.length_distrib    "scripts/a0C.lengthDistrib.tcsh $run"
+    echo "$run force recount but not on new runs never processed before"
+    if (-e Fastc/$run/fastc.count.ace) \rm Fastc/$run/fastc.count.ace
+    if (-e Fastc/$run/f2.1.fastc.gz) then
+      set n=0
+      if (-e Fastc/$run/fastc.count) then
+        set n=`wc -l Fastc/$run/fastc.count | gawk '{print $1;}'`
+      endif
+      if ($n < 3) then
+        if (-e Fastc/$run/fastc_counts.ace) \rm  Fastc/$run/fastc_counts.ace
+        scripts/submit Fastc/$run/a0C.length_distrib    "scripts/a0C.lengthDistrib.tcsh $run"
+      endif
       set ok=1    
     endif 
 end
@@ -2342,7 +2348,7 @@ if ($ok == 1) scripts/submit wait
 
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   ls -ls Fastc/$run/fastc.count.ace
-  if (! -e Fastc/$run/fastc.count.ace) then
+  if (-e Fastc/$run/fastc.count && ! -e Fastc/$run/fastc.count.ace) then
     cat Fastc/$run/fastc.count | gawk 'BEGIN{minLn=100000000;}/Sequence_kept/{ns+=$2}/Sequence_rejected/{srej+=$2;}/Tags_rejected/{trej+=$2;}/Bases_tags_rejected/{bprej+=$2;}/Exit_adaptor/{nvxt+=$3;nvxbp+=$4}/Entry_adaptor/{nvet+=$3;nvebp+=$4}/Tags_kept/{nt+=$2}/Bases_tags_kept/{nb+=$2}/^Min_probe_length/{if($2<minLn)minLn=$2;}/^Max_probe_length/{if($2>maxLn)maxLn=$2;}/^Max_count/{if($2>maxCnt)maxCnt=$2;}/^Length_distribution/{distrib=$0;}END{if (ns>0){printf("Ali %s\nRun %s\n",run,run) ; printf("Accepted %d Seq %d Tags %.3f kb %.2f bp\n", ns, nt, nb/1000, nb/nt);if(bprej>0)printf("Rejected 0 NA %d Tags %.3f kb\n", trej, bprej/1000);if(nvet>0)printf("Entry_Adaptor_clipping  %d tags %.3f  kb\n",nvet,nvebp/1000);if(nvxt>0)printf("Exit_Adaptor_clipping  %d tags %.3f  kb\n",nvxt,nvxbp/1000);printf("Min_probe_length %d\nMax_probe_length %d\n%s\nMaximal_read_multiplicity %d\n\n",minLn,maxLn,distrib,maxCnt);}}'  run=$run >  Fastc/$run/fastc.count.ace
   endif
   ls -ls Fastc/$run/fastc.count.ace
@@ -10925,7 +10931,7 @@ echo '//' > $toto
 
 set ok=0
 foreach run (`cat MetaDB/$MAGIC/RunsList`)
-   if (! -e  tmp/OR/$run/d4.candidate_introns.ace.gz) then 
+   if (! -e  tmp/OR/$run/d4.candidate_introns.ace.gz || ! -e tmp/OR/$run/d4.known.txt.gz) then 
       if (! -d  tmp/OR/$run)  mkdir tmp/OR/$run
       scripts/submit tmp/OR/$run/d4.candidate_introns "scripts/d4.candidate_introns.tcsh $run"
       echo $run

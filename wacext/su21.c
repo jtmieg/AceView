@@ -525,20 +525,20 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
   short b = newDummyIndex () ;
   short c = newDummyIndex () ;
   short d = newDummyIndex () ;
-  int z = 1 ; /* 0: no epsilon, 1:self dual, -1:anti self, 2 just epsilon */
-  int u = -4 ;
+  int z = -1 ; /* 0: no epsilon, 1:self dual, -1:anti self, 2 just epsilon */
+  int u = -1 ;
   int pqrD = pqr ;
   int pqrN = pqr ;
-  if (pqr == 99)   /* contruct the lagrangian */
+  if (pqr == 99)   /* contruct the  lagrangian */
     { z = 0 ; pqrD = pqrN = 0 ; u = 1 ; }
-  if (pqr == 20)
+  if (pqr == 20) 
     { pqrD = 2 ; pqrN = 0 ; }
-  POLYNOME p1 = newAG (mu,nu,a,b, 0,h) ; /* z */
+  POLYNOME p1 = newAG (mu,nu,a,b, z,h) ; /* z */
   if (0) p1 = newEpsilon (mu, nu, a,b,h) ;
   POLYNOME p2 = newPQR (pqrN, a,h) ;
   POLYNOME p3 = newPQR (pqrN, c,h) ;
   POLYNOME p4 = newG  (b, d,h) ;
-  POLYNOME p5 = newAG (c,d,rho,sig, 2,h) ; /* -z */
+  POLYNOME p5 = newAG (c,d,rho,sig, -z,h) ; /* -z */
   POLYNOME p31 = newG  (a, c,h) ;
   POLYNOME p41 = newG  (b, d,h) ;
   if (0) p5 = newEpsilon (c,d,rho,sig,h) ;
@@ -546,7 +546,7 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
   /* POLYNOME pp, ppp[] = {p1,p31,p41,p5, 0} ;  */
 
   p4->tt.denom[pqrD] = 2 ;
-  p4->tt.z *= u*I ;
+  if (0) p4->tt.z *= u*I ;
   pp = polMultiProduct (h, ppp) ;
 
   return pp ;
@@ -817,18 +817,28 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   pp = squareMomentaCleanUp (pp) ;
   pp = reduceIndices (pp) ;
   pp = expand (pp) ;
-  printf ("### Z2 Tensor avec loop PsiB_L Psi_L expect ::  je_sais_pas \n") ;
+  printf ("### Z2 Tensor avec loop PsiB_L Psi_L expect ::  je_sais_pas , on trouve 4/3 \n") ;
   showPol (pp) ;
-  pp = bbCleanUp (pp, a, b, c, d) ;
+  /* bbCleanUp is very fragile, i do not understand the order,
+   * but this seems to work, we know the final symmetry in abcd 
+   */
+  pp = bbCleanUp (pp, b,a, d, c) ;
   showPol (pp) ;
 
-  printf ("\n### raw propagator \n") ;
+  printf ("\n### raw propagator expect 1\n") ;
   showPol (p5) ;
   p5 = expand (p5) ;
   showPol (p5) ;
   p5 = bbCleanUp (p5, a, b, c, d) ;
   showPol (p5) ;
   printf ("DONE %s\n", title) ;
+
+  printf("\n### check that skew pairs of pauli are self dual \n") ;
+  POLYNOME r1 = newGG (a,b,c,d, 1, h) ;
+  POLYNOME r2 = newGG (a,b,c,d, -1, h) ;
+  POLYNOME r3 = newGG (a,b,c,d, 1, h) ;
+  POLYNOME r4 = newGG (a,b,c,d, -1, h) ;
+
 
   return pp ;
 } /* Z2_BB__loopPsi */
