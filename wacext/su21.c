@@ -793,6 +793,8 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   short b = newDummyIndex () ;
   short c = newDummyIndex () ;
   short d = newDummyIndex () ;
+  short e = newDummyIndex () ;
+  short f = newDummyIndex () ;
 
   POLYNOME p10 = newScalar (-1,h) ; /* Ghost loop */
   POLYNOME p1 = vertex_BB_PsiL_PsiRB (a,b,h) ;
@@ -834,12 +836,65 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   printf ("DONE %s\n", title) ;
 
   printf("\n### check that skew pairs of pauli are self dual \n") ;
-  POLYNOME r1 = newGG (a,b,c,d, 1, h) ;
-  POLYNOME r2 = newGG (a,b,c,d, -1, h) ;
-  POLYNOME r3 = newGG (a,b,c,d, 1, h) ;
-  POLYNOME r4 = newGG (a,b,c,d, -1, h) ;
+  POLYNOME r1 = newAG (a,b,c,d, 1, h) ;
+  POLYNOME r2 = newAG (a,b,c,d, -1, h) ;
+  POLYNOME r3 = newAG (c,d,e,f, 1, h) ;
+  POLYNOME r4 = newAG (c,d,e,f, -1, h) ;
+  POLYNOME s1 = newSigma (c, h) ;
+  s1->tt.sigma[1] = d ;
+  POLYNOME s2 = newSigB (c, h) ;
+  s2->tt.sigB[1] = d ;
 
+  printf ("\nP^2\n") ;
+  p5 = polProduct (r1,r3,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+  
+  printf ("\nPM\n") ;
+  p5 = polProduct (r1,r4,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+  
+  printf ("\nM^2\n") ;
+  p5 = polProduct (r2,r4,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+  
+  printf ("\nMP\n") ;
+  p5 = polProduct (r2,r3,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
 
+  printf ("\nP.Sig.SigB\n") ;
+  p5 = polProduct (r1,s1,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+
+  printf ("\nM.Sig.SigB\n") ;
+  p5 = polProduct (r2,s1,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+
+  printf ("\nP.SigB.Sig\n") ;
+  p5 = polProduct (r1,s2,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+
+  printf ("\nM.SigB.Sig\n") ;
+  p5 = polProduct (r2,s2,h) ;
+  showPol (p5) ;
+  p5 = expand (p5) ;
+  showPol (p5) ;
+
+  
+  
   return pp ;
 } /* Z2_BB__loopPsi */
 
