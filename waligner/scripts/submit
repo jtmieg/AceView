@@ -3,7 +3,7 @@
 set out_err="$1"
 set pgm="$2"
 set farm_requested="$3"
-
+set nWait=0
 # echo "submit called queue=$queue"
 # exit 0
 ##############################################
@@ -188,7 +188,8 @@ count_jobs:
   if ("$out_err" == wait || "$pgm" == wait || "$out_err" == wait5 || "$pgm" == wait5) then
     if ($n > 0) then 
        sleep 2 # 2 seconds for example, may be 1 sec is ok  
-       if ("$out_err" == wait5 || "$pgm" == wait5) sleep 298  # complete to 5 minutes
+       if ($nWait == 1 && ("$out_err" == wait5 || "$pgm" == wait5)) sleep 298  # complete to 5 minutes
+       set nWait=1
        goto count_jobs
     endif
   else
@@ -229,10 +230,15 @@ if ($farm == SGE || $farm == UGE || $farm == UGE4) then
   if ("$out_err" == run || "$pgm" == run) exit 0
 
   if ("$out_err" == wait || "$pgm" == wait || "$out_err" == wait5 || "$pgm" == wait5) then
-    if ("$out_err" == wait5 || "$pgm" == wait5) then
-      $scripts/qusage 5
+    if ($nWait == 1) then
+      if ("$out_err" == wait5 || "$pgm" == wait5) then
+        $scripts/qusage 5
+      else
+        $scripts/qusage 1
+      endif
     else
       $scripts/qusage 1
+      set nWait=1
     endif
   else
     if (! $?queue) set queue=unified

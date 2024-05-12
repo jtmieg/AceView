@@ -1378,7 +1378,6 @@ int main (int argc, const char **argv)
 	      if (1) /* parse a */
 		{
 		  sx.ai = aceInCreate (sx.swiggleFileName1, sx.gzi, h) ;
-		  aceInSpecial (sx.ai,"\t\n") ;
 		  sxWiggleParse (&sx, 0, 0) ;      /* parse x */
 		  ac_free (sx.ai) ;
 

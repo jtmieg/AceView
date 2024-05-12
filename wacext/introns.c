@@ -34,7 +34,7 @@ static void usage (char *message)
 	      "// Authors: Danielle and Jean Thierry-Mieg, NCBI, October 2009, mieg@ncbi.nlm.nih.gov\n"
 	      "// Purpose\n"
 	      "// Create a set of Introns databases in tmp/Introns_DB/zoner.*\n"
-	      "//   Import donor acceptors and introns detected in aech run, in genome or transcript\n"
+	      "//   Import donor acceptors and introns detected in each run, in genome or transcript\n"
 	      "//   Remap to genome and use this as the main identifier\n"
 	      "//   Count all detected introns in all runs using the remapping to count the suport only once\n"
 	      "//   The idea is to count donors and acceptors, including the non-spliced reference\n"

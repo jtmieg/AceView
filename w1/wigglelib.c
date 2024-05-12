@@ -788,12 +788,13 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
     }
   fprintf (stderr, "// Parsed %d positions, %ld Mb, rejected %d positions, in file %s\n", nn, nBp*stepOut/1000000, nRejected, sx->inFileName) ;      
 
-  for (nn = 0 ; nn < arrayMax (sx->aaa) ; nn++)
-    {
-      aap = arrayp (sx->aaa, nn, Array) ;
-      if (*aap)
-	arraySort (*aap, wigglePointOrder) ;
-    }
+  if (sx->aaa)
+    for (nn = 0 ; nn < arrayMax (sx->aaa) ; nn++)
+      {
+	aap = arrayp (sx->aaa, nn, Array) ;
+	if (*aap)
+	  arraySort (*aap, wigglePointOrder) ;
+      }
 }  /* sxWiggleParse */
 
 /*************************************************************************************/

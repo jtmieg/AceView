@@ -2450,7 +2450,7 @@ static int tsnpDbRun2groups (TSNP *tsnp)
   return dictMax (runDict) ;
 } /* tsnpDbRun2groups */
 
-/* export a tsf file per run and group counting supprted snps */
+/* export a tsf file per run and group counting supported snps */
 static void tsnpDbSnpProfile (TSNP *tsnp)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -2461,18 +2461,19 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   Array stats = arrayHandleCreate (1000000, int, h) ;
   DICT *runDict = tsnp->runStatDict ;
   DICT *dict = dictHandleCreate (10000, h) ;
+  DICT *gNameDict = dictHandleCreate (10000, h) ;
   int minSnpCover = tsnp->minSnpCover ;
   int minSnpCount = tsnp->minSnpCount ;
   int minSnpFrequency = tsnp->minSnpFrequency ;
   char *allSubs = "A>G_T>C_G>A_C>T_A>T_T>A_G>C_C>G_A>C_T>G_G>T_C>A" ;
-
+  int nSites = 0 ;
   tsnp->varTypeDict = tsnpMakeVarTypeDict (h) ;
-
+  
   if (tsnp->select)
     iter = ac_query_iter (db, TRUE, hprintf (h, "find variant IS  \"%s\" ", tsnp->select), 0, h) ;
   else
-    iter = ac_query_iter (db, TRUE, "Find Variant typ && BRS_counts && ! monomodal", 0, h) ;
-
+    iter = ac_query_iter (db, TRUE, "Find Variant typ && BRS_counts", 0, h) ;
+  
   while (ac_free (Snp), Snp = ac_iter_obj (iter))
     {
       AC_TABLE tbl = ac_tag_table (Snp, "BRS_counts", h) ;
@@ -2481,7 +2482,11 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
       char typ2[256] ;
       const char *typ = ac_tag_printable (Snp, "Typ", 0) ;
       int i, k, p = 0 ;
+      const char *gName = ac_tag_printable (Snp, "gName", 0) ;
 
+      if (! gName || ! dictAdd (gNameDict, gName, 0))
+	continue ;
+      nSites++ ;
       if (! typ)
 	continue ;
       
@@ -2579,21 +2584,74 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 	    { c += rmc->c ; m += rmc->m ; i = j ; }
 	  if (c >= minSnpCover && m >= minSnpCount && 100*m >= minSnpFrequency * c)
 	    {
-	      int *kp, k = 0 ;
+	      int *kp, k = 0, t = -1 ;
 	      char buf[256] ;
-	      snprintf (buf, 255, "%05d_%s", run, typ2) ;
+
+	      snprintf (buf, 255, "%05d_%s", run, "Measurable") ;
 	      dictAdd (dict, buf, &k) ;
 	      kp = arrayp (stats, k, int) ;
 	      (*kp)++ ;
+
+	      if (ac_has_tag (Snp, "monomodal"))
+		{
+		  snprintf (buf, 255, "%05d_%s", run, "Rejected_sites") ;
+		  dictAdd (dict, buf, &k) ;
+		  kp = arrayp (stats, k, int) ;
+		  (*kp)++ ;
+		  continue ;
+		}
+
+	      snprintf (buf, 255, "%05d_TYPE__%s", run, typ2) ;
+	      dictAdd (dict, buf, &k) ;
+	      kp = arrayp (stats, k, int) ;
+	      (*kp)++ ;
+	      t = -1 ;
+	      if (1)
+		{
+		  /* char *pTypes = {"Pure","High","Mid","Low","Ref"} ; */
+		  if (100 * m > 95*c) t = 4 ;
+		  else if (100 * m > 80*c) t = 3 ;
+		  else if (100 * m > 20*c) t = 2 ;
+		  else if (100 * m > 5*c) t = 1 ;
+		  else if (100 * m > 95*c) t = 0 ;
+		}
+	      if (t >= 0)
+		{
+		  snprintf (buf, 255, "%05d_Genomic__%d", run, t) ;
+		  dictAdd (dict, buf, &k) ;
+		  kp = arrayp (stats, k, int) ;
+		  (*kp)++ ;	     
+		} 
+	      t = -1 ;
+	      if (ac_has_tag (Snp, "Coding") && !ac_has_tag (Snp, "Synonymous"))
+		{
+		  /* char *pTypes = {"Pure","High","Mid","Low","Ref"} ; */
+		  if (100 * m > 95*c) t = 4 ;
+		  else if (100 * m > 80*c) t = 3 ;
+		  else if (100 * m > 20*c) t = 2 ;
+		  else if (100 * m > 5*c) t = 1 ;
+		  else if (100 * m > 95*c) t = 0 ;
+		}
+	      if (t >= 0)
+		{
+		  snprintf (buf, 255, "%05d_Protein_changing__%d", run, t) ;
+		  dictAdd (dict, buf, &k) ;
+		  kp = arrayp (stats, k, int) ;
+		  (*kp)++ ;	     
+		} 
 	    }
 	}
     }
 
   /* export in tsf format */
-  if (arrayMax (stats))
+  if (1)
     {
-      ACEOUT ao = tsnp->outFileName ? aceOutCreate (tsnp->outFileName, ".snp_profile.tsf", tsnp->gzo, h) : 0 ;
+      ACEOUT ao = aceOutCreate (tsnp->outFileName, ".snp_profile.tsf", tsnp->gzo, h) ;
       int run = 0, kMax = arrayMax (stats) ;
+
+      for (run = 1 ; run <= dictMax (runDict) ; run++)
+	aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), "Tested_sites", nSites) ; 
+      
       for (int k = 1 ; k < kMax ; k++)
 	{
 	  int nn = array (stats, k, int) ;
@@ -2601,8 +2659,14 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 	    {
 	      const char *ccp = dictName (dict, k) ;
 	      sscanf (ccp, "%d_", &run) ;
-	      while (*ccp != '_') ccp++ ;
-	      aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp+1, nn) ; 
+	      while (*ccp != '_') ccp++ ; 
+	      ccp++ ;
+	      if (!strcmp (ccp, "Measurable"))
+		{ 
+		  aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp, nn) ; 
+		  nn = nSites - nn ; ccp = "Not_measurable_sites" ; 
+		}
+	      aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp, nn) ; 
 	    }
 	}
     }

@@ -571,7 +571,7 @@ EOF
  echo "pparse $dd/geo2srp2ref.ace " | tbly  SRX_DB -no_prompt
 
 tbly SRX_DB <<EOF
-  query find srr  project == $MAGIC
+  query find project $MAGIC ; >srr
   // key sraReady.srr.list
   spush
   follow sublibraries
@@ -594,7 +594,8 @@ tbly SRX_DB <<EOF
   show -a -f $dd/srr.paper.preace
   follow abstract
   show -a -f $dd/srr.paper_abstract.ace
-  find biosample
+  query find project $MAGIC ; >srr
+  follow biosample
   show -a -f $dd/srr.biosample.preace
   kget kk
   query  Sample_builder
@@ -697,6 +698,7 @@ EOF
 cat  $dd/srr2run.preace | gawk -f $dd/srr2run.awk >  $dd/srr2run.ace
 
 cat <<EOF > $dd/srr2srr.awk
+/^SRR_download/{next;}
 /^SRR/{printf("\n");print;next;}
 /^Species/{print;next;}
 /^Stranded/{print;next;}
@@ -711,6 +713,7 @@ cat <<EOF > $dd/srp2run.awk
 /^Identifier/{print;next;}
 /^Reference/{print;next;}
 /^SRP/{printf("\n");print;print "-D T" ; next;}
+/^SRR_download/{next;}
 /^SRR/{print;printf ("Run %s\n",\$2);next;}
 /^Species/{print;next;}
 /^Title/{print;next;}
@@ -736,8 +739,6 @@ tbly MetaDB -no_prompt <<EOF
   read-models
   query find project IS $MAGIC ; > run
   edit -D group
-  query find project IS $MAGIC ; > compare
-  kill
   query find project IS $MAGIC 
   kill
   pparse  $dd/srr2run.ace
@@ -746,6 +747,8 @@ tbly MetaDB -no_prompt <<EOF
   pparse  $dd/srx.ace
   pparse  $dd/srr.nuc.ace
   pparse  $dd/srr.sranuc.ace
+  pparse  $dd/compare.ace
+  kill
   pparse  $dd/compare.ace
   save
   pparse  $dd/longtext.ace

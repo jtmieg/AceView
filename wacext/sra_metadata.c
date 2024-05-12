@@ -260,8 +260,10 @@ static int sraSetBaddies (SRA *sra, char cc)
 	  array (baddies, nBaddy++, char*) =  "C.elegans" ;
 	  array (baddies, nBaddy++, char*) =  "C. elegans" ;
 	  array (baddies, nBaddy++, char*) =  "Caenorhabditis elegans" ;
-	  array (baddies, nBaddy++, char*) =  "Model organism" ;
+	  array (baddies, nBaddy++, char*) =  "Model organism or animal sample from" ;
+	  array (baddies, nBaddy++, char*) =  "Model organism or animal sample" ;
 	  array (baddies, nBaddy++, char*) =  "Model organism or animal" ;
+	  array (baddies, nBaddy++, char*) =  "Model organism" ;
 
 	  array (baddies, nBaddy++, char*) =  "of Drosophila melanogaster" ;
 	  array (baddies, nBaddy++, char*) =  "Drosophila melanogaster" ;

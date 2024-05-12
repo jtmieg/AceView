@@ -3709,45 +3709,60 @@ static void qcBloom (QC *qc, RC *rc)
 static void qcSLsDo (QC *qc, RC *rc, BOOL isSL)
 {
   AC_HANDLE h = ac_new_handle () ;
-  TT *ti, tts[3] ;
-  TT tt0 =  { "Spacer", "", 0, 0, 0} ;
-  TT tt1A = { "Compute", "polyA site\tpolyA support\tpolyA support per site", 1, 0, 0} ; 
-  TT tt1S = { "Compute", 
-	      "\tSL1 site\tSL1 support\tSL1 support per site"
-	      "\tSL2 site\tSL2 support\tSL2 support per site"
-	      "\tSL3 site\tSL3 support\tSL3 support per site"
-	      "\tSL4 site\tSL4 support\tSL4 support per site"
-	      "\tSL5 site\tSL5 support\tSL5 support per site"
-	      "\tSL6 site\tSL6 support\tSL6 support per site"
-	      "\tSL7 site\tSL7 support\tSL7 support per site"
-	      "\tSL8 site\tSL8 support\tSL8 support per site"
-	      "\tSL9 site\tSL9 support\tSL9 support per site"
-	      "\tSL10 site\tSL10 support\tSL10 support per site"
-	      "\tSL11 site\tSL11 support\tSL11 support per site"
-	      "\tSL12 site\tSL12 support\tSL12 support per site"
-	      , 1, 0, 0
+  TT *ti, *tti ;
+  TT ttA[] = {
+    { "Spacer", "", 0, 0, 0} ,
+    { "pA", "polyA site", 1, 0, 0} ,
+    { "pA", "polyA support", 2, 0, 0} ,
+    { "pA", "polyA support per site", 3, 0, 0}  ,
+    {  0, 0, 0, 0, 0}
+  } ;
+  TT ttS[] = {
+    { "Spacer", "", 0, 0, 0} ,
+    { "SL1", "SL1 site", 1, 0, 0 } ,
+    { "SL2", "SL2 site", 1, 0, 0 } ,
+    { "SL3", "SL3 site", 1, 0, 0 } ,
+    { "SL4", "SL4 site", 1, 0, 0 } ,
+    { "SL5", "SL5 site", 1, 0, 0 } ,
+    { "SL6", "SL6 site", 1, 0, 0 } ,
+    { "SL7", "SL7 site", 1, 0, 0 } ,
+    { "SL8", "SL8 site", 1, 0, 0 } ,
+    { "SL9", "SL9 site", 1, 0, 0 } ,
+    { "SL10", "SL10 site", 1, 0, 0 } ,
+    { "SL11", "SL11 site", 1, 0, 0 } ,
+    { "SL12", "SL12 site", 1, 0, 0 } ,
+    { "SL1", "SL1 supports", 2, 0, 0 } ,
+    { "SL2", "SL2 supports", 2, 0, 0 } ,
+    { "SL3", "SL3 supports", 2, 0, 0 } ,
+    { "SL4", "SL4 supports", 2, 0, 0 } ,
+    { "SL5", "SL5 supports", 2, 0, 0 } ,
+    { "SL6", "SL6 supports", 2, 0, 0 } ,
+    { "SL7", "SL7 supports", 2, 0, 0 } ,
+    { "SL8", "SL8 supports", 2, 0, 0 } ,
+    { "SL9", "SL9 supports", 2, 0, 0 } ,
+    { "SL10", "SL10 supports", 2, 0, 0 } ,
+    { "SL11", "SL11 supports", 2, 0, 0 } ,
+    { "SL12", "SL12 supports", 2, 0, 0 } ,
+    {  0, 0, 0, 0, 0} 
   } ; 
-  TT tt2 = {  0, 0, 0, 0, 0} ;
 
   const char *caption ;
-  tts[0] = tt0 ;
-  tts[2] = tt2 ;
-
   if (! isSL)
     {
       caption =  "PolyA sites" ;
-      tts[1] = tt1A ;
+      tti = ttA ;
     }
   else 
     {
       caption = "Transpliced leaders sites" ;
-      tts[1] = tt1S ;
+      tti = ttS ;
     }
   
   if (rc == (void *) 1)
-    return  qcChapterCaption (qc, tts, caption) ;
+    return  qcChapterCaption (qc, tti, caption) ;
   
-  for (ti = tts ; ti->tag ; ti++)
+  AC_TABLE tbl = 0 ;
+  for (ti = tti ; ti->tag ; ti++)
     {
       if (rc == 0)
 	aceOutf (qc->ao, "\t%s", ti->title) ;
@@ -3757,58 +3772,41 @@ static void qcSLsDo (QC *qc, RC *rc, BOOL isSL)
 	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
 	  continue ;
 	}
-      else  if (! strcmp (ti->tag, "Compute"))
+       else  if (*ti->tag)
 	{
-	  int j, ir, pass ;
-	  AC_TABLE tt ;
-	  switch (ti->col)
-	    {
-	    case 1:
-	      tt = ac_tag_table (rc->ali, "SLs", h) ; 
-	      for (pass = 0 ; pass < 3 ; pass++)
-		{
-		  for (j = (isSL ? 1 : 0) ; j <= (isSL ? 12 : 0) ; j++)
-		    {
-		      int ns = 0, np = 0 ;
+	  int n1 = ti->col ;
+	  BOOL ok = FALSE ;
+	  int j, ir ;
+	  if (! tbl)
+	    tbl = ac_tag_table (rc->ali, "SLs", h) ; 
 
-		      for (ir = 0 ; tt && ir <= tt->rows ; ir++)
-			{
-			  const char *ccp = ac_table_printable (tt, ir, 0, "toto") ;
-			  char *cp = (j == 0 ? "pA" : messprintf ("SL%d", j)) ;
-			  
-			  if (ccp && !strcasecmp (cp, ccp))
-			    {
-			      np = ac_table_int (tt, ir, 1, 0) ;
-			      ns = ac_table_int (tt, ir, 3, 0) ;
-			      break ;
-			    }
-			}
-		      if (np > 0)
-			{
-			  switch (pass)
-			    {
-			    case 0:
-			      aceOutf (qc->ao, "\t%d", np) ;
-			      break ;
-			    case 1:
-			      aceOutf (qc->ao, "\t%d", ns) ;
-			      break ;
-			    case 2:
-			      aceOutf (qc->ao, "\t%.2f", ns/(float)np) ;
-			      break ;
-			    }
-			}
-		      else
-			aceOutf (qc->ao, "\t") ;
-		    }
-		}
-	      break ;
-	    default:
-	      break ;
-	    }
+	  if (tbl)
+	    for (ir = 0 ; ir <= tbl->rows ; ir++)
+	      {
+		if (! strcmp (ac_table_printable (tbl, ir, 0, "toto"), ti->tag))
+		  {
+		    int np = ac_table_int (tbl, ir, 1, 0) ;
+		    int ns = ac_table_int (tbl, ir, 3, 0) ;
+		    ok = TRUE ;
+		    switch (ti->col)
+		      {
+		      case 1:
+			aceOutf (qc->ao, "\t%d", np) ;
+			break ;
+		      case 2:
+			aceOutf (qc->ao, "\t%d", ns) ;
+			break ;
+		      case 3:
+			if (np == 0) 
+			  np = 1 ;
+			aceOutf (qc->ao, "\t%.2f", ns/(float)np) ;
+			break ;
+		      }
+		  }
+	      }
+	  if (! ok)
+	    aceOutf (qc->ao, "\t") ;
 	}
-      else
-	qcShowTag (qc, rc, ti) ;
     }
 
    ac_free (h) ;
@@ -5872,6 +5870,7 @@ static int qcGetEtargets (QC *qc)
   memset (qc->Etargets, 0, sizeof (qc->Etargets)) ;
   ccp = getenv ("Etargets") ;
   fprintf (stderr, "etargets = %s", ccp ? ccp : "NA") ; 
+  if (! ccp || ! *ccp) ccp = "av" ;
   if (ccp && *ccp)
     {
       ACEIN ai = aceInCreateFromText (ccp, 0, h) ;
@@ -6045,7 +6044,7 @@ static void usage (char *message)
 	    "//            g: Gene expression 2\n"
 	    "//            D:  Intergenic\n"
 	    "//            I:  Candidate introns\n"
-	    "//            S:  SL1-12\n"
+	    "//            L:  SL1-12\n"
 	    "//            X:  Sex and tissue signatures\n"
 	    "//            U:  Intergenic2\n"
 	    "//            Z: Zhenxi\n"

@@ -2770,7 +2770,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
       unsigned int *exitAdaptorFound  = (mm->pair < 0 ? pp->exitAdaptor2Found : pp->exitAdaptorFound) ;
       unsigned  int *exitAdaptorHasN = (mm->pair < 0 ? pp->exitAdaptor2HasN : pp->exitAdaptorHasN ) ;
 
-      if (pp->exitAdaptor && pp->exitAdaptor[0] && !adaptorSuffix &&
+      if (exitAdaptor && exitAdaptor[0] && !adaptorSuffix &&
 	  strlen((char *)suffix + 1) >= 6) /* search for adaptor */
 	{
 	  int ns, n1 = 0, i1, j1, nE, nN ;

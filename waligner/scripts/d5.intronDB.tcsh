@@ -182,46 +182,7 @@ goto phaseLoop
 donorAcceptor:
 
 echo "start phase $phase"
-if (! -e tmp/INTRON_DB/$chrom/d5.$MAGIC.collate.done) goto phaseLoop
-
-if (! -e tmp/INTRON_DB/$chrom/d5.$MAGIC.introns.ln_feet.done) then
-  pushd tmp/INTRON_DB/$chrom
-    ../../../bin/tace . <<EOF
-      query find intron ! length
-      select -o d5.intron.no_length.txt select  @
-      query find intron  ! intmap
-      select -o d5.nomap.txt @
-      query find intron  other
-      edit -D type
-      query find intron  ! type 
-      spush
-      select -o d5.intron_feet.R.txt select i,m,s,x,y ,f1,f2 from i in @,m in i->intmap, s in OBJECT('Sequence',m),x in m[1],y in m[2] where y<x, f1 in DNA(s,x,x-1), f2 in DNA(s,y+1,y)
-      sxor
-      spop
-      select -o d5.intron_feet.F.txt select i,m,s,x,y ,f1,f2 from i in @,m in i->intmap, s in  OBJECT('Sequence',m),x in m[1],y in m[2] where x<y, f1 in DNA(s,x,x+1), f2 in DNA(s,y-1,y)
-      save 
-      quit
-EOF
-
-    cat d5.intron_feet.[FR].txt | grep -v NULL | gawk -F '\t' '{other="";f=$6"_"$7;if(f!="gt_ag" && f!= "gc_ag" && f!="ct_ac" && f!= "at_ac")other="Other";printf("Intron %s\nType %s %s_%s\n\n", $1,other,$6,$7);}' >  d5.intron_feet.ace
-    cat d5.intron.no_length.txt | gawk -F '__' '{split ($2, aa, "_");a1=aa[1]+0;a2=aa[2]+0;da = a2-a1;if(da<0)da=-da;if(da>0){ln=da+1;printf("Intron \"%s\"\nLength %d\n\n",$0,ln);}}' > d5.intron_ln.ace
-    cat d5.nomap.txt | gawk '{n1=split($1,aa,"__");n2=split(aa[2],bb,"_");if(n1+n2==4)printf("Intron %s\nIntMap %s %s %s\n\n",$1,aa[1],bb[1],bb[2]);}' > d5.nomap.ace
-    
-    ../../../bin/tace . <<EOF
-      read-models
-      pparse d5.intron_feet.ace
-      pparse d5.intron_ln.ace
-      pparse d5.nomap.ace
-      pparse ../../../MetaDB/$MAGIC/runs.ace
-      save
-      quit
-EOF
-   touch d5.$MAGIC.introns.ln_feet.done
-  popd
-endif
-
 echo   d5.$MAGIC.introns.ln_feet.done
-
 
 # check donor acceptors
 if (! -e tmp/INTRON_DB/$chrom/d5.$MAGIC.introns.DA.done) then
@@ -396,7 +357,7 @@ cat d5.notype.txt | gawk -F '\t' '{if(length($2)==100 && length($3)==100) printf
       save
       quit
 EOF
-cat d5.stats.txt | gawk '{ii=$1;split(ii,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1>a2){a0=a1;a1=a2;a2=a0;}ip=ii;if(bb[1]>bb[2]){ip=aa[1] "__" bb[2] "_" bb[1];ii2[ip]=ii;}iip[ip]=1;}END{for(ii in iip){i2=ii2[ii];if(i2)printf("Intron %s\nHas_echo %s\nIs_echo %s\n\n",ii,i2,i2);}}' > d5.echo.ace
+cat d5.stats.txt | gawk '{ii=$1;split(ii,aa,"__");split(aa[2],bb,"_");ip=ii;if(bb[1]>bb[2]){ip=aa[1] "__" bb[2] "_" bb[1];ii2[ip]=ii;}iip[ip]=1;}END{for(ii in iip){i2=ii2[ii];if(i2)printf("Intron %s\nHas_echo %s\nIs_echo %s\n\n",ii,i2,i2);}}' > d5.echo.ace
     ../../../bin/tace . <<EOF
       read-models
       pparse d5.echo.ace

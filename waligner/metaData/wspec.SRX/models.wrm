@@ -84,6 +84,7 @@
       Sample_builder Biosample UNIQUE ?Biosample XREF SRR @T  // Precise sample identifier, please document the sample object (see below)             
                      Sex Male    UNIQUE Text
                          Female  UNIQUE Text
+                         Hermaphrodite   UNIQUE Text
                          Mixed_sex UNIQUE Text  // pooling males and females
                      Sample_name ?Text
                      Library_name ?Text
@@ -111,23 +112,29 @@
                             Nervous_and_sense_organ   UNIQUE ?Systm XREF Nervous_and_sense_organ    UNIQUE ?Text
                             Respiratory   UNIQUE ?Systm XREF Respiratory    UNIQUE ?Text
                             Urogenital   UNIQUE ?Systm XREF Urogenital   UNIQUE ?Text
-                     Stage  Early_embryo UNIQUE ?Text
-                            Embryo UNIQUE ?Text
-                            Late_embryo UNIQUE ?Text
-                            Any_larva UNIQUE ?Text
+                     Stage  Embryo UNIQUE ?Text
+                            Mixed_embryo UNIQUE ?Text
+                            Fetal  UNIQUE ?Text
+                            Larva UNIQUE ?Text 
+                            Any_larva UNIQUE ?Text //Obsolete
+                            Mixed_larvae UNIQUE ?Text
+                            EE UNIQUE ?Text
+                            LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
+                            Molt UNIQUE ?Text
                             Dauer UNIQUE ?Text
                             Pupa UNIQUE ?Text
-                            Young_adult UNIQUE  ?Text
                             Adult UNIQUE  ?Text
-                            Old_adult UNIQUE  ?Text
-                            Mixed_stages UNIQUE   UNIQUE ?Text
-                            Age UNIQUE Text 
+                            YA UNIQUE ?Text
+                            OA UNIQUE ?Text
+                            Mixed_stages UNIQUE ?Text
+                            Age Text 
                             No_stage  // non applicable, example in Cell lines samples
                      Bio Control UNIQUE  ?Text
+                         Replicate UNIQUE  ?Text
                          Treatment UNIQUE  ?Text
                          Genes Gene ?Gene XREF SRR UNIQUE ?Text
                                Gene_down ?Gene XREF SRR_down UNIQUE ?Text
@@ -283,6 +290,7 @@
              Title   UNIQUE ?Text
              Sex Male    UNIQUE Text
                  Female  UNIQUE Text
+                 Hermaphrodite   UNIQUE Text
              Species ?Species @Title
              Tissue ?Tissue  XREF Biosample
              Identifier ?Identifier  XREF Biosample Text UNIQUE Text

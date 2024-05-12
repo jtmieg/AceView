@@ -2,7 +2,7 @@
 
 set chrom=$1
 
-bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
+bin/tacembly tmp/X.$MAGIC/$chrom << EOF
   query find predicted_gene IS magic.*
   kill
   read-models
@@ -38,7 +38,7 @@ EOF
 
 
 
-bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
+bin/tacembly tmp/X.$MAGIC/$chrom << EOF
   query find read XY* ; ct_ac || other ; ! gt_ag
   edit -D Is_read
   follow from_gene
@@ -58,7 +58,7 @@ bin/tacembly tmp/X.$MAGIC/XH$chrom << EOF
 EOF
 
 # clean XH echo of intron
-pushd tmp/X.$MAGIC/XH$chrom
+pushd tmp/X.$MAGIC/$chrom
   ../../../bin/tacembly .  << EOF
     query find read XH_* 
     bql -o f4.fix.xh.txt select chr,a2,a1,s,x,n from x in @,chr in x->intmap, a1 in chr[1],a2 in chr[2],s in x->strand,x1 in x->composite,x2 in x1[1],n in x2[1]

@@ -730,7 +730,6 @@ end
   echo "... $phase $target"
   foreach run (`cat MetaDB/$MAGIC/RunsList`)
     if (-e tmp/INTRONRUNS/$run/$run.$uu.intronSupport.ace.gz && -e  tmp/INTRONRUNS/$run/known_introns.$target.ace) continue
-    
     if (! -d tmp/INTRONRUNS/$run) source scripts/mkDir INTRONRUNS $run
     set ok=1
     echo "... $phase $target ok=1"

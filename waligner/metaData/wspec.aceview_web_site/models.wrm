@@ -128,7 +128,7 @@
                           Suppressed_ref_seq
            Position Map  Text
                     Cytogenetic Text Text
-                    IntMap ?Map UNIQUE Int UNIQUE Int // from NCBI gene2refseq file
+                    IntMap UNIQUE ?Map UNIQUE Int UNIQUE Int // from NCBI gene2refseq file
            Genetic Locus_Phenotype ?Text  // texts  hand composed by Danielle or imported i.e from C.elegansII or GAD-precise-description
                    Locus_description  ?Locus_description XREF GeneId // Danielle's controlled voc equivalent in worm of human ?disease
                    Gene_RIF Text  // goes to Gene->Locus_Phenotype
@@ -267,11 +267,16 @@
             Hit ?Sequence Int COORD UNIQUE Int COORD Int COORD UNIQUE Int COORD
             Stage UNIQUE Mixed
                          Embryo
+                         Mixed_embryo
+                         EE
+                         LE
                          L1
                          L2
                          L3
                          Dauer
                          L4
+                         YA
+                         OA
             Anomalous_clone Suspected_internal_deletion ?Sequence Int // will get assembled but disregard anomalous introns
                             Suspected_internal_deletion2 ?Sequence Int // to test cdna_flag
                             Manual_internal_deletion ?Sequence Int // done by hand
@@ -772,7 +777,7 @@
             Score  UNIQUE Float
         Tissue Barcode_afx ?Tissue
                Barcode_av05 ?Tissue
-        IntMap ?Map Int UNIQUE Int
+        IntMap UNIQUE ?Map Int UNIQUE Int
         Hits  Genes Gene ?Gene
                     GeneId ?GeneId
                     Antigene  ?Gene
@@ -1672,8 +1677,9 @@
                     at_ac
                     Other UNIQUE Text
         Fuzzy
-        IntMap ?Map UNIQUE Int UNIQUE Int
+        IntMap UNIQUE ?Map UNIQUE Int UNIQUE Int
         Length UNIQUE Int
+        Sliding UNIQUE Int
         Gene ?Gene XREF Intron
         GeneId ?GeneId XREF Intron
         From_genefinder ?Sequence XREF Intron UNIQUE Int UNIQUE Int
@@ -1733,8 +1739,8 @@
                 Other_sample  UNIQUE Int
                 Primates  UNIQUE Int
                 Supports ?Sequence
-        Motifs Donor UNIQUE Text  // 12bp: 8 in exon + 4 in intron of donor
-               Acceptor UNIQUE Text // 12bp: 4 in intron + 8 in exon of acceptor
+        Motifs Donor UNIQUE Text  // 16bp: 8 in exon + 8 in intron of donor
+               Acceptor UNIQUE Text // 16bp: 8 in intron + 8 in exon of acceptor
                Left_motif UNIQUE Text
                Right_motif UNIQUE Text
         Capture ?Capture
@@ -1767,8 +1773,8 @@
         GeneId ?GeneId 
         From_gene ?Transcribed_gene 
         From_genefinder ?Genefinder 
-        In_mRNA ?mRNA 
-        IntMap ?Map UNIQUE Int UNIQUE Int
+        In_mRNA ?mRNA UNIQUE Int
+        IntMap UNIQUE ?Map UNIQUE Int UNIQUE Int
         Type UNIQUE gt
                     gc
                     ct
@@ -1777,7 +1783,7 @@
         Fuzzy
         Fuzzy_D ?Donor XREF Next_gt
         Next_gt ?Donor XREF Fuzzy_D UNIQUE Int
-        Flat ?Run UNIQUE Int 	
+        Flat ?Run UNIQUE Int UNIQUE Int 	
         Intron ?Intron XREF D  ?Run UNIQUE Int 
         PolyA ?Run UNIQUE Int 
         Support stype      AV
@@ -1802,15 +1808,15 @@
            GeneId ?GeneId 
            From_gene ?Transcribed_gene 
            From_genefinder ?Genefinder 
-           In_mRNA ?mRNA 
-           IntMap ?Map UNIQUE Int UNIQUE Int
+           In_mRNA ?mRNA UNIQUE Int
+           IntMap UNIQUE ?Map UNIQUE Int UNIQUE Int
            Type UNIQUE ag
                        ac
                        Other UNIQUE Text
            Fuzzy
            Fuzzy_A ?Acceptor XREF Next_ag
            Next_ag ?Acceptor XREF Fuzzy_A UNIQUE Int
-           Flat ?Run UNIQUE Int 
+           Flat ?Run UNIQUE Int UNIQUE Int 
            Intron ?Intron XREF A ?Run UNIQUE Int 
 	   SLs ?Run UNIQUE Int 
            Support stype   AV
@@ -1829,7 +1835,7 @@
                    RNA_seq UNIQUE Int  // de_uno cumul from ali on genome or transcripts tmp/OR/d5.$MAGIC.de_uno.ace.gz
                    de_uno ?Run UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
                    Sponge ?Run UNIQUE Int  UNIQUE Int   // Intron Exon
-           Motifs UNIQUE Text  // 54bp: 50 in exon (-) 4 in intron of donor with an explicit - sign
+           Motifs UNIQUE Text  // 52bp: 25 in exon (--) 25 in intron of donor with an explicit - sign
 
 ?Element Title UNIQUE ?Text
          From_gene ?Transcribed_gene XREF Element
@@ -1840,7 +1846,7 @@
          eIGene ?Element XREF eIntron
          Length UNIQUE Int
          In_mRNA ?mRNA 
-         IntMap ?Map UNIQUE Int UNIQUE Int
+         IntMap UNIQUE ?Map UNIQUE Int UNIQUE Int
          Pastille Pastille_coding
                   Pastille_marginally_coding
                   Pastille_spliced_non_coding
@@ -2108,7 +2114,7 @@
 #Match_seg UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int #Match_seg  // Start, End of Aligment;  Start, End of Subject
 
 ?Locus  Map ?Map XREF Locus  #Map_position
-        IntMap ?Map UNIQUE Int  UNIQUE Int 
+        IntMap UNIQUE ?Map UNIQUE Int  UNIQUE Int 
         Gene ?Gene XREF Locus
         Gene_class ?Gene_class XREF Loci
         GeneId ?GeneId XREF Locus
@@ -2358,14 +2364,18 @@
          Vector_length UNIQUE Int // (bp) length clone - length insert
          Expression_profile Int REPEAT
          Stage UNIQUE Mixed
-                      Embryo EmbE  // early embryo
-                             EmbL  // late embryo
+                      Embryo 
+                      Mixed_embryo 
+                      EE
+                      LE
                       L1
                       L2
                       L3
                       Dauer
                       L4
-                      Adult YA  // Young adult
+                      Adult
+                      YA
+                      OA
          Tissue Male
                 Ovary
                 Somatic  // no germinal 
@@ -3385,7 +3395,10 @@
                  Respiratory ?Systm XREF Respiratory  ?Text
                  Urogenital ?Systm XREF Urogenital ?Text
           Stage             Embryo UNIQUE ?Text
+                            Mixed_embryo  UNIQUE ?Text
                             Fetal  UNIQUE ?Text
+                            EE UNIQUE ?Text
+                            LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
@@ -3395,7 +3408,9 @@
                             Pupa UNIQUE ?Text
                             Juvenile UNIQUE ?Text
                             Adult UNIQUE  ?Text
-                            Mixed_stages UNIQUE   UNIQUE ?Text
+                            YA UNIQUE ?Text
+                            OA UNIQUE ?Text
+                            Mixed_stages UNIQUE ?Text
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
@@ -3468,20 +3483,21 @@
                  Nervous_and_sense_organ ?Systm  ?Text
                  Respiratory ?Systm  ?Text
                  Urogenital ?Systm  ?Text
-                 Stage      Early_embryo UNIQUE ?Text
-                            Embryo UNIQUE ?Text
-                            Late_embryo UNIQUE ?Text
+                 Stage      Embryo UNIQUE ?Text
+                            Mixed_embryo UNIQUE ?Text
                             Any_larva UNIQUE ?Text
+                            EE UNIQUE ?Text
+                            LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
                             Dauer UNIQUE ?Text
                             Pupa UNIQUE ?Text
-                            Young_adult UNIQUE  ?Text
                             Adult UNIQUE  ?Text
-                            Old_adult UNIQUE  ?Text
-                            Mixed_stages UNIQUE   UNIQUE ?Text
+                            YA UNIQUE ?Text
+                            OA UNIQUE ?Text
+                            Mixed_stages UNIQUE ?Text
                             Age UNIQUE Text 
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
