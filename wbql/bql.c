@@ -147,6 +147,7 @@ struct bqlStruct {
   int minmaxavstd ;
   int minmaxavstdN ;
   int minmaxavstdX ;
+  int minmaxavstdX2 ;
   int tableRow ;
   int inCurly ;
   char *order_by ;
@@ -390,10 +391,10 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 		    (strcasecmp (cp, "OBJECT") || ! strcmp (cp, "OBJECT")) &&
 
 		    /* (strcasecmp (cp, "COUNT") || ! strcmp (cp, "COUNT")) && */
-		    (strcasecmp (cp, "MIN") || ! strcmp (cp, "COUNT")) &&
-		    (strcasecmp (cp, "MAX") || ! strcmp (cp, "COUNT")) &&
-		    (strcasecmp (cp, "SUM") || ! strcmp (cp, "COUNT")) &&
-		    (strcasecmp (cp, "AVERAGE") || ! strcmp (cp, "COUNT")) &&
+		    (strcasecmp (cp, "MIN") || ! strcmp (cp, "MIN")) &&
+		    (strcasecmp (cp, "MAX") || ! strcmp (cp, "MAX")) &&
+		    (strcasecmp (cp, "SUM") || ! strcmp (cp, "SUM")) &&
+		    (strcasecmp (cp, "AVERAGE") || ! strcmp (cp, "AVERAGE")) &&
 		    (strcasecmp (cp, "STDDEV") || ! strcmp (cp, "STDDEV")) 
 
 
@@ -411,7 +412,7 @@ static BOOL bqlGetTypes (BQL *bql, NODE *node, BOOL *okp)
 
 		    if (0)
 		      { /* 2022-03-04, remove this clause bqltest: see the example : tom where ! p->parent && p->papers
-			 * it wrongly parses   "where !a && b" into "where ! (a && b)" rateher than the correct "where (!a) && b"
+			 * it wrongly parses   "where !a && b" into "where ! (a && b)" rather than the correct "where (!a) && b"
 			 */
 			if (node->type == NOT && node->up && node->up->type == WHERE)
 			  node->type = WHERE_AVOID ;
@@ -5188,6 +5189,7 @@ static BOOL bqlExpandTag (BQL *bql, NODE *node, NODE *coma)
 			    {
 			      bql->minmaxavstdN++ ;
 			      bql->minmaxavstdX += var->z ;
+			      bql->minmaxavstdX2 += (var->z) * (var->z) ;
 			    }
 			}
 		      else if (var->uType == _LongInt)
@@ -5205,6 +5207,7 @@ static BOOL bqlExpandTag (BQL *bql, NODE *node, NODE *coma)
 				{
 				  bql->minmaxavstdN++ ;
 				  bql->minmaxavstdX += lli ;
+				  bql->minmaxavstdX2 += lli * lli ;
 				}
 			    }
 			  var->key = 0 ;
@@ -5248,6 +5251,8 @@ static BOOL bqlExpandTag (BQL *bql, NODE *node, NODE *coma)
 				bql->minmaxavstdX = zzZ ;
 			      }
 			    break ;
+			  case STDDEV:
+			    bql->minmaxavstdX2 += zzZ * zzZ ;
 			  case AVERAGE:
 			  case SUM:
 			    bql->minmaxavstdN++ ;
@@ -5894,6 +5899,7 @@ static BOOL bqlExpandIn (BQL *bql, NODE *node, NODE *coma)
       case MAX:
       case SUM:
       case AVERAGE:
+      case STDDEV:
 	ok = bqlExpandMinMax (bql, node, coma) ;
 	break ;
       case HASTAG:
@@ -5979,7 +5985,7 @@ static BOOL bqlExpandMinMax (BQL *bql, NODE *node, NODE *coma)
     where = 0 ;
  
   if (countTag && ! bql->minmaxavstd  &&
-      (countTag->type == MIN || countTag->type == MAX || countTag->type == SUM || countTag->type == AVERAGE)
+      (countTag->type == MIN || countTag->type == MAX || countTag->type == SUM || countTag->type == AVERAGE || countTag->type == STDDEV)
       && var && var->type == VAR)
     {
       var->isNumber = TRUE ;
@@ -5988,6 +5994,7 @@ static BOOL bqlExpandMinMax (BQL *bql, NODE *node, NODE *coma)
       bql->minmaxavstd = countTag->type ;
       bql->minmaxavstdN = 0 ;
       bql->minmaxavstdX = 0;
+      bql->minmaxavstdX2 = 0;
       if ( countTag->right)
 	{
 	  countTag->down = var ;
@@ -6007,6 +6014,9 @@ static BOOL bqlExpandMinMax (BQL *bql, NODE *node, NODE *coma)
 	case AVERAGE:
 	  var->z = bql->minmaxavstdN ? bql->minmaxavstdX/bql->minmaxavstdN : 0 ;
 	  break ;
+	case STDDEV:
+	  var->z = bql->minmaxavstdN ? bql->minmaxavstdX2/bql->minmaxavstdN - (bql->minmaxavstdX/bql->minmaxavstdN)*(bql->minmaxavstdX/bql->minmaxavstdN) : 0 ;
+	  break  ;
 	default:
 	  var->z = 0 ;
 	  break ;
@@ -6015,6 +6025,7 @@ static BOOL bqlExpandMinMax (BQL *bql, NODE *node, NODE *coma)
       bql->minmaxavstd = 0 ;
       bql->minmaxavstdN = 0 ;
       bql->minmaxavstdX = 0;
+            bql->minmaxavstdX2 = 0;
       ok = TRUE ;
     }
 

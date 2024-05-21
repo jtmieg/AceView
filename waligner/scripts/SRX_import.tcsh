@@ -472,9 +472,10 @@ wc  $dd/PAPERS/a5.pmnocit.list
 pushd  $dd/PAPERS
   perl  BIBLIO/PmImport/medlineGet.pl < a5.pmnocit.list >! a5.pmnocit.gb
   perl  BIBLIO/PmImport/medline2ace.pl < a5.pmnocit.gb >! a5.pmnocit.preace
+  cat a5.pmnocit.preace | grep -v EC_symbol > a5.pmnocit.ace
 popd
 
-cat $dd/PAPERS/a5.pmnocit.preace | grep -v EC_symbol > $dd/PAPERS/a5.pmnocit.ace
+
 tbly SRX_DB << EOF
     pparse   $dd/PAPERS/a5.pmnocit.ace
     save

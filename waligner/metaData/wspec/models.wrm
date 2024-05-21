@@ -193,7 +193,7 @@
              Expression_histogram  // only applies to groups: for each gene, per chromosome, show all histos at once
              Coverage_8kb
 	     Shift_expression_index UNIQUE Float // add this value to all expression index (useful in captures where the norm is suboptimal)
-             Intron
+             Intron ?Project
              Transloc
              Compare_to ?Run XREF Compare_to ?Run UNIQUE ?Run  ?Run UNIQUE ?Run  // construtc a predictor using r1/r2 interpret pheno r3 r4 then r5 r6n   // obsolete Danielle
              DEG ?Experiment XREF DEG_high_run @DEG // export genes->DEG_high_low ?Exp score fold_change high low_av relative to Run                      // obsolete Danielle
@@ -1033,6 +1033,7 @@
           Magic_sample2 UNIQUE ?Text
           Sex Male    UNIQUE Text
               Female  UNIQUE Text
+              Hermaphrodite   UNIQUE Text
               Mixed_sex UNIQUE Text  // pooling males and females          
           Description ?Text
           Population_description ?Text
@@ -1065,14 +1066,17 @@
           Stage             Embryo  UNIQUE ?Text
                             Mixed_embryo UNIQUE ?Text
                             Fetal  UNIQUE ?Text
+                            Larva UNIQUE ?Text
+                            Any_larva UNIQUE ?Text //Obsolete
+                            Mixed_larvae UNIQUE ?Text
                             EE UNIQUE ?Text
                             LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
+                            Molt UNIQUE ?Text
                             Dauer UNIQUE ?Text
-                            Larva UNIQUE ?Text
                             Pupa UNIQUE ?Text
                             Adult UNIQUE  ?Text
                             YA UNIQUE ?Text
@@ -1083,7 +1087,7 @@
           Bio Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
               Replicate UNIQUE  ?Text
-              Genes Gene ?Gene // XREF SRR UNIQUE ?Text
+              Genes Gene ?Gene ?Text // XREF SRR UNIQUE ?Text
                     Gene_down ?Gene // XREF SRR_down UNIQUE ?Text
                     Gene_up ?Gene // XREF SRR_up UNIQUE ?Text
                     Gene_ectopic ?Gene // XREF SRR_ectopic UNIQUE ?Text

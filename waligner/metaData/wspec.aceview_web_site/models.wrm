@@ -1727,7 +1727,8 @@
                 cDNA UNIQUE Int // mRNA + EST
 		RNA_seq  UNIQUE Int 
                 de_novo UNIQUE Int UNIQUE Int  // donor acceptor in discovery more
-                de_duo  ?Run UNIQUE Int  
+                de_duo  ?Run UNIQUE Int
+		Group  ?Run UNIQUE Int UNIQUE Int UNIQUE Int		
                 de_uno Text SORTED Text UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
                 Validated_u ?Run UNIQUE Int  // validated by realignment on new introns
                 Validated_nu ?Run UNIQUE Int  // validated by realignment on new introns
@@ -1801,7 +1802,8 @@
                 Any_flat UNIQUE Int
                 RNA_seq UNIQUE Int  // de_uno cumul from ali on genome or transcripts tmp/OR/d5.$MAGIC.de_uno.ace.gz
                 de_uno ?Run UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
-                Sponge ?Run UNIQUE Int  UNIQUE Int   // Exon intron
+                Sponge ?Run UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron
+                Group  ?Run UNIQUE Int UNIQUE Int  UNIQUE Int	UNIQUE Int	// c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
         Motifs UNIQUE Text  // 54bp: 50 in exon (-) 4 in intron of donor with an explicit - sign
 
 ?Acceptor  Gene ?Gene 
@@ -1834,7 +1836,8 @@
 		   Any_flat UNIQUE Int
                    RNA_seq UNIQUE Int  // de_uno cumul from ali on genome or transcripts tmp/OR/d5.$MAGIC.de_uno.ace.gz
                    de_uno ?Run UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
-                   Sponge ?Run UNIQUE Int  UNIQUE Int   // Intron Exon
+                   Sponge ?Run UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron
+                   Group  ?Run UNIQUE Int UNIQUE Int  UNIQUE Int	UNIQUE Int	// c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
            Motifs UNIQUE Text  // 52bp: 25 in exon (--) 25 in intron of donor with an explicit - sign
 
 ?Element Title UNIQUE ?Text
@@ -3368,6 +3371,7 @@
         T SRS UNIQUE ?Text
           Sex Male    UNIQUE Text
               Female  UNIQUE Text
+              Hermaphrodite   UNIQUE Text
               Mixed_sex UNIQUE Text  // pooling males and females
           Pool Int // nb mixed individual
           Single_individual ?Text
@@ -3557,7 +3561,7 @@
              Expression_histogram  // only applies to groups: for each gene, per chromosome, show all histos at once
              Coverage_8kb
 	     Shift_expression_index UNIQUE Float // add this value to all expression index (useful in captures where the norm is suboptimal)
-             Intron
+             Intron ?Project
              Transloc
              Compare_to ?Run XREF Compare_to ?Run UNIQUE ?Run  ?Run UNIQUE ?Run  // construtc a predictor using r1/r2 interpret pheno r3 r4 then r5 r6n   // obsolete Danielle
              DEG ?Experiment XREF DEG_high_run @DEG // export genes->DEG_high_low ?Exp score fold_change high low_av relative to Run                      // obsolete Danielle

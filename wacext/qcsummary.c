@@ -1303,11 +1303,14 @@ Distribution of mismatches in best unique alignments, abslute, oberved, counts
 	  continue ;
 	}
 
-      tt = ac_tag_table (rc->ali, "SNP_profile", h) ;
 
       if (! strcmp (ti->tag, "Compute"))
 	{
 	  float zz = 0 ;
+	  int colN = 2 ;
+
+
+	  tt = ac_tag_table (rc->ali, "SNP_profile", h) ;
 	  switch (ti->col)
 	    {
 	    case 1:   /* Megabases uniquely aligned and used for mismatch counts */
@@ -1316,12 +1319,12 @@ Distribution of mismatches in best unique alignments, abslute, oberved, counts
 		  if (ir == 0)
 		    {
 		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
-		      zz = ac_table_float (tt, ir, 3, 0) ;
+		      zz = ac_table_float (tt, ir, colN, 0) ;
 		    }
 		  else if (strcmp (buf, ac_table_printable (tt, ir, 0, "xxx")))
 		    {
 		      strcpy (buf, ac_table_printable (tt, ir, 0, "xxx")) ;
-		      zz +=  ac_table_float (tt, ir, 3, 0) ;
+		      zz +=  ac_table_float (tt, ir, colN, 0) ;
 		    }
 		}
 	      aceOutf (qc->ao, "\t%.0f", zz) ;
@@ -1336,6 +1339,7 @@ Distribution of mismatches in best unique alignments, abslute, oberved, counts
 		  if (! strcasecmp (ccp, "Any"))
 		    continue ;
 		  zAny += zz ;
+		  if (ccp[2] == '_') ccp += 3 ;
 		  if (ccp[1] == '>' && ccp[3] == 0) /* substitution */
 		    {
 		      int i = 0 ;
@@ -3774,9 +3778,8 @@ static void qcSLsDo (QC *qc, RC *rc, BOOL isSL)
 	}
        else  if (*ti->tag)
 	{
-	  int n1 = ti->col ;
 	  BOOL ok = FALSE ;
-	  int j, ir ;
+	  int  ir ;
 	  if (! tbl)
 	    tbl = ac_tag_table (rc->ali, "SLs", h) ; 
 

@@ -681,6 +681,15 @@ AC_ITER ac_keyset_iter (AC_KEYSET aks, int fillhint, AC_HANDLE handle)
 } /* ac_keyset_iter */
 
 /********************************************************************/
+/* Causes the datase to save its state to disk
+ * useful in very long client codes to ensure that the work so far cannot be lost
+ */
+void ac_db_commit (AC_DB db)
+{
+  sessionClose (TRUE) ;
+} /* ac_db_commit */
+
+/********************************************************************/
 /* refresh, is declared by compatibility with acclient */
 void ac_db_refresh (AC_DB db) {} ; /* this function is not needed in acinside
 				      since bsCreate() always get the current object

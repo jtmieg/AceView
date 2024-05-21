@@ -20,12 +20,14 @@ typedef struct gxStruct {
   AC_HANDLE h ; 
   AC_DB db ; 
   const char *outFileName, *inFileName, *deMrna ;
-  const char *wiggleDir ;
   const char *project ; 
   const char *chrom ;
   BOOL gzo, gzi ;
   BOOL setFeet ; 
   BOOL setDA ;
+  BOOL setSponge ;
+  BOOL counts ;
+  BOOL setGroups ;
   BOOL hasAltIntron ;
   Array runs ;
   Array histos ;
@@ -179,7 +181,7 @@ static int gxGetAcceptors (GX *gx)
 
   /*  iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && IS *37832378; >A ", h) ; */
   iter = ac_dbquery_iter (gx->db, "Find Intron de_duo; >A ", h) ;
-  while (ac_free (h2), ac_free (obj),  nn < 300000 && (obj = ac_iter_obj (iter)))
+  while (ac_free (h2), ac_free (obj), (obj = ac_iter_obj (iter)))
     {
       h2 = ac_new_handle () ;
       AC_TABLE introns = ac_tag_table (obj , "Intron", h2) ;
@@ -335,7 +337,7 @@ static int gxGetAcceptors (GX *gx)
 
 /*************************************************************************************/
 
-static int gxSetIntronLnIntMapFeet (GX *gx) 
+static int gxSetFeet (GX *gx) 
 {
   AC_HANDLE h = ac_new_handle () ;
   int nn = 0 ;
@@ -350,14 +352,17 @@ static int gxSetIntronLnIntMapFeet (GX *gx)
 
   memset (chromName, 0, 128) ;
 
-  iter = ac_dbquery_iter (gx->db, "Find Intron type || ! Length || ! type", h) ;
-  while (ac_free (obj),  obj = ac_iter_obj (iter))
+  iter = ac_dbquery_iter (gx->db, "Find Intron ! IntMap || ! Length || ! type", h) ;
+  while (ac_free (obj),  (obj = ac_iter_obj (iter)))
     {
       AC_HANDLE h1 = ac_new_handle () ;
       char *chrom = strnew (ac_name(obj), h1), *cq ;
       int k = 0, a1 = 0, a2 = 0 ;
       int sliding = 0 ;
       vtxtClear (txt) ;
+
+      nn++ ;
+      if (nn % 10000 == 1) fprintf(stderr, ".... setFeet %d %s : %s\n", nn, ac_name(obj), timeShowNow()) ;
 
       cq = strstr (chrom, "__") ;
       if (cq)
@@ -372,13 +377,18 @@ static int gxSetIntronLnIntMapFeet (GX *gx)
 	  int ln = a2 - a1 ;
 	  if (ln < 0) ln = - ln ;
 	  ln++ ;
+	  if (ln < 3)
+	    continue ;
 	  vtxtPrintf (txt, "Intron %s\nIntMap %s %d %d\nLength %d\n"
 		      , ac_name (obj), chrom, a1, a2, ln
 		      ) ;
 	}
       else
-	vtxtPrintf (txt, "-D Intron %s\n\n", ac_name(obj)) ;
-
+	{
+	  vtxtPrintf (txt, "-D Intron %s\n\n", ac_name(obj)) ;
+	  continue ;
+	}
+      
       /* get intron feet  */
       if (k == 2 && ! ac_has_tag (obj, "Type"))
 	{
@@ -393,39 +403,49 @@ static int gxSetIntronLnIntMapFeet (GX *gx)
 	    }
           if (chromDna)
 	    {
-	      /* get sliding */
-	      for (int i = 0 ; chromDna[a1-1+i] == chromDna[a2+i] ; i++)
-		sliding++ ;
-	      for (int i = 0 ; chromDna[a1-2-i] == chromDna[a2-1-i] ; i++)
-		sliding++ ;
+	      if (1)
+		{
+		  /* get sliding */
+		  for (int i = 0 ; chromDna[a1-1+i] == chromDna[a2+i] ; i++)
+		    sliding++ ;
+		  for (int i = 0 ; chromDna[a1-2-i] == chromDna[a2-1-i] ; i++)
+		    sliding++ ;
+		}
 
 	      /* get type */
-	      if (a1 < a2)
+	      if (1)
 		{
-		  feet[0] = chromDna[a1-1] ;
-		  feet[1] = chromDna[a1] ;
-		  feet[2] = '_' ;
-		  feet[3] = chromDna[a2-2] ;
-		  feet[4] = chromDna[a2-1] ;
-		  feet[5] = 0 ;
+		  if (a1 < a2)
+		    {
+		      feet[0] = chromDna[a1-1] ;
+		      feet[1] = chromDna[a1] ;
+		      feet[2] = '_' ;
+		      feet[3] = chromDna[a2-2] ;
+		      feet[4] = chromDna[a2-1] ;
+		      feet[5] = 0 ;
+		    }
+		  else
+		    {
+		      feet[0] = complementLetter(chromDna[a1-1]) ;
+		      feet[1] = complementLetter(chromDna[a1-2]) ;
+		      feet[2] = '_' ;
+		      feet[3] = complementLetter(chromDna[a2]) ;
+		      feet[4] = complementLetter(chromDna[a2-1]) ;
+		      feet[5] = 0 ;
+		    }
 		}
-	      else
+
+	      if (1)
 		{
-		  feet[0] = complementLetter(chromDna[a1-1]) ;
-		  feet[1] = complementLetter(chromDna[a1-2]) ;
-		  feet[2] = '_' ;
-		  feet[3] = complementLetter(chromDna[a2]) ;
-		  feet[4] = complementLetter(chromDna[a2-1]) ;
-		  feet[5] = 0 ;
+		  if (strcasestr (gooddies, feet))
+		    vtxtPrintf (txt, "%s\n", feet) ;
+		  else
+		    vtxtPrintf (txt, "Other %s\n", feet) ;
+		  if (sliding)
+		    vtxtPrintf (txt, "Sliding %d\n", sliding) ;
+		  else
+		    vtxtPrintf (txt, "-D Sliding\n") ;
 		}
-	      if (strcasestr (gooddies, feet))
-		vtxtPrintf (txt, "%s\n", feet) ;
-	      else
-		vtxtPrintf (txt, "Other %s\n", feet) ;
-	      if (sliding)
-		vtxtPrintf (txt, "Sliding %d\n", sliding) ;
-	      else
-		vtxtPrintf (txt, "-D Siding\n") ;
 	    }
 	}
 	  /* set echo */
@@ -442,13 +462,22 @@ static int gxSetIntronLnIntMapFeet (GX *gx)
 	}
     
       if (vtxtPtr (txt))
-	ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
+	{
+	  ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
+	  if (nn % 10000 == -1) fprintf(stderr, ".... setFeet txtln : %ld\n", strlen (vtxtPtr(txt))) ;
+	  if (*errors)
+	    {
+	      fprintf (stderr, "%s %s\n", ac_name (obj), errors) ;
+	      invokeDebugger () ;
+	      exit (1) ;
+	    }
+	}
       ac_free (h1) ;
     }
 
   ac_free (h) ;
   return nn ;
-} /* gxGetIntronLnIntMapFeet */
+} /* gxSetFeet */
 
 /*************************************************************************************/
 
@@ -468,15 +497,18 @@ static int gxSetDA (GX *gx)
   
   memset (chromName, 0, 128) ;
   
-  iter = ac_dbquery_iter (gx->db, "Find Intron ! D || ! A", h) ;
-  while (ac_free (Intron),  Intron = ac_iter_obj (iter))
+  iter = ac_dbquery_iter (gx->db, "Find Intron  ! D || ! A", h) ;
+  while (ac_free (Intron),  (Intron = ac_iter_obj (iter)))
     {
       AC_HANDLE h1 = ac_new_handle () ;
       char *chrom = strnew (ac_name(Intron), h1), *strand, *cq ;
       int k = 0, a1 = 0, a2 = 0, A1, A2, d1, d2, d3, d4, A3, A4 ;
-      vtxtClear (txt) ;
+      vtxtClear (txt) ; 
+
       nn++ ;
-      if (nn % 10000 == 1) fprintf(stderr, ".... setDA %d %s\n", nn, ac_name(Intron)) ;
+      if (nn % 10000 == 1) fprintf(stderr, ".... setDA %d %s : %s\n", nn, ac_name(Intron), timeShowNow()) ;
+      if (nn < -360000) continue ;
+      
       cq = strstr (chrom, "__") ;
       if (cq)
 	{ 
@@ -518,6 +550,7 @@ static int gxSetDA (GX *gx)
       
       /* donor */
       vtxtPrintf (txt, "Donor %s__%d_%s\n", chromName, d4, strand) ;
+
       vtxtPrintf (txt, "IntMap %s %d %d\n", chromName, d3, d4) ;
       vtxtPrintf (txt, "Intron %s\n", ac_name (Intron)) ;
       if (d1 < d2)
@@ -550,7 +583,7 @@ static int gxSetDA (GX *gx)
       
       /* acceptor */
       vtxtPrintf (txt, "Acceptor %s__%d_%s\n", chromName, A3, strand) ;
-      vtxtPrintf (txt, "IntMap %s__%d_%d\n", chromName, A3, A4) ;
+      vtxtPrintf (txt, "IntMap %s %d %d\n", chromName, A3, A4) ;
       vtxtPrintf (txt, "Intron %s\n", ac_name (Intron)) ;
       if (A1 < A2)
 	{
@@ -603,6 +636,8 @@ static int gxSetDAsupport (GX *gx)
 
   for (pass = 0 ; pass < 2 ; pass++)
     {
+      nn = 0 ;
+      
       if (pass == 0)
 	iter = ac_dbquery_iter (gx->db, "Find Donor", h) ;
       else
@@ -625,7 +660,7 @@ static int gxSetDAsupport (GX *gx)
 	  nn++ ;
 	  if (0*nn>1000)
 	    { nn = 0 ; break ; }
-	  if (nn % 10000 == 1) fprintf(stderr, ".... setSupport %d %s\n", nn, ac_name(Donor)) ;
+	  if (nn % 10000 == 1) fprintf(stderr, ".... setSupport%s %d %s %s\n", pass==0 ? "Donor" : "Acceptor", nn, ac_name(Donor), timeShowNow()) ;
 	  
 	  if (introns)
 	    for (ir = 0 ; ir < introns->rows ; ir++)
@@ -692,6 +727,7 @@ static int gxSetDAsupport (GX *gx)
 			    , n
 			    ) ;
 	      }
+
 	  if (nnn)
 	    vtxtPrintf (txt, "RNA_seq %d\n\n", nnn) ;
 	  
@@ -704,21 +740,28 @@ static int gxSetDAsupport (GX *gx)
 	    }
 	  ac_free (h1) ;
 	}
+      fprintf(stderr, ".... setSupport done\n") ;
     }
   
   ac_free (h) ;
   h = ac_new_handle () ;
+  txt = vtxtHandleCreate (h) ;
+
   if (1)
     {
       char *qq = "Find Intron Gene && (same_donor || same_acceptor)" ;
       AC_ITER iter = ac_dbquery_iter (gx->db, qq, h) ;
       AC_OBJ Intron = 0 ;
+      int nn = 0 ;
+      fprintf(stderr, ".... setSameDonor\n") ;
       while (ac_free (Intron),  Intron = ac_iter_obj (iter))
 	{
 	  AC_HANDLE h1 = ac_new_handle () ;
 	  AC_TABLE tbl1 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_donor", 0, 0, h1) ;
 	  AC_TABLE tbl2 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_acceptor", 0, 0, h1) ;
 
+	  nn++ ;
+	  if (nn % 10000 == 1) fprintf(stderr, ".... setSameDonor %d %s %s\n", nn, ac_name(Intron), timeShowNow()) ;
 	  vtxtClear (txt) ;
 	  for (int ir = 0 ; ir < tbl1->rows ; ir++)
 	    vtxtPrintf (txt, "Gene %s\nIntron %s\n\n"
@@ -731,9 +774,10 @@ static int gxSetDAsupport (GX *gx)
 			, ac_table_printable (tbl1, ir, 0, "xxx")
 			, ac_table_printable (tbl1, ir, 1, "xxx")
 			) ;
-
-	  ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
+	  if (vtxtPtr (txt))
+	    ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
 	}
+      fprintf(stderr, ".... setSameDonor done\n") ;
     }
     
   ac_free (h) ;
@@ -868,7 +912,7 @@ static void gxFlatScan (BigArray aa, int run, AC_TABLE das, WIGGLE *sx)
 
 /*************************************************************************************/
 
-static int gxSetDAflatSupport (GX *gx) 
+static int gxSetDAflatSpongeSupport (GX *gx) 
 {
   const char *qq[4] ;
   qq[0] =  "select a1, da from da in  ?Donor where da ~ \"*_f\", chrom in da->intMap, a1 in chrom[1]" ;
@@ -893,10 +937,16 @@ static int gxSetDAflatSupport (GX *gx)
 	{
 	  AC_HANDLE h1 = ac_new_handle () ;
 
-	  char *fNam = hprintf(h1, "%s/%s/%s/R.chrom.u.%c.BF.gz", gx->wiggleDir, dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
+	  char *fNam = hprintf(h1, "tmp/WIGGLERUN/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
 	  WIGGLE sx ;
 	  memset (&sx, 0, sizeof (WIGGLE)) ; 
 	  sx.ai = aceInCreate (fNam, 0, h1) ;
+	  if (! sx.ai)
+	    {
+	      fNam = hprintf(h1, "tmp/WIGGLEGROUP/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
+	      sx.ai = aceInCreate (fNam, 0, h1) ;
+	    }
+
 	  sx.noRemap = TRUE ;
 	  sx.out_step = 10 ;
 	  sx.aaa = arrayHandleCreate (12, Array, h1) ;
@@ -973,7 +1023,7 @@ static int gxGetIntrons (GX *gx)
   int kMin = 100 ;
 
   iter = ac_dbquery_iter (gx->db, "Find Intron de_uno", h) ;
-  while (ac_free (obj),  nn < 300000 && (obj = ac_iter_obj (iter)))
+  while (ac_free (obj), (obj = ac_iter_obj (iter)))
     {
       AC_HANDLE h1 = ac_new_handle () ;
       AC_TABLE map = ac_tag_table (obj, "IntMap", h1) ;
@@ -1086,6 +1136,278 @@ static int gxGetIntrons (GX *gx)
   
   return nn ;
 } /* gxGetIntrons */
+
+/*************************************************************************************/
+
+static int gxSetGroups (GX *gx)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  DICT *runDict = dictHandleCreate (256, h) ;
+  DICT *groupDict = dictHandleCreate (64, h) ;
+  Array r2g = arrayHandleCreate (256, KEYSET, h) ;
+  vTXT txt = vtxtHandleCreate (h) ;
+  int nn = 0 ;
+  const char *errors = 0 ;
+  const char *qqR2G =  hprintf (h,
+				"select r,g from p in ?project where p == \"%s\", r in p->run, g in r>>group where g#Intron && g->project == \"%s\""
+				, gx->project
+				, gx->project
+				) ;
+
+  /* create the run->group correspondance */
+  AC_TABLE r2gTbl = ac_bql_table (gx->db, qqR2G, 0, 0, &errors, h) ;
+  if (! r2gTbl || ! r2gTbl->rows)
+    goto done ;
+
+  for (int ir = 0 ; ir < r2gTbl->rows ; ir++)
+    {
+      const char *rNam = ac_table_printable (r2gTbl, ir, 0, 0) ; ;
+      const char *gNam = ac_table_printable (r2gTbl, ir, 1, 0) ;
+      if (rNam && gNam)
+	{
+	  int r = 0, g = 0, n = 0 ;
+	  dictAdd (runDict, rNam, &r) ;
+  	  dictAdd (groupDict, gNam, &g) ;
+	  if (r && g)
+	    {
+	      KEYSET ks = array (r2g, r, KEYSET) ;
+	      if (! ks)
+		ks = array (r2g, r, KEYSET) = keySetHandleCreate (h) ;
+	      n = keySetMax (ks) ;
+	      keySet (ks, n) = g ;
+	    }
+	}
+  }
+
+  
+  /* foreach intron, donor, acceptor: get the run counts and cumulate them in the groups   */
+
+  for (int pass = 0 ; pass < 3 ; pass++)
+    {
+      AC_HANDLE h1 = ac_new_handle () ;
+      AC_HANDLE h2 = 0;
+      AC_OBJ obj = 0 ;
+      char *qq, *qq2, *qq3 = "Sponge" ;
+      switch (pass)
+	{
+	case 0 :
+	  qq = "Find Intron de_duo" ;
+	  qq2 = "de_duo" ;
+	  break ;
+	case 1 :
+	  qq = "Find Donor de_uno" ;
+	  qq2 = "de_uno" ;
+	  break ;
+	case 2 :
+	  qq = "Find Acceptor de_uno" ;
+	  qq2 = "de_uno" ;
+	  break ;
+	}
+      AC_ITER iter = ac_dbquery_iter (gx->db, qq, h1) ;
+      while (ac_free (h2), ac_free (obj), (obj = ac_iter_obj (iter)))
+	{
+	  h2 = ac_new_handle () ;
+	  AC_TABLE tbl = ac_tag_table (obj, qq2, h2) ;
+	  KEYSET ssR = keySetHandleCreate (h2) ;
+	  KEYSET cc1R = keySetHandleCreate (h2) ;
+	  KEYSET cc2R = keySetHandleCreate (h2) ;
+	  KEYSET ssG = keySetHandleCreate (h2) ;
+	  KEYSET cc1G = keySetHandleCreate (h2) ;
+	  KEYSET cc2G = keySetHandleCreate (h2) ;
+	  BOOL ok = FALSE ;
+
+	  vtxtClear (txt) ;
+	  if (tbl)
+	    for (int ir = 0 ; ir < tbl->rows ; ir++)
+	      {
+		const char *rNam = ac_table_printable (tbl, ir, 0, 0) ;
+		int r, s = ac_table_int (tbl, ir, 1, 0) ; 
+		dictAdd (runDict, rNam, &r) ;
+		keySet (ssR, r) = s ;
+		if (r < arrayMax (r2g))
+		  {
+		    KEYSET ks = array (r2g, r, KEYSET) ;
+		    for (int i = 0 ; i < keySetMax (ks) ; i++)
+		      {
+			int g = keySet (ks, i) ;
+			keySet (ssG, g) += s ;
+		      }
+		  }
+	      }
+	  
+	  tbl = ac_tag_table (obj, qq3, h2) ;
+	  if (tbl)
+	    for (int ir = 0 ; ir < tbl->rows ; ir++)
+	      {
+		const char *rNam = ac_table_printable (tbl, ir, 0, 0) ;
+		int r, c1 = ac_table_int (tbl, ir, 1, 0) ; 
+		int c2 = ac_table_int (tbl, ir, 2, 0) ; 
+		dictAdd (runDict, rNam, &r) ;
+		keySet (cc1R, r) = c1 + 1 ;
+		keySet (cc2R, r) = c2 + 1 ;
+		if (r < arrayMax (r2g))
+		  {
+		    KEYSET ks = array (r2g, r, KEYSET) ;
+		    for (int i = 0 ; i < keySetMax (ks) ; i++)
+		      {
+			int g = keySet (ks, i) ;
+			keySet (cc1G, g) += c1 ;
+			keySet (cc2G, g) += c2 ;
+		      }
+		  }
+	      }
+	  
+
+	  /* register the group counts */
+	  for (int g = 0 ; g < keySetMax (ssG) ; g++)
+	    {
+	      int s = keySet (ssG, g) ;
+	      if (s)
+		{
+		  int c1, c2, t ;
+		  if (! ok)
+		    vtxtPrintf (txt, "%s %s\n"
+				, ac_class (obj)
+				, ac_name (obj)
+				) ;
+	  
+		  switch (pass)
+		    {
+		    case 0:
+		      vtxtPrintf (txt, "Group %s %d\n"
+				  , dictName (groupDict, g)
+				    , s
+				  ) ;
+		      break ;
+		      
+		    case 1:
+		    case 2:
+		      c1 = keySet (cc1G, g) ;
+		      c2 = keySet (cc2G, g) ;
+		      t = s ? 100.0 * s / (s + c2) : 0 ;
+		      vtxtPrintf (txt, "Group %s %d %d %d %d\n"
+				  , dictName (groupDict, g)
+				  , c1
+				  , c2
+				  , s
+				  , t
+				  ) ;
+		      break ;
+		    }
+		  ok = TRUE ;
+		}
+
+	    }
+	  /* register the run counts */
+	  for (int r = 0 ; pass > 0 && r < keySetMax (ssR) ; r++)
+	    {
+	      int s = keySet (ssR, r) ;
+	      if (s) /* if s == 1 a zero has been observed */
+		{
+		  int c1, c2, t ;
+		  if (! ok)
+		    vtxtPrintf (txt, "%s %s\n"
+				, ac_class (obj)
+				, ac_name (obj)
+				) ;
+	  
+		  switch (pass)
+		    {
+		    case 1:
+		    case 2:
+		      c1 = keySet (cc1R, r) ;
+		      c2 = keySet (cc2R, r) ;
+		      if (c1 && c2)
+			{
+			  c1-- ; c2-- ; 
+			  t = s ? 100.0 * s / (s + c2) : 0 ;
+			  vtxtPrintf (txt, "Sponge %s %d %d %d %d\n"
+				      , dictName (runDict, r)
+				      , c1 
+				      , c2 
+				      , s 
+				      , t
+				      ) ;
+			}
+		      break ;
+		    }
+		  ok = TRUE ;
+		}
+
+	    }
+	  /* register the run good introns for the QC */
+	  for (int g = 0 ; g < keySetMax (ssG) ; g++)
+	    {
+	    }
+
+	  if (ok)
+	    {
+	      ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
+	      if (nn % 10000 == -1) fprintf(stderr, ".... setFeet txtln : %ld\n", strlen (vtxtPtr(txt))) ;
+	      if (*errors)
+		{
+		  fprintf (stderr, "%s %s\n", ac_name (obj), errors) ;
+		  invokeDebugger () ;
+		  exit (1) ;
+		}
+	    }
+	}
+      ac_free (h1) ;
+    }
+  
+ done:
+  ac_free (h) ;
+  
+  return nn ;
+} /* gxSetGroups */
+
+/*************************************************************************************/
+
+static void gxCounts (GX *gx)
+{
+  return ;
+  
+  AC_HANDLE h = ac_new_handle () ;
+
+  /*
+int nn = 0 ;
+  int minS = 3 ;
+  const char *errors = 0 ;
+  const char *qqRuns =  hprintf (h, "select r from p in ?project where p == \"%s\", r in p->run", gx->project) ;
+  const char *qq =  hprintf (h, "select da,r,s,c1,c2,ii,i3 from da in ?donor , r in da->de_uno where r->project == \"%s\", r2 in da->sponge where r == r2, s in r[1], c1 in r2[1], c2 in r2[2], ii in da->intron, r3 in ii->de_duo where r3 == r, i3 in r3[1]") ;
+  AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
+  AC_TABLE tbl = ac_bql_table (gx->db, qq, 0, 0, &errors, h) ;
+  KEYSET ksRuns = keySetHandleCreate (h) ;
+  
+  for (int ir = 0 ; ir < tblRuns->rows ; ir++)
+    keySetInsert (ksRuns, ac_table_key (tbl, ir, 0), 0) ;
+  for (int ir = 0 ; ir < tbl->rows ; ir++)
+    {
+      AC_HANDLE h1 = ac_new_handle () ;
+      int s = 0, c1 = 0, c2 = 0, r3 = 0 ;
+      KEY key = ac_table_key (tbl, jr, 0) ;
+      for (int jr = ir ; jr < tbl->rows ; jr++)
+	{
+	  if (ac_table_key (tbl, jr, 0) != key)
+	    break ;
+	  KEY r = ac_table_key (tbl, jr, 1) ;
+	  if (! keySetFind (ksRuns, r))
+	    continue ;
+	  s += ac_table_key (tbl, jr, 2, 0) ;
+	  c1 += ac_table_key (tbl, jr, 3, 0) ;
+	  c2 += ac_table_key (tbl, jr, 4, 0) ;
+	  c2 += ac_table_key (tbl, jr, 4, 0) ;
+	  
+	}
+      ir = jr - 1 ;
+      if (s >= minS && c1 >= minS && 10*s > c1 && 10*s > c2)
+      
+      ac_free (h1) ;
+    }
+  */
+  ac_free (h) ;
+  return ;
+} /* gxCounts */
 
 /*************************************************************************************/
 /*************************************************************************************/
@@ -1317,7 +1639,7 @@ static void usage (char *message)
 	    "//   --setDA :\n"
 	    "//      for all introns, create the associated donors/acceptors\n"
 	    "//      xxx\n"
-	    "//   -w --wiggleDir dirName:\n"
+	    "//   -w --setSponge dirName:\n"
 	    "//      for each donor acceptor at position x, parse wiggle value around x+-13\n"
 	    "// Help\n"
 	    "//   -h -help --help : export this on line help\n"
@@ -1363,17 +1685,19 @@ int main (int argc, const char **argv)
   gx.gzo = getCmdLineBool (&argc, argv, "--gzo") ;
   gx.setFeet = getCmdLineBool (&argc, argv, "--setFeet") ;
   gx.setDA = getCmdLineBool (&argc, argv, "--setDA") ;
+  gx.setSponge = getCmdLineBool (&argc, argv, "--setSponge") ;
+  gx.setGroups = getCmdLineBool (&argc, argv, "--setGroups") ;
+  gx.counts = getCmdLineBool (&argc, argv, "--counts") ;
+  getCmdLineOption (&argc, argv, "--deMrna", &(gx.deMrna)) ;
 
   /* optional arguments */
-  getCmdLineOption (&argc, argv, "-db", &dbName) ;
-  getCmdLineOption (&argc, argv, "--db", &dbName) ;
-  getCmdLineOption (&argc, argv, "-o", &(gx.outFileName)) ;
-  getCmdLineOption (&argc, argv, "-w", &(gx.wiggleDir)) ;
-  getCmdLineOption (&argc, argv, "--wiggleDir", &(gx.wiggleDir)) ;
   getCmdLineOption (&argc, argv, "-p", &(gx.project)) ;
   getCmdLineOption (&argc, argv, "--project", &(gx.project)) ;
   getCmdLineOption (&argc, argv, "--chrom", &(gx.chrom)) ;
-  getCmdLineOption (&argc, argv, "--deMrna", &(gx.deMrna)) ;
+  getCmdLineOption (&argc, argv, "-db", &dbName) ;
+  getCmdLineOption (&argc, argv, "--db", &dbName) ;
+  getCmdLineOption (&argc, argv, "-o", &(gx.outFileName)) ;
+  
 
   if (argc != 1)
     {
@@ -1401,30 +1725,40 @@ int main (int argc, const char **argv)
 
   gxInit (&gx) ;
 
-  if (gx.setDA && ! gx.project)
-    usage ("Missing argument --project needed if --setDA") ;
-  if (gx.wiggleDir && !gx.chrom)
-    usage ("Missing argument --chrom needed if --wiggleDir") ;
 
   if (gx.deMrna)
-    gxDeMrna (&gx) ;
+    {
+      gxDeMrna (&gx) ;
+      ac_db_commit (gx.db) ;
+    }
   
   if (gx.setFeet)
-      gxSetIntronLnIntMapFeet (&gx) ;
+    {
+      gxSetFeet (&gx) ;
+      ac_db_commit (gx.db) ;
+    }
   if (gx.setDA)
     {
       gxSetDA (&gx) ;
+      ac_db_commit (gx.db) ;
       gxSetDAsupport (&gx) ;
     }
-  if (gx.wiggleDir)
+  if (gx.setSponge)
     {
       gxGetRuns (&gx) ;
-      gxSetDAflatSupport (&gx) ;
+      gxSetDAflatSpongeSupport (&gx) ;
+      ac_db_commit (gx.db) ;
     }
-  if (0)
+  if (gx.setGroups)
+    {
+      gxSetGroups (&gx) ;
+      ac_db_commit (gx.db) ;
+    }
+  if (gx.counts)
     {
       gxGetRuns (&gx) ;
-
+      gxCounts (&gx) ;
+      ac_db_commit (gx.db) ;
     }
   if (0)
     {
