@@ -4924,7 +4924,7 @@ static int baHit2Intron (BA *ba, HIT *vp, int *intronp, int *z1p, int *z2p, int 
 	  *gDownp = 1 ;
 
 	  if (a1 > a2) {  ii = a1 ; a1 = a2 ; a2 = ii ; *gDownp = -1 ; }
-	  for (ii = 0, mp = arrp (map, 0, MHIT) ; ii < arrayMax (map) - 1 ; ii++, mp++)
+	  for (ii = 0, mp = arrp (map, 0, MHIT) ; ii < arrayMax (map)  ; ii++, mp++)
 	    {
 	      if (intron)
 		{
@@ -4932,9 +4932,9 @@ static int baHit2Intron (BA *ba, HIT *vp, int *intronp, int *z1p, int *z2p, int 
 		    continue ;
 		  else if (x2 != mp->x2)
 		    return 0 ;
-		  mp++ ;
+		  ii++ ;  mp++ ;
 		}
-	      if (a1 < mp->x1 - dx && a2 > mp->x2 + dx)
+	      if (ii < arrayMax (map) && a1 < mp->x1 - dx && a2 > mp->x2 + dx)
 		{
 		  *intronp = mp->exon ; 
 		  *z1p = mp->a1 ; *z2p = mp->a2 ; *zx1p = mp->x1 ; *zx2p = mp->x2 ; 

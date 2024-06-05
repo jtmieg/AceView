@@ -2767,7 +2767,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
     if ((pnx->flag & flag4) == flag4) { ns4 = ns - i ; break ; }
 
-  if (ns1 && ns2)
+  if (ns1 && ns2 && look->map->solexa)
     {
       unsigned int iMax =  arrayMax (look->map->solexa) ;
       SLX *slx, *slx1 ;

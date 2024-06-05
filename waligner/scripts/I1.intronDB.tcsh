@@ -16,8 +16,10 @@ if ($phase == setFeet) goto setFeet
 if ($phase == deUno) goto deUno
 if ($phase == deMrna) goto deMrna
 if ($phase == setDA) goto setDA
+if ($phase == setDAsupport) goto setDAsupport
 if ($phase == setSponge) goto setSponge
 if ($phase == setGroups) goto setGroups
+if ($phase == intronCounts) goto intronCounts
 
 if ($phase == deDuo) goto deDuo
 if ($phase == collate) goto collate
@@ -41,7 +43,7 @@ if (! -d tmp/INTRON_DB/$chrom/database) then
     pushd tmp/INTRON_DB/$chrom
     mkdir database
     ln -s ../../../metaData/wspec.aceview_web_site wspec
-    tace . <<EOF
+    ../../../bin/tace . <<EOF
 y
 EOF
     popd
@@ -100,7 +102,7 @@ goto phaseLoop
 ### parse the genomic de_uno counts
 
 deUno:
-echo -n "I1 phase $phase start :"
+echo -n "I2 phase $phase start :"
 date
 
 set ok=0
@@ -110,12 +112,13 @@ echo ' ' > $ff
 foreach run1 (`cat MetaDB/$MAGIC/RunList`) 
   set run2=$run1
   set run2=`cat MetaDB/$MAGIC/r2sublib | gawk -F '\t' '{if($2==run1){r=$1;last;}}END{if(r)print r;else print run1;}' run1=$run1`
-  if (-e tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz9) continue
+  if (-e tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz) continue
   set ok=1
+  # echo "... deUno $run1 $run2"
   if ($USEMAGICBLAST == 1) then
     zcat tmp/MAGICBLAST/$run1/f2.*.introns.tsf.gz | bin/tsf -s $run2 --merge | gawk -F '\t' '{split($1,aa,"__");c=aa[1];if (c != chrom) next;plit(aa[2],bb,"_");a2=bb[1];b1=bb[2];if(a2<b1){strand="Forward";a2--;a1=a2-12;b1++;b2=b1+10;ln=b1-a2-1;}else{strand="Reverse";a2++;a1=a2+10;b1--;b2=b1-10;ln=a2-b1-1;}nr=$4;feet=$7;if(nr>0)printf("INTRON\t%s\t%s\t%09d\t%09d\t%s\t%09d\t%09d\t%s\t%d\t%d\t%d\n",strand,chrom,a1,a2,chrom,b1,b2,feet,ln,nr,nperfect);}' chrom=$chom  | sort | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
   else
-    gunzip -c tmp/PHITS_genome/$run1/*.introns.gz  tmp/PHITS_mito/$run1/*.introns.gz  | gawk -F '\t' '/^INTRON/{c=$3;if (c != chrom) next;if ($6 != chrom) next;i1=$5+0;i2=$7+0;if ($2=="Forward"){i1++;i2--;}else {i1--;i2++;}nn=$11; printf("%s__%d_%d\t%s\t%d\t%s\n",c,i1,i2,run,nn,$9);}' run=$run2 chrom=$chrom | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
+    gunzip -c tmp/PHITS_genome/$run1/*.introns.gz  tmp/PHITS_mito/$run1/*.introns.gz  | gawk -F '\t' '/^INTRON/{c=$3;if (c != chrom) next;if ($6 != chrom) next;i1=$5+0;i2=$7+0;if ($2=="Forward"){i1++;i2--;}else {i1--;i2++;}nn=$11; printf("%s__%d_%d\t%d\t%s\n",c,i1,i2,nn,$9);}' chrom=$chrom | gawk -F '\t' '{i=$1;n[i]+=$2;t[i]=$3;}END{for (i in n)printf("%s\t%s\t%d\t%s\n",i,run,n[i],t[i]);}' run=$run2  | sort | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
   endif
 
   zcat tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz >> $ff
@@ -123,9 +126,10 @@ end
 
 if ($ok == 1) then
   date
-  cat $ff | sort > $ff.sorted
+  cat $ff | sort  > $ff.sorted
   date
-  /usr/bin/time bin/altintrons --deMrna $ff.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
+  echo "bin/altintrons --deMrna $ff.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC"
+        bin/altintrons --deMrna $ff.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
   date
   if (-e  tmp/INTRON_DB/$chrom/I1.setFeet.done) \rm  tmp/INTRON_DB/$chrom/I1.setFeet.done
   \rm $ff $ff.ace
@@ -137,18 +141,8 @@ goto phaseLoop
 ### parse the intron counts from mRNA alignments
 
 deMrna:
-echo -n "I1 phase $phase start :"
+echo -n "I2 phase $phase start :"
 date
-
-# export the not-merged max counts
-if (0) then
-  bin/tacembly tmp/INTRON_DB/$chrom << EOF
-    query find intron de_duo
-    select -o tmp/INTRON_DB/$chrom/i2r2n.txt1 ii, run, n from ii in @, run in ii->de_duo, n in run[1] 
-EOF
-endif
-
-#gzip tmp/INTRON_DB/$chrom/i2r2n.txt1
 
 set ok=0
 set f0=tmp/INTRON_DB/$chrom/I2.deMrna
@@ -160,8 +154,8 @@ foreach run (`cat MetaDB/$MAGIC/RunsList`)
   set ff=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz 
   if (! -e $ff) continue 
   set ok=1
-  zcat $ff | gawk  "/$chrom\t/{print}" > $f1
-  cat $f1 | gawk '{printf("%s__%d_%d\t%s\t%d\n", $1,$2+0,$3+3, run, $4+0) ;}' run=$run >> $f0
+  zcat $ff | gawk  /$chrom'__/{print;}' >> $f1
+  cat $f1 >> $f0
   gzip $f1
 end
 date
@@ -169,16 +163,10 @@ date
 if ($ok == 1) then
   cat $f0 | sort > $f0.sorted
   date
-  bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
+  echo "bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC"
+        bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
   date
   if (-e  tmp/INTRON_DB/$chrom/I1.setFeet.done) \rm  tmp/INTRON_DB/$chrom/I1.setFeet.done
-
-# export the merged max counts
-  bin/tacembly tmp/INTRON_DB/$chrom << EOF
-    query find intron de_duo
-    select -o tmp/INTRON_DB/$chrom/i2r2n.txt ii, run, n from ii in @, run in ii->de_duo, n in run[1] 
-EOF
-  gzip tmp/INTRON_DB/$chrom/i2r2n.txt
 endif
 
 goto phaseLoop
@@ -191,7 +179,8 @@ echo -n "I1 phase $phase start :"
 date
 
 if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I1.setFeet.done) then
-  bin/altintrons --setFeet --db tmp/INTRON_DB/$chrom -p $MAGIC
+  echo "bin/altintrons --setFeet --db tmp/INTRON_DB/$chrom -p $MAGIC"
+        bin/altintrons --setFeet --db tmp/INTRON_DB/$chrom -p $MAGIC
   touch tmp/INTRON_DB/$chrom/I1.setFeet.done
 endif
 
@@ -206,24 +195,45 @@ echo -n "I1 phase $phase start :"
 date
 
 if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I1.setDA.done) then
-  bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I1.setDA.done
+  echo "bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC"
+        bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC
+  touch tmp/INTRON_DB/$chrom/I1.setDA.$MAGIC.done
 endif
 
 goto phaseLoop
 
 ########################################################################
-### create the donor/acceptors counts
+### create the donor/acceptors of all introns
 
-setSponge:
-echo -n "I1 phase $phase start :"
+setDAsupport:
+echo -n "I3 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I3.setSponge.done) then
-   echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
+if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I3.setDAsupport.done) then
+    echo "bin/altintrons --setDAsupport --db tmp/INTRON_DB/$chrom -p $MAGIC"
+          bin/altintrons --setDAsupport --db tmp/INTRON_DB/$chrom -p $MAGIC
+  touch tmp/INTRON_DB/$chrom/I3.setDAsupport.$MAGIC.done
+endif
+
+goto phaseLoop
+
+########################################################################
+### create the donor/acceptors sponge 
+
+setSponge:
+echo -n "I4 phase $phase start :"
+date
+
+if (-d tmp/INTRON_DB/$chrom/database && -e tmp/INTRON_DB/$chrom/I3.setDAsupport.$MAGIC.done) then
+   bin/tacembly tmp/INTRON_DB/$chrom  <<EOF
+     read-models
+     pparse MetaDB/$MAGIC/runs.ace
+     save
+     quit
+EOF
    echo "bin/altintrons --setSponge --db tmp/INTRON_DB/$chrom --setFeet --chrom $chrom -p $MAGIC"
          bin/altintrons --setSponge --db tmp/INTRON_DB/$chrom --setFeet --chrom $chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I3.setSponge.done
+  touch tmp/INTRON_DB/$chrom/I4.setSponge.$MAGIC.done
 endif
 
 goto phaseLoop
@@ -232,14 +242,19 @@ goto phaseLoop
 ### create the intron/donor/acceptors group counts
 
 setGroups:
-echo -n "I1 phase $phase start :"
+echo -n "I5 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I3.setSponge.done) then
-   echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
+if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I4.setSponge.$MAGIC.done) then
+   bin/tacembly tmp/INTRON_DB/$chrom  <<EOF
+     read-models
+     pparse MetaDB/$MAGIC/runs.ace
+     save
+     quit
+EOF
    echo "bin/altintrons --setGroups --db tmp/INTRON_DB/$chrom  --chrom $chrom -p $MAGIC"
          bin/altintrons --setGroups --db tmp/INTRON_DB/$chrom  --chrom $chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I4.setGroups.done
+  touch tmp/INTRON_DB/$chrom/I5.setGroups.$MAGIC.done
 endif
 
 goto phaseLoop
@@ -249,16 +264,16 @@ goto phaseLoop
 # count introns export tsf
 
 intronCounts:
-echo -n "I1 phase $phase start :"
+echo -n "I6 phase $phase start :"
 date
 
-   echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
-   bin/altintrons -db tmp/INTRON_DB/$chrom --intronCounts -p $MAGIC -o tmp/INTRON_DB/$chrom/I2.$MAGIC
+if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I5.setGroups.$MAGIC.done) then
+   echo "bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/I6.$MAGIC"
+         bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/I6.$MAGIC
+  touch tmp/INTRON_DB/$chrom/I6.counts.$MAGIC.done
+endif
+
 goto phaseLoop
-
- query find donor !gt
- select -o toto.txt3  ii,n,c1,c2,x from ii in @ , n in SUM ii->de_uno[2], c1 in SUM ii->sponge[2], c2 in SUM ii->sponge[3], x = n + c2
-
 
 ########################################################################
 ########################################################################
@@ -270,7 +285,8 @@ echo -n "I1 phase $phase start :"
 date
 
    echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
-   bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/I5.altIntrons
+   echo "bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/I5.altIntrons"
+         bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/I5.altIntrons
 goto phaseLoop
 
 ########################################################################

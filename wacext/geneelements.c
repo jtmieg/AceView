@@ -4068,7 +4068,7 @@ static int sxDoVentilate (SX *sx, const char *fNam, DICT *dict, Array outs, AC_H
       aceInStep (ai, '\t') ; ccp = aceInWord (ai) ; 
       if (! ccp || strlen (ccp) > 127) continue ;
       if (sx->maxChromNameLength &&  strlen (ccp) > sx->maxChromNameLength) continue ;
-      if (! strncmp (ccp, "CHROMOSOME_", 11))
+      if (0 && ! strncmp (ccp, "CHROMOSOME_", 11))
 	ccp += 11 ;
       if (! *ccp) continue ;
       strcpy (chrom, ccp) ;

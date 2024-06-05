@@ -87,7 +87,8 @@ echo AAA $ffcds
 if (-e $ffcds) then
   cat $ffcds ZZZZZ $ffcds | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if (chrom != $3)next;}{a1=$4;a2=$5;ln=a2-a1;if(ln<0)ln = -ln;ln++;}{if(zz<1){t2ln[$1]+=ln;next;}}{nnn=t2ln[$1];if(nnn >= 450)printf("Xcds_%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n",chrom,a1,a2,ln,chrom,a1,a2,nnn);}' chrom=$chrom | sort -u | sort -V >  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2
     bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 >  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
-    cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 | gawk -F '\t' '{printf("Sequence %s\ncdna_clone %s\nForward\nColour LIGHTVIOLET\nIntMap %s %d %d\nIs_read\nComposite %d\n\n",$1,$1,$4,$5,$6,$7);}' >  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
+    cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 | gawk -F '\t' '{z=$1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6;if($7>nn[z]+0)nn[z]=$7+0;}END{for(z in nn)printf("%s\t%d\n",z,nn[z]);}' > tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3
+    cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3 | gawk -F '\t' '{printf("Sequence %s\ncdna_clone %s\nForward\nColour LIGHTVIOLET\nIntMap %s %d %d\nIs_read\nComposite %d\n\n",$1,$1,$4,$5,$6,$7);}' >  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
     bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
       pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
       pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
@@ -137,7 +138,7 @@ if (! -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
   set ch=""
   if ($species == worm) set ch=CHROMOSOME_
 
-  pushd tmp/X.$MAGIC/EHITS/$chrom
+  pushd tmp/X.$MAGIC/$chrom
     $ici/scripts/rrf
     $ici/bin/tacembly  $ici/tmp/X.$MAGIC/$chrom < _r
   popd
@@ -145,76 +146,40 @@ if (! -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
 
 
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XY.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XY.fasta
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XW.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XW.fasta
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XA.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XA.fasta
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XSL.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f2.XSL.fasta
-    pparse  tmp/X.$MAGIC/$chrom/f3.genes.ace
+    read-models
     parse metaData/methods.ace
+    parse tmp/TABIX/$MAGIC/$chrom.tabix.ace
+    pparse MetaDB/$MAGIC/runs.ace
+    pparse MetaDB/$MAGIC/samples.ace
+    pparse MetaDB/$MAGIC/ali.ace
+    // pparse my.chrom.alias.ace
+    pparse tmp/X.$MAGIC/$chrom/f1.XI.ace.gz
+    pparse tmp/X.$MAGIC/$chrom/f1.XI.fasta.gz
+    pparse tmp/X.$MAGIC/$chrom/f2.XY.ace
+    pparse tmp/X.$MAGIC/$chrom/f2.XY.fasta
+    pparse tmp/X.$MAGIC/$chrom/f2.XW.ace
+    pparse tmp/X.$MAGIC/$chrom/f2.XW.fasta
+    pparse tmp/X.$MAGIC/$chrom/f2.XA.ace
+    pparse tmp/X.$MAGIC/$chrom/f2.XA.fasta
+    pparse tmp/X.$MAGIC/$chrom/f2.XSL.ace
+    pparse tmp/X.$MAGIC/$chrom/f2.XSL.fasta
+    pparse  tmp/X.$MAGIC/$chrom/f3.genes.ace
     save
     query find intron
-    list -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.intron.list
+    list -a -f tmp/X.$MAGIC/$chrom/f3.intron.list
     quit
 EOF
-
-if (! -e tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.ace && -d IntronDB) then
-  bin/tacembly INTRON_DB/$chrom << EOF
-    key tmp/X.$MAGIC/EHITS/$chrom/f3.intron.list
-    show -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.preace Magic_any_any
-    query find intron IS $chrom* && In_mrna
-    show -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.preace
-    query find intron IS $chrom* AND Magic_any_any >= 5
-    show -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.any.preace Magic_any_any
-    quit
-EOF
-  ls -ls  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.any.preace
-
-  if (-e  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.preace) then
-    cat  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.preace | gawk '/^$/{print}{gsub(/\"/,"",$0);}/^Intron/{printf("Intron %s\n",$2);next;}/^Magic_any_any/{printf("Group_U Magic_any 0 %d\n",$2);}'  > tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.ace
-  endif
-endif
-
-  if (-e  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.any.preace && ! -e tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.ace) then
-
-    cat  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.any.preace | gawk '{gsub(/\"/,"",$0);}/^Intron/{if(mx>=5){if(a1==a2)a2=a1+30*s;if(d1==d2)d1=d2-30*s;}if(d1!=d2 && a1 != a2)printf("\tExonExon %d %d %d %d",d1,d2,a1,a2);split($2,aa,"__");split(aa[2],bb,"_");s=1;if(bb[1]>bb[2])s=-1;printf("\n%s %d %d",aa[1],bb[1],bb[2]);d1=d2=bb[1]-s;a1=a2=bb[2]+s;mx=0;next;}/^Donor /{printf("\t%s %s",$1,$2);}/^Acceptor /{printf("\t%s %s",$1,$2);}/^Magic_any_any/{if($2>=5){mx=$2;printf("\tGroup_U Magic_any 0 %d",$2);next;}}/^In_mRNA/{if ($5=="Acceptor_exon"){x=$6;y=$7;if(x != a1)next;da=s*(y-x);if(da<6)next;if(da>30)da=30;if(a2==a1 || s*(a2-a1)>da)a2=a1+s*da;next;}if ($5=="Donor_exon"){x=$6;y=$7;if(y != d2)next;da=s*(y-x);if(da<6)next;if(da>30)da=30;if(d2==d1 || s*(d2-d1)>da)d1=d1-s*da;next;}next;}END{if(d1!=d2 && a1 != a2)printf("\tExonExon %d %d %d %d",d1,d2,a1,a2);printf("\n");}' | grep  Magic_any | grep ExonExon > tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.txts
-  
- cat  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.txts |   gawk '/ExonExon/{c=$1;ii1=$2;ii2=$3;s=1;if(ii1>ii2)s=-1;i=index($0,"ExonExon");split(substr($0,i),aa," ");d1=aa[2];d2=aa[3];a1=aa[4];a2=aa[5];dd=s*(d2-d1)+1;da=s*(a2-a1)+1;printf("XK_%s__%d_%d\t1\t%d\t%s\t%d\t%d\n",c,ii1,ii2,dd,c,d1,d2);printf("XK_%s__%d_%d\t%d\t%d\t%s\t%d\t%d\n",c,ii1,ii2,dd+1,dd+da,c,a1,a2);next;}' > tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.shadow
-  
-  bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.shadow >  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.fasta
-
-  cat  tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.txts |   gawk '/ExonExon/{c=$1;ii1=$2;ii2=$3;s=1;if(ii1>ii2)s=-1;i=index($0,"Magic_any");split(substr($0,i),aa," ");mx=aa[3];i=index($0,"ExonExon");split(substr($0,i),aa," ");d1=aa[2];d2=aa[3];a1=aa[4];a2=aa[5];dd=s*(d2-d1)+1;da=s*(a2-a1)+1;printf("Sequence XK_%s__%d_%d\nIs_read\ncDNA_clone XK_%s__%d_%d\nColour PALEORANGE\nForward\nComposite %s\nIntron %s__%d_%d\nIntMap %s %d %d\n\n",c,ii1,ii2,c,ii1,ii2,mx,c,ii1,ii2,c,d1,a2);next;}' > tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.ace
-
-  endif
-
-if (-e   tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.ace) then
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f3.intronDB.other.fasta
-    save
-    quit
-EOF
-endif
-
-if (-e  RESULTS/Expression/AceFiles/$MAGIC.introns.INTRON.u.ace.gz ) then
-  gunzip -c RESULTS/Expression/AceFiles/$MAGIC.introns.INTRON.u.ace.gz | gawk '/^Intron/{ok=0;split($2,aa,"__");gsub(/\"/,"",aa[1]);if(aa[1]==chrom)ok=1;if(ok==1)print;next;}/Group_U  _SumOfAllReadsInProject/{if (ok==1)printf("RNA_seq %d\n\n",$6);}' chrom=$chrom > tmp/X.$MAGIC/EHITS/$chrom/f3.transcriptsIntronSupport.ace
-endif
-
-echo BBBB
 
 if (-d tmp/INTRON_DB/$chrom) then
   bin/tacembly tmp/INTRON_DB/$chrom << EOF
-    key tmp/X.$MAGIC/EHITS/$chrom/f3.intron.list
-    show -a -f tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace
+    key tmp/X.$MAGIC/$chrom/f3.intron.list
+    show -a -f tmp/X.$MAGIC/$chrom/f3.introns.preace
     quit
 EOF
 
-  if (-e tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace) then
-    cat tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace  | gawk '/^Magic/{next;}{print;}' >  tmp/X.$MAGIC/EHITS/$chrom/f3.introns.ace
-    \rm   tmp/X.$MAGIC/EHITS/$chrom/f3.introns.preace 
+  if (-e tmp/X.$MAGIC/$chrom/f3.introns.preace) then
+    cat tmp/X.$MAGIC/$chrom/f3.introns.preace  | gawk '/^Magic/{next;}{print;}' >  tmp/X.$MAGIC/$chrom/f3.introns.ace
+    \rm   tmp/X.$MAGIC/$chrom/f3.introns.preace 
   endif
 endif
 
@@ -337,14 +302,7 @@ end
 laba:
 
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
-    read-models
-    parse tmp/TABIX/$MAGIC/$chrom.tabix.ace
-    pparse MetaDB/$MAGIC/runs.ace
-    pparse MetaDB/$MAGIC/samples.ace
-    pparse MetaDB/$MAGIC/ali.ace
-    // pparse my.chrom.alias.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f1.ace.gz
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f1.fasta.gz
+    pparse tmp/X.$MAGIC/$chrom/f3.introns.ace
     pparse tmp/X.$MAGIC/$chrom/f3.XG.f.ace 
     pparse tmp/X.$MAGIC/$chrom/f3.XG.f.fasta
     pparse tmp/X.$MAGIC/$chrom/f3.XG.r.ace 
@@ -355,8 +313,8 @@ laba:
     pparse tmp/X.$MAGIC/$chrom/f3.XH.r.fasta
     pparse tmp/X.$MAGIC/$chrom/f3.XFC2.any.ace 
     pparse tmp/X.$MAGIC/$chrom/f3.XFC2.any.fasta
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f3.introns.ace
-    pparse tmp/X.$MAGIC/EHITS/$chrom/f3.transcriptsIntronSupport.ace
+    pparse tmp/X.$MAGIC/$chrom/f3.introns.ace
+    pparse tmp/X.$MAGIC/$chrom/f3.transcriptsIntronSupport.ace
     query find Run IS $ggs && ! W_colour_plus
     edit W_colour_plus BLUE
     edit W_colour_minus GREEN
@@ -387,8 +345,6 @@ endif
     edit -D is_read
     find method encode
     edit Show_up_strand
-    query find sequence XE_*
-    // edit -D Is_read
     query find sequence IS XY_* && (Other  || ct_ac)
     edit -D Is_read
      save
@@ -396,41 +352,10 @@ endif
 EOF
 
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
-    query find est XC_*_10
-    edit colour green1
-    query find est XC_*_20
-    edit colour green2
-    query find est XC_*_50
-    edit colour green3
-    query find est XC_*_100
-    edit colour green4
-    query find est XC_*_200
-    edit colour green5
-    query find est XC_*_500
-    edit colour green6
-    query find est XC_*_1000
-    edit colour green7
-     query find est XF_*_10
-    edit colour blue1
-    query find est XF_*_20
-    edit colour blue2
-    query find est XF_*_50
-    edit colour blue3
-    query find est XF_*_100
-    edit colour blue4
-    query find est XF_*_200
-    edit colour blue5
-    query find est XF_*_500
-    edit colour blue6
-    query find est XF_*_1000
-    edit colour blue7
-    save
     find sequence Is_read && ! cdna_clone
     acem
       cdna_80
       quit
-    query find sequence XD_* 
-    edit -D Is_read
     query find run w_stranded
     edit W_colour
     query find run w_new_exon
@@ -446,7 +371,7 @@ bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
   select -o tmp/X.$MAGIC/$chrom/f3.intron_support.txt  xi, ii, n from xi in ?Sequence where xi ~ "XI_*", n in xi->composite, ii in xi->intron where n && ii
   date
 EOF
-cat tmp/X.$MAGIC/$chrom/f3.intron_support.txt | gawk -F '\t' '{printf ("Intron %s\nRNA_seq %d\n\n",$2,$3);}' >  tmp/X.$MAGIC/$chrom/f3.intron_support.ace
+cat tmp/X.$MAGIC/$chrom/f3.intron_support.txt | gawk -F '\t' '{nn[$2]+=$3;}END{for (ii in nn)printf("%s\t%d\n",ii,nn[ii]);}' | sort -V | gawk -F '\t' '{printf ("Intron %s\nRNA_seq %d\n\n",$1,$2);}' >  tmp/X.$MAGIC/$chrom/f3.intron_support.ace
 bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
   parse tmp/X.$MAGIC/$chrom/f3.intron_support.ace
   save

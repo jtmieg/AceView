@@ -1,8 +1,8 @@
 #!bin/tcsh -f
 
 set chrom=$1
-set dd=tmp/X.$MAGIC/EHITS
-set ddc=tmp/X.$MAGIC/EHITS/$chrom
+set dd=tmp/X.$MAGIC
+set ddc=tmp/X.$MAGIC/$chrom
 echo -n "f2 $dd/f2.allDoubleIntrons.txt $chrom start : "
 date
 

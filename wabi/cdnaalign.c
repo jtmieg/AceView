@@ -12910,6 +12910,8 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
       while (cosmid1 && ncosmid < ncosmidMax)
         {
           cosmid2 = keyGetKey (cosmid1, _Overlap_right) ;
+	  if (ncosmid % 10 == 9)
+	    sessionDoSave (TRUE) ;	    
           switch (type)
             {
             case 21:
@@ -13037,7 +13039,7 @@ static void alignAllEst2Cosmids (int type, KEYSET estKs)
         printf("// Aligning all est on all descendants of %s\n",stackText(s,0)) ;
       else if (type == 2)
         printf("// Aligning active set of %u est on all descendants of %s\n"
-               , keySetMax (estKs), stackText(s,0)) ;
+                , keySetMax (estKs), stackText(s,0)) ;
       else if (type == 2001)
         printf("// Just aligning all est on all descendants of %s\n",stackText(s,0)) ;
       else if (type == 2002)

@@ -2773,40 +2773,7 @@ static POLYNOME Z3_A_PsiL_PsiLB__Bover (void)
 
 /***********************************************************************************************************************************************/
 
-static POLYNOME Z3_B_PsiR_PsiLB (void) 
-{
-  AC_HANDLE h = ac_new_handle () ;
-  short mu = newDummyIndex () ;
-  short nu = newDummyIndex () ;
-  short a = newDummyIndex () ;
-  short b = newDummyIndex () ;
-
-  int mm[4] = {1,0,0,0} ;
-
-  POLYNOME p1 = vertex_A_PsiR_PsiRB (b,h) ;
-  POLYNOME p2 = prop_PsiRB_PsiR (0,h) ;   /* (1/(k+p+q)^2 */ 
-  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
-
-  POLYNOME p4 = prop_HB_H (0,h) ; /* 1/k^2 */
-  POLYNOME p5 = prop_AA (a,b,0,h) ; /* 1/k^2 */
-  POLYNOME p6 = vertex_A_B_HB (a,mu,nu,mm,h) ;
-  POLYNOME ppp[7] = {p1,p2,p3,p4,p5,p6,0} ;
-  POLYNOME pp = polMultiProduct (h,ppp) ;
-
-
-  printf ("Z3 New vertex A/H/B contrib to vertex B_ab -psi-psi : \n") ;
-  showPol(p6) ;
-  showPol(pp) ;
-  pp = expand (pp) ;
-  showPol(pp) ;
-  pp = dimIntegral (pp) ;
-  showPol(pp) ;
-  return pp ;
-} /* ZF_B_PsiR_PsiLB */
-
-/***********************************************************************************************************************************************/
-
-static POLYNOME Z3_B__AB__PsiR_PsiLB (void)
+static POLYNOME Z3_B_PsiR_PsiLB__BBA (void)
 {
   AC_HANDLE h = ac_new_handle () ;
   short mu = newDummyIndex () ;
@@ -2826,9 +2793,9 @@ static POLYNOME Z3_B__AB__PsiR_PsiLB (void)
   POLYNOME p1 = prop_PsiRB_PsiR (0,h) ;   /* (1/(k+p+q)^2 */ 
   POLYNOME p2 = vertex_A_PsiR_PsiRB (a,h) ;
   POLYNOME p3 = prop_AA (a,b,0,h) ; /* 1/k^2 */
-  POLYNOME p4 = vertex_A_B_BB (a,mu,nu,c,d,mm1,mm2,h) ;
+  POLYNOME p4 = vertex_A_B_BB (b,mu,nu,c,d,mm1,mm2,h) ;
   POLYNOME p5 = prop_BB_B (c,d,e,f, 0,h) ; /* 1/k^2 */
-  POLYNOME p6 = vertex_BB_PsiL_PsiRB (e,f,h) ;
+  POLYNOME p6 = vertex_B_PsiR_PsiLB (e,f,h) ;
   POLYNOME ppp[7] = {p1,p2,p3,p4,p5,p6,0} ;
   POLYNOME pp = polMultiProduct (h,ppp) ;
 
@@ -2841,7 +2808,7 @@ static POLYNOME Z3_B__AB__PsiR_PsiLB (void)
   pp = dimIntegral (pp) ;
   showPol(pp) ;
   return pp ;
-} /* Z3_B_AB_PsiR_PsiLB */
+} /* Z3_B_PsiR_PsiLB__BBA */
 
 /***********************************************************************************************************************************************/
 
@@ -11249,6 +11216,10 @@ int main (int argc, const char **argv)
 	  firstDummyIndex = 'a' ; 
 	  printf ("\n\n\n@@@@@@@@@ New Ward identity  B_PsiB_Psi Aunder vertex\n") ;
 	  if (1) Z3_B_PsiR_PsiLB__Aunder () ;  
+
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ New Ward identity  B_PsiB_Psi BBA vertex\n") ; 
+	  if (1) Z3_B_PsiR_PsiLB__BBA () ; 
 
 	  printf ("\n\n\n@@@@@@@@@ New B-PsiB-Psi Ward identity  DONE\n") ; 
 

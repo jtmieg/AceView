@@ -1266,7 +1266,7 @@ static void qcSnpTypesDo (QC *qc, RC *rc, BOOL isRejected)
     { "Compute", "% deletions not in polymers", 71, 0, 0} ,
     { "Compute", "% insertions in polymers", 21, 0, 0} ,
     { "Compute", "% deletions in polymers", 21, 0, 0} ,
-    { "Compute", "A to G RNA edition: ratio of A>G relative to T>C (1 means no visible edition)", 21, 0, 0} ,
+    { "Compute", "A to G RNA edition: ratio of A>G relative to (A>G + T>C) (1/2 means no visible edition)", 21, 0, 0} ,
 
     {  0, 0, 0, 0, 0}
   } ; 
@@ -1463,15 +1463,15 @@ Distribution of mismatches in best unique alignments, abslute, oberved, counts
 		  aceOutf (qc->ao, "\t%.2f", 100 * zDeletion / zAny) ;
 		  aceOutf (qc->ao, "\t%.2f", 100 * zSlidingInsertion / zAny) ;
 		  aceOutf (qc->ao, "\t%.2f", 100 * zSlidingDeletion / zAny) ; 
-		  if ( zSub[1] > 100)
-		    aceOutf (qc->ao, "\t%.2f", zSub[0]/zSub[1]) ;
+		  if ( zSub[0]+ zSub[1] >= 10)
+		    aceOutf (qc->ao, "\t%.2f", zSub[0]/(zSub[0] + zSub[1])) ;
 		  else
 		    aceOut (qc->ao, "\t") ;
 		}
 	      else
 		aceOut (qc->ao, "\t\t\t\t\t\t\t\t") ;
 	      break ;
-	    default: /* alread  treated in case 2 */
+	    default: /* already  treated in case 2 */
 	      break ;
 
 	    }

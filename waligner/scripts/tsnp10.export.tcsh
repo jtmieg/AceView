@@ -27,7 +27,8 @@ if (-d DanLi) then
 endif
 
 
-  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.snp3a.$zone --snpType 0 # --minSnpFrequency $minSnpFrequency --minSnpCover $minSnpCover 
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min$minSnpFrequency --snpType 0 # --minSnpFrequency $minSnpFrequency --minSnpCover $minSnpCover
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min80 --snpType 0 --minSnpFrequency 80 # --minSnpCover $minSnpCover 
   touch tmp/TSNP_DB/$zone/$MAGIC.tsnp10.done
 
 

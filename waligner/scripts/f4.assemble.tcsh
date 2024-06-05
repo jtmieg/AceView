@@ -13,7 +13,7 @@ if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
     ln -s $ici/tmp/TABIX TABIX
     if (! -e tables) ln -s ../../metaData/tables
   popd
-  if ($species == worm && ! -e tmp/X.$MAGIC/EHITS/$chrom/genes.ace) then
+  if ($species == worm && ! -e tmp/X.$MAGIC/$chrom/genes.ace) then
     tbly ~/yknew <<EOF
       query find gene transcribed_gene && IntMap == $chrom
       show -a -f tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace IntMap
@@ -29,11 +29,9 @@ EOF
   
   endif
 
-zcat   tmp/X.$MAGIC/EHITS/$chrom/f1.txts.gz  | gawk -F '\t' '/^#/{next}/^\/\//{next}{chrom=$1;gsub(/CHROMOSOME_/,"",chrom);u1=$8;u2=$9;typeb=$4;if(typeb == "Exon") { next;xx="XJ_" ;} else {xx="XI_" ; }nam=xx group "_" chrom "__" u1 "_" u2 ; names[nam]++; n = names[nam] ;nam = nam "." n ; printf(">%s\n%s%s%s\n",nam, $12,$13,$14) ;}' group=$MAGIC  | gzip > tmp/X.$MAGIC/EHITS/$chrom/f1.fasta.gz
 
   bin/tacembly tmp/X.$MAGIC/$chrom << EOF
     read-models
-    parse tmp/X.$MAGIC/EHITS/$chrom/f1.fasta.gz
     query find sequence Is_read && ! cdna_clone
     acembly
       cdna_80
@@ -158,24 +156,8 @@ pushd tmp/X.$MAGIC/$chrom
       cdna_73  // restore missing flags gt_ag in est
       quit
     comment "FlipAllGenes"
-    query find est Is_read && Reverse &&  (IS XE_* || IS XF_*)
-    edit -D Is_read  // because they were doubly defined
-    query find est  (Reverse && (IS XE_* || IS XF_*)) ; from_gene
-    follow from_gene
-    comment "realign"
-    acem
-      cdna_73
-      quit
     acembly
       cDNA_FlipAllGenes
-      quit
-    query find est Is_read && Reverse && (IS XE_* || IS XF_*)
-    edit -D Is_read  // because they were doubly defined
-    query find est  (Reverse && (IS XE_* || IS XF_*)) ; from_gene
-    follow from_gene
-    comment "realign"
-    acem
-      cdna_73
       quit
     query find est Flipped
     sor

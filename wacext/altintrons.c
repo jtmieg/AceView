@@ -25,6 +25,7 @@ typedef struct gxStruct {
   BOOL gzo, gzi ;
   BOOL setFeet ; 
   BOOL setDA ;
+  BOOL setDAsupport ;
   BOOL setSponge ;
   BOOL counts ;
   BOOL setGroups ;
@@ -179,7 +180,6 @@ static int gxGetAcceptors (GX *gx)
   KEYSET nrOk = keySetHandleCreate (h) ;
   ACEOUT ao = aceOutCreate (gx->outFileName, ".differential_acceptors.tsf", gx->gzo, h) ;
 
-  /*  iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && IS *37832378; >A ", h) ; */
   iter = ac_dbquery_iter (gx->db, "Find Intron de_duo; >A ", h) ;
   while (ac_free (h2), ac_free (obj), (obj = ac_iter_obj (iter)))
     {
@@ -399,8 +399,11 @@ static int gxSetFeet (GX *gx)
 	      strncpy (chromName, chrom, 127) ;
 	      ac_free (chromDna) ;
 	      chromObj = ac_get_obj (gx->db, "Sequence", chromName, h) ;
+	      if (! chromObj)
+		messcrash ("Unknown ChromName %s", chromName) ;
 	      chromDna = ac_obj_dna (chromObj, h) ;
 	    }
+	  feet[0] = 0 ;
           if (chromDna)
 	    {
 	      if (1)
@@ -455,9 +458,9 @@ static int gxSetFeet (GX *gx)
 	  KEY key = ac_get_key (gx->db, "Intron", echo) ;
 	  if (key)
 	    {
-	      vtxtPrintf (txt, "Has_echo %s\n", ac_key_name(key)) ;
+	      if (0) vtxtPrintf (txt, "Has_echo %s\n", ac_key_name(key)) ;
 	      if (! strcmp (feet, "ct_ac") || ! strcmp (feet, "ct_gc"))
-		vtxtPrintf (txt, "Is_echo\n") ;
+		vtxtPrintf (txt, "Is_echo %s\n", echo) ;
 	    }
 	}
     
@@ -647,7 +650,7 @@ static int gxSetDAsupport (GX *gx)
 	{
 	  AC_HANDLE h1 = ac_new_handle () ;
 	  AC_TABLE introns = ac_tag_table (Donor, "Intron", h1) ;
-	  const char *qq = "select r, n from d in @, ii in d->intron, r in ii->de_duo, n in r[1] where n>0" ;
+	  const char *qq = "select r, n, ii from d in @, ii in d->intron, r in ii->de_duo, n in r[1] where n>0" ;
 	  AC_TABLE counts = ac_obj_bql_table (Donor, qq, 0, 0, h1) ; 
 	  AC_TABLE genes = ac_obj_bql_table (Donor, "select g from d in @, ii in d->Intron, g in ii->gene", 0, 0, h1) ; 
 	  AC_TABLE gfs = ac_obj_bql_table (Donor, "select g from d in @, ii in d->Intron, g in ii->From_genefinder", 0, 0, h1) ; 
@@ -656,6 +659,8 @@ static int gxSetDAsupport (GX *gx)
 	  AC_TABLE mrnas = ac_obj_bql_table (Donor, "select m,m1 from d in @, ii in d->Intron, m in ii->In_mrna, m1 in m[1]", 0, 0, h1) ; 
 	  int ir, jr ;
 
+	  if (! introns || introns->rows > 12)
+	    continue ;
 	  vtxtClear (txt) ;
 	  nn++ ;
 	  if (0*nn>1000)
@@ -666,9 +671,9 @@ static int gxSetDAsupport (GX *gx)
 	    for (ir = 0 ; ir < introns->rows ; ir++)
 	      for (jr = ir + 1 ; jr < introns->rows ; jr++)
 		vtxtPrintf (txt , "Intron %s\n%s %s\n\n"
-			    , ac_table_printable (introns, ir, 0, "xxx")
+			    , ac_table_printable (introns, ir, 0, "xxx1")
 			    , pass == 0 ? "Same_donor" : "Same_acceptor"
-			    , ac_table_printable (introns, jr, 0, "xxx")
+			    , ac_table_printable (introns, jr, 0, "xxx2")
 			    ) 
 		  ;
 	  vtxtPrintf (txt , "\n%s %s\n"
@@ -679,28 +684,28 @@ static int gxSetDAsupport (GX *gx)
 	    for (ir = 0 ; ir < genes->rows ; ir++)
 	      {
 		vtxtPrintf (txt, "Gene %s\n"
-			    , ac_table_printable (genes, ir, 0, "xxx") 
+			    , ac_table_printable (genes, ir, 0, "xxx3") 
 			    ) ;
 	      }
 	  if (gfs)
 	    for (ir = 0 ; ir < gfs->rows ; ir++)
 	      {
 		vtxtPrintf (txt, "From_genefinder %s\n"
-			    , ac_table_printable (gfs, ir, 0, "xxx") 
+			    , ac_table_printable (gfs, ir, 0, "xxx4") 
 			    ) ;
 	      }
 	  if (tgs)
 	    for (ir = 0 ; ir < tgs->rows ; ir++)
 	      {
 		vtxtPrintf (txt, "From_gene %s\n"
-			    , ac_table_printable (tgs, ir, 0, "xxx") 
+			    , ac_table_printable (tgs, ir, 0, "xxx5") 
 			    ) ;
 	      }
 	  if (mrnas)
 	    for (ir = 0 ; ir < mrnas->rows ; ir++)
 	      {
 		vtxtPrintf (txt, "In_mRNA %s %d\n"
-			    , ac_table_printable (mrnas, ir, 0, "xxx") 
+			    , ac_table_printable (mrnas, ir, 0, "xxx6") 
 			    , ac_table_int (mrnas, ir, 1, 0)
 			    ) ;
 	      }
@@ -708,7 +713,7 @@ static int gxSetDAsupport (GX *gx)
 	    for (ir = 0 ; ir < sTypes->rows ; ir++)
 	      {
 		vtxtPrintf (txt, "sType %s\n"
-			    , ac_table_printable (sTypes, ir, 0, "xxx") 
+			    , ac_table_printable (sTypes, ir, 0, "xxx7") 
 			    ) ;
 	    }
 	  int nnn = 0 ;
@@ -723,7 +728,7 @@ static int gxSetDAsupport (GX *gx)
 		ir = jr - 1 ; /* reposition */
 		nnn += n ;
 		vtxtPrintf (txt, "De_uno %s %d\n"
-			    , ac_table_printable (counts, ir, 0, "xxx") 
+			    , ac_table_printable (counts, ir, 0, "xxx8") 
 			    , n
 			    ) ;
 	      }
@@ -740,7 +745,7 @@ static int gxSetDAsupport (GX *gx)
 	    }
 	  ac_free (h1) ;
 	}
-      fprintf(stderr, ".... setSupport done\n") ;
+      fprintf(stderr, ".... setSupport done %s\n", timeShowNow()) ;
     }
   
   ac_free (h) ;
@@ -749,7 +754,7 @@ static int gxSetDAsupport (GX *gx)
 
   if (1)
     {
-      char *qq = "Find Intron Gene && (same_donor || same_acceptor)" ;
+      char *qq = "Find Intron Gene && IntMap && type && (same_donor || same_acceptor)" ;
       AC_ITER iter = ac_dbquery_iter (gx->db, qq, h) ;
       AC_OBJ Intron = 0 ;
       int nn = 0 ;
@@ -757,23 +762,26 @@ static int gxSetDAsupport (GX *gx)
       while (ac_free (Intron),  Intron = ac_iter_obj (iter))
 	{
 	  AC_HANDLE h1 = ac_new_handle () ;
-	  AC_TABLE tbl1 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_donor", 0, 0, h1) ;
-	  AC_TABLE tbl2 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_acceptor", 0, 0, h1) ;
+	  AC_TABLE tbl1 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_donor where ! i2->gene == g", 0, 0, h1) ;
+	  AC_TABLE tbl2 = ac_obj_bql_table (Intron, "select g, i2 from ii in @, g in ii->gene, i2 in ii->same_acceptor where ! i2->gene == g", 0, 0, h1) ;
 
 	  nn++ ;
 	  if (nn % 10000 == 1) fprintf(stderr, ".... setSameDonor %d %s %s\n", nn, ac_name(Intron), timeShowNow()) ;
 	  vtxtClear (txt) ;
-	  for (int ir = 0 ; ir < tbl1->rows ; ir++)
-	    vtxtPrintf (txt, "Gene %s\nIntron %s\n\n"
-			, ac_table_printable (tbl1, ir, 0, "xxx")
-			, ac_table_printable (tbl1, ir, 1, "xxx")
-			) ;
+	  if (tbl1)
+	    for (int ir = 0 ; ir < tbl1->rows ; ir++)
+	      vtxtPrintf (txt, "Gene %s\nIntron %s\n\n"
+			  , ac_table_printable (tbl1, ir, 0, "xxx9")
+			  , ac_table_printable (tbl1, ir, 1, "xxx10")
+			  ) ;
 	  
-	  for (int ir = 0 ; ir < tbl2->rows ; ir++)
-	    vtxtPrintf (txt, "Gene %s\nIntron %s\n\n"
-			, ac_table_printable (tbl1, ir, 0, "xxx")
-			, ac_table_printable (tbl1, ir, 1, "xxx")
-			) ;
+	  if (tbl2)
+	    for (int ir = 0 ; ir < tbl2->rows ; ir++)
+	      vtxtPrintf (txt, "Gene %s\nIntron %s\n\n"
+			  , ac_table_printable (tbl1, ir, 0, "xxx11")
+			  , ac_table_printable (tbl1, ir, 1, "xxx12")
+			  ) ;
+	  
 	  if (vtxtPtr (txt))
 	    ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h1) ;
 	}
@@ -848,7 +856,7 @@ static void gxDeMrna (GX *gx)
 		  if (tbl)
 		    for (int ir = 0 ; ir < tbl->rows ; ir++)
 		      {
-			dictAdd (runDict, ac_table_printable (tbl, ir, 0, "xxx"), &run) ;
+			dictAdd (runDict, ac_table_printable (tbl, ir, 0, "xxx13"), &run) ;
 			keySet (ks, run) = ac_table_int (tbl, ir, 1, 0) ;
 		      }		      
 		}
@@ -939,14 +947,17 @@ static int gxSetDAflatSpongeSupport (GX *gx)
 
 	  char *fNam = hprintf(h1, "tmp/WIGGLERUN/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
 	  WIGGLE sx ;
-	  memset (&sx, 0, sizeof (WIGGLE)) ; 
-	  sx.ai = aceInCreate (fNam, 0, h1) ;
+	  memset (&sx, 0, sizeof (WIGGLE)) ;
+	  if (filCheckName(fNam, 0, "r"))
+	    sx.ai = aceInCreate (fNam, 0, h1) ;
 	  if (! sx.ai)
 	    {
 	      fNam = hprintf(h1, "tmp/WIGGLEGROUP/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
-	      sx.ai = aceInCreate (fNam, 0, h1) ;
+	      if (filCheckName(fNam, 0, "r"))
+		sx.ai = aceInCreate (fNam, 0, h1) ;
 	    }
-
+	  if (! sx.ai)
+	    continue ;
 	  sx.noRemap = TRUE ;
 	  sx.out_step = 10 ;
 	  sx.aaa = arrayHandleCreate (12, Array, h1) ;
@@ -977,7 +988,7 @@ static int gxSetDAflatSpongeSupport (GX *gx)
 		  vtxtClear (txt) ;
 		  vtxtPrintf (txt, "%s %s\n"
 			      , pass2 == 0 ? "Donor" : "Acceptor"
-			      , ac_table_printable (das, da, 1, "xxx")
+			      , ac_table_printable (das, da, 1, "xxx14")
 			      ) ;
 		  for (jj = ii, vp = up ; jj < iMax && vp->da == da ; jj++, vp++)
 		    {
@@ -1195,7 +1206,7 @@ static int gxSetGroups (GX *gx)
 	  qq2 = "de_duo" ;
 	  break ;
 	case 1 :
-	  qq = "Find Donor de_uno" ;
+	  qq = "Find Donor de_uno"  ;
 	  qq2 = "de_uno" ;
 	  break ;
 	case 2 :
@@ -1365,46 +1376,266 @@ static int gxSetGroups (GX *gx)
 
 static void gxCounts (GX *gx)
 {
-  return ;
-  
+  typedef struct isupStruct { int ii, d1, d2, d3, a1, a2, a3 ; } ISS ;
+  typedef struct rsupStruct { int ii, gt, sup ; } RSS ;
   AC_HANDLE h = ac_new_handle () ;
-
-  /*
-int nn = 0 ;
-  int minS = 3 ;
-  const char *errors = 0 ;
-  const char *qqRuns =  hprintf (h, "select r from p in ?project where p == \"%s\", r in p->run", gx->project) ;
-  const char *qq =  hprintf (h, "select da,r,s,c1,c2,ii,i3 from da in ?donor , r in da->de_uno where r->project == \"%s\", r2 in da->sponge where r == r2, s in r[1], c1 in r2[1], c2 in r2[2], ii in da->intron, r3 in ii->de_duo where r3 == r, i3 in r3[1]") ;
-  AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
-  AC_TABLE tbl = ac_bql_table (gx->db, qq, 0, 0, &errors, h) ;
+  ACEOUT ao = aceOutCreate (gx->outFileName, ".intron_counts.tsf", gx->gzo, h) ;
   KEYSET ksRuns = keySetHandleCreate (h) ;
+  KEYSET avN = keySetHandleCreate (h) ;
+  KEYSET aa = arrayHandleCreate (100, ISS, h) ;
+  KEYSET rr = arrayHandleCreate (100, RSS, h) ;
+  Array r2gs = arrayHandleCreate (128, KEYSET, h) ;
+  DICT *avDict = dictHandleCreate (10, h) ;
+  const char *errors = 0 ;
+  int runMax = 0 ;
+  int runClasse = 0 ;
   
-  for (int ir = 0 ; ir < tblRuns->rows ; ir++)
-    keySetInsert (ksRuns, ac_table_key (tbl, ir, 0), 0) ;
-  for (int ir = 0 ; ir < tbl->rows ; ir++)
+  dictAdd (avDict, "av", 0) ;
+  if (1)
     {
-      AC_HANDLE h1 = ac_new_handle () ;
-      int s = 0, c1 = 0, c2 = 0, r3 = 0 ;
-      KEY key = ac_table_key (tbl, jr, 0) ;
-      for (int jr = ir ; jr < tbl->rows ; jr++)
+      const char *qqRuns =  hprintf (h, "select r from p in ?project where p == \"%s\", r in p->run where r#is_Run && ! r#sublibrary_of " , gx->project) ;
+      AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
+      for (int ir = 0 ; ir < tblRuns->rows ; ir++)
 	{
-	  if (ac_table_key (tbl, jr, 0) != key)
-	    break ;
-	  KEY r = ac_table_key (tbl, jr, 1) ;
-	  if (! keySetFind (ksRuns, r))
-	    continue ;
-	  s += ac_table_key (tbl, jr, 2, 0) ;
-	  c1 += ac_table_key (tbl, jr, 3, 0) ;
-	  c2 += ac_table_key (tbl, jr, 4, 0) ;
-	  c2 += ac_table_key (tbl, jr, 4, 0) ;
-	  
+	  KEY run = ac_table_key (tblRuns, ir, 0, 0) ;
+	  runClasse = class (run) ;
+	  run = KEYKEY (run) ;
+	  keySetInsert(ksRuns, run) ;
+	  if (runMax < run + 1)
+	    runMax = run + 1 ;
 	}
-      ir = jr - 1 ;
-      if (s >= minS && c1 >= minS && 10*s > c1 && 10*s > c2)
-      
-      ac_free (h1) ;
     }
-  */
+  if (1)
+    {
+      const char *qqRuns =  hprintf (h, "select r, g from p in ?project where p == \"%s\", r in p->run where r#is_Run && ! r#sublibrary_of , g in r>>group where g->project == \"%s\"", gx->project, gx->project) ;
+      AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
+
+      for (int ir = 0 ; ir < tblRuns->rows ; ir++)
+	{
+	  KEY run = ac_table_key (tblRuns, ir, 0, 0) ;
+	  run = KEYKEY (run) ;
+	  if (keySetFind (ksRuns, run, 0))
+	    {
+	      KEYSET r2g = array (r2gs, run, KEYSET) ;
+	      if (! r2g)
+		r2g = array (r2gs, run, KEYSET) = keySetHandleCreate (h) ;
+	      {
+		KEY g = ac_table_key (tblRuns, ir, 1, 0) ;
+		g = KEYKEY (g) ;
+		keySetInsert(r2g, g) ;
+		if (runMax < g + 1)
+		  runMax = g + 1;
+	      }
+	    }
+	}
+    }
+  if (keySetMax (ksRuns))
+    {
+      int nnn = 0 ;
+      AC_HANDLE h2 = 0 ;
+      AC_OBJ obj = 0 ;
+      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && ! Is_echo", h) ;
+      ISS *up = arrayp (aa, runMax, ISS) ; /* make room */
+      RSS *rp = arrayp (rr, 4 * runMax, RSS) ; /* make room */
+      rp->ii = 0 ; /* for compiler happiness */
+      
+      while (ac_free (h2), ac_free (obj), (obj = ac_iter_obj (iter)))
+	{
+	  if (nnn++ < -1000) break ;
+	  h2 = ac_new_handle () ;
+	  BOOL isGt = FALSE ;
+	  AC_OBJ D = ac_tag_obj (obj, "D", h2) ;
+	  AC_OBJ A = ac_tag_obj (obj, "A", h2) ;
+	  AC_TABLE iTbl = ac_tag_table (obj, "de_duo", h2) ;
+	  AC_TABLE aTbl = A ? ac_tag_table (A, "de_uno", h2) : 0 ;
+	  AC_TABLE dTbl = D ? ac_tag_table (D, "de_uno", h2) : 0 ;
+	  AC_TABLE asTbl = A ? ac_tag_table (A, "sponge", h2) : 0 ;
+	  AC_TABLE dsTbl = D ? ac_tag_table (D, "Sponge", h2) : 0 ;
+	  
+	  if (! iTbl || ! dTbl || ! aTbl || ! dsTbl || ! asTbl )
+	    continue ;
+	  
+	  aa = arrayReCreate (aa, runMax, ISS) ;	  
+	  if (1)
+	    {
+	      const char *fNam = ac_tag_printable (obj, "Type", 0) ;
+	      if (fNam && (! strcmp (fNam, "gt_ag") || ! strcmp (fNam, "gc_ag")))
+		isGt = TRUE ;
+	    }	  
+	  for (int ir = 0 ; ir < iTbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (iTbl, ir, 0, 0) ;
+
+	      run = KEYKEY (run) ;
+	      if (keySetFind (ksRuns, run, 0))
+		{
+		  up = arrayp (aa, run, ISS) ;
+		  up->ii = ac_table_int (iTbl, ir, 1, 0) ;
+		}
+	    }
+	  for (int ir = 0 ; ir < dTbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (dTbl, ir, 0, 0) ;
+
+	      run = KEYKEY (run) ;
+	      if (keySetFind (ksRuns, run, 0))
+		{
+		  up = arrayp (aa, run, ISS) ;
+		  up->d1 = ac_table_int (dTbl, ir, 1, 0) ;
+		}
+	    }
+	  for (int ir = 0 ; ir < aTbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (aTbl, ir, 0, 0) ;
+
+	      run = KEYKEY (run) ;
+	      if (keySetFind (ksRuns, run, 0))
+		{
+		  up = arrayp (aa, run, ISS) ;
+		  up->a1 = ac_table_int (aTbl, ir, 1, 0) ;
+		}
+	    }
+	  for (int ir = 0 ; ir < dsTbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (dsTbl, ir, 0, 0) ;
+
+	      run = KEYKEY (run) ;
+	      if (keySetFind (ksRuns, run, 0))
+		{
+		  up = arrayp (aa, run, ISS) ;
+		  up->d2 = ac_table_int (dsTbl, ir, 1, 0) ;
+		  up->d3 = ac_table_int (dsTbl, ir, 2, 0) ;
+		}
+	    }
+	  for (int ir = 0 ; ir < asTbl->rows ; ir++)
+	    {
+	      KEY run = ac_table_key (asTbl, ir, 0, 0) ;
+
+	      run = KEYKEY (run) ;
+	      if (keySetFind (ksRuns, run, 0))
+		{
+		  up = arrayp (aa, run, ISS) ;
+		  up->a2 = ac_table_int (asTbl, ir, 1, 0) ;
+		  up->a3 = ac_table_int (asTbl, ir, 2, 0) ;
+		}
+	    }
+
+	  /* cumulate in the groups */
+	  for (int run = 0 ; run < runMax ; run++)
+	    {
+	      KEYSET r2g = array (r2gs, run, KEYSET) ;
+	      if (r2g)
+		for (int jj = 0 ; jj < keySetMax (r2g) ; jj++)
+		  {
+		    KEY g = keySet (r2g, jj) ;
+		    ISS *up = arrayp (aa, run , ISS) ;
+		    ISS *gp = arrayp (aa, g , ISS) ;
+		    gp->ii += up->ii ;
+		    gp->a1 += up->a1 ;
+		    gp->a2 += up->a2 ;
+		    gp->a3 += up->a3 ;
+		    gp->d1 += up->d1 ;
+		    gp->d2 += up->d2 ;
+		    gp->d3 += up->d3 ;
+		  }
+	    }
+	  
+	  AC_TABLE sTbl = ac_tag_table (obj, "sType", h2) ;
+	  for (int run = 0 ; run < runMax ; run++)
+	    {
+	      ISS *up = arrp (aa, run, ISS) ;
+	      RSS *rp ;
+	      BOOL inAny = FALSE ;
+	      
+	      if (up->ii < 3)
+		continue ;
+	      if (! isGt && up->ii < 10)
+		continue ;
+	      if (10 * up->d1 < up->d2 || 10 * up->a1 < up->a2)
+		continue ;
+
+	      rp = arrayp (rr, 4 * run, RSS) ;
+	      rp->ii++ ;
+	      rp->sup += up->ii ;
+	      if (isGt)
+		rp->gt++ ;
+
+	      if (sTbl)
+		for (int iav = 0 ; iav < sTbl->rows ; iav++)
+		  {
+		    const char *sNam = ac_table_printable (sTbl, iav, 0, 0) ;
+		    int av = 0 ;
+		    dictAdd (avDict, sNam, &av) ;
+		    if (av < 2)
+		      {
+			inAny = TRUE ;
+			rp = arrayp (rr, 4 * run + av, RSS) ;
+			rp->ii++ ;
+			rp->sup += up->ii ;
+			if (isGt)
+			rp->gt++ ;
+		      }
+		  }
+	      if (inAny)
+		{
+		  rp = arrayp (rr, 4 * run + 3, RSS) ;
+		  rp->ii++ ;
+		  rp->sup += up->ii ;
+		  if (isGt)
+		    rp->gt++ ;
+		}
+	    }
+	}
+    }
+
+  /* count the denominators */
+  for (int av = 1 ; av < 3 && av <= dictMax (avDict) ; av++)
+    {
+      const char *typ = dictName (avDict, av) ;
+      int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, hprintf (h, "Find Intron %s", typ), h)) ;
+      keySet (avN, av) = nn ;
+    }
+    if (dictMax (avDict))
+      {
+	vTXT t = vtxtHandleCreate (h) ;
+	vtxtPrintf (t, "Find Intron ( %s ", dictName (avDict, 1) );
+	for (int av = 2 ; av < 3 && av < dictMax (avDict) ; av++)
+	  vtxtPrintf (t, " || %s ", dictName (avDict, av)) ;
+	vtxtPrintf (t, " ) ") ;
+	int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, vtxtPtr (t), h)) ;
+	keySet (avN, 3) = nn ;
+      }
+  
+  /* export */
+  for (int run = 0 ; run < runMax ; run++)
+    {
+      int n11 = 0, n33 = 0 ;
+      KEY runKey = KEYMAKE (runClasse, run) ;
+      const char *runName = name (runKey) ;
+      for (int av = 0 ; av < 4 ; av++)
+	{
+	  RSS *rp = arrayp (rr, 4 * run + av, RSS) ;
+	  int nn = keySet (avN, av) ;
+	  if (rp->ii)
+	    {
+	      int n1 = rp->ii ;
+	      int n2 = rp->gt ;
+	      int n3 = rp->sup ;
+	      if (av == 0)
+		{ n11 = n1 ; n33 = n3 ; continue ; }
+	      aceOutf (ao, "%s\t%s\tiiiiii\t%d\t%d\t%d\t%d\t%d\t%d\n"
+		       , runName, av < 3 ? dictName (avDict, av) : "any"
+		       , nn /* number of annotated av introns */
+		       , n1 /* number of observed av introns */
+		       , n11 - n1 /* number of observed new introns */
+		       , n2 /* number of gt_ag intron */ 
+		       , n3 /* number of supporting tags  in */
+		       , n33 - n3 /* number of supporting tags out */
+		       ) ;
+	    }
+	}
+    }
+  
   ac_free (h) ;
   return ;
 } /* gxCounts */
@@ -1639,6 +1870,9 @@ static void usage (char *message)
 	    "//   --setDA :\n"
 	    "//      for all introns, create the associated donors/acceptors\n"
 	    "//      xxx\n"
+	    "//   --setDAsupport :\n"
+	    "//      for all donor/acceptors counts the de_uno supports\n"
+	    "//      xxx\n"
 	    "//   -w --setSponge dirName:\n"
 	    "//      for each donor acceptor at position x, parse wiggle value around x+-13\n"
 	    "// Help\n"
@@ -1685,6 +1919,7 @@ int main (int argc, const char **argv)
   gx.gzo = getCmdLineBool (&argc, argv, "--gzo") ;
   gx.setFeet = getCmdLineBool (&argc, argv, "--setFeet") ;
   gx.setDA = getCmdLineBool (&argc, argv, "--setDA") ;
+  gx.setDAsupport = getCmdLineBool (&argc, argv, "--setDAsupport") ;
   gx.setSponge = getCmdLineBool (&argc, argv, "--setSponge") ;
   gx.setGroups = getCmdLineBool (&argc, argv, "--setGroups") ;
   gx.counts = getCmdLineBool (&argc, argv, "--counts") ;
@@ -1741,6 +1976,9 @@ int main (int argc, const char **argv)
     {
       gxSetDA (&gx) ;
       ac_db_commit (gx.db) ;
+    }
+  if (gx.setDAsupport)
+    {
       gxSetDAsupport (&gx) ;
     }
   if (gx.setSponge)

@@ -8918,7 +8918,8 @@ static int clipAlignRun (CLIPALIGN *pp)
 	    }
 	  if (n == 3)
 	    {
-	      fprintf (stderr, "// ... %s : %s\n", timeShowNow (), pp->targetFileName) ;
+	      if (0)
+		fprintf (stderr, "// ... %s : %s\n", timeShowNow (), pp->targetFileName) ;
 	      nHits += clipAlignRunOne (pp) ;
 	    }
 	  else

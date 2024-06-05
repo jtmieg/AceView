@@ -180,7 +180,7 @@ static BOOL locateGene (AC_OBJ Gene, int mode, Array genes)
       nn->isUp = isUp ;
       
       cp = dictName (Maps, nn->map) ;
-      if (!strncmp(cp,"CHROMOSOME_",11))
+      if (0 && !strncmp(cp,"CHROMOSOME_",11))
 	cp += 11 ;
       if (!strcmp (dictName (Maps, nn->map),"I") ||
 	  (cp && !strcmp (cp,"I")))

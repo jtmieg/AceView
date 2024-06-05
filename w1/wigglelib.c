@@ -1925,7 +1925,7 @@ Array sxGetWiggleZone (Array aa, const char *fNam, char *type, int step, const c
     if (chrom && sx->in == TABIX)
       {
 	ch = chrom ; 
-	if (!strncmp (ch, "CHROMOSOME_", 11))
+	if (0 && !strncmp (ch, "CHROMOSOME_", 11))
 	  ch += 11 ;
 	sx->ai = aceInCreateFromPipe (hprintf (h, "tabix %s %s:%d-%d", sx->inFileName,ch,z1,z2), rtype, 0, h) ;
       }

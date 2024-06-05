@@ -1406,6 +1406,7 @@
                GenBank_id UNIQUE ?GenBank XREF Sequence
                GeneCard_id UNIQUE Text
                Ref_mRNA
+               AV
           Properties    Pseudogene Text
                         Transposon Text                // transposon type
                         Coding  CDS UNIQUE Int COORD UNIQUE Int COORD
@@ -1802,7 +1803,7 @@
                 Any_flat UNIQUE Int
                 RNA_seq UNIQUE Int  // de_uno cumul from ali on genome or transcripts tmp/OR/d5.$MAGIC.de_uno.ace.gz
                 de_uno ?Run UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
-                Sponge ?Run UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron
+                Sponge ?Run UNIQUE Int UNIQUE Int   UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
                 Group  ?Run UNIQUE Int UNIQUE Int  UNIQUE Int	UNIQUE Int	// c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
         Motifs UNIQUE Text  // 54bp: 50 in exon (-) 4 in intron of donor with an explicit - sign
 
@@ -1836,7 +1837,7 @@
 		   Any_flat UNIQUE Int
                    RNA_seq UNIQUE Int  // de_uno cumul from ali on genome or transcripts tmp/OR/d5.$MAGIC.de_uno.ace.gz
                    de_uno ?Run UNIQUE Int  // manip,tissue,support jumping single sequence in discovery more
-                   Sponge ?Run UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron
+                   Sponge ?Run UNIQUE Int UNIQUE Int   UNIQUE Int UNIQUE Int   // c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
                    Group  ?Run UNIQUE Int UNIQUE Int  UNIQUE Int	UNIQUE Int	// c1: Exon, c2:intron, s: splice, t: 100*s/(s+c2) 	
            Motifs UNIQUE Text  // 52bp: 25 in exon (--) 25 in intron of donor with an explicit - sign
 
@@ -3398,23 +3399,26 @@
                  Nervous_and_sense_organ ?Systm XREF Nervous_and_sense_organ  ?Text
                  Respiratory ?Systm XREF Respiratory  ?Text
                  Urogenital ?Systm XREF Urogenital ?Text
-          Stage             Embryo UNIQUE ?Text
-                            Mixed_embryo  UNIQUE ?Text
+          Stage             Embryo  UNIQUE ?Text
+                            Mixed_embryo UNIQUE ?Text
                             Fetal  UNIQUE ?Text
+                            Larva UNIQUE ?Text
+                            Any_larva UNIQUE ?Text //Obsolete
+                            Mixed_larvae UNIQUE ?Text
                             EE UNIQUE ?Text
                             LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
+                            Molt UNIQUE ?Text
                             Dauer UNIQUE ?Text
-                            Larva UNIQUE ?Text
                             Pupa UNIQUE ?Text
-                            Juvenile UNIQUE ?Text
                             Adult UNIQUE  ?Text
                             YA UNIQUE ?Text
                             OA UNIQUE ?Text
                             Mixed_stages UNIQUE ?Text
+                            Age UNIQUE Text
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
@@ -3487,22 +3491,27 @@
                  Nervous_and_sense_organ ?Systm  ?Text
                  Respiratory ?Systm  ?Text
                  Urogenital ?Systm  ?Text
-                 Stage      Embryo UNIQUE ?Text
+                 Stage      Embryo  UNIQUE ?Text
                             Mixed_embryo UNIQUE ?Text
-                            Any_larva UNIQUE ?Text
+                            Fetal  UNIQUE ?Text
+                            Larva UNIQUE ?Text
+                            Any_larva UNIQUE ?Text // obsolete
+                            Mixed_larvae UNIQUE ?Text
                             EE UNIQUE ?Text
                             LE UNIQUE ?Text
                             L1 UNIQUE ?Text
                             L2 UNIQUE ?Text
                             L3 UNIQUE ?Text
                             L4 UNIQUE ?Text
+                            Molt UNIQUE ?Text
                             Dauer UNIQUE ?Text
                             Pupa UNIQUE ?Text
-                            Adult UNIQUE  ?Text
+                            Juvenile UNIQUE ?Text
+                            Adult UNIQUE ?Text
                             YA UNIQUE ?Text
                             OA UNIQUE ?Text
-                            Mixed_stages UNIQUE ?Text
-                            Age UNIQUE Text 
+                            Mixed_stages UNIQUE   UNIQUE ?Text
+                            Age  Text
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
