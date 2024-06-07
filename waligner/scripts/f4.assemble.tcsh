@@ -86,6 +86,8 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      spush
      query find sequence IS XY_* && (Other  || ct_ac)
      sor
+     query find sequence IS XW_* && (Other  || ct_ac)
+     sor
      follow from_gene
      sor
      spop

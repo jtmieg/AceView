@@ -138,7 +138,13 @@ static void mrnaDesignGetElements (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	  }  
     }
 
-   if (debug)
+  if (1)
+    {
+      /* include the Sl1 */
+
+    }
+
+    if (debug)
      {
        fprintf (stderr, "... getElements Z\n") ;
        showDs (sc, exons) ;
@@ -196,7 +202,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 {
   HIT *up ;
   DSX *vp, *ssp, *ssp2 ;
-  int ii, jj, ir, iss, iss2, a1, a2, b1, b2, ssMax, u1 ;
+  int ii, jj, ir, iss, iss2, ssMax, u1 ;
   int nXI = 0, nXF = 0, nXG = 0, nXA = 0, nXSL = 0, nXcds = 0 ;
   BOOL isDown ;
   BOOL debug = FALSE ;
@@ -214,12 +220,13 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
   for (ii = 0, up = arrp (s2m->plainHits, 0, HIT) ; ii < arrayMax (s2m->plainHits) ; ii++, up++)
     {
       BOOL flipped = up->x1 > up->x2 ? TRUE : FALSE ;
+      int a1 = isDown ? up->a1 - sc->a1 + 1 : sc->a1 - up->a2 + 1 ;
+      int a2 = isDown ? up->a2 - sc->a1 + 1 : sc->a1 - up->a1 + 1 ;
+      int b1 = 0, b2 = 0 ;
       if ( ! strncmp (name(up->est), "XI_", 3))
 	{
 	  if (! keyFindTag (up->est, _Composite))
 	    continue ;
-	  a1 = isDown ? up->a1 - sc->a1 + 1 : sc->a1 - up->a2 + 1 ;
-	  a2 = isDown ? up->a2 - sc->a1 + 1 : sc->a1 - up->a1 + 1 ;
 	  /* identify the introns in the intron table */
 	  if (arrayMax (ds->introns) &&  (up->type & gI))
 	    {
@@ -501,15 +508,15 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 			if (! strncmp (name(up->est), "Xends_ELR_", 9) &&  isDown)
 			  continue ;
 			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;
+			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;ssp->cover = 1 ; /* the ends geometry is too random to allow creattion of exons */
 			 if (! strncmp (name(up->est), "Xends_ELF_", 9) && isDown) 
-			   { ssp->type |= (gS | gX) ; ssp->a2 = ssp->a1 + 30 ; }
+			   { ssp->type |= (gReal5p | gX) ; ssp->a1 += 20 ; ssp->a2 = ssp->a1 + 30 ; }
 			 if (! strncmp (name(up->est), "Xends_ERF_", 9) && isDown) 
-			   { ssp->type |= (gReal3p | gX) ; ssp->a1 = ssp->a1 - 30 ; } 
+			   { ssp->type |= (gReal3p | gX) ; ssp->a2 -= 30 ; ssp->a1 = ssp->a2 - 30 ; } 
 			 if (! strncmp (name(up->est), "Xends_ERR_", 9) && ! isDown) 
-			   { ssp->type |= (gS | gX) ; ; ssp->a1 = ssp->a1 - 30 ; } 
+			   { ssp->type |= (gReal5p | gX) ; ssp->a2 -= 30 ; ssp->a1 = ssp->a2 - 30 ; } 
 			 if (! strncmp (name(up->est), "Xends_ELR_", 9) && ! isDown) 
-			   { ssp->type |= (gReal3p | gX) ;  ssp->a2 = ssp->a1 + 30 ; }
+			   { ssp->type |= (gReal3p | gX) ; ssp->a1 += 30 ; ssp->a2 = ssp->a1 + 30 ; }
 			if (debug)
 			  fprintf(stderr, "....%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
 		      }
@@ -623,12 +630,12 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
        {
 	 DSX* vp2 ;
 	 int jj2 ;
+	 int a1 = vp->a1 ;
+	 int a2 = vp->a2 ;
 	 long int cover = vp->cover ;
 
          cover *= 100 ;
 
-	 a1 = vp->a1 ;
-	 a2 = vp->a2 ;
 	 
 	 /* compare the cover to the donor exon (a1 - 1) and the retained intron (a1) */
 	 while (ii > 0 && ssp->a1 > a1-5) { ii-- ; ssp-- ; }
@@ -663,10 +670,11 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
    if (arrayMax (ds->exons) )
      for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
        {
+	 int a1 = vp->a1 ;
+	 int a2 = vp->a2 ;
 	 long int nn, nnn ;
 	 nnn = nn = 0 ;
-	 a1 = vp->a1 ;
-	 a2 = vp->a2 ;
+
 	 while (ii > 0 && ssp->a1 > a1) { ii-- ; ssp-- ; }
 	 u1 = a1 ; if (u1 < ssp->a1) u1 = ssp->a1 ; nn = ssp->cover ; 
 	 
@@ -718,7 +726,7 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
        showDs (sc, ss2) ;
 	}
    
-   if (1) /* reestablish the polyA flags */
+   if (0) /* reestablish the polyA flags */
      for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
        {
 	 for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
@@ -732,7 +740,10 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 		 ssp->a2 < vp->a2 &&
 		 ssp->a2 >= vp->a1
 		 )
-	       vp->type |= gS ;
+	       {
+		 vp->type |= gS ;
+	       }
+		   
 	     if ((ssp->type & (gA | gReal3p)) &&
 		 ssp->a1 > vp->a1 &&
 		 ssp->a1 <= vp->a2
@@ -744,6 +755,30 @@ static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Arra
 	       }
 	   }
        }
+
+   if (0) /* merge length 1 flags */
+     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) - 1 ; jj++, vp++)
+       {
+	 DSX *wp = vp + 1 ;
+	 if (wp->a1 == wp->a2 && wp->a1 == vp->a2 + 1)
+	   { vp->type |= wp->type ; vp->a2 = wp->a2 ; wp->type = 0 ; wp->cover = 0 ; }
+       }
+   /* keep happy few */
+   if (0)
+     {
+       DSX *wp ;
+       for (ii = 0, jj = 0, vp = arrp (ds->exons, 0, DSX), wp = vp ; ii < arrayMax (ds->exons) ; ii++, vp++)
+	 {
+	   if (vp->cover)
+	     {
+	       
+	       if (wp < vp) *wp = *vp ;
+	       wp++ ; jj++ ;
+	     }
+	 }
+       arrayMax (ds->exons) = jj ;
+     }
+
    if (debug)
      {
        fprintf (stderr, "mrnaDesignGetSupport  done\n") ;
@@ -873,12 +908,12 @@ static void mrnaDesignSplitExons (DS *ds, SC *sc)
 		vp->type |= gCompleteCDS ;
 	      if ((ssp->type & gS) &&
 		  ssp->a1 < vp->a2 &&
-		  ssp->a1 >= vp->a1
+		  ssp->a1 >= vp->a1 - 1
 		  )
 		vp->type |= gS ;
 	      if ((ssp->type & (gA | gReal3p)) &&
 		  ssp->a2 > vp->a1 &&
-		  ssp->a2 <= vp->a2
+		  ssp->a2 <= vp->a2 + 1
 		  )
 		{
 		  vp->type |= (ssp->type & (gA | gCompleteCDS | gReal3p)) ;
@@ -903,12 +938,23 @@ static void mrnaDesignSplitExons (DS *ds, SC *sc)
 static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int *nIntronp, int *nStartp, int *nStopp)
 { 
   int length = 0 ;
-  int a2, ii, nn, score = 0 ; 
+  int a2, ii, nn, score = 0, bestScore = 0 ; 
   int sMax = arrayMax (segs) ;
   DSX *up, *vp, *wp = 0 ;
 
   up = arrp (segs, nn0, DSX) ;
   a2 = up->a2 + 1 ;
+
+  for (vp = up, ii = nn0 ; ii >= 0 ; ii--, vp--)
+    {
+      if (vp->path == path)
+	{
+	  if (vp->type & gI)
+	    break ;
+	  if (bestScore < vp->score)
+	    bestScore = vp->score ;
+	}
+    }
 
   for (nn = 0, vp = up + 1, ii = nn0 + 1 ; ii < sMax && vp->a1 <= a2 ; ii++, vp++)
     {
@@ -917,6 +963,8 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
     }
 
   if (! score)
+    return 0 ;
+  if (! (wp->type & (gA | gReal3p)) && 20 * score < bestScore)  /* 2024_06_06 was score == 0 */
     return 0 ;
 
   if (*nStopp &&  !(wp->type & gCompleteCDS) && 
@@ -927,7 +975,7 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
   length = vp->a2 - vp->a1 + 1 ;
   keySet (ks, arrayMax(ks)) = nn ;
   
-  if (1 || ! wp->path) wp->path = path ;
+  wp->path = path ;
   
   if (wp->type & gI)
     (*nIntronp)++ ;
@@ -987,12 +1035,14 @@ static int mrnaDesignExtendDown (SC *sc, DS *ds, Array segs, KEYSET ks, int path
 static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int *nIntronp, int *nStartp, int *nStopp, int useCDS)
 { 
   int length = 0 ;
-  int a1, ii, nn, score = 0 ; 
+  int a1, ii, nn, score = 0, bestScore = 0 ;  
   int sMax = arrayMax (segs) ;
   DSX *up, *vp, *wp = 0 ;
 
   up = arrp (segs, nn0, DSX) ;
   a1 = up->a1 - 1 ;
+  if (up->type & gS)
+    return 0 ;
   if (useCDS)
     for (nn = ii = 0, vp = arrp (segs, 0, DSX) ; ii < sMax && vp->a1 <= a1 ; ii++, vp++)
       {
@@ -1011,28 +1061,36 @@ static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, 
 	}
     }
   
+  /* find local exon score */
+  if (wp && ! (wp->type & (gS | gReal5p | gCompleteCDS)))
+    for (ii = nn, vp = arrp (segs, ii, DSX) ; ii < sMax ; ii++, vp++)
+      {
+	if (vp->path == path)
+	  {
+	    if (20 * score <  vp->score)
+	      score = 0 ; 
+	    if (vp->type & gI)
+	      break ;
+	  }
+      }
+  
+  if (!score || 20 * score < bestScore)  /* 2024_06_06 was score == 0 */
+    return 0 ;
+  
   if (score)
     {
-      /* kill alternative branches  with too low relative score */
-      if (0)
-	for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < sMax && vp->a1 <= a1 ; ii++, vp++)
-	  {  
-	    if (vp->a2 != a1) continue ;
-	    if (score > 200 * vp->score) { vp->score = 0 ; }
-	  }
-
       if (! useCDS)
 	{
 	  if (*nStartp && (wp->type & ( gA | gReal3p) && ! (wp->type & gCompleteCDS)))
 	    return 0 ;
 	  if (0 && *nIntronp && (wp->type & (gA | gReal3p)))
 	    return 0 ;
-	}
-
-      length = vp->a2 - vp->a1 + 1 ;
+	    }
+      
+      length = wp->a2 - wp->a1 + 1 ;
       keySet (ks, arrayMax(ks)) = nn ;
 
-      if (1 || ! wp->path) wp->path = path ;
+      wp->path = path ;
       if (! useCDS)
 	{
 	  if (wp->type & gI)
@@ -1155,6 +1213,32 @@ static int mrnaDesignExport (S2M *s2m, DS *ds, Array segs, KEYSET ks, int path, 
 
 /**********************************************************************************/
 
+static BOOL mrnaDesignIsNewPath (Array ksPaths, KEYSET ks0, AC_HANDLE h)
+{
+  BOOL ok = TRUE ;
+  KEYSET ks = keySetHandleCopy (ks0, h) ;
+  int iMax = keySetMax (ks) ;
+  keySetSort (ks) ;
+
+  for (int ii = 0 ; ok && ii < arrayMax (ksPaths) ; ii++)
+    {
+      KEYSET ks1 = array (ksPaths, ii, KEYSET) ;
+      ok = FALSE ;
+      if (! ks1 || keySetMax (ks1) != iMax)
+	ok = TRUE ;
+      else
+	{
+	  for (int i = 0 ; !ok && i < iMax ; i++)
+	    if (keySet (ks, i) != keySet (ks1, i))
+	      ok = TRUE ;
+	}
+    }
+  if (ok)
+    array (ksPaths, arrayMax(ksPaths), KEYSET) = ks ;
+  return ok ;
+} /* mrnaDesignIsNewpath */
+
+/**********************************************************************************/
 static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
   int ii, jj, ii2, maxScore, path, a2Max, nIntron, nStart, nStop, useCDS ;
@@ -1164,7 +1248,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
   DSX *up, *vp, *vp2 ; ;
   KEYSET ks = keySetHandleCreate (ds->h) ;
   BOOL debug = FALSE ;
-
+  Array ksPaths = arrayHandleCreate (20, KEYSET, ds->h) ;
   /* group exons/introns */
   segs = arrayHandleCreate (eeMax + iiMax +1, DSX, ds->h) ;
   if (arrayMax (ds->exons))
@@ -1178,8 +1262,11 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
       {	    
 	up =  arrayp (segs,ii, DSX) ;
 	*up = *vp ; up->score = vp->cover ; up->nn = ii ;
-	if (up->score < vp->donor) up->score = vp->donor ;
-	if (up->score < vp->acceptor) up->score = vp->acceptor ;
+	if (0) /* 2024_06_07 */
+	  {
+	    if (up->score < vp->donor) up->score = vp->donor ;
+	    if (up->score < vp->acceptor) up->score = vp->acceptor ;
+	  }
 	up->score <<= 1 ;
 	if (0 && ! up->score) up->score = 1 ;
       }
@@ -1189,7 +1276,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
   if (0)
     showDs (sc, segs) ;
   
-      /* kill the non extremal exon extensions which are below 15 bp and do not hook onto an intron */
+      /* kill the non extremal exon extensions which are below 32 bp long and do not hook onto an intron */
   if (arrayMax (segs))
     for (ii = a2Max = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
       if (a2Max < vp->a2) a2Max = vp->a2 ;
@@ -1197,7 +1284,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
   if (arrayMax (segs))
     for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
       {
-	if (! (vp->type & (gDebut | gFin)) && (vp->type & gX) && vp->a2 < vp->a1 + 15)
+	if (! (vp->type & (gDebut | gFin)) && (vp->type & gX) && vp->a2 < vp->a1 + 31)
 	  {
 	    int ok1 = 0, ok2 = 0, ok3 = 0, ok4 = 0 ;
 	    int a1 = vp->a2 + 1, a2 = vp->a1 - 1 ;
@@ -1283,7 +1370,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	  }
 	
 	/* a retained intron which is over 50% of the neighbouring exon
-	 * should have a score higher than the corrsponding intron
+	 * should have a high score relative to the corresponding intron
 	 * otherwise if it is below 10% it should be dropped
 	 * otherwise it should be flagged and not extended
 	 */
@@ -1428,9 +1515,11 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	      mrnaDesignExtendDown (sc, ds, segs, ks, path, vp->nn, &nIntron, &nStart, &nStop, useCDS) ;
 	      nStart = (vp->type & gS) ? 1 : 0 ;
 	      nStop = 1 ;
-	      mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, &nIntron, &nStart, &nStop, useCDS) ;
+	      if (mrnaDesignIsNewPath (ksPaths, ks, ds->h))
+		mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, &nIntron, &nStart, &nStop, useCDS) ;
 	    }
-	  mrnaDesignExport (s2m, ds, segs, ks, path, smrnas) ;
+	  if (mrnaDesignIsNewPath (ksPaths, ks, ds->h))
+	    mrnaDesignExport (s2m, ds, segs, ks, path, smrnas) ;
 	  if(useCDS) /* we only want the best CDS guy */
 	    break ;
 	}
@@ -1513,17 +1602,18 @@ void mrnaDesignSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrna
   for (iii = 0 ; iii >-1 && iii < arrayMax(smrnas) ; iii++) 
     {
       smrna = arrp (smrnas, iii, SMRNA) ;
-      
-      /* search the flags of the first exon */
-      if (arrayMax (smrna->hits))
-	for (j = 0, up = arrp (smrna->hits, 0, HIT) ; j < 1 && j < arrayMax(smrna->hits);  up++, j++)
-	  mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, TRUE) ;
-
-       /* search the polyA flags of the last exon */
-      if (arrayMax (smrna->hits))
-	for (j = arrayMax(smrna->hits) - 1 ; j >= 0 && (up = arrp (smrna->hits, j, HIT)) ; j = -1)
-	  mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, FALSE) ;
+      if (smrna->hits && arrayMax (smrna->hits))      
+	{
+	  /* search the flags of the first exon */
+	  for (j = 0, up = arrp (smrna->hits, 0, HIT) ; j < 1 && j < arrayMax(smrna->hits);  up++, j++)
+	    mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, TRUE) ;
+	  
+	  /* search the polyA flags of the last exon */
+	  for (j = arrayMax(smrna->hits) - 1 ; j >= 0 && (up = arrp (smrna->hits, j, HIT)) ; j = -1)
+	    mrnaDesignSetOneCompletenessFlag (s2m, sc, up, smrna, gmrna->estHits, FALSE) ;
+	}
     }
+  
   return ;
 } /*  mrnaDesignSetCompletenessFlags */
 
@@ -1537,7 +1627,7 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
   int i ;
   HIT *up ;
   BOOL ok = FALSE ;
-  BOOL debug =  FALSE ;
+  BOOL debug =  TRUE  ;
 
   if (0 || arrayMax (smrnas) < 1) 
     return FALSE; 

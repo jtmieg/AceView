@@ -1842,7 +1842,7 @@ static BOOL snpFilter (TSNP *tsnp, SNP *snp)
 {
   BOOL ok = TRUE ;
   int minF = tsnp->minSnpFrequency ;
-  int minC = tsnp->minSnpCover ;
+  int minC = tsnp->minSnpCover > 0 ? tsnp->minSnpCover : 1 ;
 
 
   if (tsnp->snpType < 3 && minF + minC > 0)
@@ -1855,11 +1855,14 @@ static BOOL snpFilter (TSNP *tsnp, SNP *snp)
       if (tt && tt->rows)
 	for (ir = 0 ; ir < tt->rows && !ok ; ir++)
 	  {
+	    const char *runNam = ac_table_printable (tt, ir, 0, 0) ;
 	    int c = ac_table_int (tt, ir, 1, 0) ;
 	    int m = ac_table_int (tt, ir, 2, 0) ;
 
-	    if (c >= minC && 100 * m >= minF * c)
-	      ok = TRUE ;
+	    if (runNam && dictFind (tsnp->runDict, runNam, 0) 
+		&& c >= minC && 100 * m >= minF * c
+		)
+		  ok = TRUE ;
 	  }
 
       ac_free (h) ;
@@ -2387,7 +2390,7 @@ int main (int argc, const char **argv)
   tsnp.gzo =   getCmdLineBool (&argc, argv, "--gzo") ;
 
   tsnp.minSnpFrequency = 0 ;
-  tsnp.minSnpCover = 0 ;
+  tsnp.minSnpCover = 10 ;
   getCmdLineInt (&argc, argv, "--minSnpFrequency", &tsnp.minSnpFrequency) ;
   getCmdLineInt (&argc, argv, "--minSnpCover", &tsnp.minSnpCover) ;
   if (! tsnp.dbName)

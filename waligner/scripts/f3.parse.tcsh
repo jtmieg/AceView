@@ -346,8 +346,20 @@ endif
     find method encode
     edit Show_up_strand
     query find sequence IS XY_* && (Other  || ct_ac)
-    edit -D Is_read
-     save
+    spush
+    query find sequence IS XY_* && ! gt_ag && ! gc_ag && COUNT {> intron ; gt_ag || gc_ag} == 0
+    sor
+    query find sequence IS XW_* && (Other  || ct_ac)
+    sor
+    query find sequence IS XW_* && ! gt_ag && ! gc_ag && COUNT {> intron ; gt_ag || gc_ag} == 0
+    sor
+    spop
+    spush
+    follow cdna_clone
+    sor
+    spop
+    kill
+    save
     quit
 EOF
 

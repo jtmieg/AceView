@@ -23,7 +23,7 @@ endif
 
 
 if (-d DanLi) then
-    bin/snpsummary -db tmp/TSNP_DB/$zone -o RESULTS/SNV/DanLi.$zone -snpType 3 
+    bin/snpsummary -db tmp/TSNP_DB/$zone -o RESULTS/SNV/DanLi.$zone --snpType 3 
 endif
 
 

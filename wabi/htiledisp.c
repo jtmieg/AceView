@@ -2184,7 +2184,8 @@ static BOOL htileConvert (Htile look, BOOL force, ACEOUT ao)
     {
       look->intMap = ac_table_key (tbl, 0, 0, 0) ; 
       a1 = ac_table_int (tbl, 0, 1, 0) ; 
-      a2 = ac_table_int (tbl, 0, 2, 0) ; 
+      a2 = ac_table_int (tbl, 0, 2, 0) ;
+      look->from += a1 ;
     }
 
   if (a1 > a2) { int a0 = a1 ; a1 = a2 ; a2 = a0 ; }
@@ -2745,10 +2746,13 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 {
   PNX *pnx ;
+  int NA = -999 ;
   unsigned int flag1 = 0, flag2 = 0, flag3 = 0, flag4 = 0 ;
-  int i, ns1 = 0, ns2 = 0, ns3 = 0, ns4 = 0 ;
+  int i, ns1, ns2, ns3, ns4 ;
   float seuil = .7 ;
   float zoom = 40 ;
+  
+  ns1 = ns2 = ns3 = ns4 = NA ;
   if ((pnx0->flag &  PGG_endRatioLF) ==  PGG_endRatioLF)
     { zoom = 40 ; flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
   if ((pnx0->flag &  PGG_endRatioRF) ==  PGG_endRatioRF)
@@ -2767,7 +2771,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
     if ((pnx->flag & flag4) == flag4) { ns4 = ns - i ; break ; }
 
-  if (ns1 && ns2 && look->map->solexa)
+  if (ns1 != NA && ns2 != NA && look->map->solexa)
     {
       unsigned int iMax =  arrayMax (look->map->solexa) ;
       SLX *slx, *slx1 ;
@@ -2784,11 +2788,15 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	      slx1 = arrayp (look->map->solexa, ii+j, SLX) ;
 	      x += slx1->signal[ns1] ;
 	      y += slx1->signal[ns2] ;
-	      if (ns3) z += slx1->signal[ns3] ; 
-	      if (ns4) t += slx1->signal[ns4] ; 
+	      if (ns3 != NA) z += slx1->signal[ns3] ; 
+	      if (ns4 != NA) t += slx1->signal[ns4] ; 
 	    }
-	  x = x + z ; if (x < 0) x = 0 ; x /= 11 ; 
-	  y = y + t ; if (y < 0) y = 0 ; y /= 11 ;
+	  if (0) /* non stranded */
+	    {
+	      x = x + z ; if (x < 0) x = 0 ; x /= 2 ;
+	      y = y + t ; if (y < 0) y = 0 ; y /= 2 ;
+	    }
+	  x /= 5.5 ; y /= 5.5 ;
 	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
 	  if (u < 0) u = 0 ;
 	  slx->signal[ns] = zoom * u * x ;
@@ -6348,7 +6356,7 @@ static BOOL solexaAllInit (Htile look)
       KEY col ;
       unsigned int flag[14] =  { PGG_ELF, PGG_ERF, PGG_ELR, PGG_ERR, PGG_nuf, PGG_nur, PGG_ppf, PGG_ppr, PGG_uf, PGG_ur, PGG_endRatioLF, PGG_endRatioRF, PGG_endRatioLR, PGG_endRatioRR  } ;
       const char *suffix[14] = {".LF", ".RF", ".LR", ".RR", "nu+", "nu-", "pp+", "pp-", "+", "-", ".eLF", ".eRF", ".eLR", ".eRR" } ;
-      const int colors[14] = { BROWN, GREEN, MAGENTA, CYAN, PALEORANGE, YELLOW, BLACK, GRAY, ORANGE, DARKBLUE, GREEN4, DARKCYAN , RED4, BLUE4  } ;
+      const int colors[14] = { BROWN, GREEN, MAGENTA, CYAN, PALEORANGE, YELLOW, BLACK, GRAY, ORANGE, DARKBLUE, PALEGREEN, PALEVIOLET, PALEMAGENTA, PALECYAN  } ;
       aa = look->solexaAll = arrayHandleCreate (128, PNX, look->h) ;
       iter = ac_dbquery_iter (look->db, "find run w_colour", h) ;
       ir = -1 ;
@@ -6426,7 +6434,7 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
       graphActivate (oldlook->map->graph)
       )
     { 
-      oldlook->from = from ;
+      oldlook->from = from + oldlook->map->a1 ;
       tmapResize () ;
       return TRUE ;
     }

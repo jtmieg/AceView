@@ -7286,7 +7286,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
                     }
                 }
             }
-          if ( isReal3p || (isPolyA && nOpen < 600)) /* mieg 2008_09_14, mais prevent later detection of supect-polyA */
+          if (( isReal3p || isPolyA) && nOpen < 600) /* mieg 2008_09_14, mais prevent later detection of supect-polyA */
 	    nOpen = 0 ;
           cds = 0 ;
           if (nOpen)
@@ -7568,20 +7568,23 @@ static BOOL mrnaConstructOrfs  (S2M *s2m, SC *sc, SMRNA *gmrna, Array smrnas)
   for (ii = 0 ; ii < arrayMax(smrnas) ; ii++)
     {
       smrna = arrp (smrnas, ii, SMRNA) ;
-      /*       printf(" makeMrnaGene nCall = %d\n",nMrnaCall) ; */
-      chrono ("makeMrnaGeneLocate") ;
-      if (!smrna->dnas)
-        mrnaMakeDnas (s2m, sc, gmrna->estHits, smrna) ;
-      if (smrna->dnas && !smrna->orfs)
-        mrnaLocateOrfs (s2m, arrayMax (smrnas), smrna, FALSE) ;
-      /*
-	mrnaMakeOrfs (smrnas) ;
-        on a le dna en p morceaux correspondants aux exons p = #gap + 1
-        il faut choisir les orf de tout ca
-        rabouter les dna
-        prendre le ou les orf complet
-      */
-      chronoReturn () ;
+      if (smrna->hits)
+	{
+	  /*       printf(" makeMrnaGene nCall = %d\n",nMrnaCall) ; */
+	  chrono ("makeMrnaGeneLocate") ;
+	  if (!smrna->dnas)
+	    mrnaMakeDnas (s2m, sc, gmrna->estHits, smrna) ;
+	  if (smrna->dnas && !smrna->orfs)
+	    mrnaLocateOrfs (s2m, arrayMax (smrnas), smrna, FALSE) ;
+	  /*
+	    mrnaMakeOrfs (smrnas) ;
+	    on a le dna en p morceaux correspondants aux exons p = #gap + 1
+	    il faut choisir les orf de tout ca
+	    rabouter les dna
+	    prendre le ou les orf complet
+	  */
+	  chronoReturn () ;
+	}
     }
   return TRUE ;
 } /* mrnaConstructOrfs */
@@ -11678,7 +11681,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
         
         nonSpecificClones = keySetCreate () ;
         for (im = 0, sm = arrp (smrnas, im, SMRNA) ; im < arrayMax(smrnas) ; sm++, im++)
-          if (sm != smrna)
+          if (sm->clones && sm != smrna)
             for (j = 0 ; j < arrayMax (sm->clones) ; j++)
               keySet (nonSpecificClones, jj++) = keySet (sm->clones, j) ;
         
@@ -11833,7 +11836,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   }
     
   /*** Expression profile ***/
-  mrnaSaveExpressionProfile (Transcript, smrna->clones, nonSpecificClones) ;
+  if (smrna->clones)
+    mrnaSaveExpressionProfile (Transcript, smrna->clones, nonSpecificClones) ;
   
   /*** PolyA signal ****/
   
@@ -12875,7 +12879,7 @@ static void makeMrnaFilterGeneHits (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas
   for (ii = 0 ; ii < arrayMax(smrnas) ; ii++)
     {
       smrna = arrp (smrnas, ii, SMRNA) ;
-      if (smrna->bestDna >= 0 && smrna->cGroup < 2)
+      if (smrna->hits && smrna->bestDna >= 0 && smrna->cGroup < 2)
         for (jj = 0 ; jj < arrayMax (smrna->hits) ; jj++)
           {
             vp = arrp (smrna->hits, jj, HIT) ;
@@ -13254,6 +13258,8 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 	  BOOL addOneSuccess ;
 
 	  smrna = arrp (smrnas, ii, SMRNA) ;
+	  if (! smrna->hits)
+	    continue ;
 	  if (!(smrna->bestDna >= 0 && smrna->cGroup < 2))
 	    continue ;
 
