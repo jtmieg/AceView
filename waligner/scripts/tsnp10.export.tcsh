@@ -26,9 +26,11 @@ if (-d DanLi) then
     bin/snpsummary -db tmp/TSNP_DB/$zone -o RESULTS/SNV/DanLi.$zone --snpType 3 
 endif
 
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min$minSnpFrequency.counts --snpType 1 --minSnpFrequency $minSnpFrequency -e IGR
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min$minSnpFrequency.frequency --snpType 1 --minSnpFrequency $minSnpFrequency -e Igr
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min80.counts --snpType 1 --minSnpFrequency 80 # --minSnpCover $minSnpCover -e IGR
+  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min80.frequency --snpType 1 --minSnpFrequency 80 # --minSnpCover $minSnpCover -e Igr
 
-  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min$minSnpFrequency --snpType 0 # --minSnpFrequency $minSnpFrequency --minSnpCover $minSnpCover
-  bin/snpsummary -db tmp/TSNP_DB/$zone -p $MAGIC -o RESULTS/SNV/$MAGIC.$zone.min80 --snpType 0 --minSnpFrequency 80 # --minSnpCover $minSnpCover 
-  touch tmp/TSNP_DB/$zone/$MAGIC.tsnp10.done
+    touch tmp/TSNP_DB/$zone/$MAGIC.tsnp10.done
 
-
+exit 0

@@ -648,6 +648,7 @@ static void setZoneUserCoords (LOOK look, int x0, int x1)
 			 COORD (look, look->zoneMax)-1),
 	     15) ;
   if (look->zoneBox) graphBoxDraw (look->zoneBox, -1, -1) ;
+
   fMapReDrawDNA (look) ;
 }
 
@@ -776,21 +777,26 @@ static void drawHeader (LOOK look)
     graphTextScrollEntry (look->zoneBuf, 23, 14, 56.5, .5, 
 			  TEXT_ENTRY_FUNC_CAST fMapSetZone) ;
 
+  graphText ("Centre:", 72., .5) ;
+  sprintf (look->centreBuf, "%d", (int)COORD(look, look->map->centre)) ;
+  look->centreBox = graphBoxStart () ;
+  graphTextPtr (look->centreBuf, 80., .5, 9) ;
+  graphBoxEnd () ;
   /* mhmp 02.06.98 + 08.09.98 */
   graphEntryDisable () ;
   graphRegister (KEYBOARD, fMapKbd) ;			
   if (look->flag & FLAG_COMPLEMENT)
-    graphText ("COMPLEMENT", 70, 0) ;
+    graphText ("COMPLEMENT", 90, 0) ;
   if (look->flag & FLAG_COMPLEMENT_SUR_PLACE)
     {
-      graphText ("COMP_DNA", 81, 0) ;
-      graphText ("IN_PLACE", 81, 1) ;
+      graphText ("COMP_DNA", 101, 0) ;
+      graphText ("IN_PLACE", 101, 1) ;
     }
   if (( (look->flag & FLAG_COMPLEMENT) && 
        ! (look->flag & FLAG_REVERSE)) || 
       (! (look->flag & FLAG_COMPLEMENT) &&
        (look->flag & FLAG_REVERSE)))
-    graphText ("REVERSED", 70, 1) ;
+    graphText ("REVERSED", 90, 1) ;
 
   look->segBox = graphBoxStart () ;
   graphTextPtr (look->segTextBuf, 2, 2, 126) ;
@@ -1243,6 +1249,9 @@ static void fMapLeftDrag (double x, double y)
 {
   graphXorLine (0, oldy, mapGraphWidth, oldy) ;
   oldy = y ;
+  int centre = COORD (oldlook, y) ;
+  sprintf (oldlook->centreBuf, "%d", centre) ;
+  graphBoxDraw (oldlook->centreBox, BLACK, WHITE) ;
   graphXorLine (0, y, mapGraphWidth, y) ;
 }
 
@@ -1376,6 +1385,7 @@ static void fMapPick (int box, double x, double y)
     { graphBoxDim (box, &x1, &y1, &x2, &y2) ;
       y += y1 ;
       oldy = y ;
+      oldlook = look ;
       graphColor (BLACK) ;
       graphXorLine (0, y, mapGraphWidth, y) ;
       graphRegister (LEFT_DRAG, (GraphFunc)fMapLeftDrag) ;
@@ -2893,6 +2903,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	    { 
 	      char *cp ;
 	      int mycol = 0 ;
+	      int cover = 0 ;
 	      KEY intr ;
 	      KEY chrom ;
 	      int tg1 , tg2 ;
@@ -2931,6 +2942,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 				iCol = 8 ;
 			      if (iCol > 0)
 				mycol = iCol ;
+			      cover = x ;
 			    }
 			  bsDestroy (Intr) ;
 			}
@@ -2957,8 +2969,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 			    lexaddkey ("Other", &seg1->data.k,0) ;
 			}
 		    }
-		  if (mycol)
-		    seg1->data.k |= (mycol << 24) ;
+		  seg1->data.k = mycol ? KEYMAKE (mycol, cover) : 0 ;
 		}
 	    }
 	}

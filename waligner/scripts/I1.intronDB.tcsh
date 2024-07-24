@@ -140,6 +140,27 @@ goto phaseLoop
 ########################################################################
 ### parse the intron counts from mRNA alignments
 
+cleanUp:
+
+\rm _killIntrons
+foreach run (`cat MetaDB/$MAGIC/RunsList`) 
+  set f1=tmp/INTRON_DB/$chrom/I2.$run.deMrna
+  if (-e $f1.gz) then
+    set ok=`ls -ls $f1.gz | gawk '{print $6}'`
+    if ($ok < 100) then
+      echo "\\rm $f1.gz" >> _killIntrons
+    endif
+  endif
+  set f1=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts
+  if (-e $f1.gz) then
+    set ok=`ls -ls $f1.gz | gawk '{print $6}'`
+    if ($ok < 100) then
+      echo "\\rm -rf tmp/INTRONLANES/$run tmp/INTRONRUNS/$run"  >> _killIntrons
+    endif
+  endif
+end
+wc  _killIntrons
+
 deMrna:
 echo -n "I2 phase $phase start :"
 date
@@ -149,14 +170,16 @@ set f0=tmp/INTRON_DB/$chrom/I2.deMrna
 if (-e $f0) \rm $f0
 foreach run (`cat MetaDB/$MAGIC/RunsList`) 
   set f1=tmp/INTRON_DB/$chrom/I2.$run.deMrna
-  if (-e $f1.gz) continue
-
-  set ff=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz 
+  if (-e $f1.gz) then
+    set ok=`ls -ls $f1.gz | gawk '{print $6}'`
+    if ($ok > 100) continue
+  endif
+  set ff=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz
   if (! -e $ff) continue 
   set ok=1
   zcat $ff | gawk  /$chrom'__/{print;}' >> $f1
   cat $f1 >> $f0
-  gzip $f1
+  gzip -f $f1
 end
 date
 
@@ -382,8 +405,7 @@ phaseLoop:
   echo -n "I1 phase $phase done :"
   date
 end
-  echo "phases $phases done"
-  echo I1.intronDB.tcsh phase $phase  done
+  echo I1.intronDB.tcsh $phases  done
   exit 0
 
 

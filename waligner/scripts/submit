@@ -251,14 +251,14 @@ if ($farm == SGE || $farm == UGE || $farm == UGE4) then
     echo "SGE submit: pgm=###$pgm###    stdout/err=###$out_err.out/err### queue=###$queue### isBlasp=###$isBlastp###"
 
     if ($queue == profiling) then
-      set numero=`qsub -V -b y -j n -N $MAGIC -P unified $isBlastp  $request_multicore -l  osverfull="(7*|8*)",h_rt=86400,h_vmem=64G,mem_free=32G,m_mem_free=32G,cputype="*E5-2650*",m_core=16,mem_total=125G   -o $out_err.out -e $out_err.err "./bin/time -p $pgm"`
+      set numero=`qsub -V -b y -j n -N $MAGIC -P unified $isBlastp  $request_multicore -l h_rt=86400,h_vmem=64G,mem_free=32G,m_mem_free=32G,cputype="*E5-2650*",m_core=16,mem_total=125G   -o $out_err.out -e $out_err.err "./bin/time -p $pgm"`
     else
       # which qsub : /netmnt/gridengine/current/bin/lx-amd64/qsub
 # new syntax as of 2018 on UGE_ncbi qsub -l m_mem_free=4G,h_rt=14400,h_vmem=10G <other options> <job>
 
-      echo "qsub -V -b y -j n -N $MAGIC -P  $queue  $isBlastp  $request_multicore "'-l osverfull="(7*|8*)"'",h_rt=86400,h_vmem=$h_vmem,mem_free=$mem_free,m_mem_free=$m_mem_free$xx,cputype="'\!*EPYC*'"  -o $out_err.out -e $out_err.err ./bin/time -p $pgm"
+      echo "qsub -V -b y -j n -N $MAGIC -P  $queue  $isBlastp  $request_multicore -l h_rt=86400,h_vmem=$h_vmem,mem_free=$mem_free,m_mem_free=$m_mem_free$xx,cputype="'\!*EPYC*'"  -o $out_err.out -e $out_err.err ./bin/time -p $pgm"
 
-            qsub -V -b y -j n -N $MAGIC -P  $queue  $isBlastp  $request_multicore -l osverfull="(7*|8*)",h_rt=86400,h_vmem=$h_vmem,mem_free=$mem_free,m_mem_free=$m_mem_free$xx,cputype='\!*EPYC*'  -o $out_err.out -e $out_err.err "./bin/time -p $pgm"
+            qsub -V -b y -j n -N $MAGIC -P  $queue  $isBlastp  $request_multicore -l h_rt=86400,h_vmem=$h_vmem,mem_free=$mem_free,m_mem_free=$m_mem_free$xx,cputype='\!*EPYC*'  -o $out_err.out -e $out_err.err "./bin/time -p $pgm"
     endif
 
 # multithreaded tasks

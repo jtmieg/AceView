@@ -3630,9 +3630,8 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	if (bsFindTag (Est, _Forward) &&
 	    bsFindTag (Est, _Composite) &&
 	    bsGetData (Est, _Composite, _Int, &n) &&
-	    bsFindTag (Est, _Real_5prime) &&
-	    bsGetData (Est, _bsRight, _Int, &x) &&
-	    e1 < x + 5)
+	    bsFindTag (Est, _Real_5prime)
+	    )
 	  { top = TRUE ; isSl = 1 ; nSl+= n; }
 	if (bsFindTag (Est, _Forward) &&
 	    bsGetKey (Est, _Transpliced_to, &sl) &&
@@ -3695,17 +3694,15 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	if (!strncmp(name(clone),"yk",2) && !strncmp(name(est),"GB",2))
 	  { bsDestroy (Est); continue ; }
 	/*
-	if (bsFindTag (Est, _Reverse) &&
-	    bsFindTag (Est, _Composite) &&
-	    bsGetData (Est, _Composite, _Int, &n) &&
-	    bsFindTag (Est, _Real_3prime) &&
-	    e1 < x + 5)
-	  { top = TRUE ; isSl = 1 ; nSl+= n; }
 	*/
 	iPriming = keyFindTag (clone, _Internal_priming) ;
 	polyAPriming = keyFindTag (clone, _Primed_on_polyA) ;
 	if (bsFindTag (Est, _PolyA_after_base))
 	  {
+	    if (bsFindTag (Est, _Reverse) &&
+		bsFindTag (Est, _Composite)
+		)
+	      bsGetData (Est, _Composite, _Int, &n) ;
 	    if (bsGetData (Est, _PolyA_after_base, _Int, &pA) &&
 		(
 		 (e1 < e2 && e2 > pA - 5 && e2 < pA + 5) || /* fully aligned */
@@ -4475,8 +4472,8 @@ static int abiFixLabelReportPolyA (KEY mrna, Array aa5, Array aa3, DICT *dict)
 		    if (d > -26 && d < 26) 
 		      {
 			atEnd = TRUE ;
-			if (keyFindTag (ap2->est, _Composite) &&
-			    keyFindTag (ap2->est, _PolyA_after_base)
+			if (keyFindTag (ap2->est0, _Composite) &&
+			    keyFindTag (ap2->est0, _PolyA_after_base)
 			    )
 			  {
 			    xTags += ap2->mClones03 ;  

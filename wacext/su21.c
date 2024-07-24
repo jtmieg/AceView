@@ -10176,6 +10176,31 @@ static void superExponential (int NN, int type, int typeb, AC_HANDLE h)
   showPol (pp) ;
   }
 
+void pmxSwap (PMX pmx)
+{
+  int N = pmx ? pmx->N : 0 ;
+
+  POLYNOME q[N*N] ;
+  int m, n, sw[N] ;
+  for (int i = 0 ; i < N ; i++)
+    sw[i] = i ;
+  if (N < 4) messcrash ("pmxSwap N=%d < 4", N) ;
+  sw[0] = 0 ; sw[1] = 2 ;
+  sw[2] = 1 ; sw[3] = 3 ;
+
+  for (int i = 0 ; i < N ; i++)
+    for (int j = 0 ; j < N ; j++)
+      q[N*i + j] = pmx->pp[N*i + j] ;
+  
+  for (int i = 0 ; i < N ; i++)
+    for (int j = 0 ; j < N ; j++)
+      {
+	m = sw[i] ;
+	n = sw[j] ;
+	pmx->pp[N*i + j] = q [N*m + n] ;
+      }  
+} /* pmxSwap */
+
 /*************************************************************************************/
 
 static void THETA (void)
@@ -10409,7 +10434,7 @@ static void THETA (void)
   PMX uvwx2 = pmxMultiSum (uvwxSet2, "u2+v2+w2+x2", h) ;
   PMX uvwx = pmxMultiSum (uvwxSet, "u+v+w+x", h) ;
   pmxShow (uvwx) ;
-
+  pmxSwap (uvwx) ;
   PMX uvexp1 = pmxExponential (uvwx1, "exp(u1+v1+w1+x1)", 6, h) ;
   PMX uvexp2 = pmxExponential (uvwx2, "exp(u2+v2+w2+x2)", 6, h) ;
   PMX uvexp = pmxExponential (uvwx, "exp(u+v+w+x)", 6, h) ;

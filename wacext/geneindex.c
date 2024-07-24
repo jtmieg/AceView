@@ -2938,7 +2938,7 @@ static void gxOneGroupCumul (GX *gx, RC *rc, int myGene)
 	  rc->tags += rc2->tags ;
 	  rc->geneTags += rc2->geneTags ;
 
-	  rc->nReadsOk += rc->nReadsOk ;
+	  rc->nReadsOk += rc2->nReadsOk ;
 	  rc->kb += rc2->kb ;
 	  rc->nerr += rc2->nerr ;
 	  rc->a2g += rc2->a2g ;

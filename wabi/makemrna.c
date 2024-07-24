@@ -3977,7 +3977,8 @@ static void mrnaSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrn
   for (iii = 0 ; iii < arrayMax(smrnas) ; iii++) 
     {
       smrna = arrp (smrnas, iii, SMRNA) ;
-      
+      if (! smrna->hits)
+	continue ;
       /* search the flags of the first exon */
       for (j = 0, up = arrp (smrna->hits, 0, HIT) ; j < 1 && j < arrayMax(smrna->hits);  up++, j++)
         mrnaSetOneCompletenessFlag (up, smrna, gmrna->estHits, TRUE) ;
@@ -10582,7 +10583,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
             keySetInsert (ks, up->cDNA_clone) ;
           }
 
-        if (!estUp &&            /* composite 5' read */
+        if (0 && /* on peut pas lire les flags dans les composites */
+	    !estUp &&            /* composite 5' read */
 	    keyFindTag (est, _Composite) &&
             !keySetFind (ks, up->cDNA_clone, 0) &&
             !keyFindTag (up->cDNA_clone, _Not_real_5prime) &&
@@ -10752,16 +10754,17 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
               {
                 int i, pure = 0 ;
                 BSunit *uu ;
-                        
+		BOOL isComposite = TRUE ;
+		
                 units = arrayReCreate (units, 800, BSunit) ;
                 if (bsGetArray (Est,  str2tag("Transpliced_to"), units, 2))
                   {
-                    
+                    int dx = isComposite ? 1 : 60 ;
                     for (i = 0 ; i < arrayMax(units) ; i += 2)
                       {
                         uu = arrp (units, i, BSunit) ;
                         if ((uu[1].i > x1 - 3 && uu[1].i <= x1 + 3) && /* wobble helps in graphic interface */
-                            up->a1 > smrna->a1 - 60 && up->a1 < smrna->a1 + 60 &&        /* cluster at top of mrna */
+                            up->a1 > smrna->a1 - dx && up->a1 < smrna->a1 + dx &&        /* cluster at top of mrna */
                             !strncasecmp ("SL", name(uu[0].k), 2))
                           {
                             bsAddKey (Transcript, str2tag("Transpliced_to"), uu[0].k) ;
@@ -13138,7 +13141,7 @@ void showSmrnas (S2M *s2m, Array smrnas, char *mm)
                   , smrna->orfs && arrayMax(smrna->orfs) > 1 ?  arr (smrna->orfs, 1, ORFT).nOpen : 0
                   , smrna->orfs && arrayMax(smrna->orfs) > 2 ?  arr (smrna->orfs, 2, ORFT).nOpen : 0
                   ) ;
-        if (mm != (char*)1) showHits(smrna->hits) ;        
+        if (0 && mm != (char*)1) showHits(smrna->hits) ;        
         printf("\n") ;
       }        
   printf("\nmaxgap = %d\n", mrnaCountGaps (smrnas)) ;
@@ -13156,10 +13159,12 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
   KEYSET genes = 0 ;
   int doFilter = mrnaPleaseMinTranscriptSize() ; 
   int bigGap = mrnaPleaseBigGapSize() ; 
-  
+  static int nnG = 0 ;  
   if (0) messalloccheck () ;
   chrono ("makeMrnaGene") ;
-  
+
+  if (! ((++nnG) % 200))
+    sessionClose (TRUE) ;
   cdnaReExtendHits (s2m, sc, gmrna, clipTops, clipEnds) ;
   mrnaGrignotte (s2m, sc, gmrna, smrnas, -1, FALSE) ;  /* grignotte all */
 

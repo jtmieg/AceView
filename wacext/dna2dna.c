@@ -3197,10 +3197,12 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		      aceOutf (ao, "-D Source_exons\nSource_exons 1 %d CDS\n", dx) ;
 		    }
 
-		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (shadow2->mrna == old) ; j--, shadow2--)  {} ;
+		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
 		  j++ ; shadow2++ ; 
 		  for ( gene = title = note = hasCDS = gene_name = 0 ; j < i ; j++, shadow2++)
 		    {
+		      if (! shadow2->mrna)
+			continue ;
 		      if (shadow2->ncRNA)
 			aceOutf (ao, "%s\n", dictName(dict, shadow2->ncRNA)) ;
 		      if (shadow2->gene && ! gene)
@@ -3269,13 +3271,15 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 				   ) ;
 			}
 		    }
-		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (shadow2->mrna == old) ; j--, shadow2--) {} ;
+		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
 		  j++ ; shadow2++ ; 
 		  {
 		    int v1 = 0 ; /*  v2 = 0 ; */
 		    hasCDS = FALSE ;
 		    for ( ; j < i && ! hasCDS ; j++, shadow2++)
 		      {
+			if (! shadow2->mrna)
+			  continue ;
 			if (shadow2->cds && ! hasCDS)
 			  {
 			    hasCDS = TRUE ;
@@ -3286,10 +3290,12 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		      }
 		    if (hasCDS) /* start again on the exon to find the start of the CDS */
 		      {
-			for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (shadow2->mrna == old) ; j--, shadow2--) {} ;
+			for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
 			j++ ; shadow2++ ; 
 			for ( ; j < i ; j++, shadow2++)
 			  {
+			    if (! shadow2->mrna)
+			      continue ;
 			    if (shadow2->cds) continue ;
 			    if (shadow2->isDown)
 			      {
@@ -3315,7 +3321,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		      }
 		  }
 		  
-		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (shadow2->mrna == old) ; j--, shadow2--) {} ;
+		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
 		  j++ ; shadow2++ ; 
 		  for ( ; j < i ; j++, shadow2++)
 		    { int dv= 0 ; /* set to gene start to help debugging i.e. dv = 4195563 ; */
@@ -3324,6 +3330,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		      BOOL ok1 ;
 		      
 		      if (shadow2->cds)
+			continue ;
+		      if (! shadow2->mrna)
 			continue ;
 		      
 		      /* if there is a CDS inside this exon it is below, thanks to shadowOrder */
@@ -3446,7 +3454,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	    a1 = shadow->a2 ;
 	    a2 = shadow2->a1 ;
 	    isDown = shadow->isDown ;
-	    
+	    if (0) continue ; /* 2024_07_22 */
 	    if (shadow->mrna  && shadow->mrna == shadow2->mrna &&
 		! shadow->cds && ! shadow2->cds
 		)

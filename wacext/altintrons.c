@@ -920,7 +920,7 @@ static void gxFlatScan (BigArray aa, int run, AC_TABLE das, WIGGLE *sx)
 
 /*************************************************************************************/
 
-static int gxSetDAflatSpongeSupport (GX *gx) 
+static int gxSetSponge (GX *gx) 
 {
   const char *qq[4] ;
   qq[0] =  "select a1, da from da in  ?Donor where da ~ \"*_f\", chrom in da->intMap, a1 in chrom[1]" ;
@@ -1019,7 +1019,7 @@ static int gxSetDAflatSpongeSupport (GX *gx)
       ac_free (h) ;
     }  /* loop on the 2 strands */
   return 0 ;
-} /* gxSetDAflatSupport */
+} /* gxSetSponge */
 
 /*************************************************************************************/
 
@@ -1434,6 +1434,7 @@ static void gxCounts (GX *gx)
       int nnn = 0 ;
       AC_HANDLE h2 = 0 ;
       AC_OBJ obj = 0 ;
+      /*      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron IS CHROMOSOME_III__1557_1508 && de_duo && ! Is_echo", h) ;*/
       AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && ! Is_echo", h) ;
       ISS *up = arrayp (aa, runMax, ISS) ; /* make room */
       RSS *rp = arrayp (rr, 4 * runMax, RSS) ; /* make room */
@@ -1958,6 +1959,9 @@ int main (int argc, const char **argv)
   if (! gx.project)
     usage ("Missing argument --project") ;
 
+  if (! gx.chrom && gx.setSponge)
+    usage ("Missing argument --chrom") ;
+
   gxInit (&gx) ;
 
 
@@ -1984,7 +1988,7 @@ int main (int argc, const char **argv)
   if (gx.setSponge)
     {
       gxGetRuns (&gx) ;
-      gxSetDAflatSpongeSupport (&gx) ;
+      gxSetSponge (&gx) ;
       ac_db_commit (gx.db) ;
     }
   if (gx.setGroups)

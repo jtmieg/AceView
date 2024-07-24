@@ -546,7 +546,10 @@ foreach ss (`cat  $dd/SRA/srr.todo`)
   set srr=`echo $ss | gawk -F '___' '{print $1}'`
   if (! -d Fastc/$srr &&  ! -e $dd/SRA/$srr && ! -e $dd/SRA/$srr.fasta.gz &&  ! -e $dd/SRA/$srr'_1'.fasta.gz && ! -e $dd/SRA/$srr.csfasta.gz &&  ! -e $dd/SRA/$srr'_1'.csfasta.gz) then
     echo $ss >> totosraNeeded
-   if ($phase == sraDownload) scripts/submit $dd/SRA/$srr "scripts/SRX_import_fasta.tcsh $dd/SRA $ss" 
+   if ($phase == sraDownload) then
+     scripts/submit $dd/SRA/$srr "scripts/SRX_import_fasta.tcsh $dd/SRA $ss"
+     sleep 1
+   endif
   endif
 end
 wc totosraNeeded

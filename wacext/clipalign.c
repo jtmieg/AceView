@@ -4526,6 +4526,7 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
   if (!singleTarget)
     return 1 ;
 
+  if (1) globallyStranded = 0 ; /* at this stage we ignore the strand of the read, because we have not counted yet */
   if (1)
     {	
       if (pp->nIntronPlus  > 1000 && pp->nIntronPlus  > 20 * pp->nIntronMinus)
@@ -4533,7 +4534,7 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
       else if (pp->nIntronMinus > 1000 && pp->nIntronMinus > 20 * pp->nIntronPlus)
 	globallyStranded = -1 ;
     }
-  if (1) globallyStranded = 1 ; /* at this stage we keep the strand of the read, because we have not counted yet */
+ 
   aa = exportIntrons ;
   ii = jj = 0 ; nIntrons = arrayMax (aa) ;
   up = bigArrp (exportDonors, 0, PEXPORT) ;
@@ -4549,7 +4550,10 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
       a2 = up->a2 ;
       if ((isDown==1 &&  up->a1 > up->a2) || (isDown == -1 &&  up->a1 < up->a2))
 	continue ;
-      stranded = globallyStranded ;
+      if (globallyStranded)
+	stranded = globallyStranded ;
+      else
+	stranded = pp->stranded ;
       if (mm->pair < 0) stranded = -stranded ;
       if (0 && up->a1 > 25170000 && up->a1 < 25171000)
 	  invokeDebugger () ;
@@ -11321,12 +11325,12 @@ int main (int argc, const char **argv)
       fprintf (stderr, "##### ERROR -antiprobe and -clipPolyA are incompatible, sorry\n") ;
       exit (1) ;
     }
-  if (0 && p.stranded == 1 &&  p.clipPolyT)
+  if (0 && p.stranded > 0 &&  p.clipPolyT)
     {
       fprintf (stderr, "##### ERROR -clipPolyT -stranded \"n>0\"  are incompatible options, sorry\n") ;
       exit (1) ;
     }
-  if (0 && p.stranded == -1 &&  p.clipPolyA)
+  if (0 && p.stranded < 0 &&  p.clipPolyA)
     {
       fprintf (stderr, "##### ERROR -clipPolyA -stranded \"n<0\" are incompatible options, sorry\n") ;
       exit (1) ;

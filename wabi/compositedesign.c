@@ -48,6 +48,8 @@ static void showDs (SC *sc, Array aa)
 	  if (gS & up->type) fprintf (stderr, "SL ") ;
 	  if (gS0 & up->type) fprintf (stderr, "SL0 ") ;
 	  if (gReal5p & up->type) fprintf (stderr, "r5p ") ;
+	  if (g5 & up->type) fprintf (stderr, "X5 ") ;
+	  if (g3 & up->type) fprintf (stderr, "X3 ") ;
 	  if (gD & up->type) fprintf (stderr, "Debut ") ;
 	  if (gDF & up->type) fprintf (stderr, "DebutFuzzy ") ;
 	  if (gCompleteCDS & up->type) fprintf (stderr, "CDS ") ;
@@ -58,6 +60,8 @@ static void showDs (SC *sc, Array aa)
 	  if (gB & up->type) fprintf (stderr, "Alter ") ;
 	  if (gStolen & up->type) fprintf (stderr, "Stolen ") ;
 	  if (gPredicted & up->type) fprintf (stderr, "Predicted ") ;
+
+	  if (up->clipable) fprintf (stderr, " *") ;
 	  
 	  fprintf (stderr, "\n") ;
 	}
@@ -83,6 +87,21 @@ static int dsScoreOrder (const void *va, const void *vb)
 
 /**********************************************************************************/
 
+static int dsCoverOrder (const void *va, const void *vb)
+{
+  DSX *a = (DSX *)va, *b = (DSX *)vb ;
+  int n ;
+
+  n = a->cover - b->cover ; if (n) return -n ; /* large cover first */
+  n = a->type - b->type ; if (n) return n ;
+  n = a->a1 - b->a1 ; if (n) return n ;
+  n = a->a2 - b->a2 ; if (n) return n ;
+  
+  return 0 ;
+} /* dsScoreOrder */
+
+/**********************************************************************************/
+
 static int dsA1Order (const void *va, const void *vb)
 {
   DSX *a = (DSX *)va, *b = (DSX *)vb ;
@@ -97,6 +116,33 @@ static int dsA1Order (const void *va, const void *vb)
 
 /**********************************************************************************/
 
+static int ssHappyFew (Array ss)
+{
+  int iMax = arrayMax (ss) ;
+  if (iMax)
+     {
+       int ii, jj ;
+       DSX *ssp, *ssp1 ;
+
+       arraySort (ss, dsA1Order) ;
+       for (ii = jj = 0, ssp1 = ssp = arrp (ss, 0, DSX) ; ii < iMax ; ii++, ssp++)
+	 {
+	   if (ssp->cover > 0)
+	     {
+	       if (jj < ii)
+		 *ssp1 = *ssp ;
+	       jj++ ; ssp1++ ;
+	     }
+	 }
+       iMax = arrayMax (ss) = jj ;
+     }
+
+  arraySort (ss, dsA1Order) ;
+  return iMax ;
+} /* ssHappyFew */
+
+/**********************************************************************************/
+
 static void mrnaDesignGetElements (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
   int ii = 0, jje = 0, jji = 0, j, j2, j2Max, a1, *ip ;
@@ -107,7 +153,7 @@ static void mrnaDesignGetElements (S2M *s2m, SC *sc, DS *ds, Array smrnas)
   Array ks ;
   AC_HANDLE h = ac_new_handle () ;
   BOOL debug = FALSE ;
-
+  
   exons = ds->exons = arrayHandleCreate (100, DSX, ds->h) ;
   introns = ds->introns = arrayHandleCreate (100, DSX, ds->h) ;
   ds->reads = keySetHandleCreate (ds->h) ;
@@ -146,15 +192,17 @@ static void mrnaDesignGetElements (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 
     if (debug)
      {
-       fprintf (stderr, "... getElements Z\n") ;
+       fprintf (stderr, "... getElements exons Z\n") ;
        showDs (sc, exons) ;
+       fprintf (stderr, "... getElements exons Z done\n") ;
      }
    arraySort (exons, dsA1Order) ;
    arrayCompress (exons) ;
    if (debug)
      {
-       fprintf (stderr, "... getElements A\n") ;
+       fprintf (stderr, "... getElements exons A\n") ;
        showDs (sc, exons) ;
+       fprintf (stderr, "... getElements exons A done\n") ;
      }
    /* now we split the exons in subparts */ 
    ks = arrayHandleCreate (2 * arrayMax (exons) + 1, int, h) ;
@@ -183,765 +231,1052 @@ static void mrnaDesignGetElements (S2M *s2m, SC *sc, DS *ds, Array smrnas)
    arrayCompress (ds->exons) ;
    if (debug) 
      {
-       fprintf (stderr, "... getElements B\n") ;
+       fprintf (stderr, "... getElements exons final\n") ;
        showDs (sc, ds->exons) ;
+       fprintf (stderr, "... getElements exons final done\n") ;
      }
 
    arraySort (introns, dsA1Order) ;
    arrayCompress (introns) ;
    if (debug)
-     showDs (sc, introns) ; 
-
+     {
+       fprintf (stderr, "... getElements introns final\n") ;
+       showDs (sc, introns) ;
+       fprintf (stderr, "... getElements introns final done\n") ;
+     }
    ac_free (h) ;
    return ;
 } /* mrnaDesignGetElements */
 
 /**********************************************************************************/
-/* get the XI Composite supporting the introns and their counts */
-static void  mrnaDesignGetSupport  (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
+/* get the X Composite and their counts */
+static void mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
 {
-  HIT *up ;
-  DSX *vp, *ssp, *ssp2 ;
-  int ii, jj, ir, iss, iss2, ssMax, u1 ;
-  int nXI = 0, nXF = 0, nXG = 0, nXA = 0, nXSL = 0, nXcds = 0 ;
+  BOOL debug = TRUE ;
+  HIT *up, *up1 ;
+  DSX *ssp ;
+  int i1, ii, jj, iMax = 0, ir, iss = 0 ;
+  int nXI = 0, nXE = 0, nXA = 0, nXSL = 0, nXends = 0 ;
   BOOL isDown ;
-  BOOL debug = FALSE ;
-  BOOL hasData = FALSE ;
-  Array units = 0 ;
+  Array units ;
   BSunit *uu ;
   OBJ Est = 0 ;
   AC_HANDLE h = ac_new_handle () ;
-  KEYSET xks = keySetHandleCreate (h) ;
-  Array ss2 = 0, ss = arrayHandleCreate (256, DSX, h) ; iss = 0 ;
-
+  Array ss = arrayHandleCreate (256, DSX, ds->h) ;
+  KEYSET ks1 = keySetHandleCreate (h) ;
+  KEYSET ks2 = keySetHandleCreate (h) ;
+  KEYSET ks5 = keySetHandleCreate (h) ;
+  KEYSET ks3 = keySetHandleCreate (h) ;
+  int iiMax = arrayMax ( s2m->plainHits) ;
+  int ii1Max = arrayMax ( gmrna->hits) ;
+  
   /* grab the introns in the plainHits EST alignments */
   isDown = (sc->a1 < sc->a2) ? TRUE : FALSE ;
   units = arrayHandleCreate (12, BSunit, h) ;
-  for (ii = 0, up = arrp (s2m->plainHits, 0, HIT) ; ii < arrayMax (s2m->plainHits) ; ii++, up++)
-    {
-      BOOL flipped = up->x1 > up->x2 ? TRUE : FALSE ;
-      int a1 = isDown ? up->a1 - sc->a1 + 1 : sc->a1 - up->a2 + 1 ;
-      int a2 = isDown ? up->a2 - sc->a1 + 1 : sc->a1 - up->a1 + 1 ;
-      int b1 = 0, b2 = 0 ;
-      if ( ! strncmp (name(up->est), "XI_", 3))
-	{
-	  if (! keyFindTag (up->est, _Composite))
-	    continue ;
-	  /* identify the introns in the intron table */
-	  if (arrayMax (ds->introns) &&  (up->type & gI))
+
+  for (ii = 0, up = arrp (s2m->plainHits, ii, HIT) ; ii < iiMax ; ii++, up++)
+    for (i1 = 0, up1 = arrp (gmrna->hits, 0, HIT) ; i1 < ii1Max ; i1++, up1++)
+      {
+	int b1, b2 ;
+	
+	if (sc->a1 < sc->a2)
+	  {
+	    b1 = up1->a1 + sc->a1 - 1 ;
+	    b2 = up1->a2 + sc->a1 - 1 ;
+	  }
+	else
+	  {
+	    b2 = - up1->a1 + sc->a1 + 1 ;
+	    b1 = - up1->a2 + sc->a1 + 1 ;
+	  }
+	
+	if (
+	    ((up1->type & gI) && (up->type & gI) && up->a1 == b1 && up->a2 == b2) ||
+	    ((up1->type & gX) && (up->type & gX) && up->a1 < b2 && up->a2 > b1)
+	    )
 	    {
-	      if (up->x1 < 8 || up->x2 > up->clipEnd - 8)
-		continue ;
-	      nXI++ ;
-	      for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < arrayMax (ds->introns) ; jj++, vp++)
+	      BOOL flipped = up->x1 > up->x2 ? TRUE : FALSE ;
+	      int a1 = isDown ? up->a1 - sc->a1 + 1 : sc->a1 - up->a2 + 1 ;
+	      int a2 = isDown ? up->a2 - sc->a1 + 1 : sc->a1 - up->a1 + 1 ;
+	      int xdx = up->x2 - up->x1 ;
+	      int cdx = up->clipEnd - up->clipTop ;
+	      if (cdx < 0) cdx = - cdx ;
+	      if (xdx < 0) xdx = - xdx ;
+	      
+	      if (0 && debug)
 		{
-		  if (vp->a1 != a1 || vp->a2 != a2)
+		  fprintf (stderr, "......getSS ii=%d a1=%d a2=%d %s \n", ii, a1, a2, name (up->est)) ;
+		  showDs (sc, ss) ;
+		  fprintf (stderr, "......getSS done\n") ;
+		}
+	      if ( ! strncmp (name(up->est), "XI_", 3) ||
+		   ! strncmp (name(up->est), "XW_", 3) ||
+		   ! strncmp (name(up->est), "XY_", 3)
+		   )
+		{
+		  if (! keyFindTag (up->est, _Composite))
 		    continue ;
 		  if ((Est = bsCreate (up->est)))
 		    {
-		      if (bsGetArray (Est, _Composite, units, 5))
-			{
-			  keySet (ds->reads, keySetMax (ds->reads)) = up->est ;
-			  if (arrayMax (units) >= 1)
-			    {
-			      int k ;
-			      uu = arrp (units, 0, BSunit) ;
-			      k =  uu[0].i ; 
-			      if (bsFindTag (Est, _Other))
-				k /= 5 ;
-			      if (1 || vp->cover < k)
-				vp->cover  += k ;
-			    }
-			}
-		  bsDestroy (Est) ;
-		    }
-		}
-	    }
-	}
-      /* register the support of the exon support */
-      if (up->type & gX)
-	{
-	  if ( ! strncmp (name(up->est), "XG_", 3) || ! strncmp (name(up->est), "XH_", 3))
-	    {
-	      int iss0 = iss ;
-	      if ((Est = bsCreate (up->est)))
-		{
-		  hasData = TRUE ;
-		  if (bsGetArray (Est, _Composite, units, 3) && arrayMax (units) >= 3)
-		    {
-		      if (up->reverse == flipped)
-			for (ir = 0 ; ir < arrayMax (units) ; ir += 3)
+		      int s = 0 ;
+		      KEY intron = 0 ;
+		      if (bsGetArray (Est, _Composite, units, 1))
+			for (int jj = 0 ; jj < 1 && jj < arrayMax (units) ; jj+=1)	
 			  {
-			    uu = arrp (units, ir, BSunit) ;
-			    b1 = a1 + uu[0].i - 1 ; 	
-			    b2 = a1 + uu[1].i - 1 ;
-
-			    ssp = arrayp (ss, iss++, DSX) ;
-			    ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
-			    ssp->clipable = 1 ;
-			    if (debug)
-			      fprintf(stderr, "%s %d %d %d %s %s \n", name(up->est), ssp->a1, ssp->a2, ssp->cover, up->reverse ? "reverse" : "forward", isDown ? "Down":  " Up") ;
+			    uu = arrp (units, jj, BSunit) ;
+			    s =  uu[0].i ; 
 			  }
-		      else
-			for (ir = arrayMax (units) - 3 ; ir >= 0 ; ir -= 3)
+		      if (s && bsGetArray (Est, _Intron, units, 1))
+			for (int jj = 0 ; jj < 1 && jj < arrayMax (units) ; jj+=1)	
 			  {
-			    uu = arrp (units, ir, BSunit) ;
-			    b1 = a2 - uu[1].i + 1 ; 	
-			    b2 = a2 - uu[0].i + 1 ;
-			    
-			    ssp = arrayp (ss, iss++, DSX) ;
-			    ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
-			    ssp->clipable = 1 ;
-			    if (debug)
-			      fprintf(stderr, "%s %d %d %d %s %s \n", name(up->est), ssp->a1, ssp->a2, ssp->cover, up->reverse ? "reverse" : "forward", isDown ? "Down":  " Up") ;
+			    uu = arrp (units, jj, BSunit) ;
+			    intron = uu[0].k ;
+			    if (keyFindTag (intron, _Other))
+			      s /= 5 ;
 			  }
-		    }
-			
-		  bsDestroy (Est) ;
-		}
-	      /* shrink the higher expressed segments */
-	      if ( ! strncmp (name(up->est), "XG_", 3) || ! strncmp (name(up->est), "XH_", 3))
-		{
-		  int ii ;
-		  nXF++;  nXG++ ;
-		  for (ii = iss0 ; ii < iss - 1 ; ii++)
-		    {
-		      DSX *ssq ;
-		      ssp = arrayp (ss, ii, DSX) ;
-		      ssq = ssp + 1 ;
-		      if (ssp->a1 < ssp->a2 && ssp->a2 == ssq->a1 - 1)
+		      
+		      if (s > 0)
 			{
-			  if (ssp->cover < ssq->cover)
-			    { ssp->a2 += 10 ; ssq->a1 += 10 ; }
-			  if (ssp->cover > ssq->cover)
-			    { ssp->a2 -= 10 ; ssq->a1 -= 10 ; }
+			  DSX *ssp = arrayp (ss, iss++, DSX) ;
+			  ssp->a1 = a1 ;
+			  ssp->a2 = a2 ;
+			  s *= 5 ;
+			  if (up->type & gI)
+			    { nXI++; ssp->type = gI ; ssp->cover = s ; }
+			  else if (up->type & gX)
+			    { nXE++; ssp->type = gX ; ssp->cover = s ; }
 			}
-		      if (ssp->a1 > ssp->a2 && ssp->a2 == ssq->a1 + 1)
-			{
-			  if (ssp->cover < ssq->cover)
-			    { ssp->a2 -= 10 ; ssq->a1 -= 10 ; }
-			  if (ssp->cover > ssq->cover)
-			    { ssp->a2 += 10 ; ssq->a1 += 10 ; }
-			}
+		      
+		      bsDestroy (Est) ;
 		    }
-		  ssp = arrayp (ss, iss0, DSX) ;
-		  ssp->a1 += (ssp->a1 < ssp->a2 ? +10 : -10) ;
-		  ssp = arrayp (ss, iss - 1, DSX) ;
-		  ssp->a2 += (ssp->a1 < ssp->a2 ? -10 : +10) ;
-		  if (ssp->a1 > ssp->a2) ssp->cover = 0 ;
-		  for (ii = iss0 ; ii < iss ; ii++)
-		    {
-		      ssp = arrayp (ss, ii, DSX) ;
-		      if (debug)
-			fprintf(stderr, "... %s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-		    }
+		  continue ;
 		}
-	      continue ;
-	    }	  
-      
-	  if (! strncmp (name(up->est), "XI_", 3))
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  BOOL j ;
-		  hasData = TRUE ;
-		  if (bsGetArray (Est, _Composite, units, 1) && arrayMax (units) >= 1)
-		    for (ir = 0 ; ir < arrayMax (units) ; ir += 1)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;
-			/* only count as supported the region close to the intron */
-			j = keySetInsert (xks, up->est) ^ up->reverse ;
-			if (j) /* first exonic apparition */
-			  ssp->a1 = a2 - 30 ;
-			else
-			  ssp->a2 = a1 + 30 ;
-			if (debug)
-			  fprintf(stderr, "%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-		      }	    
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }	  
-      
-	  if (! strncmp (name(up->est), "XW_", 3) || ! strncmp (name(up->est), "XY_", 3))
-	    {  /* double introns incoded in the name */
-	      if (keySetInsert (xks, up->est) && /* first exonic apparition */
-		  (Est = bsCreate (up->est)))
-		{
-		  int cover = 0 ;
-		  const char *ccp = strstr (name(up->est), "__") ;
-		  if (! bsFindTag (Est, _Other) &&
-		      ccp && bsGetData (Est, _Composite, _Int, &cover) && cover > 0)
-		    {
-		      int k, u1 = 0, u2 = 0, v1 = 0, v2 = 0 ;
-		      char c = 0 ;
-		      hasData = TRUE ;
-		      k = sscanf (ccp + 2, "%d_%d_%d_%d%c", &u1, &u2, &v1, &v2, &c) ;
-		      if (k == 4) /* found 6 numbers, zero terminated */
-			{
-			  int isDown1 = isDown ? 1 : -1 ;
-			  int isDown2 = (u1 < u2 ? 1 : -1) ;
-			  int da1 = sc->a1 ;
-
-			  if (! ds->c1)
-			    {
-			      OBJ Cosmid = bsCreate (s2m->cosmid) ;
-			      int c1 = 0 ;
-			      KEY map ;
-
-			      if (Cosmid)
-				{
-				  if (bsGetKey (Cosmid, _IntMap, &map) &&
-				      bsGetData (Cosmid, _bsRight, _Int, &c1)
-				      )
-				    ds->c1 = c1 ;
-				  bsDestroy (Cosmid) ;
-				}
-			    }
-			  da1 = sc->a1 + ds->c1 - 1 ;
-
-			  ssp = arrayp (ss, iss++, DSX) ;  /* first exon */
-			  ssp->a1 = isDown1 * (u1 - 30 * isDown2 - da1) + 1  ; 
-			  if (0) ssp->a1 = isDown1 * (up->a1 - sc->a1) + 1 ;
-			  ssp->a2 = isDown1 * (u1 - isDown2   - da1 ) + 1 ;
-			  ssp->cover = cover ;
-			  if (debug) 
-			      fprintf(stderr, "A::%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-
-			  ssp = arrayp (ss, iss++, DSX) ;  /* second exon */
-			  ssp->a1 =  isDown1 * (u2 + isDown2  - da1) + 1  ; 
-			  ssp->a2 =  isDown1 * (v1 -isDown2  - da1) + 1  ; 
-			  ssp->cover = cover ;
-			  if (debug)
-			      fprintf(stderr, "B::%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-
-			  ssp = arrayp (ss, iss++, DSX) ;  /* third exon */
-			  ssp->a1 =  isDown1 * (v2 + isDown2  - da1) + 1   ; 
-			  ssp->a2 =  isDown1 * (v2 + 30 * isDown2  - da1) + 1  ; 
-			  if (0) ssp->a2 = isDown1 * (up->a2 - sc->a1) + 1 ;
-			  ssp->cover = cover ;
-			  if (debug)
-			      fprintf(stderr, "C::%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-			}
-		    }	    
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }	  
-
-	  if (! strncmp (name(up->est), "XSL", 3))
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  nXSL++ ;
-		  if (bsGetArray (Est, _Composite, units, 2) && arrayMax (units) >= 2)
-		    for (ir = 0 ; ir < arrayMax (units) ; ir += 2)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = ssp->a1 + 30 ; ssp->cover = uu[0].i ;
-			ssp->type |= (gS | gX) ;
-			if (debug)
-			  fprintf(stderr, "%s %d %d %d:%d \n", name(up->est), a1, a2, uu[0].i, uu[4].i) ;
-		      }	    
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }
-	  
-	  if (! strncmp (name(up->est), "XA_", 3)) 
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  nXA++ ;
-		  if (bsGetArray (Est, _Composite, units, 2) && arrayMax (units) >= 2)
-		    for (ir = 0 ; ir < arrayMax (units) ; ir += 2)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ;
-			ssp->cover = uu[0].i ;
-			ssp->type |= (gA | gX) ;
-			if (debug)
-			  fprintf(stderr, "%s %d %d %d\n", name(up->est), a1, a2, uu[0].i) ;
-		      }	    
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }
-	  if (! strncmp (name(up->est), "Xcds_", 5)) 
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  nXcds++ ;
-		  if (bsGetArray (Est, _Composite, units, 1) && arrayMax (units) >= 1)
-		    for (ir = 0 ; ir < arrayMax (units) ; ir++)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;
-			ssp->cover = 12 ; /* a nominal value, uu[0].i is the length of the CDS, not very useful */
-			ssp->type |= (gCompleteCDS | gX) ;
-			if (debug)
-			  fprintf(stderr, "%s %d %d %d\n", name(up->est), a1, a2, uu[0].i) ;
-		      }	    
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }
-	  if (! strncmp (name(up->est), "Xends_", 6))
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  if (bsGetArray (Est, _Composite, units, 1) && arrayMax (units) >= 1)
-		    for (ir = 0 ; ir < arrayMax (units) ; ir ++)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			if (! strncmp (name(up->est), "Xends_ELF_", 9) && ! isDown)
-			  continue ;
-			if (! strncmp (name(up->est), "Xends_ERF_", 9) && ! isDown)
-			  continue ;
-			if (! strncmp (name(up->est), "Xends_ERR_", 9) &&  isDown)
-			  continue ;
-			if (! strncmp (name(up->est), "Xends_ELR_", 9) &&  isDown)
-			  continue ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;ssp->cover = 1 ; /* the ends geometry is too random to allow creattion of exons */
-			 if (! strncmp (name(up->est), "Xends_ELF_", 9) && isDown) 
-			   { ssp->type |= (gReal5p | gX) ; ssp->a1 += 20 ; ssp->a2 = ssp->a1 + 30 ; }
-			 if (! strncmp (name(up->est), "Xends_ERF_", 9) && isDown) 
-			   { ssp->type |= (gReal3p | gX) ; ssp->a2 -= 30 ; ssp->a1 = ssp->a2 - 30 ; } 
-			 if (! strncmp (name(up->est), "Xends_ERR_", 9) && ! isDown) 
-			   { ssp->type |= (gReal5p | gX) ; ssp->a2 -= 30 ; ssp->a1 = ssp->a2 - 30 ; } 
-			 if (! strncmp (name(up->est), "Xends_ELR_", 9) && ! isDown) 
-			   { ssp->type |= (gReal3p | gX) ; ssp->a1 += 30 ; ssp->a2 = ssp->a1 + 30 ; }
-			if (debug)
-			  fprintf(stderr, "....%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-		      }
-		  bsDestroy (Est) ;
-		}
-	      continue ;
-	    }
-	  	  
-	  if (1)  /* catch all else case */
-	    {
-	      if ((Est = bsCreate (up->est)))
-		{
-		  if (bsGetArray (Est, _Composite, units, 1) && arrayMax (units) >= 1)
-		    for (ir = 0 ; ir < 1 && ir < arrayMax (units) ; ir ++)
-		      {
-			uu = arrp (units, ir, BSunit) ;
-			ssp = arrayp (ss, iss++, DSX) ;
-			ssp->a1 = a1 ; ssp->a2 = a2 ; ssp->cover = uu[0].i ;
-			if (debug)
-			  fprintf(stderr, "%s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
-		      }
-		  bsDestroy (Est) ;
-		}	  
-	      continue ;
-	    }
-	}
-    }
-  if (! (nXF + nXG + nXcds) || ! hasData)
-    arrayMax (ss) = 0 ;
-  if (! arrayMax (ss))
-    goto done ;
-  /* at each position choose the maximal value */
-  arraySort (ss, dsA1Order) ;
-
-  if (debug)
-    {
-      fprintf (stderr, "mrnaDesignGetSupport phase 1 done\n") ;
-      showDs (sc, ss) ;
-    }
-  if (arrayMax (ds->introns))
-    {
-      float intronBonus = 3.0 ;
-      for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < arrayMax (ds->introns) ; jj++, vp++)
-	{
-	  if (! (vp->type & gSuspect))
-	    vp->cover *= intronBonus ;
-	  else
-	    vp->cover /= 2 ;
-	}
-    }
-   
-  /*  register all boundaries */
-  arrayDestroy (s2m->compositeDesignCovering) ;
-  s2m->compositeDesignCovering = ds->covering = ss2 = arrayHandleCreate (2 * arrayMax (ss), DSX, s2m->h) ;
-  for (jj = iss = 0, ssp = arrp (ss, 0, DSX) ; iss < arrayMax (ss) ; iss++, ssp++)
-    {
-      if(ssp->a1 > ssp->a2) { ssp->cover = 0 ; continue ; }
-      ssp2 = arrayp (ss2, jj++, DSX) ;
-      ssp2->a1 = ssp2->a2 = ssp->a1 ; ssp2->type = ssp->type & gDebut ; 
-      ssp2 = arrayp (ss2, jj++, DSX) ;
-      ssp2->a1 = ssp2->a2 = ssp->a2 ; ssp2->type = ssp->type & gFin ; 
-      ssp2 = arrayp (ss2, jj++, DSX) ; /* this point is needed to go back to zero at the end of the intervals */
-      ssp2->a1 = ssp2->a2 = ssp->a2 + 1 ;
-      ssp2 = arrayp (ss2, jj++, DSX) ; /* this point is needed to go back to zero at the end of the intervals */
-      ssp2->a1 = ssp2->a2 = ssp->a1 - 1 ;
-    }
-  /* some coords appear in the exons but not in ss */
-  for (iss = 0, ssp = arrp (ds->exons, 0, DSX) ; iss < arrayMax (ds->exons) ; iss++, ssp++)
-    {
-      if(ssp->a1 > ssp->a2) { ssp->cover = 0 ; continue ; }
-      ssp2 = arrayp (ss2, jj++, DSX) ;
-      ssp2->a1 = ssp2->a2 = ssp->a1 ; ssp2->type = ssp->type & gDebut ; 
-      ssp2 = arrayp (ss2, jj++, DSX) ;
-      ssp2->a1 = ssp2->a2 = ssp->a2 ; ssp2->type = ssp->type & gFin ; 
-      ssp2 = arrayp (ss2, jj++, DSX) ; /* this point is needed to go back to zero at the end of the intervals */
-      ssp2->a1 = ssp2->a2 = ssp->a2 + 1 ;
-      ssp2 = arrayp (ss2, jj++, DSX) ; /* this point is needed to go back to zero at the end of the intervals */
-      ssp2->a1 = ssp2->a2 = ssp->a1 - 1 ;
-    }
-  arraySort (ss2, dsA1Order) ; 
-  for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
-    { /* so that compress will eliminate coords duplicates created with different flags */
-      for (iss2 = iss+1, ssp2 = ssp + 1 ;  iss2 < arrayMax (ss2) && ssp2->a1 == ssp->a1 && ssp2->a2 == ssp->a2; iss2++, ssp2++)
-	{ ssp2->type |= ssp->type ; ssp->type = ssp2->type ; }
-    }
-  arrayCompress (ss2) ;
-  /* register the max values in each zone */ 
-  for (jj = iss = iss2 = 0, ssp = arrp (ss, 0, DSX), ssp2 = arrp (ss2, 0, DSX) ; iss < arrayMax (ss) ; iss++, ssp++)
-    {
-      /* position ssp2 on ssp->a1 */
-      while (iss2 > 0 && ssp2->a1 > ssp->a1) { iss2-- ; ssp2-- ; }
-      while (iss2 < arrayMax (ss2) && ssp2->a1 < ssp->a1) { iss2++ ; ssp2++ ; }
-      /* possibly increment the coverage */
-      while (iss2 < arrayMax (ss2) && ssp2->a1 <= ssp->a2) 
-	{ 
-	  if (ssp2->cover < ssp->cover) /* 2024_02 */
-	    ssp2->cover = ssp->cover ;
-	  iss2++ ; ssp2++ ; 
-	}
-    }
-  if (debug)
-    {
-      fprintf (stderr, "max value in each zone\n") ;
-      showDs (sc, ss2) ;
-    }
-
-  /* look for weak introns donor/acceptor */
-   ii = 0 ; ssp = arrp (ss2, 0, DSX) ; ssMax = arrayMax (ss2) ;
-   if (arrayMax(ds->introns))
-     for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; ii < ssMax && jj < arrayMax (ds->introns) ; jj++, vp++)
-       {
-	 DSX* vp2 ;
-	 int jj2 ;
-	 int a1 = vp->a1 ;
-	 int a2 = vp->a2 ;
-	 long int cover = vp->cover ;
-
-         cover *= 100 ;
-
-	 
-	 /* compare the cover to the donor exon (a1 - 1) and the retained intron (a1) */
-	 while (ii > 0 && ssp->a1 > a1-5) { ii-- ; ssp-- ; }
-	 for ( ; ssp->a1 <= a1+5 && ii < ssMax ; ssp++, ii++)
-	   if (ssp->a1 >= a1 - 5 && ssp->a1 <= a1 + 5)
-	     if (ssp->cover > cover)
-	       { vp->donor = -1 ; break ; }
-	 /* compare to other introns starting at same site */
-	 for (jj2 = jj - 1, vp2 = vp - 1 ; jj2 >= 0  && vp2->a1 == a1 ; jj2--, vp2--)
-	    if (vp2->cover > cover)
-	       { vp->donor = -1 ; break ; }
-	 for (jj2 = jj + 1, vp2 = vp + 1 ; jj2 <  arrayMax (ds->introns)  && vp2->a1 == a1 ; jj2++, vp2++)
-	    if (vp2->cover > cover)
-	       { vp->donor = -1 ; break ; }
-	 /* compare the cover to the donor exon (a2 + 1) and the retained intron (a2) */
-	 while (ii > 0 && ssp->a1 > a2 - 5) { ii-- ; ssp-- ; }
-	 for ( ; ssp->a1 <= a2 + 5 && ii < ssMax ; ssp++, ii++)
-	   if (ssp->a1 >= a2 - 5  && ssp->a1 <= a2 + 5)
-	     if (ssp->cover > cover)
-	       { vp->acceptor = -1 ; break ; }
-	 for (jj2 = jj + 1, vp2 = vp + 1 ; jj2 <  arrayMax (ds->introns)  && vp2->a1 < a2 ; jj2++, vp2++)
-	    if (vp2->a2 == a2 && vp2->cover > cover)
-	       { vp->acceptor = -1 ; break ; }
-	 if (vp->donor == -1 && vp->acceptor == -1)
-	   vp->cover = vp->score = 0 ; 
-	 if (ii) { ii-- ; ssp-- ; }
-       }
-  
-   
-   /* compute the average support of each exon fragment */
-   ii = 0 ; ssp = arrp (ss2, 0, DSX) ; ssMax = arrayMax (ss2) ;
-   if (arrayMax (ds->exons) )
-     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
-       {
-	 int a1 = vp->a1 ;
-	 int a2 = vp->a2 ;
-	 long int nn, nnn ;
-	 nnn = nn = 0 ;
-
-	 while (ii > 0 && ssp->a1 > a1) { ii-- ; ssp-- ; }
-	 u1 = a1 ; if (u1 < ssp->a1) u1 = ssp->a1 ; nn = ssp->cover ; 
-	 
-	 for ( ; ii < ssMax && ssp->a1 < a1 ; ii++, ssp++) 
-	   {
-	     nn = ssp->cover ; 
-	   }
-	 
-	 for ( ; ii < ssMax && ssp->a1 < a2 ; ii++, ssp++)
-	   {
-	     nnn += nn * (ssp->a1 - u1) ;
-	     if (ssp->a1 >= u1) u1 = ssp->a1 ; 
-	     nn = ssp->cover ;
-	   }
-	 if (0 && ii < ssMax && a2 == ssp->a1)
-	   vp->type |= (ssp->type & gFin) ; 
-	 if (a2 >= u1) 
-	   nnn += nn * (a2 - u1 + 1) ;
-	 
-	 vp->cover = nnn / (a2 - a1 + 1) ;
-	 if (nnn >= 0 && vp->cover < 1) vp->cover = 1 ;
-       }
-   
-   if (debug)
-     {
-       fprintf (stderr, "mrnaDesignGetSupport phase 2 done\n") ;
-       showDs (sc, ss) ;
-     }
-   
-   if (1) /* Xcds is used to mask Xends */
-     for (jj = 0, vp = arrp (ss, 0, DSX) ; jj < arrayMax (ss) ; jj++, vp++)
-       if (vp->type & gCompleteCDS)
-	 for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
-	   {
-	     if (
-		 ssp->a1 >= vp->a1 &&
-		 ssp->a1 <= vp->a2
-		 )
-	       {
-		 ssp->type |=  gCompleteCDS ;
-		 ssp->type &= ~gReal3p ;  /* Xcds is used to mask Xends */
-		 ssp->type &= ~gA ;  /* Xcds is used to mask Xends */
-	       }
-	   }
-   
-   if (debug)
-     {
-       fprintf (stderr, "mrnaDesignGetSupport phase 3 done\n") ;
-       showDs (sc, ss2) ;
-	}
-   
-   if (0) /* reestablish the polyA flags */
-     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
-       {
-	 for (iss = 0, ssp = arrp (ss2, 0, DSX) ; iss < arrayMax (ss2) ; iss++, ssp++)
-	   {
-	     if ((ssp->type & gCompleteCDS) &&
-		 ssp->a2 <= vp->a2 &&
-		 ssp->a2 >= vp->a1
-		 )
-	       vp->type |= gCompleteCDS ;
-	     if ((ssp->type & gS) &&
-		 ssp->a2 < vp->a2 &&
-		 ssp->a2 >= vp->a1
-		 )
-	       {
-		 vp->type |= gS ;
-	       }
-		   
-	     if ((ssp->type & (gA | gReal3p)) &&
-		 ssp->a1 > vp->a1 &&
-		 ssp->a1 <= vp->a2
-		 )
-	       {
-		 vp->type |= (ssp->type & (gA | gCompleteCDS | gReal3p)) ;
-		 if (vp->type & gCompleteCDS &  gReal3p) vp->type &= ~gReal3p ;
-		 if (vp->type & gCompleteCDS &  gA) vp->type &= ~gA ;
-	       }
-	   }
-       }
-
-   if (0) /* merge length 1 flags */
-     for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) - 1 ; jj++, vp++)
-       {
-	 DSX *wp = vp + 1 ;
-	 if (wp->a1 == wp->a2 && wp->a1 == vp->a2 + 1)
-	   { vp->type |= wp->type ; vp->a2 = wp->a2 ; wp->type = 0 ; wp->cover = 0 ; }
-       }
-   /* keep happy few */
-   if (0)
-     {
-       DSX *wp ;
-       for (ii = 0, jj = 0, vp = arrp (ds->exons, 0, DSX), wp = vp ; ii < arrayMax (ds->exons) ; ii++, vp++)
-	 {
-	   if (vp->cover)
-	     {
-	       
-	       if (wp < vp) *wp = *vp ;
-	       wp++ ; jj++ ;
-	     }
-	 }
-       arrayMax (ds->exons) = jj ;
-     }
-
-   if (debug)
-     {
-       fprintf (stderr, "mrnaDesignGetSupport  done\n") ;
-       showDs (sc, ds->exons) ;
-     }
- done:
-   ac_free (h) ;
-   return ;
-} /* mrnaDesignGetSupport */
-
-/**********************************************************************************/
-/* copy the exon up0 into ds->exons, possibly splitting it */
-static void mrnaDesignSplitOneExon (DS *ds, SC *sc, DSX *up0)
-{
-  DSX *up, *xp ;
-  
-  if ( 
-      (up0->type & gX) &&  
-      (	   
-       (up0->type & (gReal5p | gS | gS0)) ||
-       (up0->type & (gReal3p | gA))
-	   )
-       )
-    {
-      int ii ;
-      int iMax = arrayMax (ds->covering) ;
-      int a1 = up0->a1 ;
-      int a2 = up0->a2 ;
-      int cover = 0 ;
-      unsigned int type = 0 ;
-      
-      for (ii = 0, xp = arrp (ds->covering, 0, DSX) ; ii < iMax ; xp++, ii++)
-	{
-	  if (xp->a1 >= a1 && xp->a1 <= a2)
-	    {
-	      if  (ii && 
-		   (
-		    ( 5 * xp->cover < (xp-1)->cover || 
-		      xp->cover > 5 * (xp-1)->cover) ||
-		    ( (type | xp->type) & (gS | gS0 | gReal3p | gA)) ||
-		    ( (xp->type & gDebut) && (type & gFin)) ||
-		    ( (type & gDebut) && (xp->type & gFin))
-		    )
+	      
+	      /* register the exon support and  shrink the higher expressed segments */
+	      if ( ! strncmp (name(up->est), "XG_", 3) ||
+		   ! strncmp (name(up->est), "XH_", 3)
 		   )
 		{
-		  if (cover)
+		  int iss0 = iss, b1, b2 ;
+		  if (10 * xdx < 9 * cdx) continue ;
+		  if (! keyFindTag (up->est, _Composite))
+		    continue ;
+		  if ((Est = bsCreate (up->est)))
 		    {
-		      up = arrayp (ds->exons, arrayMax (ds->exons), DSX) ;
-		      up->a1 = a1 ;
-		      up->a2 = xp->a1 - 1 ;
-		      up->type = type | gX ;
-		      if (up->a2 >= up->a1)
-			up->cover = cover/(up->a2 - up->a1 + 1) ;
+		      if (bsGetArray (Est, _Composite, units, 3) && arrayMax (units) >= 3)
+			{
+			  if (up->reverse == flipped)
+			    for (ir = 0 ; ir < arrayMax (units) ; ir += 3)
+			      {
+				uu = arrp (units, ir, BSunit) ;
+				b1 = a1 + uu[0].i - 1 ; 	
+				b2 = a1 + uu[1].i - 1 ;
+				
+				ssp = arrayp (ss, iss++, DSX) ;
+				ssp->type = gX ;
+				ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
+				if (ir == 0 || ir == arrayMax (units) - 3)
+				  ssp->clipable = 1 ;
+				if (0 && debug)
+				  fprintf(stderr, "%s %d %d %d %s %s \n", name(up->est), ssp->a1, ssp->a2, ssp->cover, up->reverse ? "reverse" : "forward", isDown ? "Down":  " Up") ;
+			      }
+			  else
+			    for (ir = arrayMax (units) - 3 ; ir >= 0 ; ir -= 3)
+			      {
+				uu = arrp (units, ir, BSunit) ;
+				b1 = a2 - uu[1].i + 1 ; 	
+				b2 = a2 - uu[0].i + 1 ;
+				
+				ssp = arrayp (ss, iss++, DSX) ;
+				ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
+				if (ir == 0 || ir == arrayMax (units) - 3)
+				  ssp->clipable = 1 ;
+				if (0 && debug)
+				  fprintf(stderr, "----%s %d %d %d %s %s \n", name(up->est), ssp->a1, ssp->a2, ssp->cover, up->reverse ? "reverse" : "forward", isDown ? "Down":  " Up") ;
+			      }
+			}
+		      
+		      bsDestroy (Est) ;
+		      
+		      /* shrink the higher expressed segments */
+		      if ( ! strncmp (name(up->est), "XG_", 3) || ! strncmp (name(up->est), "XH_", 3))
+			{
+			  int ii ;
+			  for (ii = iss0 ; ii < iss - 1 ; ii++)
+			    {
+			      DSX *ssq ;
+			      ssp = arrayp (ss, ii, DSX) ;
+			      ssq = ssp + 1 ;
+			      if (ssp->a1 < ssp->a2 && ssp->a2 == ssq->a1 - 1)
+				{
+				  if (ssp->cover < ssq->cover && ssq->a2 > ssq->a1 + 10)
+				    { ssp->a2 += 10 ; ssq->a1 += 10 ; }
+				  if (ssp->cover > ssq->cover && ssp->a2 > ssp->a1 + 10)
+				    { ssp->a2 -= 10 ; ssq->a1 -= 10 ; }
+				}
+			      if (ssp->a1 > ssp->a2 && ssp->a2 == ssq->a1 + 1)
+				{
+				  messcrash ("a1>a2 should never happen") ;
+				  if (ssp->cover < ssq->cover && ssq->a1 > ssp->a1 + 10)
+				    { ssp->a2 -= 10 ; ssq->a1 -= 10 ; }
+				  if (ssp->cover > ssq->cover && ssq->a2 > ssq->a1 + 10)
+				    { ssp->a2 += 10 ; ssq->a1 += 10 ; }
+				}
+			    }
+			  if (0)
+			    {
+			      ssp = arrayp (ss, iss0, DSX) ;
+			      ssp->a1 += (ssp->a1 < ssp->a2 ? +10 : -10) ;
+			      ssp = arrayp (ss, iss - 1, DSX) ;
+			      ssp->a2 += (ssp->a1 < ssp->a2 ? -10 : +10) ;
+			      if (ssp->a1 > ssp->a2) ssp->cover = 0 ;
+			    }
+			  for (ii = iss0 ; ii < iss ; ii++)
+			    {
+			      ssp = arrayp (ss, ii, DSX) ;
+			      if (0 && debug)
+				fprintf(stderr, "... %s %d %d %d \n", name(up->est), ssp->a1, ssp->a2, ssp->cover) ;
+			    }
+			}
+		      continue ;
 		    }
-		  a1 = xp->a1 ;
-		  cover = 0 ;
-		  type = 0 ;
 		}
-	      type |= xp->type ;
-	      cover += xp->cover * ((xp+1)->a1 - xp->a1) ;
-	    }
-	}
-      up = arrayp (ds->exons, arrayMax (ds->exons), DSX) ;
-      up->a1 = a1 ;
-      up->a2 = up0->a2 ;
-      if (up->a2 + 1 > up->a1)
-	{
-	  up->cover = cover/(up->a2 - up->a1 + 1) ;
-	  up->type = type | gX ;
-	}
-      else
-	up->a2 = up->a1 ;
-    }
-  else
-    {
-      up = arrayp (ds->exons, arrayMax (ds->exons), DSX) ;
-      *up = *up0 ;
-    }
-  
-  return ;
-} /* mrnaDesignSplitOneExon */
-
-/**********************************************************************************/
-
-static void mrnaDesignSplitExons (DS *ds, SC *sc)
-{
-  BOOL debug =  FALSE ;
-
-  if (debug)
-    {
-      fprintf (stderr, "mrnaDesignSpliExon starts\n") ;
-      showDs (sc, ds->covering) ;
-      fprintf (stderr, "   .. original exons\n") ;
-      showDs (sc, ds->exons) ;
-    }
-
-  if (arrayMax (ds->exons))
-    {
-      int ii ;
-      DSX *up ;
-      Array aa = arrayCopy (ds->exons) ;
-
-      arrayMax (ds->exons) = 0 ;
-      for (ii = 0, up = arrp (aa, 0, DSX) ; ii < arrayMax (aa) ; ii++, up++)
-	mrnaDesignSplitOneExon (ds, sc, up) ; 
-      arrayDestroy (aa) ;
-    }
-
-
-
-  if (arrayMax (ds->exons) &&
-      ds->covering &&
-      arrayMax (ds->covering)
-      ) /* reestablish the polyA flags */
-    {
-      int iss, jj ;
-      DSX *vp, *ssp ;
-      
-      for (jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < arrayMax (ds->exons) ; jj++, vp++)
-	{
-	  for (iss = 0, ssp = arrp (ds->covering, 0, DSX) ; iss < arrayMax (ds->covering) ; iss++, ssp++)
-	    {
-	      if ((ssp->type & gCompleteCDS) &&
-		  ssp->a2 <= vp->a2 &&
-		  ssp->a2 >= vp->a1
-		  )
-		vp->type |= gCompleteCDS ;
-	      if ((ssp->type & gS) &&
-		  ssp->a1 < vp->a2 &&
-		  ssp->a1 >= vp->a1 - 1
-		  )
-		vp->type |= gS ;
-	      if ((ssp->type & (gA | gReal3p)) &&
-		  ssp->a2 > vp->a1 &&
-		  ssp->a2 <= vp->a2 + 1
+	      
+	      /* register the predicted cds support */
+	      if (! strncmp (name(up->est), "Xcds_", 5))
+		{
+		  if (! keyFindTag (up->est, _Composite))
+		    continue ;
+		  if (10 * xdx < 9 * cdx) continue ;
+		  if ((Est = bsCreate (up->est)))
+		    {
+		      int s = 12 ;
+		      nXE++ ;
+		      ssp = arrayp (ss, iss++, DSX) ;
+		      ssp->a1 = a1 ;
+		      ssp->a2 = a2 ;
+		      ssp->cover = s ;
+		      ssp->type = gX | gCompleteCDS | gFF ; /* useless */
+		      ssp->type = gX | gFF ;
+		      ssp->clipable = 1 ;
+		      
+		      bsDestroy (Est) ;
+		    }
+		  continue ;
+		}
+	      
+	      /* register the polyA */
+	      if (! strncmp (name(up->est), "XA_", 3) ||
+		  ! strncmp (name(up->est), "XSL", 3) ||
+		  ! strncmp (name(up->est), "Xends_", 6)
 		  )
 		{
-		  vp->type |= (ssp->type & (gA | gCompleteCDS | gReal3p)) ;
-		  if (vp->type & gCompleteCDS &  gReal3p) vp->type &= ~gReal3p ;
-		  if (vp->type & gCompleteCDS &  gA) vp->type &= ~gA ;
+		  if (! keyFindTag (up->est, _Composite))
+		    continue ;
+		  if (10 * xdx < 9 * cdx) continue ;
+		  if ((Est = bsCreate (up->est)))
+		    {
+		      int s = 0 ;
+		      if (bsGetArray (Est, _Composite, units, 1))
+			for (int jj = 0 ; jj < 1 && jj < arrayMax (units) ; jj+=1)	
+			  {
+			    uu = arrp (units, jj, BSunit) ;
+			    s =  uu[0].i ; 
+			  }
+		      if (s)
+			{
+			  if (! strncmp (name(up->est), "Xends_ELF_", 9) && ! isDown)
+			    continue ;
+			  if (! strncmp (name(up->est), "Xends_ERF_", 9) && ! isDown)
+			    continue ;
+			  if (! strncmp (name(up->est), "Xends_ERR_", 9) &&  isDown)
+			    continue ;
+			  if (! strncmp (name(up->est), "Xends_ELR_", 9) &&  isDown)
+			    continue ;
+			  
+			  ssp = arrayp (ss, iss++, DSX) ;
+			  ssp->a1 = a1 ;
+			  ssp->a2 = a2 ;
+			  ssp->cover = s ;
+			  ssp->clipable = TRUE ;
+			  if (! strncmp (name(up->est), "XA_", 3))
+			    {
+			      nXA++ ;
+			      ssp->a1 = ssp->a2 ;
+			      ssp->type = gX | gA ;
+			      ssp->clipable = FALSE ;
+			    }
+			  else if (! strncmp (name(up->est), "XSL", 3))
+			    {
+			      nXSL++ ;
+			      ssp->a2 = ssp->a1 ;
+			      ssp->type = gX | gS ;
+			      ssp->clipable = FALSE ;
+			    }
+			  else if (! strncmp (name(up->est), "Xends_ELF_", 9) && isDown) 
+			    { nXends++ ; ssp->type = (gReal5p | gDF | gX) ; if (0) { ssp->a1 += 1 ; ssp->a2 = ssp->a1 + 30 ; }}
+			  else if (! strncmp (name(up->est), "Xends_ERF_", 9) && isDown) 
+			    { nXends++ ; ssp->type = (gReal3p | gFF | gX) ; if (0) { ssp->a2 -= 1 ; ssp->a1 = ssp->a2 - 30 ; }} 
+			  else if (! strncmp (name(up->est), "Xends_ERR_", 9) && ! isDown) 
+			    { nXends++ ; ssp->type = (gReal5p | gDF | gX) ; if (0) { ssp->a1 += 1 ; ssp->a2 = ssp->a1 + 30 ; }} 
+			  else if (! strncmp (name(up->est), "Xends_ELR_", 9) && ! isDown) 
+			    { nXends++ ; ssp->type = (gReal3p | gFF | gX) ; if (0) { ssp->a2 -= 1 ; ssp->a1 = ssp->a2 - 30 ; }}
+			  
+			}
+		      bsDestroy (Est) ;
+		    }
+		  continue ;
+		}
+	    }
+      }
+
+  if (debug)
+    {
+       fprintf (stderr, "mrnaDesignGetGraphElements\n") ;
+       showDs (sc, ss) ;
+       fprintf (stderr, "mrnaDesignGetGraphElements  done\n") ;
+    }
+  arraySort (ss, dsA1Order) ;
+  if (debug)
+    {
+       fprintf (stderr, "mrnaDesignGetGraphElements\n") ;
+       showDs (sc, ss) ;
+       fprintf (stderr, "mrnaDesignGetGraphElements  done\n") ;
+       fprintf (stderr, "s2m->plainHits\n") ;
+       showHits (s2m->plainHits) ;
+       fprintf (stderr, "s2m->plainHits  done\n") ;
+       fprintf (stderr, "gmrna->hits\n") ;
+       showHits (gmrna->hits) ;
+       fprintf (stderr, "gmrna->hits  done\n") ;
+     }
+
+  iMax = ssHappyFew (ss) ;
+  if (iMax) /* kill overlapping introns below 1/1000 */
+     {
+       for (jj = 0, ssp = arrp (ss, jj, DSX) ; jj < iMax - 1 ; ssp++, jj++)
+         {
+	   int i ;
+	   DSX *ssp1 ;
+
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     {
+	       int b2 = ssp->a2 ;
+	       for (i = 1, ssp1 = ssp + i ; i + jj < iMax && ssp1->a1 <= b2 ; i++, ssp1++)
+		 {
+		   if (ssp1->type & gI)
+		     {
+		       if (ssp->cover > 1000 * ssp1->cover)
+			 ssp1->cover = 0 ;
+		       if (ssp1->cover > 1000 * ssp->cover)
+			 ssp->cover = 0 ;
+		     }
+		 }
+	     }
+	 }
+     }
+  
+  iMax = ssHappyFew (ss) ;
+  if (! iMax)
+    goto done ;
+
+  /*  register all boundaries */
+  keySet (ks1, 0) = 0 ;
+  keySet (ks2, 0) = 0 ;
+  for (int ii = 0, m = 1, n = 1 ; ii < iMax ; ii++)
+    {
+      ssp = arrp (ss, ii, DSX) ;
+      keySet (ks1, m++) = ssp->a1 ;         /* begin */
+      keySet (ks2, n++) = ssp->a2 ;         /* end */
+      keySet (ks1, m++) = ssp->a2 + 1 ;     /* virtual begin */
+      keySet (ks2, n++) = ssp->a1 - 1 ;     /* virtual end */
+      if (ssp->type & gI)
+	{
+	  keySet (ks5, m++) = ssp->a2 + 1 ;     /* exon acceptor */
+	  keySet (ks3, n++) = ssp->a1 - 1 ;     /* exon donor */
+	}
+    }
+  keySetSort (ks1) ;
+  keySetSort (ks2) ;
+  keySetSort (ks5) ;
+  keySetSort (ks3) ;
+  keySetCompress (ks1) ;
+  keySetCompress (ks2) ;
+  keySetCompress (ks5) ;
+  keySetCompress (ks3) ;
+  
+  /* split when needed */
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements before split\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements before split done\n") ;
+    }
+  if (1)
+    {
+      int m = 0, n = 0, b1 ;
+      int mMax = keySetMax (ks1), nMax = keySetMax (ks2) ;
+      Array ss1 = arrayHandleCreate (2*ii + 1 , DSX, ds->h ) ;
+      int j5Max = keySetMax (ks5) ;
+      int j3Max = keySetMax (ks3) ;
+      
+      for (int ii = 0, jj = 0 ; ii < iMax ; ii++)
+	  {
+	    int i4 = 0 ;
+	    ssp = arrp (ss, ii, DSX) ;
+	    if (ssp->type & gX)
+	      {
+		while (m > 0 && keySet (ks1, m) >= ssp->a1)
+		  m-- ;
+		while (n > 0 && keySet (ks2, n) >= ssp->a1)
+		  n-- ;
+		while (m < mMax  && keySet (ks1, m) < ssp->a1)
+		  m++ ;
+		while (n < nMax && keySet (ks2, n) < ssp->a1)
+		  n++ ;
+		b1 = ssp->a1 ;
+		while (n < nMax && keySet (ks2, n) <= ssp->a2)
+		  {
+		    if (1 ||  /* otherwise in 0_923 je cree un trou avec l'exon au dessus */
+			i4++ || (! ssp->clipable || keySet (ks2, n)  > b1 + 10))
+		      {
+			DSX *ssp1 = arrayp (ss1, jj++, DSX) ;
+			*ssp1 = *ssp ;
+			ssp1->a1 = b1 ; ssp1->a2 = keySet (ks2, n) ;
+		      }
+		    b1 = keySet (ks2, n)  + 1 ;
+		    n++ ;
+		  }
+		if (n == nMax) n-- ;
+		if (b1 < ssp->a2 && (! ssp->clipable || b1 < ssp->a2 - 10))
+		  {
+		    DSX *ssp1 = arrayp (ss1, jj++, DSX) ;
+		    *ssp1 = *ssp ;
+		    ssp1->a1 = b1 ; ssp1->a2 = ssp->a2 ;
+		  }
+	      }
+	    else if (ssp->type & gI)
+	      {
+		DSX *ssp1 = arrayp (ss1, jj++, DSX) ;
+		*ssp1 = *ssp ;
+	      }	    
+	  }
+      arrayDestroy (ss) ;
+      ss = ss1 ;
+      iMax = arrayMax (ss) ;
+      
+      for (int ii = 0, j3 = 0, j5 = 0 ; ii < iMax ; ii++)
+	{
+	  ssp = arrayp (ss1, ii, DSX) ;
+	  if (ssp->type & gX)
+	    {
+	      int b1 = ssp->a1 ;
+	      int b2 = ssp->a2 ;
+	      
+	      while (j5 > 0 && keySet (ks5, j5) > b1) j5-- ;
+	      while (j5 < j5Max - 1 && keySet (ks5, j5) < b1) j5++ ;
+	      if (keySet (ks5, j5) == b1) ssp->type |= g5 ;
+	      
+	      while (j3 > 0 && keySet (ks3, j3) > b2) j3-- ;
+	      while (j3 < j3Max - 1 && keySet (ks3, j3) < b2) j3++ ;
+	      if (keySet (ks3, j3) == b2) ssp->type |= g3 ;
+	    }
+	}
+    }
+
+  if (0 && debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after split\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after split done\n") ;
+    }
+	      
+  arraySort (ss, dsA1Order) ;
+	    
+  if (0 && debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after split sort\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after split sort done\n") ;
+    }
+	      
+  /* at each position choose the maximal value */
+  if (1)
+    {
+      int jj = 0, gIX = gI | gX ;
+
+      for (int ii = 0 ; ii < iMax ; ii++)
+	{
+	  ssp = arrp (ss, ii, DSX) ;
+	  
+	  int type = ssp->type & gIX ;
+	  int b1 = ssp->a1 ;
+	  int b2 = ssp->a2 ;
+	  DSX *ssp1 ;
+	  
+	  for (jj = ii + 1, ssp1 = ssp + 1 ; jj < iMax && (ssp1->type & gIX) == type && ssp1->a1 == b1 && ssp1->a2 == b2 ; jj++, ssp1++)
+	    {
+	      if ((ssp->type & gX) && (ssp1->type & (gDF | gFF)))
+		{
+		  ssp1->cover = ssp->cover ;
+		  ssp1->type &= (~(gDF | gFF)) ;
+		}
+	      ssp->type |= ssp1->type ;
+	      if (ssp->cover < ssp1->cover)
+		ssp->cover = ssp1->cover ;
+	      ssp1->cover = 0 ;
+	    }
+	  ii = jj - 1 ;
+	}
+    }
+
+  iMax = ssHappyFew (ss) ;
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after top score\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after top score done\n") ;
+    }
+
+ 
+  if (iMax) /* merge continuous exons */
+     {
+       for (jj = 0, ssp = arrp (ss, jj, DSX) ; jj < iMax ; ssp++, jj++)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if ((ssp->type & gX) && ! (ssp->type & (gA | g3 | gReal3p)))
+	     {
+	       int i ;
+	       DSX *ssp1 ;
+	       for (i = jj + 1, ssp1 = arrp (ss, i, DSX) ; i < iMax ; ssp1++, i++)
+		 {
+		   if (! ssp1->cover) continue ;
+		   if (ssp1->type & gI) continue ;
+		   if (ssp1->type & (g5 | gS | gS0)) break ;
+		   if (ssp1->cover != ssp->cover) break ;
+		   if (ssp1->a1 != ssp->a2 + 1) break ;
+		   ssp->a2 = ssp1->a2 ; ssp->type |= ssp1->type ;
+		   ssp1->cover = 0 ;
+		   if (ssp->type & (gA | g3 | gReal3p)) break ;
+		 }
+	     }
+	 }
+     }
+
+  iMax = ssHappyFew (ss) ;
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge exons \n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge exons done\n") ;
+    }
+
+ 
+  if (iMax) /* absorb in exons 10% of intron support */
+     {
+       for (jj = 0, ssp = arrp (ss, 0, DSX) ; jj < iMax ; jj++, ssp++)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     {
+	       DSX *ssp1 ;
+	       int i, c = ssp->cover/10 ;
+	       int b1 = ssp->a1 ;
+	       int b2 = ssp->a2 ;
+	       if (c > 0)
+		 {
+		   for (i = -1, ssp1 = ssp - 1 ; ssp1->a1 == b1 && jj + i >= 0 ; ssp1--, i--)
+		     if ((ssp1->type & gX) && ! (ssp1->type & (gS | gA | g5 | g3)))
+		       ssp1->cover -= c ;
+		   for (i = 1, ssp1 = ssp + 1 ; ssp1->a2 <= b2 && jj + i < iMax ; ssp1++, i++)
+		     if ((ssp1->type & gX) && ! (ssp1->type & (gS | gA | g5 | g3)))
+		       ssp1->cover -= c ;
+		 }
+	     }
+	 }
+     }
+
+  iMax = ssHappyFew (ss) ;
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after deduce in exon 10%% of intron score\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after deduce in exon 10%% of intron score done\n") ;
+    }
+
+
+  if (iMax) /* absorb leaking exons at donor or acceptor site */
+     {
+       for (jj = 0, ssp = arrp (ss, 0, DSX) ; jj < iMax ; jj++, ssp++)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     {
+	       DSX *ssp1 ;
+	       int i ;
+	       int b1 = ssp->a1 ;
+	       int b2 = ssp->a2 ;
+
+	       for (i = -1, ssp1 = ssp - 1 ; ssp1->a1 == b1 && jj + i >= 0 ; ssp1--, i--)
+		 if ((ssp1->type & gX) && ssp1->a2 < b1 + 10 && ! (ssp1->type & (gA | g3)))
+		   { if ((ssp1[1].type & gX) && ssp1[1].a1 == ssp1->a2 + 1) ssp1->cover = ssp1[1].cover ; else ssp1->cover = 0 ;}
+	       for (i = 1, ssp1 = ssp + 1 ; ssp1->a1 <= b2 && jj + i < iMax ; ssp1++, i++)
+		 if ((ssp1->type & gX) && ssp1->a1 > b2 - 10 && ! (ssp1->type & (gS | g5) ))
+		   { if ((ssp1[-1].type & gX) && ssp1[-1].a2 == ssp1->a1 - 1) ssp1->cover = ssp1[-1].cover ; else ssp1->cover = 0 ;}
+	     }
+	 }
+     }
+
+  /* keep happy few */
+  iMax = ssHappyFew (ss) ;
+  
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after absorb leaking exons\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after absrb leaking exons done\n") ;
+    }
+  
+  
+  /* regularize the real5p */
+  if (1)
+    {
+      for (int ii = iMax -1 ; ii > 0 ; ii--)
+	{
+	  ssp = arrp (ss, ii, DSX) ;
+	  if (ssp->type & gReal5p)
+	    {
+	      DSX *ssp1, *ssp0 = ssp ;
+	      int jj, bestCover = ssp->cover, b1 = ssp->a1 - 1 ;
+
+	      for (jj = ii - 1, ssp1 = ssp - 1 ; jj >= 0 && ssp1->a2 == b1 ; jj--, ssp1--)
+		{
+		  if (ssp1->type & gI) continue ;
+		  if (ssp1->type & (gA | gReal3p)) break ;
+		  if (100 * ssp1->cover < bestCover)
+		    {
+		      for ( ; jj >= 0 && ssp1->a2 == b1 && (ssp1->type & gReal5p) ; jj--, ssp1--)
+			{
+			  if (ssp1->type & gI) continue ;
+			  b1 = ssp1->a1 - 1 ;
+			  ssp1->type &= ~ gReal5p ;
+			}
+		      break ;
+		    }
+		  else
+		    {
+		      if (ssp1->cover > bestCover) bestCover = ssp1->cover ;
+		      ssp0->type &= ~gReal5p ;
+		      ssp1->type |= gReal5p ;
+		      ssp0 = ssp1 ;
+		      b1 = ssp1->a1 - 1 ;
+		    }
 		}
 	    }
 	}
     }
   
-  if (debug)
+  /* regularize the real3p */
+  if (1)
     {
-      fprintf (stderr, "   .. final exons\n") ;
-      showDs (sc, ds->exons) ;
+      for (int ii = 0 ; ii < iMax - 1 ; ii++)
+	{
+	  ssp = arrp (ss, ii, DSX) ;
+	  if (ssp->type & gReal3p)
+	    {
+	      DSX *ssp1, *ssp0 = ssp ;
+	      int jj, bestCover = ssp->cover, b2 = ssp->a2 + 1 ;
+
+	      for (jj = ii + 1, ssp1 = ssp + 1 ; jj < iMax && ssp1->a1 == b2 ; jj++, ssp1++)
+		{
+		  if (ssp1->type & gI) continue ;
+		  if (ssp1->type & (gS | gS0 | gReal5p)) break ;
+		  if (100 * ssp1->cover < bestCover) break ;
+		  if (ssp1->cover > bestCover) bestCover = ssp1->cover ;
+		  ssp0->type &= ~gReal3p ;
+		  ssp1->type |= gReal3p ;
+		  ssp0 = ssp1 ;
+		  b2 = ssp1->a2 + 1 ;
+		}
+	    }
+	}
     }
   
- return ;
-} /* mrnaDesignSplitExons  */
+  
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after regularize r5p\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after regularize r5 done\n") ;
+    }
+
+  if (iMax) /* merge SL in next exon */
+     {
+       for (jj = 0, ssp = arrp (ss, jj, DSX) ; jj < iMax ; ssp++, jj++)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if ((ssp->type & (gReal5p | gS)) && ! (ssp->type & (gA | gReal3p)))
+	     {
+	       int i ;
+	       DSX *ssp1 ;
+	       for (i = jj + 1, ssp1 = arrp (ss, i, DSX) ; i < iMax ; ssp1++, i++)
+		 {
+		   if (ssp1->type & gI) continue ;
+		   if (ssp1->cover <= 0) continue ;
+		   if (ssp1->a1 == ssp->a2 + 1)
+		     {
+		       ssp1->type |= g5 ;
+		     }
+		   else
+		     break ;
+		 }
+	     }
+	 }
+     }
+
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge SL\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge SL done\n") ;
+    }
+
+  if (iMax) /* merge polyA in previous exon */
+    {
+      for (jj = iMax - 1, ssp = arrp (ss, jj, DSX) ; jj > 0 ; jj--, ssp--)
+	{
+	  if (ssp->cover <= 0)   continue ;
+	  if ((ssp->type & gX) && (ssp->type & (gA | g3)) && ! (ssp->type & (g5 | gS)))
+	    {
+	      int i ;
+	      DSX *ssp1 ;
+	      for (i = jj - 1, ssp1 = arrp (ss, i, DSX) ; i >= 0 ; i--, ssp1--)
+		{
+		  if (ssp1->type & gI) continue ;
+		  if (ssp1->cover <= 0) continue ;
+		  if (ssp1->a2 >= ssp->a1 - 120)
+		    {
+		      ssp1->type |=g3 ;
+		      if (1 && ssp->a1 > ssp1->a2 +1)
+			ssp->a1 = ssp1->a2 + 1 ;
+		    }
+		  break ;
+		}
+	    }
+	}
+    }
+  
+  /* keep happy few */
+  iMax = ssHappyFew (ss) ;
+  
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge same, SL, pA\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements after merge same, SL, pA done\n") ;
+    }
+
+
+  if (iMax) /* clip exons above first strong signal */
+     {
+       int bestCover = 0 ;
+       for (jj = 0, ssp = arrp (ss, 0, DSX) ; jj < iMax ; jj++, ssp++)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     continue ;
+	   if (ssp->cover > bestCover)
+	     bestCover = ssp->cover ;
+	   if (ssp->type & gReal5p)
+	     {
+	       break ;
+	     }
+	   if (0 && 2 * ssp->cover < bestCover)
+	     break ;
+	 }
+       if (ssp->type & gReal5p)
+	 {
+	   /* I found a real5p, kill all exons above */
+	   for (int i = 0 ; i < jj ; i++)
+	     if (ssp[-i-1].a2 < ssp->a1 && (1*ssp[-i - 1].cover <= bestCover || (ssp[-i-1].type & (gDF | gFF))))
+	       ssp[-i - 1].cover = 0 ;
+	     else
+	       break ;
+	   if (! (ssp->type & g5))
+	     {
+	       ssp->a1 -= 15 ; /* move back to original position */
+	       if (ssp->a1 < 1)
+		 ssp->a1 = 1 ;
+	     }
+	 }
+     }
+  if (iMax) /* clip exons after last strong signal */
+
+    {
+       int bestCover = 0 ;
+       for (jj = iMax - 1, ssp = arrp (ss, jj, DSX) ; jj > 0 ; jj--, ssp--)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     break ;
+	   if (ssp->type & gReal3p)
+	     break ;
+	   if (2 * ssp->cover < bestCover)
+	     break ;
+	   if (ssp->cover > bestCover)
+	     bestCover = ssp->cover ;
+	 }
+       if (ssp->type & gReal3p)
+	 {
+	   /* I found a real3p, kill all exons below */
+	   DSX *ssp1 ;
+	   int i ;
+	   for (i = iMax - 1, ssp1 = arrp (ss, i, DSX) ; i > jj ; i--, ssp1--)
+	     {
+	       if (ssp1->type & gA)
+		 break ;
+	       else
+		 ssp1->cover = 0 ;
+	     }
+	 }
+     }
+  if (iMax) /* clip exons after last polyA */
+    {
+       int bestCover = 0 ;
+       for (jj = iMax - 1, ssp = arrp (ss, jj, DSX) ; jj > 0 ; jj--, ssp--)
+         {
+	   if (ssp->cover <= 0)   continue ;
+	   if (ssp->type & gI)
+	     break ;
+	   if (ssp->type & gA)
+	     break ;
+	   if (2 * ssp->cover < bestCover)
+	     break ;
+	   if (ssp->cover > bestCover)
+	     bestCover = ssp->cover ;
+	 }
+       if (ssp->type & gA)
+	 {
+	   /* I found a polyA, kill all exons below */
+	   for (int i = jj + 1 ; i < iMax ; i++)
+	     ssp[i - jj].cover = 0 ;
+	 }
+     }
+
+ done:
+  /* keep happy few */
+  iMax = ssHappyFew (ss) ;
+  ds->exons = ss ;
+  
+  if (debug)
+     {
+       fprintf (stderr, "mrnaDesignGetGraphElements final exons/introns\n") ;
+       showDs (sc, ds->exons) ;
+       fprintf (stderr, "mrnaDesignGetGraphElements final exons/introns done\n") ;
+     }
+
+   ac_free (h) ;
+   return ;
+} /* mrnaDesignGetGraphElements */
+
+/**********************************************************************************/
+/* Rationalize the exon flags */
+static void mrnaDesignCleanExons (S2M *s2m, SC *sc, DS *ds)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  BOOL debug = TRUE ;
+  int ii ;
+  DSX *up ;
+  int iiMax = ssHappyFew (ds->exons) ;
+
+
+  /* create and boost some scores */
+  for (ii = 0, up = arrp (ds->exons, 0, DSX) ; ii < iiMax ; ii++, up++)
+    {
+      up->nn = ii ;
+      up->score = up->cover ;
+      if (up->type & gI) up->score *= 3 ;
+      if (up->type & gA) up->score *= 3 ;
+    }
+
+  if (iiMax == 1)   
+    {       /* eliminate weak short cloud exons */
+      up = arrayp (ds->exons,0, DSX) ;
+      int da = up->a2 > up->a1 ? up->a2 - up->a1 : up->a1 - up->a2 ;
+      if (da < 50 && up->score < 10)
+	iiMax = arrayMax (ds->exons) = 0 ;
+    }
+
+  if (iiMax)
+    {  /* erase consecutive gReal5p */
+      for (ii = 0, up = arrp (ds->exons, 0, DSX) ; ii < iiMax ; ii++, up++)
+	if (up->type & gReal5p)
+	  { 
+	    DSX *vp ;
+	    int i ;
+	    
+	    for (i = ii + 1, vp = up+1 ; i < iiMax && (vp->type & gReal5p)  ; vp++, i++)
+	      vp->type &= ~gReal5p ;
+	    
+	    /* if there is a  previous exon, shift the flag vp */
+	    if (ii > 0 && (up[-1].type & gX))
+	      {
+		if (((up[-1].type & gS) || 10*up[-1].score > up->score)&& up[-1].a1 + 25 > up->a1)
+		  {
+		    up->type &= ~gReal5p ;
+		    up[-1].type |= gReal5p ;
+		    if (up[-1].score < up->score)
+		      up[-1].score = up->score ;
+		  }
+	      }
+	  }
+    }
+
+  if (iiMax)
+    {  /* erase consecutive gReal3p */
+      for (ii = iiMax - 1, up = arrp (ds->exons, ii, DSX) ; ii > 0 ; ii--, up--)
+	if (up->type & gReal3p)
+	  { 
+	    DSX *vp ;
+	    int i ;
+	    
+	    for (i = ii - 1, vp = up - 1 ; i >= 0 && (vp->type & gReal3p)  ; vp--, i--)
+	      vp->type &= ~gReal3p ;
+	    
+	    /* if there is a following exon, shift the flag down */
+	    if (ii < iiMax -1 && (up[1].type & gX))
+	      {
+		if (((up[1].type & gA) || 10*up[1].score > up->score)&& up[1].a2 - 25 < up->a2)
+		  {
+		    up->type &= ~gReal3p ;
+		    up[-1].type |= gReal3p ;
+		    if (up[1].score < up->score)
+		      up[1].score = up->score ;
+		  }
+	      }
+	  }
+    }
+  
+  /* if we have   2 introns with same acceptor
+   * the exon bit going to the second donor
+   * should have the support of the short intron
+   */
+  if (iiMax)
+    for (ii = 0, up = arrp (ds->exons, 0, DSX) ; ii < iiMax ; ii++, up++)
+      {
+	if (up->type & gI)
+	  {
+	    DSX *vp ;
+	    int jj, ok2 = 0 ;
+	    
+	    for (jj = ii + 1, vp = up + 1 ; jj < iiMax && vp->a2 < up->a2 && vp->a1 == vp[-1].a2 + 1   ; jj++, vp++)
+	      if (vp->type & gI)
+		{ ok2 = TRUE ; break ; }
+	    if (ok2 && vp->a1 < up->a1 + 30)
+	      for (int i = 1 ; ii + i < jj ; i++)
+		{
+		  if (up[i].score < vp->score)
+		    up[i].score = vp->score ;
+		}
+	  }
+      }
+
+  /* polyA are saved */
+  if (iiMax)
+    for (ii = iiMax - 1, up = arrp (ds->exons, ii, DSX) ; ii >= 0 ; ii--, up--)
+      {
+	if (up->type & gA)
+	  { 
+	    DSX *vp ;
+	    int i, jj, bestScore = up->score ;
+	    int b2 = up->a1 - 1 ;
+	    for (i = ii - 1, vp = arrp (ds->exons, i, DSX) ; i >= 0 ; vp--, i--)
+	      {
+		if (vp->type & gI)
+		  {
+		    if (vp->a1 == b2 + 1)
+		      break ;
+		    continue ;
+		  }
+		if (vp->a2 != b2) break ;
+		b2 = vp->a1 - 1 ;
+		if (vp->score > bestScore) bestScore = vp->score ;
+	      }
+	    jj = i ;
+	    for (i = jj + 1, vp = arrp (ds->exons, i, DSX) ; i <= ii ; i++, vp++)
+	      vp->score = bestScore ;
+	  }
+      }  
+  
+  /* overlapping elements are killed if below 1% */
+  iiMax = ssHappyFew (ds->exons) ;
+  if (1)
+    {
+      for (ii = 0, up = arrp (ds->exons, 0, DSX) ; ii < iiMax ; ii++, up++)
+	if (up->score > 100)
+	  {
+	    int jj ;
+	    DSX *vp ;
+	    for (jj = ii - 1, vp = up -1 ; jj >= 0 && vp->a1 == up->a1 ; vp--, jj--)
+	      ;
+	    for (jj++, vp++ ; jj < iiMax && vp->a1 < up->a2 ; jj++, vp++)
+	      if (100 * vp->score < up->score)
+		vp->cover = vp->score = 0 ;
+	  }
+    }
+
+      
+  /* flag  gCompleteCDS introns: those linking gCompleteCDS exons */
+  if (0)
+    {
+#ifdef JUNK
+      for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
+	{
+	  if ((vp->type & gX) && (vp->type & gCompleteCDS))
+	    {
+	      int a21 = vp->a2 + 1 ;
+	      for (jj = ii + 1, vp2 = vp +1 ; jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
+		if ((vp2->type & gI) && vp2->a1 == a21)
+		  vp2->type |= gCompleteCDS ; /* flag, the donor is in a CDS */
+	    }
+	  if ((vp->type & gI) && (vp->type & gCompleteCDS))
+	    {
+	      int ok = 0, a21 = vp->a2 + 1 ;
+	      for (jj = ii + 1, vp2 = vp +1 ; !ok && jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
+		if ((vp2->type & gX) && (vp2->type & gCompleteCDS) && vp2->a1 == a21)
+		  ok = 1 ;
+	      if (! ok) /* kill the flag, the intron acceptor does not hook to a CDS */
+		vp2->type &= (~ gCompleteCDS) ;
+	    }
+	}
+#endif
+    }
+
+  iiMax = ssHappyFew (ds->exons) ;
+  /* number the segments */
+  for (ii = 0, up = arrp (ds->exons, 0, DSX) ; ii < iiMax ; ii++, up++)
+    up->nn = ii ;
+
+  if (debug)
+    {
+      fprintf (stderr, "mrnaDesignCleanExons\n") ;
+      showDs (sc, ds->exons) ;
+      /* showDs (sc, ds->introns) ; */
+      fprintf (stderr, "mrnaDesignCleanExons done\n") ;
+    }
+  ac_free (h) ;
+   return ;
+} /* mrnaDesignCleanExons */
 
 /**********************************************************************************/
 /* extend the path Down via the best supported route */
-static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int *nIntronp, int *nStartp, int *nStopp)
+static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxScore)
 { 
   int length = 0 ;
-  int a2, ii, nn, score = 0, bestScore = 0 ; 
+  int a2, ii, nn, score = 0 ;
   int sMax = arrayMax (segs) ;
   DSX *up, *vp, *wp = 0 ;
-
+  
   up = arrp (segs, nn0, DSX) ;
   a2 = up->a2 + 1 ;
 
@@ -951,47 +1286,64 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
 	{
 	  if (vp->type & gI)
 	    break ;
-	  if (bestScore < vp->score)
-	    bestScore = vp->score ;
+	  int score2 = ((vp->type & gI) ? vp->score/3 :  vp->score) ;
+	  if (bestScore < score2)
+	    bestScore = score2 ;
 	}
     }
 
   for (nn = 0, vp = up + 1, ii = nn0 + 1 ; ii < sMax && vp->a1 <= a2 ; ii++, vp++)
     {
       if (vp->a1 != a2) continue ;
-      if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
+      int score2 = ((vp->type & gI) ? vp->score/3 :  vp->score) ;
+      if (score < score2) { score = score2 ; nn = vp->nn ; wp = vp ; }
     }
 
   if (! score)
-    return 0 ;
-  if (! (wp->type & (gA | gReal3p)) && 20 * score < bestScore)  /* 2024_06_06 was score == 0 */
-    return 0 ;
+    return length ;
 
-  if (*nStopp &&  !(wp->type & gCompleteCDS) && 
+  if (nStop && 
       (wp->type & (gS | gS0 | gReal5p))
       )
     return length ;
   
+  if (! (wp->type & (gA | gReal3p)))
+    {
+      if (up->type & gReal3p)
+	{
+	  if (up->score > 10 * score)
+	    return length ;
+	}
+      if (up->score > 100 * score)
+	return length ;
+
+      if (100 * score < bestScore)
+	return length ;
+    }
+
   length = vp->a2 - vp->a1 + 1 ;
   keySet (ks, arrayMax(ks)) = nn ;
   
   wp->path = path ;
   
   if (wp->type & gI)
-    (*nIntronp)++ ;
+    { nIntron++ ; nStop = 0 ; }
   if (wp->type & gS)
-    (*nStartp)++ ;
+    nStart++ ;
   if (wp->type & (gA | gReal3p))
-    (*nStopp)++ ;
-  
+    nStop++ ;
+  score = ((wp->type & gI) ? wp->score/3 :  wp->score) ;
+  if (score > bestScore)
+    bestScore = score ;
   if (0) fprintf (stderr, "Path=%d  %d:%d >> %d:%d\n", path, up->a1, up->a2, wp->a1, wp->a2) ;
-  length += mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntronp, nStartp, nStopp) ;
+  length += mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore) ;
 
   return length ;
 } /* mrnaDesignExtendDownRaw */
 
 /***********/
-static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int *nIntronp, int *nStartp, int *nStopp)
+
+static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxScore)
 { 
   int length = 0 ;
   int a2, ii, nn, score = 0 ; 
@@ -1006,40 +1358,43 @@ static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, i
 	if (vp->a1 != a2) continue ;
 	if (! (vp->type &  (gCompleteCDS)))
 	  continue ;
-	if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
+	if (score < vp->cover) { score = vp->cover ; nn = vp->nn ; wp = vp ; }
       }
   if (! score)
-    return   mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn0, nIntronp, nStartp, nStopp) ;
+    return   mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn0, nIntron, nStart, nStop, bestScore, maxScore) ;
 
   length = vp->a2 - vp->a1 + 1 ;
   keySet (ks, arrayMax(ks)) = nn ;
-  if (1 || ! wp->path) wp->path = path ;
-  
-  length += mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntronp, nStartp, nStopp) ;
+  wp->path = path ;
+  if (score > bestScore)
+    bestScore = score ;
+  length += mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore) ;
 
   return length ;
 } /* mrnaDesignExtendDownLoopCDS */
 
 /***********/
 
-static int mrnaDesignExtendDown (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn, int *nIntronp, int *nStartp, int *nStopp, int useCDS)
+static int mrnaDesignExtendDown (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn, int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxScore)
 {
   if (useCDS)
-    return mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntronp, nStartp, nStopp) ;
+    return mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore) ;
 
-  return mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntronp, nStartp, nStopp) ;
+  return mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore) ;
 } /* mrnaDesignExtendDown */
 
 /**********************************************************************************/
 /* extend the path Up via the best supported route */
-static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int *nIntronp, int *nStartp, int *nStopp, int useCDS)
+static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0
+			       , int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxScore)
 { 
   int length = 0 ;
-  int a1, ii, nn, score = 0, bestScore = 0 ;  
+  int a1, ii, nn = 0, score = 0 ;
   int sMax = arrayMax (segs) ;
   DSX *up, *vp, *wp = 0 ;
 
   up = arrp (segs, nn0, DSX) ;
+  if (up->nn != nn0) messcrash ("nn != nn0 in  mrnaDesignExtendUp") ;
   a1 = up->a1 - 1 ;
   if (up->type & gS)
     return 0 ;
@@ -1060,63 +1415,75 @@ static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, 
 	  if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
 	}
     }
-  
-  /* find local exon score */
-  if (wp && ! (wp->type & (gS | gReal5p | gCompleteCDS)))
-    for (ii = nn, vp = arrp (segs, ii, DSX) ; ii < sMax ; ii++, vp++)
-      {
-	if (vp->path == path)
-	  {
-	    if (20 * score <  vp->score)
-	      score = 0 ; 
-	    if (vp->type & gI)
-	      break ;
-	  }
-      }
-  
-  if (!score || 20 * score < bestScore)  /* 2024_06_06 was score == 0 */
-    return 0 ;
-  
-  if (score)
+
+  if (! score)
+    return length ;
+
+  if (nStart &&
+      (wp->type & (gA | gReal3p))
+      )
+    return length ;
+    
+  if (! (wp->type & (gS | gS0 | gReal5p)))
     {
-      if (! useCDS)
+      if (up->type & gReal5p)
 	{
-	  if (*nStartp && (wp->type & ( gA | gReal3p) && ! (wp->type & gCompleteCDS)))
-	    return 0 ;
-	  if (0 && *nIntronp && (wp->type & (gA | gReal3p)))
-	    return 0 ;
-	    }
-      
-      length = wp->a2 - wp->a1 + 1 ;
-      keySet (ks, arrayMax(ks)) = nn ;
-
-      wp->path = path ;
-      if (! useCDS)
-	{
-	  if (wp->type & gI)
-	    (*nIntronp)++ ;
-	  if (wp->type & gS)
-	    (*nStartp)++ ;
-	  if (wp->type & (gA | gReal3p))
-	    (*nStopp)++ ;
+	  if (up->score > 10 * score)
+	    return length ;
 	}
+      if (up->score > 100 * score)
+	return length ;
 
-      if (0) fprintf (stderr, "Path=%d  %d:%d << %d:%d\n", path, up->a1, up->a2, wp->a1, wp->a2) ;
-      length += mrnaDesignExtendUp (sc, ds, segs, ks, path, nn, nIntronp, nStartp, nStopp, useCDS) ;
+      if (100 * score < bestScore)
+	return length ;
     }
+
+  /* find local exon score */
+  if (nStart && ! (wp->type & (gS | gReal5p | gCompleteCDS)))
+    if (100 * score < bestScore)
+      return length ;
+    
+  if (! useCDS)
+    {
+      if (nStart && (wp->type & ( gA | gReal3p) && ! (wp->type & gCompleteCDS)))
+	return 0 ;
+      if (0 && nIntron && (wp->type & (gA | gReal3p)))
+	return 0 ;
+    }
+  
+  length = wp->a2 - wp->a1 + 1 ;
+  keySet (ks, arrayMax(ks)) = nn ;
+  
+  wp->path = path ;
+  if (! useCDS)
+    {
+      if (wp->type & gI)
+	{ nIntron++ ; nStart = 0 ; }
+      if (wp->type & (gS | gReal5p))
+	nStart++ ;
+      if (wp->type & (gA | gReal3p))
+	nStop++ ;
+    }
+  if (wp->cover > bestScore)
+    bestScore = wp->cover ;
+  if (0) fprintf (stderr, "Path=%d  %d:%d << %d:%d\n", path, up->a1, up->a2, wp->a1, wp->a2) ;
+  length += mrnaDesignExtendUp (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, useCDS, bestScore, maxScore) ;
+
   return length ;
 } /* mrnaDesignExtendUp */
 
 /**********************************************************************************/
 
-static int mrnaDesignExport (S2M *s2m, DS *ds, Array segs, KEYSET ks, int path, Array smrnas)
+static int mrnaDesignExport (S2M *s2m, SC *sc, DS *ds, Array segs, KEYSET ks, int path, Array smrnas)
 {
-  int a1 = 0, ii,jj,  nn, nn2, nn3, maxScore = 0 ;
-  DSX *up, *up2, *up3 ;
+  int a1 = 0, ii,jj,  nn, maxScore = 0 ;
+  DSX *up, *up2 ;
   SMRNA *smrna ;
   HIT *vp = 0 ;
-  BOOL debug = FALSE ;
-
+  BOOL debug = TRUE ;
+  AC_HANDLE h = ac_new_handle () ;
+  
+  Array exions = arrayHandleCreate (keySetMax(ks), DSX, h) ;
   smrna = arrayp(smrnas, path - 1, SMRNA) ;
   arrayDestroy (smrna->dnas) ;
   arrayMax (smrnas) = path ;
@@ -1133,81 +1500,70 @@ static int mrnaDesignExport (S2M *s2m, DS *ds, Array segs, KEYSET ks, int path, 
       up = arrp (segs, nn, DSX) ;
       if (up->score > maxScore)
 	maxScore = up->score ;
+      up2 = arrayp (exions, ii, DSX) ;
+      *up2 = *up ;
     }
+   if (0 && debug)
+     {
+       fprintf (stderr, "mrnaDesignExport path %d exons/introns\n", path) ;
+       showDs (sc, exions) ;
+       fprintf (stderr, "mrnaDesignExport exons/introns done\n") ;
+     }
   for (ii = 0 ; ii < keySetMax (ks) ; ii++)
     {
-      nn = keySet (ks, ii) ; 
-      up = arrp (segs, nn, DSX) ;
-      up2 = 0 ;
-      if (ii + 1 < keySetMax (ks))
-	{
-	  nn2 = keySet (ks, ii + 1) ; 
-	  up2 = arrp (segs, nn2, DSX) ;
- 	}
-      if (nn == 0 || 
-	  100 * up->score > maxScore ||
-	  (up->type & (gI | gS | gS0)) ||
-	  (up2 && (up2->type & gI)) ||
-	  (up2 && (up2->score < (up2->type & gS ? 3 : 10) * up->score)) 	  
-	  )
+      up = arrp (exions, ii, DSX) ;
+      if (up->type & (gS | gS0) ||
+	  100 * up->score > maxScore)
 	break ;
       up->score = 0 ;
     }
+  if (ii > 0 && (up->type & gI) && (up[-1].type & gX) && up[-1].score == 0)
+    up[-1].score = up->score ;
   for (ii = keySetMax (ks) - 1 ; ii >= 0 ; ii--)
     {
-      nn = keySet (ks, ii) ; 
-      up = arrp (segs, nn, DSX) ;
-      up2 = up3 = 0 ;
-      if (ii > 0)
-	{
-	  nn2 = keySet (ks, ii - 1) ; 
-	  up2 = arrp (segs, nn2, DSX) ;
- 	}
-      if (ii > 1)
-	{
-	  nn3 = keySet (ks, ii - 2) ; 
-	  up3 = arrp (segs, nn3, DSX) ;
- 	}
-     if ( up3 && 
-	  (up2->type & (gA | gReal3p)) &&
-	  ! (up->type & (gI | gA | gReal3p)) &&
-	  up3->score > 100 * up->score
-	  )
-       up->score = 0 ;	  
-
-      if (nn == arrayMax (segs) - 1 ||
-	  100 * up->score > maxScore ||
-	  (up->type & (gI | gA | gReal3p)) ||
-	  (up2 && (up2->type & gI)) ||
-	  (up2 && (up2->score <  (up2->type & (gA | gReal3p) ? 3 : 10) * up->score))
-	  )
+      up = arrp (exions, ii, DSX) ;
+      if (up->type & (gA) ||
+	  100 * up->score > maxScore)
 	break ;
       up->score = 0 ;
     }
+    
+   if (debug)
+     {
+       fprintf (stderr, "mrnaDesignExport### path %d exons/introns\n", path) ;
+       showDs (sc, exions) ;
+       fprintf (stderr, "mrnaDesignExport### exons/introns done\n") ;
+     }
 
-  for (ii = jj = 0 ; ii < keySetMax (ks) ; ii++)
+   for (vp = 0, ii = jj = 0 ; ii < keySetMax (ks) ; ii++)
     {
-      nn = keySet (ks, ii) ; 
-      up = arrp (segs, nn, DSX) ;
+      up = arrp (exions, ii, DSX) ;
       if (!ii && (up->type & gI))
 	continue ;
       if (! up->score)
 	continue ;
-      if (!vp) a1 = smrna->a1 = up->a1 ; 
+      if (!vp)
+	a1 = smrna->a1 = up->a1 ; 
       smrna->a2 = up->a2 ; 
-      if (!vp || ((up->type & (gX | gI)) != (vp->type & (vp->type & (gX | gI)))))
+      if (!vp || ((up->type & (gX | gI)) != (vp->type & (gX | gI))))
 	{	
 	  vp = arrayp (smrna->hits, jj++, HIT) ;
 	  vp->a1 = up->a1 - a1 + 1 ;
 	}
       vp->a2 = up->a2 - a1 + 1 ;
-      vp->type |= up->type ;
-      if (debug) fprintf(stderr, "Path %d :: %d :: %d :: %s %d %d\t%d\td%d:a%d:c%d\t%d%s\ttvp %d:%d\n"
-	      , path, ii, nn, up->type & gX ? "exon" : "intron", up->a1, up->a2, up->score, up->donor, up->acceptor, up->cover
-	      , up->path, path == up->path ? "*****" : ""
-	      , vp->a1, vp->a2
-	      ) ;
+      vp->type |= ( up->type  & (~ gFF)) ;
+      if (jj > 1)
+	vp->type &= (~ (gS | gS0 | gD | gReal5p | g5 | g3 | gDF)) ;
     }
+  for (ii = 0 ; ii < jj - 1 ; ii++)
+    {
+      vp = arrayp (smrna->hits, ii, HIT) ;
+      vp->type &= (~ (gA | gF | gReal3p | g5 | g3 | gFF)) ;
+    }
+  if (debug)
+    showHits (smrna->hits) ;
+
+  ac_free (h) ;
   return path ;
 } /* mrnaDesignExport G_t_NC_003281.10_1_4561 */
 
@@ -1241,285 +1597,80 @@ static BOOL mrnaDesignIsNewPath (Array ksPaths, KEYSET ks0, AC_HANDLE h)
 /**********************************************************************************/
 static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
-  int ii, jj, ii2, maxScore, path, a2Max, nIntron, nStart, nStop, useCDS ;
-  int eeMax = arrayMax (ds->exons) ;
-  int iiMax = arrayMax (ds->introns) ;
+  BOOL debug = TRUE ;
+  int ii2, path, nIntron, nStart, nStop, useCDS ;
+  int eeMax = ssHappyFew (ds->exons) ;
   Array segs, segs2 ;
-  DSX *up, *vp, *vp2 ; ;
+  DSX *vp, *vp2 ; ;
   KEYSET ks = keySetHandleCreate (ds->h) ;
-  BOOL debug = FALSE ;
   Array ksPaths = arrayHandleCreate (20, KEYSET, ds->h) ;
-  /* group exons/introns */
-  segs = arrayHandleCreate (eeMax + iiMax +1, DSX, ds->h) ;
-  if (arrayMax (ds->exons))
-    for (ii = jj = 0, vp = arrp (ds->exons, 0, DSX) ; jj < eeMax ; ii++, jj++, vp++)
-      {	    
-	up =  arrayp (segs,ii, DSX) ;
-	*up = *vp ; up->score = vp->cover ; up->nn = ii ;
-	}
-  if (arrayMax (ds->introns))
-    for (jj = 0, vp = arrp (ds->introns, 0, DSX) ; jj < iiMax ; ii++, jj++, vp++)
-      {	    
-	up =  arrayp (segs,ii, DSX) ;
-	*up = *vp ; up->score = vp->cover ; up->nn = ii ;
-	if (0) /* 2024_06_07 */
-	  {
-	    if (up->score < vp->donor) up->score = vp->donor ;
-	    if (up->score < vp->acceptor) up->score = vp->acceptor ;
-	  }
-	up->score <<= 1 ;
-	if (0 && ! up->score) up->score = 1 ;
-      }
-  arraySort (segs, dsA1Order) ;
-  eeMax = arrayMax (segs) ; 
-  
-  if (0)
-    showDs (sc, segs) ;
-  
-      /* kill the non extremal exon extensions which are below 32 bp long and do not hook onto an intron */
-  if (arrayMax (segs))
-    for (ii = a2Max = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-      if (a2Max < vp->a2) a2Max = vp->a2 ;
-  
-  if (arrayMax (segs))
-    for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-      {
-	if (! (vp->type & (gDebut | gFin)) && (vp->type & gX) && vp->a2 < vp->a1 + 31)
-	  {
-	    int ok1 = 0, ok2 = 0, ok3 = 0, ok4 = 0 ;
-	    int a1 = vp->a2 + 1, a2 = vp->a1 - 1 ;
-	    if (vp->a1 == 1)
-	      ok1++ ;
-	    else
-	      for (jj = ii - 1, vp2 = vp - 1 ; ok1 == 0 && jj >= 0 ; jj--, vp2--)
-		{
-		  if (vp2->a2 == a2)
-		    {
-		      if (1 || (vp2->type & gI) ||
-			  (vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score))
-			ok1 = 1 ;
-		    }
-		  if (0 &&  (vp2->type & gI) && vp2->a2 == vp->a2 &&  vp->a2 < vp->a1 + 8)
-		    {
-		      ok3 = 1 ;
-		    }
-		}
-	    if (vp->a2 == a2Max) 
-	      ok2 = 1 ;
-	    else
-	      for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 <= a1 ; jj++, vp2++)
-		{
-		  if (vp2->a1 == a1)
-		    {
-		      if (1 || (vp2->type & gI) ||   /* vp2 intron sticcking to vp exon */
-			  (vp->score > .8 * vp2->score && vp->score < 1.2 * vp2->score)) /* vp2 exon with similar score directly sticking to vp exon */
-			ok2 = 1 ;
-		    }
-		  if (0 &&  (vp2->type & gI) && vp2->a1 == vp->a1 &&  vp->a2 < vp->a1 + 8)
-		    {
-		      ok4 = 1 ;
-		    }
-		  
-		}
-	    if (ok1 + ok2 < 2) 
-	      vp->score = -1 ;
-	    else if (0 && ok3 + ok4) /* disfavor intron leaks below 10bp, the wiggle resolution */
-	      vp->score /= 5 ; /* already done, grep for 'disfavor'  */
-	  }
-      }
-  /* if we have   2 introns with same acceptor    XXXXXXXX=====----XXXX and a matching === bit of exon, the ===  should have the support of the short intron */
-  if (arrayMax (segs))
-    for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-      {
-	if (vp->type & gI)
-	  {
-	    int ok2 = 0 ;
-	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 < vp->a2 ; jj++, vp2++)
-	      if ((vp2->type & gI) && vp2->a2 <= vp->a2)
-		{
-		  /* search for the === exon */
-		  int kk ;
-		  DSX *vp3 ;
-		  for (kk = ii - 1, vp3 = vp - 1 ; ok2 == 0 && kk >= 0 && vp3->a1 < vp->a2 ; kk--, vp3--)
-		    if ((vp3->type & gX) && vp3->a1 == vp->a1 && vp3->a2 == vp2->a1 - 1)
-		      {
-			if (vp3->score < vp2->score)
-			  vp3->score = vp2->score ;
-			ok2 = 1 ;
-		      }
-		}
-	  }
-	/* same problem single donor 2 acceptors */
-	if (vp->type & gI)
-	  {
-	    int ok2 = 0 ;
-	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 == 0 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
-	      if ((vp2->type & gI) && vp2->a2 > vp->a2)
-		{
-		  /* search for the === exon */
-		  int kk ;
-		  DSX *vp3 ;
-		  for (kk = ii + 1, vp3 = vp + 1 ; ok2 == 0 && kk < eeMax && vp3->a1 <= vp->a2 + 1 ; kk++, vp3++)
-		    if ((vp3->type & gX) && vp3->a1 == vp->a2 + 1 && vp3->a2 == vp2->a2 - 1)
-		      {
-			if (vp3->score < vp->score)
-			  vp3->score = vp->score ;
-			ok2 = 1 ;
-		      }
-		}
-	  }
-	
-	/* a retained intron which is over 50% of the neighbouring exon
-	 * should have a high score relative to the corresponding intron
-	 * otherwise if it is below 10% it should be dropped
-	 * otherwise it should be flagged and not extended
-	 */
-	if (vp->type & gX)
-	  {
-	    int ok2 = 0 ;
-	    DSX *wp = 0 ;
-	    for (jj = ii + 1, vp2 = vp + 1 ; ok2 < 2 && jj < eeMax && vp2->a1 == vp->a1 ; jj++, vp2++)
-	      if ((vp2->type & gI) && vp2->a2 >= vp->a2)
-		{ wp = vp2 ; ok2 =  (vp2->a2 == vp->a2 ? 2 : 1) ; }
-	    for (jj = ii - 1, vp2 = vp - 1 ; ok2 < 2 && jj >= 0 ; jj--, vp2--)
-	      if ((vp2->type & gI) && vp2->a2 == vp->a2)
-		{ wp = vp2 ;  ok2 = (vp2->a1 == vp->a1 ? 2 : 1) ; }
-	    if (ok2) 
-	      {
-		int score1 = 0, score2 = 0 ;
-		/* search for highest sore of neighbouring exon */
-		for (jj = ii + 1, vp2 = vp + 1 ; jj < eeMax && vp2->a1 <= vp->a2 + 1 ; jj++, vp2++)
-		  if (vp2->a1 == vp->a2 + 1 && vp2->score > score1)
-		    {
-		      if (vp2->a1 >= wp->a1 + 1 || (vp2->type & gI))
-			score1 = vp2->score ;
-		      if ((vp2->a2 <= wp->a2 || vp2->a2 - vp2->a1 < 10) && jj + 1 < eeMax)
-			{
-			  DSX *vp3 = vp2 + 1 ;
-			  if (vp3->a1 == vp2->a2 + 1 && vp3->score > score1 &&
-			      vp3->a1 >= wp->a1 + 1)
-			    score1 = vp3->score ;
-			}
-		    }
-		for (jj = ii - 1, vp2 = vp - 1 ; jj >= 0 ; jj--, vp2--)
-		  if ((vp2->type) && vp2->a2 == vp->a1 - 1 && vp2->score > score2)
-		    {
-		      if (vp2->a2 <= wp->a1 - 1 || (vp2->type & gI))
-			score2 = vp2->score ; 
-		      if ((vp2->a1 >= wp->a1 || vp2->a2 - vp2->a1 < 10) && jj > 0)
-			{
-			  DSX *vp3 = vp2 - 1 ;
-			  if (vp3->a2 == vp2->a1 - 1 && vp3->score > score2 &&
-			      vp3->a2 <= wp->a1 - 1)
-			    score2 = vp3->score ;
-			}
-		    }
-		if (vp->a2 < vp->a1 + 8 && score1 * score2 == 0)  /* disfavor intron leaks below 10bp, the wiggle resolution */
-		  vp->score /= 5 ;
-		if ((! score1 || 20 * vp->score < score1) && (!score2 || 20 * vp->score < score2))
-		  vp->score = -1 ; /* drop very low retained introns */
-		else if (
-			 ((score1 && 2 * vp->score > score1) || (score2 && 2 * vp->score > score2)) &&
-			 vp->score <= wp->score
-			 )
-		  { vp->score = wp->score + 1 ; vp->type &= (~gB) ; }
-		else if (vp->score >= wp->score)
-		  { }
-		else
-		  { vp->type |= gB ; vp->type &=(~ gCompleteCDS) ; }
-	      }
-	  }
-      }
-  
-  /* keep happy few */
-  if (arrayMax (segs))
-    {
-      for (ii = jj = 0, vp = vp2 = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-	{
-	  if (vp->score <= 0)
-	    continue ;
-	  if (vp2 < vp)
-	    *vp2 = *vp ;
-	  vp2++ ; jj++ ;
-	}
-      arrayMax (segs) = eeMax = jj ;
-    
-      /* flag  gCompleteCDS introns: those linking gCompleteCDS exons */
-      for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-	{
-	  if ((vp->type & gX) && (vp->type & gCompleteCDS))
-	    {
-	      int a21 = vp->a2 + 1 ;
-	      for (jj = ii + 1, vp2 = vp +1 ; jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
-		if ((vp2->type & gI) && vp2->a1 == a21)
-		  vp2->type |= gCompleteCDS ; /* flag, the donor is in a CDS */
-	    }
-	  if ((vp->type & gI) && (vp->type & gCompleteCDS))
-	    {
-	      int ok = 0, a21 = vp->a2 + 1 ;
-	      for (jj = ii + 1, vp2 = vp +1 ; !ok && jj < eeMax && vp2->a1 <= a21 ; jj++, vp2++)
-		if ((vp2->type & gX) && (vp2->type & gCompleteCDS) && vp2->a1 == a21)
-		  ok = 1 ;
-	      if (! ok) /* kill the flag, the intron acceptor does not hook to a CDS */
-		vp2->type &= (~ gCompleteCDS) ;
-	    }
-	}
-      
-      for (ii = 0, vp = arrp (segs, 0, DSX) ; ii < eeMax ; ii++, vp++)
-	vp->nn = ii ;
-    }
 
- /* sort a copy by score */
-  segs2 = arrayHandleCopy (segs, ds->h) ;
-  arraySort (segs2, dsScoreOrder) ;
+  arraySort (ksPaths, dsScoreOrder) ; /* for computer happiness */
 
   if (debug)
-    showDs (sc, segs) ;
+     {
+       fprintf (stderr, "mrnaDesignFindPaths start\n") ;
+       showDs (sc, ds->exons) ;
+       fprintf (stderr, "mrnaDesignFindPaths start done\n") ;
+     }
+  
+  /* sort a copy by cover */
+  segs = ds->exons ;
+  segs2 = arrayHandleCopy (segs, ds->h) ;
+  arraySort (segs2, dsCoverOrder) ;
 
+  /* construct all paths */
   for (path = 0, useCDS = 1 ; useCDS >=0 ; useCDS--)
     {
-      for (ii2 = 0, vp2 = arrp (segs2, 0, DSX), maxScore = ((vp2->type & gI) ? vp2->score/6 :  vp2->score) ; ii2 < eeMax && (100 * vp2->score > maxScore || vp2->score >= 1) ; ii2++, vp2++)
+      ii2 = 0 ;
+      vp2 = arrp (segs2, 0, DSX) ;
+      int maxScore = vp2->cover ;
+      for ( ; ii2 < eeMax ; ii2++, vp2++)
 	{
 	  /* find highest scoring seg not yet incorporated in a path */
 	  vp = arrp (segs, vp2->nn, DSX) ;
-	  if (vp->path || ! vp->score)
+	  if (vp->path || ! vp->score || (100 * vp->score < maxScore) || (vp->type & (gDF | gFF)))
 	    continue ;
 	  if (useCDS && ! (vp->type &  gCompleteCDS))
 	    continue ;
-	  /* do not start on a retained intron */
-	  if (0 && vp->type & gX)
-	    {
-	      DSX *wp, *wp2 ;
-	      int jj2 ;
-	      BOOL ok2 = TRUE ;
-	      
-	      for (jj2 = 0, wp2 = arrp (segs2, 0, DSX) ; ok2 && jj2 < ii2 ; jj2++, wp2++)
-		{
-		  wp =  arrp (segs, wp2->nn, DSX) ;
-		  if ((wp->type & gI) && wp->a1 <= vp->a1 && wp->a2 >= vp->a2 && wp->score > 3 * vp->score && 4*vp->score < maxScore)
-		    ok2 = FALSE ;  /* wp is a true  intron better and including  my stupid  vp retained intron (i.e. artefactual exon) */
-		}
-	      if (! ok2)
-		continue ;
-	    }
+	  /* do not start on a mini exon */
+	  if (vp->a2 < vp->a1 + 10 && (vp->type & gX) && (!(vp->type & (gS | gA))))
+	    continue ;
 	  
 	  path++ ;
 	  vp->path = path ;
-	  ks = keySetReCreate (ks) ;
-	  keySet (ks, 0) = vp2->nn ;
-	  if (! (vp->type & gB))
+	  if (debug)
 	    {
-	      nIntron = (vp->type & gI) ? 1 : 0 ;
+	      fprintf (stderr, "+++New path %d start on %d %d score=%d maxScore=%d\n", path, vp->a1, vp->a2, vp->score, maxScore) ;
+	    }
+	  ks = keySetReCreate (ks) ;
+	  keySet (ks, 0) = vp->nn ;
+	  if (1) /* ! (vp->type & gB) */
+	    {
+	      int bestScore = ((vp2->type & gI) ? vp2->score/3 :  vp2->score) ;
+	      int nnn = (vp->type & gX) ? 3 : 0 ;
+	      nIntron = (vp->type & gI) ? 3 : 0 ;
 	      nStart = 1 ;
 	      nStop = (vp->type & (gA | gReal3p)) ? 1 : 0 ;
-	      mrnaDesignExtendDown (sc, ds, segs, ks, path, vp->nn, &nIntron, &nStart, &nStop, useCDS) ;
+	      mrnaDesignExtendDown (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, bestScore, maxScore) ;
 	      nStart = (vp->type & gS) ? 1 : 0 ;
 	      nStop = 1 ;
+	      if (keySetMax (ks) > 1)
+		nnn |= 1 ;
 	      if (mrnaDesignIsNewPath (ksPaths, ks, ds->h))
-		mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, &nIntron, &nStart, &nStop, useCDS) ;
+		{
+		  int nn2 = keySetMax (ks) ;
+		  mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, maxScore, maxScore) ;
+		  if (keySetMax (ks) > nn2)
+		    nnn |= 2 ;
+		  if (nnn >= 0)
+		    mrnaDesignExport (s2m, sc, ds, segs, ks, path, smrnas) ;
+		}
 	    }
-	  if (mrnaDesignIsNewPath (ksPaths, ks, ds->h))
-	    mrnaDesignExport (s2m, ds, segs, ks, path, smrnas) ;
+	  /*
+	  else if (mrnaDesignIsNewPath (ksPaths, ks, ds->h))
+	    mrnaDesignExport (s2m, sc, ds, segs, ks, path, smrnas) ;
+	  */
 	  if(useCDS) /* we only want the best CDS guy */
 	    break ;
 	}
@@ -1539,7 +1690,7 @@ static void mrnaDesignCleanUp (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 
   if (! keySetMax (ds->reads)) 
     return ;
-  ks = query (ds->reads, "(IS XY_* || IS XW_*) && (ct_ac || other || small_deletion) && (ct_ac > 1 || other > 1 || (ct_ac && other) || ! composite > 50)") ;
+  ks = query (ds->reads, "(IS XY_* || IS XW_*) && (ct_ac || other || small_deletion) && (ct_ac > 1 || other > 1 || (ct_ac && other)) && ! composite > 50)") ;
   if (keySetMax (ks))
     {
       txt = vtxtHandleCreate (ds->h) ;
@@ -1627,7 +1778,7 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
   int i ;
   HIT *up ;
   BOOL ok = FALSE ;
-  BOOL debug =  TRUE  ;
+  BOOL debug =  FALSE ;
 
   if (0 || arrayMax (smrnas) < 1) 
     return FALSE; 
@@ -1644,16 +1795,16 @@ BOOL mrnaDesignUsingCompositeStrategy (S2M *s2m, SC* sc, SMRNA *gmrna, Array smr
   ds.h = h = ac_new_handle () ;
 
   mrnaDesignGetElements (s2m, sc, &ds, smrnas) ;
-  mrnaDesignGetSupport (&ds, s2m, sc, gmrna, smrnas) ;
-  mrnaDesignSplitExons (&ds, sc) ;
   if (debug)
     {
       showDs (sc, ds.exons) ;
       showDs (sc, ds.introns) ; 
     }
+  mrnaDesignGetGraphElements (&ds, s2m, sc, gmrna, smrnas) ;
+  mrnaDesignCleanExons (s2m, sc, &ds) ;
   smrnas = arrayReCreate (smrnas, 12, SMRNA) ;
   mrnaDesignFindPaths (s2m, sc, &ds, smrnas) ;
-  mrnaDesignSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
+  if (0) mrnaDesignSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
   mrnaDesignCleanUp (s2m, sc, &ds, smrnas) ;
   
   ac_free (h) ;

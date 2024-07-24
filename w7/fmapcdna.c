@@ -1337,10 +1337,12 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 		{
 		  if (seg->data.i & 0x40000000)
 		    {
-		      int bx1 = graphBoxStart () ;
+		      /* int bx1 = 0 ; obsured the mouse click  graphBoxStart () ; */
 		      graphCircle (x + .9, y2, .6) ; 
-		      graphBoxEnd () ;
-		      estBubbleInfo (bx1, seg, look->origin, 3) ;
+		      /*
+			graphBoxEnd () ;
+			estBubbleInfo (bx1, seg, look->origin, 3) ;
+		      */
 		      y2 += .6 ;
 		    }
 		  else
@@ -1378,11 +1380,13 @@ void fMapcDNAShowSplicedcDNAorExon (LOOK look, float *offset, BOOL showExonSuppo
 		{
 		  if (seg->data.i & 0x40000000)
 		    {
-		      int bx1 = graphBoxStart () ;
+		      /* int bx1 = 0 ; obscured the mouse click */
 		      
 		      graphCircle (x + .9, y2, .6) ; 
-		      graphBoxEnd () ;
-		      estBubbleInfo (bx1, seg, look->origin, 3) ;
+		      /*
+			graphBoxEnd () ;
+			estBubbleInfo (bx1, seg, look->origin, 3) ;
+		      */
 		      y2 += .6 ;
 		      if (0) /* test TRANSPARENT */
 			{ 
@@ -2085,8 +2089,8 @@ void fMapcDNAReportTranscript (char *buffer, SEG *seg1, int maxBuf)
 void fMapcDNAReportTranscribedgene (char *buffer, SEG *seg1, int maxBuf)
 {
   char *cp = strnew(buffer,0) ;
-  strncpy (buffer, messprintf ("Gene %s, %s  %s", name(seg1->parent), 
-			       cp, seg1->data.k ? name(seg1->data.k) : ""), maxBuf) ;
+  strncpy (buffer, messprintf ("Gene %s, %s #%d", name(seg1->parent), 
+			       cp, seg1->data.k ? KEYKEY(seg1->data.k) : 0), maxBuf) ;
   messfree (cp) ;
 }
 
@@ -3939,7 +3943,7 @@ void fMapcDNAShowTranscribedgene  (LOOK look, float *offset)
       graphBoxDraw (box, BLACK, color) ;
       /* mhmp 30.09.99 
       graphBoxInfo (box, seg->key, name(seg->key)) ; */
-      fMapBoxInfo (look, box, seg) ;
+      fMapBoxInfo (look, box, seg) ; /*  */
       graphBoxFreeMenu(box, fMapTranscribedgeneAction, fMapTranscribedgeneMenu) ;
       graphBubbleInfo (box, seg->parent, className(seg->parent),
 		       messprintf("%s %s", seg->key ? name(seg->key) : "", seg->data.k ? name(seg->data.k) : "")) ;

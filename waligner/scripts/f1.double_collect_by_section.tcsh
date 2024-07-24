@@ -17,7 +17,7 @@ if (! -e $iDuo) then
   tace tmp/INTRON_DB/$chrom <<EOF
     find intron 
     date
-    select -o $iDuo ii, g, s, av, t, t2, c, c1, c2, dnaD, dnaA from ii in @ where ! ii#is_echo, g in ii->group where g#Intron && g->Intron[1] == $MAGIC, s in g[1] where s >= $sMin, t in ii->type, t2 in ii->Other, av in ii->stype[1], d in ii->D, a in ii->A, dg in d->group where dg == g, ag in a->group where ag == g, d1 in dg[1], d2 in dg[2], d3 in dg[3], a1 in ag[1], a2 in ag[2], a3 in ag[3] where 10*d2 >= d3 && 10*a2 >= a3 , dnaD in d->motifs, dnaA in a->motifs, c in ii->IntMap, c1 in c[1], c2 in c[2]
+    select -o $iDuo ii, g, s, av, t, t2, c, c1, c2, dnaD, dnaA from ii in @ where ! ii#is_echo, g in ii->group where g#Intron && g->Intron[1] == $MAGIC, s in g[1] where s >= $sMin, t in ii->type, t2 in ii->Other, av in ii->stype[1], d in ii->D, a in ii->A, dg in d->group where dg == g, ag in a->group where ag == g, d1 in dg[1], d2 in dg[2], d3 in dg[3], a1 in ag[1], a2 in ag[2], a3 in ag[3] where 10*d3 >= d2 && 10*a3 >= a2 , dnaD in d->motifs, dnaA in a->motifs, c in ii->IntMap, c1 in c[1], c2 in c[2]
     date
 EOF
 endif
@@ -29,6 +29,7 @@ touch tmp/X.$MAGIC/$chrom/f1.done
 
 exit 0
  # sponge_exon sponge_intron splice splice_percent
+  select intron chrIII__12040_12350
   select ii, g, s, av, t, d1, d2, d3, a1, a2, a3 from ii in @ where ! ii#is_echo, g in ii->group where g#Intron && g->Intron[1] == Good_Long279V, s in g[1] where s >= 3, t in ii->type, av in ii->stype[1], d in ii->D, a in ii->A, dg in d->group where dg == g, ag in a->group where ag == g, d1 in dg[1], d2 in dg[2], d3 in dg[3], a1 in ag[1], a2 in ag[2], a3 in ag[3] where 10*d3 >= d2 && 10*a3 >= a2
 
 ##########################################################################

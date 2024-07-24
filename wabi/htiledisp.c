@@ -2781,9 +2781,11 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	{
 	  float x = 0, y = 0, z=0, t=0, u=0 ;
 	  int damper = 10 ;
+	  int nn = 0 ; /* was 5, so 2n+1 = 110 bases */
+
 	  slx = arrayp (look->map->solexa, ii, SLX) ;
 
-	  for (int j = -5 ; j < 6 ; j++)
+	  for (int j = -nn ; j <= nn ; j++)
 	    {
 	      slx1 = arrayp (look->map->solexa, ii+j, SLX) ;
 	      x += slx1->signal[ns1] ;
@@ -2796,7 +2798,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	      x = x + z ; if (x < 0) x = 0 ; x /= 2 ;
 	      y = y + t ; if (y < 0) y = 0 ; y /= 2 ;
 	    }
-	  x /= 5.5 ; y /= 5.5 ;
+	  x /= 2 * nn + 1 ; y /= 2 * nn + 1 ;
 	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
 	  if (u < 0) u = 0 ;
 	  slx->signal[ns] = zoom * u * x ;
@@ -6447,7 +6449,7 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
       firstPass = FALSE ;
       look0->smoothing = 0 ;
       look0->ratio = 0 ;
-      look0->showDot = 0 ;  /* 0: line , 1: line, 2: bar, 3: stack */
+      look0->showDot = 3 ;  /* 0: line , 1: line, 2: bar, 3: stack */
       look0->showExtrema = FALSE ;
       look0->rejectAmbiguous = 0 ;
       look0->romainSmoothing = 0 ;
@@ -6480,7 +6482,7 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
       look0->showRZones = FALSE ;
       look0->showGenes = TRUE ;
       look0->showCaptureProbes = TRUE ;
-      look0->showGeneSignal = TRUE ;
+      look0->showGeneSignal = TRUE ; 
       {
 	int i ;
 	switch (look0->ratio)
@@ -6517,6 +6519,7 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
 
   memset (look->geneSearchBuf, 0, 301) ;
   look->map = tmapCreate (look, look->h, htileDraw) ;
+  look->map->lnWidth = .3 ;
 
   if (!htileConvert (look, FALSE, 0) || ! (isOldGraph ||  displayCreate (DtTiling)))
     { 

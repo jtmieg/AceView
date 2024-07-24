@@ -1728,15 +1728,14 @@ static void sxWiggleEndRatioOne (WIGGLE *sx, Array aa, Array bb)
 	  int damper = 10 ;
 	  float seuil = .7 ;
 	  float zoom = 40 ;
-
-	  /* average over 11 steps (generally 100 bases */
-	  for (int j = -5 ; j < 6 ; j++)
+	  int nn = 0 ; /* was 5, so 2n+1 = 110 bases */
+	  for (int j = -nn ; j <= nn ; j++)
 	    {
 	      x += wp[j].y ;
 	      y += zp[j].y ;
 	    }
-	  x /= 11 ;
-	  y /= 11 ;
+	  x /= 2 * nn + 1 ;
+	  y /= 2 * nn + 1 ;
 	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
 	  if (u < 0) u = 0 ;
 	  *rp = zoom * u * x ;
