@@ -37,6 +37,10 @@ EOF
       cdna_80
       quit
     acembly
+      cdna_77
+      quit
+    save
+    acembly
       cdna_1 $chrom
       quit
     save

@@ -88,6 +88,8 @@ if (! -e tmp/INTRON_DB/$chrom/I1.parse_genes.done) then
     ../../../bin/tace . <<EOF
       read-models
       parse I1.TargetIntrons.ace.gz
+      query find intron av
+      edit AceView
       save
       quit
 EOF
@@ -106,7 +108,7 @@ echo -n "I2 phase $phase start :"
 date
 
 set ok=0
-set ff=tmp/INTRON_DB/$chrom/I2.$MAGIC.deUno
+set ff=tmp/INTRON_DB/$chrom/$MAGIC.I2.deUno
 echo ' ' > $ff
 
 foreach run1 (`cat MetaDB/$MAGIC/RunList`) 
@@ -210,17 +212,16 @@ endif
 goto phaseLoop
 
 ########################################################################
-### create the donor/acce
-ptors of all introns
+### create the donor/acceptors of all introns
 
 setDA:
 echo -n "I1 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I1.setDA.done) then
+if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.setDA.done) then
   echo "bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC"
         bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I1.setDA.$MAGIC.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I1.setDA.done
 endif
 
 goto phaseLoop
@@ -232,10 +233,10 @@ setDAsupport:
 echo -n "I3 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/I3.setDAsupport.done) then
+if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) then
     echo "bin/altintrons --setDAsupport --db tmp/INTRON_DB/$chrom -p $MAGIC"
           bin/altintrons --setDAsupport --db tmp/INTRON_DB/$chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I3.setDAsupport.$MAGIC.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done
 endif
 
 goto phaseLoop
@@ -247,7 +248,7 @@ setSponge:
 echo -n "I4 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database && -e tmp/INTRON_DB/$chrom/I3.setDAsupport.$MAGIC.done) then
+if (-d tmp/INTRON_DB/$chrom/database && -e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) then
    bin/tacembly tmp/INTRON_DB/$chrom  <<EOF
      read-models
      pparse MetaDB/$MAGIC/runs.ace
@@ -256,7 +257,7 @@ if (-d tmp/INTRON_DB/$chrom/database && -e tmp/INTRON_DB/$chrom/I3.setDAsupport.
 EOF
    echo "bin/altintrons --setSponge --db tmp/INTRON_DB/$chrom --setFeet --chrom $chrom -p $MAGIC"
          bin/altintrons --setSponge --db tmp/INTRON_DB/$chrom --setFeet --chrom $chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I4.setSponge.$MAGIC.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I4.setSponge.done
 endif
 
 goto phaseLoop
@@ -268,7 +269,7 @@ setGroups:
 echo -n "I5 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I4.setSponge.$MAGIC.done) then
+if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/$MAGIC.I4.setSponge.done) then
    bin/tacembly tmp/INTRON_DB/$chrom  <<EOF
      read-models
      pparse MetaDB/$MAGIC/runs.ace
@@ -277,7 +278,7 @@ if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I4.setSponge.$M
 EOF
    echo "bin/altintrons --setGroups --db tmp/INTRON_DB/$chrom  --chrom $chrom -p $MAGIC"
          bin/altintrons --setGroups --db tmp/INTRON_DB/$chrom  --chrom $chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/I5.setGroups.$MAGIC.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done
 endif
 
 goto phaseLoop
@@ -290,10 +291,10 @@ intronCounts:
 echo -n "I6 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/I5.setGroups.$MAGIC.done) then
-   echo "bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/I6.$MAGIC"
-         bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/I6.$MAGIC
-  touch tmp/INTRON_DB/$chrom/I6.counts.$MAGIC.done
+if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done) then
+   echo "bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/$MAGIC.I6"
+         bin/altintrons -db tmp/INTRON_DB/$chrom --counts -p $MAGIC -o tmp/INTRON_DB/$chrom/$MAGIC.I6
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I6.counts.done
 endif
 
 goto phaseLoop
@@ -304,12 +305,12 @@ goto phaseLoop
 # altIntrons
 
 altIntrons:
-echo -n "I1 phase $phase start :"
+echo -n "I7 phase $phase start :"
 date
 
    echo "pparse MetaDB/$MAGIC/runs.ace" | bin/tace tmp/INTRON_DB/$chrom -no_prompt
-   echo "bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/I5.altIntrons"
-         bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/I5.altIntrons
+   echo "bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/$MAGIC.I7.altIntrons"
+         bin/altintrons -db tmp/INTRON_DB/$chrom -p $MAGIC -o tmp/INTRON_DB/$chrom/$MAGIC.I7.altIntrons
 goto phaseLoop
 
 ########################################################################
@@ -318,19 +319,19 @@ goto phaseLoop
 deDuo:
 echo -n "I1 phase $phase start :"
 date
-set toto = tmp/introns/I1.$MAGIC.de_duo.$chrom
+set toto = tmp/introns/$MAGIC.I1.de_duo.$chrom
 
-if (! -e tmp/INTRON_DB/$chrom/I1.$MAGIC.deDuo.done) then
+if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.deDuo.done) then
 
   # hack, because of the schema, the supports are set in intron->de_duo rather than de_uno in the final ace file
-  set toto = tmp/INTRON_DB/$chrom/I1.$MAGIC.de_duo
+  set toto = tmp/INTRON_DB/$chrom/$MAGIC.I1.de_duo
   echo ' ' > $toto.1
   echo ' ' > $toto.txt
   foreach run (`cat MetaDB/$MAGIC/RunsList`)
     set ff=tmp/OR/$run/d4.de_uno.txt.gz
     if (! -e $ff) set ff=tmp/OR/$run/I1.de_uno.txt.gz
     if (-e  $ff) then
-      set minS=`cat  tmp/introns/I1.$MAGIC.minS | gawk -F '\t' 'BEGIN{n=1;}{if($1==run)n=$2+0;}END{print n}' run=$run`
+      set minS=`cat  tmp/introns/$MAGIC.I1.minS | gawk -F '\t' 'BEGIN{n=1;}{if($1==run)n=$2+0;}END{print n}' run=$run`
       zcat $ff | gawk -F '\t' "/^$chrom\t/"'{a1=$2+0 ; a2=$3+0 ; ii=$1 "__" a1 "_" a2 ; if ($4>=minS) printf ( "%s\t%s\t%s\t%s\t%d\n",ii,$5,"any",run,$4 ) ; }' run=$run minS=$minS chrom=$chrom >> $toto.txt
     endif
   end
@@ -338,12 +339,12 @@ if (! -e tmp/INTRON_DB/$chrom/I1.$MAGIC.deDuo.done) then
   cat $toto.txt | sort -V | gzip > $toto.txt.gz
   \rm  $toto.txt  $toto.1 $toto.2.gz
   # hack, because of the schema, the supports are set in intron->de_duo rather than de_uno in the final ace file
-  zcat $toto.txt.gz  | gawk -F '\t' '{ii=$1; if($5+0<1)next;if(ii!=old){if (n>0)printf("RNA_seq %d\n",n);n=0;printf("\nIntron \"%s\"\n",ii);}old=ii;printf("de_duo %s %d\n",$4,$5);n+=$5;}END{if (n>0)printf("RNA_seq %d\n",n);printf("\n");}' | gzip > tmp/INTRON_DB/$chrom/I1.$MAGIC.de_duo.ace.gz
+  zcat $toto.txt.gz  | gawk -F '\t' '{ii=$1; if($5+0<1)next;if(ii!=old){if (n>0)printf("RNA_seq %d\n",n);n=0;printf("\nIntron \"%s\"\n",ii);}old=ii;printf("de_duo %s %d\n",$4,$5);n+=$5;}END{if (n>0)printf("RNA_seq %d\n",n);printf("\n");}' | gzip > tmp/INTRON_DB/$chrom/$MAGIC.I1.de_duo.ace.gz
 
-  if (-e tmp/INTRON_DB/$chrom/I1.$MAGIC.collate.done) \rm tmp/INTRON_DB/$chrom/I1.$MAGIC.collate.done
-  touch tmp/INTRON_DB/$chrom/I1.$MAGIC.deDuo.done
+  if (-e tmp/INTRON_DB/$chrom/$MAGIC.I1.collate.done) \rm tmp/INTRON_DB/$chrom/$MAGIC.I1.collate.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I1.deDuo.done
 endif
-ls -ls tmp/INTRON_DB/$chrom/I1.$MAGIC.de_duo.ace.gz
+ls -ls tmp/INTRON_DB/$chrom/$MAGIC.I1.de_duo.ace.gz
 goto phaseLoop
 
 #############################################################################
@@ -353,7 +354,7 @@ donorAcceptor:
 echo -n "I1 phase $phase start :"
 date
 
-if (! -e tmp/INTRON_DB/$chrom/I1.$MAGIC.collate.done) goto phaseLoop
+if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.collate.done) goto phaseLoop
 
 
 
@@ -367,7 +368,7 @@ goto phaseLoop
 ### CAPTURE
 
 capture:
-  if ($?CAPTURES && -e tmp/METADATA/$MAGIC.av.captured_genes.ace && ! -e tmp/INTRON_DB/$chrom/I1.$MAGIC.capture.done) then 
+  if ($?CAPTURES && -e tmp/METADATA/$MAGIC.av.captured_genes.ace && ! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.capture.done) then 
     pushd tmp/INTRON_DB/$chrom
       ../../../bin/tace . << EOF
         read-models
@@ -379,21 +380,21 @@ capture:
         spop
         kill
         save
-        bql -o  I1.$MAGIC.captured_introns.txt select ii,c from g in ?Gene, c in g->capture where c, ii in g->Intron  
+        bql -o  $MAGIC.I1.captured_introns.txt select ii,c from g in ?Gene, c in g->capture where c, ii in g->Intron  
         quit
 EOF
 
-     cat I1.$MAGIC.captured_introns.txt  | gawk -F '\t' '{if($1 != old)printf ("\nIntron %s\n",$1);old=$1;printf("Capture %s\n",$2);}END{printf("\n");}' > I1.$MAGIC.captured_introns.ace
+     cat $MAGIC.I1.captured_introns.txt  | gawk -F '\t' '{if($1 != old)printf ("\nIntron %s\n",$1);old=$1;printf("Capture %s\n",$2);}END{printf("\n");}' > $MAGIC.I1.captured_introns.ace
      ../../../bin/tace .  << EOF
-       parse I1.$MAGIC.captured_introns.ace
+       parse $MAGIC.I1.captured_introns.ace
        save
        quit
 EOF
 
-      touch tmp/INTRON_DB/$chrom/I1.$MAGIC.capture.done
+      touch tmp/INTRON_DB/$chrom/$MAGIC.I1.capture.done
     popd  
    endif
-  touch tmp/INTRON_DB/$chrom/I1.$MAGIC.capture.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I1.capture.done
 goto phaseLoop
 
 

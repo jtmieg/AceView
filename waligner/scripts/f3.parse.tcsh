@@ -24,7 +24,7 @@ if (! -d tmp/X.$MAGIC/$chrom/database) then
    popd
 endif
 
-echo "Clone MainClone\nMain_clone\nMainTitle $MAGIC\n\n" > tmp/X.$MAGIC/$chrom/Main_clone.ace
+echo "Clone R\nMain_clone\nMainTitle $MAGIC\nSpecies $species\n" > tmp/X.$MAGIC/$chrom/Main_clone.ace
 
 set target=`echo $Etargets | gawk '{print $1}'`
 
@@ -251,7 +251,7 @@ foreach XGH (XG XH)
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/$chrom/f3.$XGH.f.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.f.fasta
 
 
-   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.multiPeaks ZZZZZ | scripts/tab_sort -k 1,1 -k2nr | gawk -F '\t' '/^#/{next;}{if(a10<1){a1=$3;a10=$3;}if($1=="ZZZZZ" || $3 <= a2-10){if(a2-a1 < 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$3;score=0;}}c=$1; a1=$3;a2=$2;if(a2<1)a2=1;cov= cov "\nComposite " a10 -a1  + 1 " " a10 -a2 " " int($6); if($6>score)score=int($6); }' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
+   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.multiPeaks | scripts/tab_sort -k 1,1 -k2nr | gawk -F '\t' '/^ZZZZZ/{next;}{if(a10<1){a1=$3;a10=$3;}if(substr($1,1,11)=="#Chromosome" || $3 <= a2-10){if(a2-a1 < 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$3;score=0;}}c=$1; a1=$3;a2=$2;if(a2<1)a2=1;cov= cov "\nComposite " a10 -a1  + 1 " " a10 -a2 " " int($6); if($6>score)score=int($6); }' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
   wc  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace  | gawk '/^Sequence/{split($2,aa,"__");chrom=substr(aa[1],4);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.fasta
@@ -275,17 +275,17 @@ foreach fr (ELF ELR ERF ERR)
   if (-e  $ff) then
 
      if ($fr == ELF) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$6);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite %d\nForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$7/100);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALECYAN\n-D Composite\nComposite %d\nForward\nmForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ERF) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$6);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite %d\nReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$7/100);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALEYELLOW\n-D Composite\nComposite %d\nReverse\nmReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ERR) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<2)$1=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$6);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour CYAN\nComposite %d\nForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<2)$1=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$7/100);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALECYAN\n-D Composite\nComposite %d\nForward\nmForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      else if ($fr == ELR) then
-       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$6);}' fr=$fr > $ff.shadow
-       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour YELLOW\nComposite %d\nReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
+       cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$7/100);}' fr=$fr > $ff.shadow
+       cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALEYELLOW\n-D Composite\nComposite %d\nReverse\nmReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      endif
 
      bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow $ff.shadow > $ff.fasta
@@ -315,9 +315,23 @@ laba:
     pparse tmp/X.$MAGIC/$chrom/f3.XFC2.any.fasta
     pparse tmp/X.$MAGIC/$chrom/f3.introns.ace
     pparse tmp/X.$MAGIC/$chrom/f3.transcriptsIntronSupport.ace
+    query find Sequence IS Xends_ELF.* && Forward
+    edit Real_5prime
+    edit Colour PALECYAN
+    query find Sequence IS Xends_ERR.* && Forward
+    edit Real_5prime
+    edit Colour PALECYAN
+    query find Sequence IS Xends_ERF.* && Reverse
+    edit Real_3prime
+    edit Colour PALEYELLOW
+    query find Sequence IS Xends_ELR.* && Reverse
+    edit Real_3prime
+    edit Colour PALEYELLOW
     query find Run IS $ggs && ! W_colour_plus
     edit W_colour_plus BLUE
     edit W_colour_minus GREEN
+    query find Runs Wiggle && ! W_stranded == $MAGIC &&  ! W_new_exon == $MAGIC
+    edit -D Wiggle
     save
     quit
 EOF
@@ -419,7 +433,24 @@ EOF
 end
 
 
-# les introns mangent 10% de leur soutien sur les zones inclues des XH sur les 2 brins
+# only keep the group wiggles
+bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
+  query find run wiggle  && ! union_of
+  edit -D wiggle
+  save
+  quit
+EOF
+
+
+
+# les introns mangent 1% de leur soutien sur les zones inclues des XH sur les 2 brins
+
+bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
+  quit
+EOF
+
+
+
 
   touch tmp/X.$MAGIC/$chrom/f3.parse.done
 

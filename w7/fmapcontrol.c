@@ -3228,34 +3228,57 @@ BOOL fMapConvert (LOOK look, BOOL force)
 
          /* mRNA pieces, Valid3p  mieg */
       pos1 = 0 ;
-      if (( (seg->type | 0x1) == PMRNA_UP || (seg->type | 0x1) == MRNA_UP) &&
-	  bsGetArray (obj, str2tag ("Valid3p"), units, 5))
-	{ 
-	  BSunit *uu ; char *cp ;
-
-	  for (i = 0 ; i < arrayMax (units) ; i += 5)
+      if (( (seg->type | 0x1) == PMRNA_UP || (seg->type | 0x1) == MRNA_UP))
+	{
+	  if (bsGetArray (obj, str2tag ("Valid3p"), units, 5))
 	    { 
-	      if (arrayMax (units) < i + 1)
-		continue ;
-	      uu = arrp (units, i, BSunit) ; 
-	      pos1 = uu[0].i ;
-	      pos2 = pos1 ;
-
+	      BSunit *uu ; char *cp ;
+	      
+	      for (i = 0 ; i < arrayMax (units) ; i += 5)
+		{ 
+		  if (arrayMax (units) < i + 1)
+		    continue ;
+		  uu = arrp (units, i, BSunit) ; 
+		  pos1 = uu[0].i ;
+		  pos2 = pos1 ;
+		  
+		  seg1 = arrayp (segs,nsegs++,SEG) ; seg = arrp (segs,iseg,SEG) ;
+		  POS_TO_SEG1 ;
+		  seg1->key = str2tag ("Valid3p") ;
+		  seg1->parent = seg->key ; 
+		  seg1->source = seg->source + 1 ; /* needed for correct order */
+		  seg1->sourceDx = seg->sourceDx - 2 ;
+		  if ((seg->type | 0x1) == PMRNA_UP)
+		    seg1->type = (isDown) ? PMRNA : PMRNA_UP ;
+		  else
+		    seg1->type = (isDown) ? MRNA : MRNA_UP ;
+		  seg1->data.i = uu[2].i ; /* nb of supporting clones */
+		  cp = arr (units, i + 3, BSunit).s ;
+		  if (cp && *cp && strcasecmp (cp, "AATAAA"))
+		    seg1->data.i = - seg1->data.i ;
+		  if (bsFindTag (obj, str2tag ("Aggregated_3p_clones")))
+		    seg1->data.i |= (1 << 24) ;
+		}
+	    }
+	  else if (bsFindTag (obj, str2tag ("Aggregated_3p_clones")))
+	    {
+	      pos1 = pos2 = seg->x2 - seg->x1 ;
 	      seg1 = arrayp (segs,nsegs++,SEG) ; seg = arrp (segs,iseg,SEG) ;
 	      POS_TO_SEG1 ;
 	      seg1->key = str2tag ("Valid3p") ;
 	      seg1->parent = seg->key ; 
 	      seg1->source = seg->source + 1 ; /* needed for correct order */
 	      seg1->sourceDx = seg->sourceDx - 2 ;
+
 	      if ((seg->type | 0x1) == PMRNA_UP)
 		seg1->type = (isDown) ? PMRNA : PMRNA_UP ;
 	      else
 		seg1->type = (isDown) ? MRNA : MRNA_UP ;
-	      seg1->data.i = uu[2].i ; /* nb of supporting clones */
-	      cp = arr (units, i + 3, BSunit).s ;
-	      if (cp && *cp && strcasecmp (cp, "AATAAA"))
-		seg1->data.i = - seg1->data.i ;
+	      seg1->data.i = 10 ;
+	      seg1->data.i = - seg1->data.i ;
+	      seg1->data.i |= (1 << 24) ;
 	    }
+	    
 	}
 
            /* mRNA pieces, Valid5p  mieg */
@@ -3401,6 +3424,8 @@ BOOL fMapConvert (LOOK look, BOOL force)
 		      cp = arr (units, i + 3, BSunit).s ;
 		      if (cp && *cp && strcasecmp (cp, "AATAAA"))
 			seg1->data.i = - seg1->data.i ;
+		      if (bsFindTag (Mrna, str2tag ("Aggregated_3p_clones")))
+			seg1->data.i |= (1 << 24) ;
 		    }
 		  /* disregard a valid5p if protein was constructed from AA==1 
 		   * it means that the protein was computed before we decided

@@ -10891,7 +10891,17 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		int u1 = x1 < x2 ? x1 : x2 ;
                 if (a1 < 10 && u1 < clip1 + 10)
                   {
-                    bsAddKey (Transcript, str2tag ("Submitted_as_5p_complete"), up->cDNA_clone) ;
+		    if (bsFindTag (Est, str2tag ("Composite")))
+		      {
+			int k = 0 ;
+			if (bsGetData (Est, str2tag ("Composite"), _Int, &k))
+			  if (k > 0)
+			    {
+			      bsAddData (Transcript, str2tag ("Aggregated_5p_clones"), _Int, &k) ;
+			    }
+		      }
+		    else
+		      bsAddKey (Transcript, str2tag ("Submitted_as_5p_complete"), up->cDNA_clone) ;
                     complete5 = TRUE ;
                   }
               }
@@ -10900,12 +10910,22 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		int u2 = x1 < x2 ? x2 : x1 ;
                 if (a2 > mrnaLength - 10 && u2 > clip2 - 10)
                   {
-                    bsAddKey (Transcript, str2tag ("Submitted_as_3p_complete"), up->cDNA_clone) ;
+		    if (bsFindTag (Est, str2tag ("Composite")))
+		      {
+			int k = 0 ;
+			if (bsGetData (Est, str2tag ("Composite"), _Int, &k))
+			  if (k > 0)
+			    {
+			      bsAddData (Transcript, str2tag ("Aggregated_3p_clones"), _Int, &k) ;
+			    }
+		      }
+		    else
+		      bsAddKey (Transcript, str2tag ("Submitted_as_3p_complete"), up->cDNA_clone) ;
                     complete3 = TRUE ;
                   }
               }
 
-            if (bsFindTag (Est, _Forward) &&
+            if ( (vp->type & gX) && vp->a1 + smrna->a1 - 1 <= up->a2 && vp->a2 + smrna->a1 - 1 >= up->a2 && 
                 !bsFindTag (Clone, str2tag("Internal_priming")) &&
                 bsGetData (Est, _PolyA_after_base, _Int, &x))
               {
@@ -10921,7 +10941,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                 bsAddData (Transcript, str2tag ("PolyA_seen"), _Int, &a2) ;
                 bsAddKey (Transcript, _bsRight, up->cDNA_clone) ;
               }
-            if (bsFindTag (Est, _Reverse) &&
+            if ( (vp->type & gX) && vp->a1 + smrna->a1 - 1 <= up->a2 && vp->a2 + smrna->a1 - 1 >= up->a2 && 
+		bsFindTag (Est, _Reverse) &&
                 /* b2 > mrnaLength + stolen - 20 && stupid, prevents later flagging of internal_priming 
                  * because the ORF will not reach the polyA if we have imposed completion
                  */

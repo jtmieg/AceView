@@ -87,6 +87,7 @@ if ($species == worm) then
   set ff='/home/mieg/ACEVIEWHELP/Worm_DATA/20190828_SRA_RNA_runinfo.txt'
   set date=2024_03_21
   set ff='/home/mieg/ACEVIEWHELP/Worm_DATA/20230321_26255_RNAinSRA_Celegans_SraRunInfo.txt'
+  set date=2024_10_01
 endif
 if ($species == mm) then
   set date=2016_11_04
@@ -365,10 +366,10 @@ tbly SRX_DB <<EOF
   select -o  $dd/r2f.s.s @
 EOF
 
-cat $dd/r2f.p  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta/1 %s/SRA/%s_1.fasta.gz\nFile fasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd > $dd/r2f.ace
-cat $dd/r2f.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
-cat $dd/r2f.s.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta %s/SRA/%s.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
-cat $dd/r2f.p.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta/1 %s/SRA/%s_1.fasta.gz\nFile csfasta/2 %s/SRA/%s_2.fasta.gz\n\n",$2,dd,$2,dd,$2);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.p  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta/1 %s/SRA/%s_1.fasta.gz\nFile fasta/2 %s/SRA/%s_2.fasta.gz\n\n",$1,dd,$1,dd,$1);}' dd=$dd > $dd/r2f.ace
+cat $dd/r2f.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile fasta %s/SRA/%s.fasta.gz\n\n",$1,dd,$1,dd,$1);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.s.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta %s/SRA/%s.fasta.gz\n\n",$1,dd,$1,dd,$1);}' dd=$dd >> $dd/r2f.ace
+cat $dd/r2f.p.s  | gawk  '{gsub(/\"/,"",$0);printf("SRR %s\n-D File\nFile csfasta/1 %s/SRA/%s_1.fasta.gz\nFile csfasta/2 %s/SRA/%s_2.fasta.gz\n\n",$1,dd,$1,dd,$1);}' dd=$dd >> $dd/r2f.ace
 
 echo "pparse  $dd/r2f.ace" | tbly SRX_DB -no_prompt
 
@@ -544,6 +545,12 @@ if (-e totosraNeeded) \rm totosraNeeded
 touch totosraNeeded
 foreach ss (`cat  $dd/SRA/srr.todo`)
   set srr=`echo $ss | gawk -F '___' '{print $1}'`
+  if (-e Fastc/$srr/f2.2.fastc.gz) then
+    if (-e $dd/SRA/$srr.fasta.gz || -e $dd/SRA/$srr'_1'.fasta.gz || -e $dd/SRA/$srr.csfasta.gz || -e $dd/SRA/$srr'_1'.csfasta.gz) then
+      echo "removing $dd/SRA/$srr...fasta.gz"
+      \rm $dd/SRA/$srr.*fasta.gz  $dd/SRA/$srr'_'*fasta.gz
+    endif
+  endif
   if (! -d Fastc/$srr &&  ! -e $dd/SRA/$srr && ! -e $dd/SRA/$srr.fasta.gz &&  ! -e $dd/SRA/$srr'_1'.fasta.gz && ! -e $dd/SRA/$srr.csfasta.gz &&  ! -e $dd/SRA/$srr'_1'.csfasta.gz) then
     echo $ss >> totosraNeeded
    if ($phase == sraDownload) then

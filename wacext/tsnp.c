@@ -2468,6 +2468,7 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   char *allSubs = "A>G_T>C_G>A_C>T_A>T_T>A_G>C_C>G_A>C_T>G_G>T_C>A" ;
   int nSites = 0 ;
   tsnp->varTypeDict = tsnpMakeVarTypeDict (h) ;
+  int nnn = 0 ;
   
   if (tsnp->select)
     iter = ac_query_iter (db, TRUE, hprintf (h, "find variant IS  \"%s\" ", tsnp->select), 0, h) ;
@@ -2666,9 +2667,14 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 		  aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp, nn) ; 
 		  nn = nSites - nn ; ccp = "Not_measurable_sites" ; 
 		}
-	      aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp, nn) ; 
+	      aceOutf (ao, "%s\t%s\ti\t%d\n", dictName (runDict, run), ccp, nn) ;
+	      nnn++ ; 
 	    }
 	}
+ 
+      fprintf (stderr, "tsnpDbSnpProfile exported %d snps in file %s\n"
+	       , nnn, aceOutFileName (ao)
+	       ) ;
     }
   
   ac_free (h) ;
@@ -6356,6 +6362,164 @@ static void tsnpMakeWords (TSNP *tsnp)
 } /* tsnpMakeWords */
 
 /*************************************************************************************/
+/*************************************************************************************/
+/* compute for jafar sum of Nth pwers of the integers in formal variables */
+static void getSumNthPowers (int N)
+{
+  int ii, P = 8 , s[P+1], a[N +1], b[N+1], d = 1 ;
+  int M = 5 ;
+  /* compute the actual partial sums up to order P */
+  for (ii = 0 ; ii <= 8 ; ii++)
+    {
+      s[ii] = 0 ;
+      if (ii > 0)
+	{
+	  int k = ii ;
+	  for (int j=2 ; j <= N ; j++)
+	    k *= ii ;
+	  s[ii] = s[ii-1] + k ;
+	}
+    }
+  switch (N)
+    {
+    default: return ;
+    case 1:  /* n (n+1)/2 */
+      for (a[0] = 1 ; a[0] <= M ; a[0]++)
+	for (a[1] = 1 ; a[1] <= M ; a[1]++)
+	  for (b[0] = -M ; b[0] <= M ; b[0]++)
+	    for (b[1] = -M ; b[1] <= M ; b[1]++)
+	      {
+		int jj ;
+
+		d = 2 * a[0] * a[1] ;
+		if (d == 0)
+		  continue ;
+		for (jj = 0 ; jj < 8 ; jj++)
+		  {
+		    int x = (a[0] * jj + b[0]) * (a[1] * jj + b[1]) ;
+		    if (x % d)
+		      break ;
+		    if (x != d*s[jj])
+		      break ;
+		  }
+		if (jj == 8) /* success */
+		  {
+		    printf("+++++  formula is sum(i^N) = (%d n + %d) (%d n + %d)/%d\n", a[0], b[0], a[1], b[1], d) ;
+		    exit (0) ;
+		  }
+	      }
+      break ;
+    case 2: /* n (n+1) (2n+1)/6 */
+      for (a[0] = 1 ; a[0] <= M ; a[0]++)
+	for (a[1] = 1 ; a[1] <= M ; a[1]++)
+	  for (a[2] = 1 ; a[2] <= M ; a[2]++)
+	    for (b[0] = -M ; b[0] <= M ; b[0]++)
+	      for (b[1] = -M ; b[1] <= M ; b[1]++)
+		for (b[2] = -M ; b[2] <= M ; b[2]++)
+	      {
+		int jj ;
+
+		d = 3 * a[0] * a[1] * a[2] ;
+		if (d == 0)
+		  continue ;
+		for (jj = 0 ; jj < 8 ; jj++)
+		  {
+		    int x = (a[0] * jj + b[0]) * (a[1] * jj + b[1]) * (a[2] * jj + b[2]) ;
+		    if (x % d)
+		      break ;
+		    if (x != d*s[jj])
+		      break ;
+		  }
+		if (jj == 8) /* success */
+		  {
+		    printf("+++++  formula is sum(i^N) = (%d n + %d) (%d n + %d) (%d n + %d)/%d\n", a[0], b[0], a[1], b[1], a[2], b[2], d) ;
+		    exit (0) ;
+		  }
+	      }
+      break ;
+    case 3: /* n^2 (n+1)^2/4 */
+      for (a[0] = 1 ; a[0] <= M ; a[0]++)
+	for (a[1] = 1 ; a[1] <= M ; a[1]++)
+	  for (a[2] = 1 ; a[2] <= M ; a[2]++)
+	    for (a[3] = 1 ; a[3] <= M ; a[3]++)
+	    for (b[0] = -M ; b[0] <= M ; b[0]++)
+	      for (b[1] = -M ; b[1] <= M ; b[1]++)
+		for (b[2] = -M ; b[2] <= M ; b[2]++)
+		  for (b[3] = -M ; b[3] <= M ; b[3]++)
+	      {
+		int jj ;
+
+		d = N + 1 ;
+		for (int i = 0 ; i <= N ; i++)
+		  d = d * a[i] ;
+		if (d == 0)
+		  continue ;
+		for (jj = 0 ; jj < 8 ; jj++)
+		  {
+		    int x = 1 ;
+		    for (int i = 0 ; i <= N ; i++)
+		      x *= a[i] * jj + b[i] ;
+		    if (x % d)
+		      break ;
+		    if (x != d * s[jj])
+		      break ;
+		  }
+		if (jj == 8) /* success */
+		  {
+		    printf("+++++  formula is sum(i^N) = ") ;
+		    for (int i = 0 ; i <= N ; i++)
+		      printf (" (%d n + %d) ", a[i], b[i]) ;
+		    printf (" / %d\n", d) ;
+		    exit (0) ;
+		  }
+	      }
+      break ;
+    case 4:
+      /* faux la vrai formule est n (n+1)(2n+1)(3n^2 + 3n -1)/30 */
+      for (a[0] = 1 ; a[0] <= M ; a[0]++)
+	for (a[1] = 1 ; a[1] <= M ; a[1]++)
+	  for (a[2] = 1 ; a[2] <= M ; a[2]++)
+	    for (a[3] = 1 ; a[3] <= M ; a[3]++)
+	      for (a[4] = 1 ; a[4] <= M ; a[4]++)
+		for (b[0] = -M ; b[0] <= M ; b[0]++)
+		  for (b[1] = -M ; b[1] <= M ; b[1]++)
+		    for (b[2] = -M ; b[2] <= M ; b[2]++)
+		      for (b[3] = -M ; b[3] <= M ; b[3]++)
+			for (b[4] = -M ; b[4] <= M ; b[4]++)
+		      {
+		int jj ;
+
+		d = N + 1 ;
+		for (int i = 0 ; i <= N ; i++)
+		  d = d * a[i] ;
+		if (d == 0)
+		  continue ;
+		for (jj = 0 ; jj < 8 ; jj++)
+		  {
+		    int x = 1 ;
+		    for (int i = 0 ; i <= N ; i++)
+		      x *= a[i] * jj + b[i] ;
+		    if (x % d)
+		      break ;
+		    if (x != d * s[jj])
+		      break ;
+		  }
+		if (jj == 8) /* success */
+		  {
+		    printf("+++++  formula is sum(i^N) = ") ;
+		    for (int i = 0 ; i <= N ; i++)
+		      printf (" (%d n + %d) ", a[i], b[i]) ;
+		    printf (" / %d\n", d) ;
+		    exit (0) ;
+		  }
+	      }
+      break ;
+    }
+  printf ("Solution NOT found N = %d\n", N) ;
+		
+}
+
+/*************************************************************************************/
 /***************************** Public interface **************************************/
 /*************************************************************************************/
 /* run -run NA12878MOD -laneList tmp/TSNP/NA12878MOD/LaneList -t 20 -target_fasta TARGET/CHROMS/hs.chrom_20.fasta.gz -t1 25000001 -t2 30010000 -minSnpFrequency 18 -minSnpCover 10 -minSnpCount 4 -target_class Z_genome -o tata -maxLanes 4
@@ -6478,6 +6642,13 @@ int main (int argc, const char **argv)
       sprintf(cp, "%s ", argv[ix]) ;
   }
 
+  if (0)
+    {
+      int N = 0 ;
+      if (getCmdLineInt (&argc, argv, "--jaf", &N))
+	getSumNthPowers (N) ;
+      exit(0) ;
+    }
   /* consume optional args */
   tsnp.gzi = getCmdLineBool (&argc, argv, "--gzi") ;
   tsnp.gzo = getCmdLineBool (&argc, argv, "--gzo") ;

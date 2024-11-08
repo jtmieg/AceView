@@ -222,6 +222,15 @@ Web_right_priority	 9
 Show_text	
 EMBL_feature	 "CDS"
 
+Method "RefSeq"A
+Colour	 MIDBLUE
+Show_up_strand	
+Bumpable	
+Right_priority	 1.8
+Web_right_priority	 9
+Show_text	
+EMBL_feature	 "CDS"
+
 Method "genefinder6"
 Colour	 DARKGRAY
 Show_up_strand	

@@ -84,7 +84,8 @@
       Sample_builder Biosample UNIQUE ?Biosample XREF SRR @T  // Precise sample identifier, please document the sample object (see below)             
                      Sex Male    UNIQUE Text
                          Female  UNIQUE Text
-                         Hermaphrodite   UNIQUE Text
+                         Hermaphrodite   UNIQUE Text 
+                         Males_and_females
                          Mixed_sex UNIQUE Text  // pooling males and females
                      Sample_name ?Text
                      Library_name ?Text
@@ -290,6 +291,7 @@
              Title   UNIQUE ?Text
              Sex Male    UNIQUE Text
                  Female  UNIQUE Text
+                 Males_and_females
                  Hermaphrodite   UNIQUE Text
              Species ?Species @Title
              Tissue ?Tissue  XREF Biosample

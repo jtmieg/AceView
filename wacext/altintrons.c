@@ -920,34 +920,98 @@ static void gxFlatScan (BigArray aa, int run, AC_TABLE das, WIGGLE *sx)
 
 /*************************************************************************************/
 
+static void gxSetSpongeRegister (GX *gx, int pass, KEYSET runs, BigArray aaD, BigArray aaA, AC_TABLE dasD, AC_TABLE dasA)
+{
+  const char *errors = 0 ;
+
+  fprintf (stderr, "// gxSetSpongeRegister aaD:%ld aaA:%ld\n", bigArrayMax (aaD), bigArrayMax (aaA)) ;
+  for (int pass2 = 0 ; pass2 < 2 ; pass2++)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      BigArray aa = (pass2 == 0 ? aaD : aaA) ;
+      AC_TABLE das = (pass2 == 0 ? dasD : dasA) ;
+      fprintf (stderr, "... %d\n", pass2) ;
+      if (bigArrayMax (aa)) 
+	{
+	  vTXT txt = vtxtHandleCreate (h) ;
+	  long int ii, jj, iMax = bigArrayMax (aa) ;
+	  bigArraySort (aa, gxFlatOrder) ;
+	  for (ii = 0 ; ii < iMax ; ii++)
+	    {
+	      FLAT *vp, *up = bigArrp (aa, ii, FLAT) ;
+	      int da = up->da ;
+
+	      if (keySet (runs, up->run) != 1)
+		continue ;
+	      vtxtClear (txt) ;
+	      vtxtPrintf (txt, "%s %s\n"
+			  , pass2 == 0 ? "Donor" : "Acceptor"
+			  , ac_table_printable (das, da, 1, "xxx14")
+			  ) ;
+	      for (jj = ii, vp = up ; jj < iMax && vp->da == da ; jj++, vp++)
+		{
+		  int n1, n2 ;
+		  switch (pass + pass2)
+		    {
+		    case 0: n1 = vp->n1 ; n2 = vp->n2 ; break ;
+		    case 1: n1 = vp->n2 ; n2 = vp->n1 ; break ;
+		    case 2: n1 = vp->n2 ; n2 = vp->n1 ; break ;
+		    case 3: n1 = vp->n1 ; n2 = vp->n2 ; break ;
+		    }
+		  if (n1 + n2 >= 10)
+		    vtxtPrintf (txt, "Sponge %s %d %d\n", dictName (gx->runDict, vp->run), n1, n2) ;
+		  else
+		    vtxtPrintf (txt, "-D Sponge %s\n", dictName (gx->runDict, vp->run)) ;
+		}
+	      ii = jj - 1 ;
+	      vtxtPrintf (txt, "\n") ;
+	      ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h) ;
+	      if (*errors)
+		{
+		  fprintf(stderr, "%s\n", errors) ;
+		  invokeDebugger () ;
+		}
+	    }
+	}
+      ac_free (h) ;
+    }
+    runs = keySetReCreate (runs) ;
+} /* gxSetSpongeRegister */
+
+/*************************************************************************************/
+
 static int gxSetSponge (GX *gx) 
 {
+  AC_HANDLE h1 = 0, h = ac_new_handle () ;
   const char *qq[4] ;
+  int runMax = gx->runs ? dictMax (gx->runDict) + 1 : 0 ;
   qq[0] =  "select a1, da from da in  ?Donor where da ~ \"*_f\", chrom in da->intMap, a1 in chrom[1]" ;
   qq[1] =  "select a1, da from da in  ?Acceptor where da ~ \"*_f\", chrom in da->intMap, a1 in chrom[1]" ;
   qq[2] =  "select a1, da from da in  ?Donor where da ~ \"*_r\", chrom in da->intMap, a1 in chrom[1]" ;
   qq[3] =  "select a1, da from da in  ?Acceptor where da ~ \"*_r\", chrom in da->intMap, a1 in chrom[1]" ;
 
+  BigArray aaD = bigArrayHandleCreate (100000000, FLAT, h) ;
+  BigArray aaA = bigArrayHandleCreate (100000000, FLAT, h) ;
+  AC_TABLE das[4] ;
+  const char *errors = 0 ;
+  
+  for (int pass = 0 ; pass < 4 ; pass ++)
+    das[pass] = ac_bql_table (gx->db, qq[pass], 0, 0, &errors, h) ;
+
   for (int pass = 0 ; pass < 4 ; pass += 2)
     {
-      
-      AC_HANDLE h = ac_new_handle () ;
-      int runMax = gx->runs ? dictMax (gx->runDict) + 1 : 0 ;
-      BigArray aaD, aaA ;
-      vTXT txt = vtxtHandleCreate (h) ;
-      const char *errors = 0 ;
-      AC_TABLE  dasD = ac_bql_table (gx->db, qq[pass+0], 0, 0, &errors, h) ;
-      AC_TABLE  dasA = ac_bql_table (gx->db, qq[pass+1], 0, 0, &errors, h) ;
-      
-      aaD = bigArrayHandleCreate (100000, FLAT, h) ;
-      aaA = bigArrayHandleCreate (100000, FLAT, h) ;
+      AC_TABLE dasD = das[pass] ;
+      AC_TABLE dasA = das[pass+1] ;
+      KEYSET runs = keySetHandleCreate (h) ;
       for (int run = 1 ; run < runMax && -run < 3 ; run++)
-	{
-	  AC_HANDLE h1 = ac_new_handle () ;
+	{      
+	  ac_free (h1) ;
+	  h1 = ac_new_handle () ;
 
 	  char *fNam = hprintf(h1, "tmp/WIGGLERUN/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
 	  WIGGLE sx ;
 	  memset (&sx, 0, sizeof (WIGGLE)) ;
+	  sx.h = h1 ;
 	  if (filCheckName(fNam, 0, "r"))
 	    sx.ai = aceInCreate (fNam, 0, h1) ;
 	  if (! sx.ai)
@@ -958,6 +1022,7 @@ static int gxSetSponge (GX *gx)
 	    }
 	  if (! sx.ai)
 	    continue ;
+	  keySet (runs, run) = 1 ;
 	  sx.noRemap = TRUE ;
 	  sx.out_step = 10 ;
 	  sx.aaa = arrayHandleCreate (12, Array, h1) ;
@@ -966,58 +1031,36 @@ static int gxSetSponge (GX *gx)
 	    {
 	      sxWiggleParse (&sx, 0, 0) ; /* whole wiggle, no zoning */
 	      ac_free (sx.ai) ;
-
+	      
 	      gxFlatScan (aaD, run, dasD, &sx) ;
 	      gxFlatScan (aaA, run, dasA, &sx) ;
 	    }
-	  ac_free (h1) ;
-	}
-      for (int pass2 = 0 ; pass2 < 2 ; pass2++)
-	{
-	  BigArray aa = (pass2 == 0 ? aaD : aaA) ;
-	  AC_TABLE das = (pass2 == 0 ? dasD : dasA) ;
-	  if (bigArrayMax (aa)) 
+	  int mx = 0 ;
+	  messAllocMaxStatus (&mx) ;   
+	  fprintf (stderr, "// %d: run %s: %s\tmax memory %d Mb aaD=%ld aaA=%ld dasD=%d dasA=%d\n"
+		   , run
+		   , dictName (gx->runDict, run)
+		   , timeShowNow(), mx
+		   , bigArrayMax (aaD)
+		   , bigArrayMax (aaA)
+		   , dasD->rows
+		   , dasA->rows
+		   ) ;
+
+	  if (bigArrayMax (aaD) +  bigArrayMax (aaA) > 200000000)
 	    {
-	      long int ii, jj, iMax = bigArrayMax (aa) ;
-	      bigArraySort (aa, gxFlatOrder) ;
-	      for (ii = 0 ; ii < iMax ; ii++)
-		{
-		  FLAT *vp, *up = bigArrp (aa, ii, FLAT) ;
-		  int da = up->da ;
-		  
-		  vtxtClear (txt) ;
-		  vtxtPrintf (txt, "%s %s\n"
-			      , pass2 == 0 ? "Donor" : "Acceptor"
-			      , ac_table_printable (das, da, 1, "xxx14")
-			      ) ;
-		  for (jj = ii, vp = up ; jj < iMax && vp->da == da ; jj++, vp++)
-		    {
-		      int n1, n2 ;
-		      switch (pass + pass2)
-			{
-			case 0: n1 = vp->n1 ; n2 = vp->n2 ; break ;
-			case 1: n1 = vp->n2 ; n2 = vp->n1 ; break ;
-			case 2: n1 = vp->n2 ; n2 = vp->n1 ; break ;
-			case 3: n1 = vp->n1 ; n2 = vp->n2 ; break ;
-			}
-		      if (n1 + n2 >= 10)
-			vtxtPrintf (txt, "Sponge %s %d %d\n", dictName (gx->runDict, vp->run), n1, n2) ;
-		      else
-			vtxtPrintf (txt, "-D Sponge %s\n", dictName (gx->runDict, vp->run)) ;
-		    }
-		  ii = jj - 1 ;
-		  vtxtPrintf (txt, "\n") ;
-		  ac_parse (gx->db, vtxtPtr (txt), &errors, 0, h) ;
-		  if (*errors)
-		    {
-		      fprintf(stderr, "%s\n", errors) ;
-		      invokeDebugger () ;
-		    }
-		}
+	      gxSetSpongeRegister (gx, pass, runs, aaD, aaA, dasD, dasA) ;
+	      aaD = bigArrayReCreate (aaD, 100000000, FLAT) ;
+	      aaA = bigArrayReCreate (aaA, 100000000, FLAT) ;
 	    }
 	}
-      ac_free (h) ;
-    }  /* loop on the 2 strands */
+      gxSetSpongeRegister (gx, pass, runs, aaD, aaA, dasD, dasA) ;
+      aaD = bigArrayReCreate (aaD, 100000000, FLAT) ;
+      aaA = bigArrayReCreate (aaA, 100000000, FLAT) ;
+      ac_free (h1) ;
+    } /* loop on the 2 strands */
+  ac_free (h) ;
+
   return 0 ;
 } /* gxSetSponge */
 
@@ -1390,12 +1433,13 @@ static void gxCounts (GX *gx)
   int runMax = 0 ;
   int runClasse = 0 ;
   
-  dictAdd (avDict, "av", 0) ;
+  dictAdd (avDict, "AceView", 0) ;
+  dictAdd (avDict, "RefSeq", 0) ;
   if (1)
     {
       const char *qqRuns =  hprintf (h, "select r from p in ?project where p == \"%s\", r in p->run where r#is_Run && ! r#sublibrary_of " , gx->project) ;
       AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
-      for (int ir = 0 ; ir < tblRuns->rows ; ir++)
+      for (int ir = 0 ; tblRuns && ir < tblRuns->rows ; ir++)
 	{
 	  KEY run = ac_table_key (tblRuns, ir, 0, 0) ;
 	  runClasse = class (run) ;
@@ -1410,7 +1454,7 @@ static void gxCounts (GX *gx)
       const char *qqRuns =  hprintf (h, "select r, g from p in ?project where p == \"%s\", r in p->run where r#is_Run && ! r#sublibrary_of , g in r>>group where g->project == \"%s\"", gx->project, gx->project) ;
       AC_TABLE tblRuns = ac_bql_table (gx->db, qqRuns, 0, 0, &errors, h) ;
 
-      for (int ir = 0 ; ir < tblRuns->rows ; ir++)
+      for (int ir = 0 ; tblRuns && ir < tblRuns->rows ; ir++)
 	{
 	  KEY run = ac_table_key (tblRuns, ir, 0, 0) ;
 	  run = KEYKEY (run) ;
@@ -1541,7 +1585,7 @@ static void gxCounts (GX *gx)
 		  }
 	    }
 	  
-	  AC_TABLE sTbl = ac_tag_table (obj, "sType", h2) ;
+	  AC_TABLE sTbl = ac_tag_table (obj, "Support", h2) ;
 	  for (int run = 0 ; run < runMax ; run++)
 	    {
 	      ISS *up = arrp (aa, run, ISS) ;
@@ -1566,8 +1610,7 @@ static void gxCounts (GX *gx)
 		  {
 		    const char *sNam = ac_table_printable (sTbl, iav, 0, 0) ;
 		    int av = 0 ;
-		    dictAdd (avDict, sNam, &av) ;
-		    if (av < 2)
+		    if (dictFind (avDict, sNam, &av) && av < 3)
 		      {
 			inAny = TRUE ;
 			rp = arrayp (rr, 4 * run + av, RSS) ;
@@ -1596,19 +1639,19 @@ static void gxCounts (GX *gx)
       int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, hprintf (h, "Find Intron %s", typ), h)) ;
       keySet (avN, av) = nn ;
     }
-    if (dictMax (avDict))
-      {
-	vTXT t = vtxtHandleCreate (h) ;
-	vtxtPrintf (t, "Find Intron ( %s ", dictName (avDict, 1) );
-	for (int av = 2 ; av < 3 && av < dictMax (avDict) ; av++)
-	  vtxtPrintf (t, " || %s ", dictName (avDict, av)) ;
-	vtxtPrintf (t, " ) ") ;
-	int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, vtxtPtr (t), h)) ;
-	keySet (avN, 3) = nn ;
-      }
+  if (dictMax (avDict))
+    {
+      vTXT t = vtxtHandleCreate (h) ;
+      vtxtPrintf (t, "Find Intron ( %s ", dictName (avDict, 1) );
+      for (int av = 2 ; av < 3 && av <= dictMax (avDict) ; av++)
+	vtxtPrintf (t, " || %s ", dictName (avDict, av)) ;
+      vtxtPrintf (t, " ) ") ;
+      int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, vtxtPtr (t), h)) ;
+      keySet (avN, 3) = nn ;
+    }
   
   /* export */
-  for (int run = 0 ; run < runMax ; run++)
+  for (int run = 1 ; run < runMax ; run++)
     {
       int n11 = 0, n33 = 0 ;
       KEY runKey = KEYMAKE (runClasse, run) ;
@@ -1963,8 +2006,7 @@ int main (int argc, const char **argv)
     usage ("Missing argument --chrom") ;
 
   gxInit (&gx) ;
-
-
+  
   if (gx.deMrna)
     {
       gxDeMrna (&gx) ;

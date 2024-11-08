@@ -87,6 +87,7 @@
         T Sex Male    UNIQUE Text
               Female  UNIQUE Text
               Hermaphrodite   UNIQUE Text
+              Males_and_females
               Mixed_sex UNIQUE Text  // pooling males and females          
           Description ?Text
           Population_description ?Text
@@ -1008,6 +1009,7 @@
              Sex Male    UNIQUE Text
                  Female  UNIQUE Text
                  Hermaphrodite   UNIQUE Text
+                 Males_and_females
                  Mixed_sex UNIQUE Text  // pooling males and females
              Species ?Species @Title
              Tissue ?Tissue  // XREF Biosample
@@ -1034,6 +1036,7 @@
           Sex Male    UNIQUE Text
               Female  UNIQUE Text
               Hermaphrodite   UNIQUE Text
+              Males_and_females
               Mixed_sex UNIQUE Text  // pooling males and females          
           Description ?Text
           Population_description ?Text

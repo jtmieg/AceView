@@ -13,7 +13,6 @@ if ($phase == k9) goto phasek9
 
 # if ($species == hs && $chrom != chr4) goto phaseLoop
 
-
 ############################################################
 ## Phase k0 : create the Kantor/$chrom database
 
@@ -23,9 +22,10 @@ phasek0:
   set KDB=Kantor/$chrom/KantorDB
   if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
   if (! -d Kantor/$chrom/done/creation) mkdir Kantor/$chrom/done/creation
+echo bb $species $species_kantor
   if (! -d Kantor/$chrom/tmp/$species_kantor.data) mkdir Kantor/$chrom/tmp/$species_kantor.data
   if (! -d Kantor/$chrom/tmp/$species_kantor.data/$chrom) mkdir Kantor/$chrom/tmp/$species_kantor.data/$chrom
-
+echo cc
   if (! -d $KDB) then
      echo "// hello" > touch Kantor/$chrom/done/creation/ace.creation
      mv Kantor/$chrom/done/* Kantor/$chrom/tmp
@@ -40,9 +40,10 @@ y
         quit
 EOF
      popd
-     touch $db/k0.done
-     \rm $db/k0.start
   endif
+  touch $db/k0.done
+  \rm $db/k0.start
+
 goto phaseLoop
 
 ############################################################
@@ -120,9 +121,8 @@ set KDB=Kantor/$chrom/KantorDB
     if (! -d Kantor/$chrom/done) mkdir Kantor/$chrom/done
     mv Kantor/$chrom/tmp/*  Kantor/$chrom/done
   endif
- if (-e $db/$phase.start) \rm $db/$phase.start
+  \rm $db/$phase.start
   touch $db/k1.done
-endif
 
 goto phaseLoop
 
@@ -135,8 +135,6 @@ goto phaseLoop
 phasek2:
 
 set KDB=Kantor/$chrom/KantorDB
-if (-d $KDB && ! -e $db/k2.ddone) then
-  if (-e $db/k9.done) \rm $db/k9.done
 
   tacembly $db << EOF
     query find kantor product
@@ -169,11 +167,11 @@ echo "\n\n-R Method Pfam.v32 Pfam\n\n" >> $db/k2.ace
     quit
 EOF
 
-endif
 
  if (-e $db/k9.done) \rm $db/k9.done
  if (-e $db/$phase.start) \rm $db/$phase.start
-touch $db/k2.done
+ touch $db/k2.done
+
 goto phaseLoop
 
 ############################################################
@@ -189,8 +187,9 @@ date
 
 setenv ici `pwd`
 set KDB=Kantor/$chrom/KantorDB
-if (-d $KDB && -d $KDB/database &&  ! -e $db/k9.megaRun.done) then 
+echo k9aaa
 
+echo k9bbb
     setenv megaRun ~/MEGA3/scripts/megaRun
     echo -n 'starting MEGA3/scripts/megaRun :'
     date
@@ -199,19 +198,22 @@ if (-d $KDB && -d $KDB/database &&  ! -e $db/k9.megaRun.done) then
     pushd Kantor/$chrom/tmp
       # if (! -d tmp/$species_kantor.data) mkdir tmp/$species_kantor.data
        $megaRun $ici/$db  psort $species_kantor
-       $megaRun $ici/$db  acekog $species_kantor  
+      # $megaRun $ici/$db  acekog $species_kantor  
        $megaRun $ici/$db  pfam $species_kantor  
-      # $megaRun $ici/$db blastp $species_kantor  
+       $megaRun $ici/$db blastp $species_kantor  
       # $megaRun $ici/$db oligo $species_kantor   
       # $megaRun $ici/$db acekog_n $species_kantor  
       date
     popd
-    
+
+    echo -n "removing $db/k1.done,  pwd="
+    pwd
+    ls -ls $db/k1.done
     if (-e $db/k1.done) \rm $db/k1.done
     if (-e $db/k2.done) \rm $db/k2.done
     if (-e $db/$phase.start) \rm $db/$phase.start
     touch  $db/k9.done
-endif
+
 
 echo -n 'End of phase k9'
 date

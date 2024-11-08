@@ -26,20 +26,23 @@ if (! -e $out/wg2b.done) then
     foreach fr (f r  ELF ELR ERF ERR)
       if (-e $out/$fr.$uu.chrom.list) \rm  $out/$fr.$uu.chrom.list
       if (-e $out/$fr.$uu.genes.list) \rm $out/$fr.$uu.genes.list
+      touch $out/$fr.$uu.chrom.list
       set ok=0
       foreach run (`cat tmp/WIGGLEGROUP/$group/RunList`)
-        set drop=0
-        if ($fr ==  ELF || $fr ==  ELR || $fr == ERF || $fr == ERR) then
-          foreach run2 (`cat MetaDB/$MAGIC/WiggleDropEndList`)
-            if ($run2 == $run) set drop=1
-          end
-          if ($drop == 1) continue 
-        endif
-        if (-e tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
+        if (-e MetaDB/$MAGIC/WiggleDropEndList) then
+          set drop=0
+          if ($fr ==  ELF || $fr ==  ELR || $fr == ERF || $fr == ERR) then
+            foreach run2 (`cat MetaDB/$MAGIC/WiggleDropEndList`)
+              if ($run2 == $run) set drop=1
+            end
+            if ($drop == 1) continue 
+          endif
+	endif
+        if (-e      tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
           echo -n " tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz " >>   $out/$fr.$uu.chrom.list
           set ok=1
         endif
-        if (-e tmp/WIGGLEGROUP/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
+        if (-e      tmp/WIGGLEGROUP/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
           echo -n " tmp/WIGGLEGROUP/$run/$chrom/R.chrom.$uu.$fr.BF.gz " >>   $out/$fr.$uu.chrom.list
           set ok=1
         endif

@@ -306,6 +306,12 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
     { 
       part = stackCreate (128) ;
       full = stackCreate (MAXPATHLEN) ;
+    /* 
+    * add cwd as default to search.  This use of getcwd() is ok because
+    * if you look above, you see that the Stack full was created with
+    * MAXPATHLEN bytes in it.
+    */
+      filAddDir (".") ; /* getcwd (stackText (full, 0), MAXPATHLEN )) ; */
     }
 
   /*
@@ -341,17 +347,6 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
 	return 0 ;
     }
   
-  
-  if (!dirPath)		
-    {
-    /* 
-    * add cwd as default to search.  This use of getcwd() is ok because
-    * if you look above, you see that the Stack full was created with
-    * MAXPATHLEN bytes in it.
-    */
-      filAddDir ("./") ; /* getcwd (stackText (full, 0), MAXPATHLEN )) ; */
-    }
-
   /*
   * walk down the directory path, looking for the specified file
   * in each directory

@@ -2521,9 +2521,9 @@ static void qcMainResults5 (QC *qc, RC *rc)
 	  target2 = target ;
 	  switch (ti->col)
 	    {
-	    case 10: tag = "Candidate_introns" ;  ic = 3 ; target2 = "av" ;  break ;
-	    case 20: tag = "Candidate_introns" ;  ic = 5 ; target2 = "av" ;  break ;
-	    case 30: tag = "Candidate_introns" ;  ic = 13 ; target2 = "av" ;  break ;
+	    case 10: tag = "Candidate_introns" ;  ic = 3 ; target2 = "AceView" ;  break ;
+	    case 20: tag = "Candidate_introns" ;  ic = 5 ; target2 = "AceView" ;  break ;
+	    case 30: tag = "Candidate_introns" ;  ic = 13 ; target2 = "AceView" ;  break ;
 	    }
 	  tt = ac_tag_table (rc->ali, tag, h) ;
 	  z = 0 ;
@@ -4911,7 +4911,7 @@ static void qcCandidateIntrons (QC *qc, RC *rc)
 	    {
 	      target = qc->Etargets [ii] ;
 	      aceOutf (qc->ao, "\t") ;
-	      
+	      if (! strcmp (target, "av")) target = "AceView" ;
 	      if (ttCI && target && *target)
 		{
 		  for (ir = 0 ; ir < ttCI->rows ; ir++)

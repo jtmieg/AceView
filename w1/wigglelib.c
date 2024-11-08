@@ -1704,8 +1704,8 @@ void sxWiggleFloor (WIGGLE *sx, float mini)
 
 /*************************************************************************************/
 /*************************************************************************************/
-/* the 'ratio' 
- * ATTENTION  synchronize with htileSolexaEndRatios 
+/* the endRatio
+ * ATTENTION  synchronize with wabi/htiledisp.c:htileSolexaEndRatios 
  */
 static void sxWiggleEndRatioOne (WIGGLE *sx, Array aa, Array bb)
 { 
@@ -1726,9 +1726,9 @@ static void sxWiggleEndRatioOne (WIGGLE *sx, Array aa, Array bb)
 	{
 	  float x = 0, y = 0, u ;
 	  int damper = 10 ;
-	  float seuil = .7 ;
+	  float seuil = .80 ;
 	  float zoom = 40 ;
-	  int nn = 0 ; /* was 5, so 2n+1 = 110 bases */
+	  int nn = 1 ; /* was 5, so 2n+1 = 110 bases */
 	  for (int j = -nn ; j <= nn ; j++)
 	    {
 	      x += wp[j].y ;

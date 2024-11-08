@@ -6,8 +6,8 @@
 if (! -d tmp/METADATA) mkdir tmp/METADATA
 if (-e tmp/METADATA/metadata.ok) \rm tmp/METADATA/metadata.ok
 
-if (! -e tmp/METADATA/v2017_05_11) \rm  tmp/METADATA/*
-touch  tmp/METADATA/v2017_05_11
+if (! -e tmp/METADATA/v2024_10_10) \rm  tmp/METADATA/*
+touch  tmp/METADATA/v2024_10_10
 
 echo "=== check the TARGET data"
 

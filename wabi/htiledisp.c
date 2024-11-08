@@ -2742,6 +2742,9 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 } /* htileWiggleConvert */
 
 /************************************************************/
+/* the endRatio
+ * ATTENTION  synchronize with w1/wigglelib.c:sxWoiggleEndRatio1
+ */
 
 static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 {
@@ -2749,7 +2752,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
   int NA = -999 ;
   unsigned int flag1 = 0, flag2 = 0, flag3 = 0, flag4 = 0 ;
   int i, ns1, ns2, ns3, ns4 ;
-  float seuil = .7 ;
+  float seuil = .80 ;
   float zoom = 40 ;
   
   ns1 = ns2 = ns3 = ns4 = NA ;
@@ -2781,7 +2784,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	{
 	  float x = 0, y = 0, z=0, t=0, u=0 ;
 	  int damper = 10 ;
-	  int nn = 0 ; /* was 5, so 2n+1 = 110 bases */
+	  int nn = 1 ; /* was 5, so 2n+1 = 110 bases */
 
 	  slx = arrayp (look->map->solexa, ii, SLX) ;
 
@@ -2804,7 +2807,11 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	  slx->signal[ns] = zoom * u * x ;
 	}
     }
-  look->isClosed[ns] = look->isSolexaClosed[ns] = 2 ;  
+  if (ns1 != NA)   look->isClosed[ns1] = look->isSolexaClosed[ns1] = 2 ;  
+  if (ns2 != NA)   look->isClosed[ns2] = look->isSolexaClosed[ns2] = 2 ;  
+  if (ns3 != NA)   look->isClosed[ns3] = look->isSolexaClosed[ns3] = 2 ;  
+  if (ns4 != NA)   look->isClosed[ns4] = look->isSolexaClosed[ns4] = 2 ;  
+  look->isClosed[ns] = look->isSolexaClosed[ns] = 0 ;  
   /*   pnx0->signal = w1 ; */
 
 } /* htileSolexaEndRatios */
@@ -4579,10 +4586,10 @@ static void htileDrawDna (Htile look, float offset)
 	  {
 	    x = look->map->graphWidth/2.0 + (i - a0) * dx - .5 ;
 	    ai = i - a1 ;
-	    if (ai >= 0 && ai < ln)
+	    if (ai >= 3 && ai < ln)
 	      {
 		buf[0] = dna[ai] ;
-		if (x > 2 && x < look->map->graphWidth - 2)
+		if (x > 20 && x < look->map->graphWidth - 2)
 		  {
 		    int col = 0 ;
 		    for (j = 0 ; j < 32 ; j++)

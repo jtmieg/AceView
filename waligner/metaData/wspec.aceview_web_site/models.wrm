@@ -747,6 +747,7 @@
                                PolyA_found Int ?cDNA_clone
                                PolyA_Signal AATAAA Int 
                                             Variant Text Int
+                               Aggregated_3p_clones  UNIQUE Int
                                Submitted_as_3p_complete ?cDNA_clone
                      Multi3p   PolyA_primed_clone_seen Int ?cDNA_clone
                                PolyA_seen Int ?cDNA_clone
@@ -1432,7 +1433,7 @@
                         Is_mutant
                         Complete_mRNA  // same as real_3prime AND Real_5prime
                         Complete_CDS  //  same has having an SL0, means find Met inside this read
-                        Composite Int REPEAT  // [coords for exons]  number of supporting tags
+                        Composite Int Int UNIQUE Int  // [coords for exons]  number of supporting tags
                         Real_5prime    // do not fuse upstream   by  hand
                         Real_3prime    // do not fuse downstream by  hand
                         Manual_real_5prime    // do not fuse upstream   by  hand Danielle aug23
@@ -1449,8 +1450,11 @@
                                           ncRNA UNIQUE Text
                                           antisense_RNA UNIQUE Text
                                           rRNA UNIQUE Text
-                                          tRNA UNIQUE Text
-                                          miRNA UNIQUE Text      
+                                          rRNA_pseudogene UNIQUE Text
+	                                  tRNA UNIQUE Text
+                                          tRNA_pseudogene UNIQUE Text
+                                          miRNA UNIQUE Text
+                                          piRNA UNIQUE Text      
                                           G26RNA UNIQUE Text
                                           u21RNA UNIQUE Text
                                           snoRNA UNIQUE Text
@@ -1719,7 +1723,8 @@
                            Fatigue WB
                                    PBMC
                            Corona
-                RefSeq UNIQUE Int
+                AceView UNIQUE Int
+		RefSeq UNIQUE Int
                 FlyBase UNIQUE Int
                 RvY UNIQUE Int
                 Magic UNIQUE Int
@@ -1796,6 +1801,7 @@
                            EBI
                            Magic
                            FlyBase
+                AceView UNIQUE Int
                 RefSeq UNIQUE Int
                 mRNA UNIQUE Int
                 EST UNIQUE Int 
@@ -1830,6 +1836,7 @@
                            EBI
                            Magic
                            FlyBase
+                   AceView UNIQUE Int
                    RefSeq UNIQUE Int
                    mRNA UNIQUE Int
                    EST UNIQUE Int 
@@ -1882,6 +1889,7 @@
                             Combi
                             De_novo UNIQUE Int UNIQUE Int
                             OtherSupport Text Text  // Method Gene_name _for_that_method
+                 AceView UNIQUE Int
                  RefSeq UNIQUE Int
                  mRNA UNIQUE Int
                  EST UNIQUE Int 
@@ -3373,6 +3381,7 @@
           Sex Male    UNIQUE Text
               Female  UNIQUE Text
               Hermaphrodite   UNIQUE Text
+              Males_and_females
               Mixed_sex UNIQUE Text  // pooling males and females
           Pool Int // nb mixed individual
           Single_individual ?Text
@@ -3464,6 +3473,7 @@
         T Sex Male    UNIQUE Text
               Female  UNIQUE Text
               Hermaphrodite   UNIQUE Text
+              Males_and_females
               Mixed_sex UNIQUE Text  // pooling males and females          
           Description ?Text
           Population_description ?Text

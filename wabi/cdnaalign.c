@@ -12320,6 +12320,44 @@ KEY cDNARealignGene (KEY gene, int z1, int z2, int direction,
       }
     keySetDestroy (reads) ;
   }
+  {
+    KEYSET reads = getReads (gene) ;
+    KEYSET greens2 = 0, greens = keySetCreate () ;
+    OBJ Gene ;
+    BOOL fix = FALSE ;
+    
+    for (int i = 0 ; i < keySetMax (reads) ; i++)
+      {
+	KEY green = keySet (reads, i) ;
+	const char *nam = name (green) ;
+
+	if (! strncmp (nam, "XG_", 3) || ! strncmp (nam, "XG_", 3))
+	  {
+	    fix |= mrnaDesignCutOnePreMrna (gene, green, greens) ;
+	  }
+	else
+	  keySet (greens, keySetMax (greens)) = green ; 
+      }
+    keySetSort (greens) ;
+    greens2 = query (greens, ">cDNA_clone") ;
+    if (fix && (Gene = bsUpdate (gene)))
+      {
+	KEY tag = _bsRight ;
+	bsFindTag (Gene, _cDNA_clone) ;
+	bsRemove (Gene) ;
+	bsAddTag (Gene, _cDNA_clone) ;
+	for (int i = 0 ; i < keySetMax (greens) ; i++)
+	  {
+	    KEY green = keySet (greens, i) ;
+	    bsAddKey (Gene, tag, green) ;
+	    tag = _bsDown ;
+	  }
+	bsSave (Gene) ;
+      }
+    keySetDestroy (greens) ;
+    keySetDestroy (greens2) ;
+    keySetDestroy (reads) ;
+  }
   if (!doLimit && ! searchRepeats)
     {
       doLimit = cDNAlimitRepeatedGene (cosmid, gene, a1, a2, &z1, &z2) ;
@@ -15791,6 +15829,7 @@ static void cDNADuplicateCloneInfo (KEYSET ks, int *n0p, int *n1p, int *n2p)
 /*********************************************************************/
 /*********************************************************************/
 
+
 void fMapcDNADoSelect (KEY k, KEYSET ks, KEYSET taceKs)
 {
   KEY key ;
@@ -16230,6 +16269,16 @@ void fMapcDNADoSelect (KEY k, KEYSET ks, KEYSET taceKs)
           }
         keySetDestroy (genes) ;
       }
+    case 76: /* split in the active set of TG all XG_ exons on Xends_ signals */
+      if (!keySetExists(taceKs))
+	{ messout ("no active transcribed_gene set, sorry") ; break ; }
+      mrnaDesignCutAllPreMrna (taceKs) ;
+      break ;      
+      
+    case 77: /* kill premrna echo on other strand */
+      mrnaDesignCleanEcho () ;
+      break ;      
+      
     case 80: 
        if (!keySetExists(taceKs))
          { messout ("no active sequence set, sorry") ; break ; }
