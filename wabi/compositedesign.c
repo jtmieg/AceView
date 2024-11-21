@@ -2751,6 +2751,7 @@ static void mrnaDesignCleanUp (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 
 /**********************************************************************************/
 /**********************************************************************************/
+#ifdef JUNK
 /* s2m->>compositeDesignCovering was created by  mrnaDesignUsingCompositeStrategy below
  * the final mRNAs have been contructed by makemrna.c
  * the task is to reintrocuce the SL. polyA etc flags
@@ -2813,7 +2814,7 @@ void mrnaDesignSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrna
   
   return ;
 } /*  mrnaDesignSetCompletenessFlags */
-
+#endif
 /**********************************************************************************/
 /**********************************************************************************/
 

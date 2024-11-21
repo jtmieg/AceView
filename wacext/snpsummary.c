@@ -767,8 +767,8 @@ static void snpBrsTitrationDo (TSNP *tsnp, SNP *snp)
   
   if (ir > irOld + 1)
     snpBrsTitrationDoOne (tsnp, snp, tt, irOld, ir) ;
-
-    ac_free (h) ;
+  
+  ac_free (h) ;
 } /* snpBrsTitrationDo */
 
 /*************************************************************************************/

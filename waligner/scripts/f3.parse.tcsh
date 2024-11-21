@@ -13,7 +13,7 @@ if (! -d tmp/X.$MAGIC/$chrom/database) then
         \cp  $ici/metaData/wspec.aceview_web_site/*.wrm wspec
         pushd wspec
           \rm models.wrm
-          ln -s $ici/metaData/wspec.aceview_web_site/models.wrm
+          ln -s ../../../../metaData/wspec.aceview_web_site/models.wrm
         popd
         set mynam=`whoami`
         set n=`cat wspec/passwd.wrm | gawk '{if($1==mynam)n++}END{printf("%d", 0+n)}' mynam=$mynam`

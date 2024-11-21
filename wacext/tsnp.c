@@ -2586,23 +2586,23 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 	  if (c >= minSnpCover && m >= minSnpCount && 100*m >= minSnpFrequency * c)
 	    {
 	      int *kp, k = 0, t = -1 ;
-	      char buf[256] ;
+	      char buf[276] ;
 
-	      snprintf (buf, 255, "%05d_%s", run, "Measurable") ;
+	      snprintf (buf, 275, "%05d_%s", run, "Measurable") ;
 	      dictAdd (dict, buf, &k) ;
 	      kp = arrayp (stats, k, int) ;
 	      (*kp)++ ;
 
 	      if (ac_has_tag (Snp, "monomodal"))
 		{
-		  snprintf (buf, 255, "%05d_%s", run, "Rejected_sites") ;
+		  snprintf (buf, 275, "%05d_%s", run, "Rejected_sites") ;
 		  dictAdd (dict, buf, &k) ;
 		  kp = arrayp (stats, k, int) ;
 		  (*kp)++ ;
 		  continue ;
 		}
 
-	      snprintf (buf, 255, "%05d_TYPE__%s", run, typ2) ;
+	      snprintf (buf, 275, "%05d_TYPE__%s", run, typ2) ;
 	      dictAdd (dict, buf, &k) ;
 	      kp = arrayp (stats, k, int) ;
 	      (*kp)++ ;
@@ -2618,7 +2618,7 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 		}
 	      if (t >= 0)
 		{
-		  snprintf (buf, 255, "%05d_Genomic__%d", run, t) ;
+		  snprintf (buf, 275, "%05d_Genomic__%d", run, t) ;
 		  dictAdd (dict, buf, &k) ;
 		  kp = arrayp (stats, k, int) ;
 		  (*kp)++ ;	     
@@ -2635,7 +2635,7 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 		}
 	      if (t >= 0)
 		{
-		  snprintf (buf, 255, "%05d_Protein_changing__%d", run, t) ;
+		  snprintf (buf, 275, "%05d_Protein_changing__%d", run, t) ;
 		  dictAdd (dict, buf, &k) ;
 		  kp = arrayp (stats, k, int) ;
 		  (*kp)++ ;	     

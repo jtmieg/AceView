@@ -1432,9 +1432,13 @@ static void gxCounts (GX *gx)
   const char *errors = 0 ;
   int runMax = 0 ;
   int runClasse = 0 ;
+  int NN = 0 ;
   
   dictAdd (avDict, "AceView", 0) ;
   dictAdd (avDict, "RefSeq", 0) ;
+  dictAdd (avDict, "magic", 0) ;
+  NN = dictMax (avDict) + 2 ;
+
   if (1)
     {
       const char *qqRuns =  hprintf (h, "select r from p in ?project where p == \"%s\", r in p->run where r#is_Run && ! r#sublibrary_of " , gx->project) ;
@@ -1481,7 +1485,7 @@ static void gxCounts (GX *gx)
       /*      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron IS CHROMOSOME_III__1557_1508 && de_duo && ! Is_echo", h) ;*/
       AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && ! Is_echo", h) ;
       ISS *up = arrayp (aa, runMax, ISS) ; /* make room */
-      RSS *rp = arrayp (rr, 4 * runMax, RSS) ; /* make room */
+      RSS *rp = arrayp (rr, NN * runMax, RSS) ; /* make room */
       rp->ii = 0 ; /* for compiler happiness */
       
       while (ac_free (h2), ac_free (obj), (obj = ac_iter_obj (iter)))
@@ -1599,7 +1603,7 @@ static void gxCounts (GX *gx)
 	      if (10 * up->d1 < up->d2 || 10 * up->a1 < up->a2)
 		continue ;
 
-	      rp = arrayp (rr, 4 * run, RSS) ;
+	      rp = arrayp (rr, NN * run, RSS) ;
 	      rp->ii++ ;
 	      rp->sup += up->ii ;
 	      if (isGt)
@@ -1610,10 +1614,10 @@ static void gxCounts (GX *gx)
 		  {
 		    const char *sNam = ac_table_printable (sTbl, iav, 0, 0) ;
 		    int av = 0 ;
-		    if (dictFind (avDict, sNam, &av) && av < 3)
+		    if (dictFind (avDict, sNam, &av))
 		      {
 			inAny = TRUE ;
-			rp = arrayp (rr, 4 * run + av, RSS) ;
+			rp = arrayp (rr, NN * run + av, RSS) ;
 			rp->ii++ ;
 			rp->sup += up->ii ;
 			if (isGt)
@@ -1622,7 +1626,7 @@ static void gxCounts (GX *gx)
 		  }
 	      if (inAny)
 		{
-		  rp = arrayp (rr, 4 * run + 3, RSS) ;
+		  rp = arrayp (rr, NN * run + NN - 1, RSS) ;
 		  rp->ii++ ;
 		  rp->sup += up->ii ;
 		  if (isGt)
@@ -1633,7 +1637,7 @@ static void gxCounts (GX *gx)
     }
 
   /* count the denominators */
-  for (int av = 1 ; av < 3 && av <= dictMax (avDict) ; av++)
+  for (int av = 1 ; av < NN - 1 ; av++)
     {
       const char *typ = dictName (avDict, av) ;
       int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, hprintf (h, "Find Intron %s", typ), h)) ;
@@ -1643,11 +1647,11 @@ static void gxCounts (GX *gx)
     {
       vTXT t = vtxtHandleCreate (h) ;
       vtxtPrintf (t, "Find Intron ( %s ", dictName (avDict, 1) );
-      for (int av = 2 ; av < 3 && av <= dictMax (avDict) ; av++)
+      for (int av = 2 ; av < NN -1 ; av++)
 	vtxtPrintf (t, " || %s ", dictName (avDict, av)) ;
       vtxtPrintf (t, " ) ") ;
       int nn = ac_keyset_count (ac_dbquery_keyset (gx->db, vtxtPtr (t), h)) ;
-      keySet (avN, 3) = nn ;
+      keySet (avN, NN - 1) = nn ;
     }
   
   /* export */
@@ -1656,9 +1660,10 @@ static void gxCounts (GX *gx)
       int n11 = 0, n33 = 0 ;
       KEY runKey = KEYMAKE (runClasse, run) ;
       const char *runName = name (runKey) ;
-      for (int av = 0 ; av < 4 ; av++)
+      for (int av = 0 ; av < NN ; av++)
+
 	{
-	  RSS *rp = arrayp (rr, 4 * run + av, RSS) ;
+	  RSS *rp = arrayp (rr, NN * run + av, RSS) ;
 	  int nn = keySet (avN, av) ;
 	  if (rp->ii)
 	    {
@@ -1668,7 +1673,7 @@ static void gxCounts (GX *gx)
 	      if (av == 0)
 		{ n11 = n1 ; n33 = n3 ; continue ; }
 	      aceOutf (ao, "%s\t%s\tiiiiii\t%d\t%d\t%d\t%d\t%d\t%d\n"
-		       , runName, av < 3 ? dictName (avDict, av) : "any"
+		       , runName, av < NN - 1 ? dictName (avDict, av) : "any"
 		       , nn /* number of annotated av introns */
 		       , n1 /* number of observed av introns */
 		       , n11 - n1 /* number of observed new introns */

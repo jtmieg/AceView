@@ -6782,7 +6782,7 @@ static BOOL bqlParseAcedbQuery (BQL *bql, const char *query)
   BOOL debug = bql->debug ;
   BOOL ok = FALSE ;
   vTXT txt = vtxtHandleCreate (bql->h) ;
-  char nam[12] ;
+  char nam[32] ;
   int nQ = 0 ;
   char cc, *cp, *cq, *cr ;
   cp = strnew (query, bql->h) ;

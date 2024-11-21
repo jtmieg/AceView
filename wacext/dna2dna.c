@@ -2362,7 +2362,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   BOOL wantGene = !strcasecmp (featureType, "gene") ;
   BOOL wantMRNA = !strcasecmp (featureType, "mRNA") ;
   BOOL wantExon = !strcasecmp (featureType, "exon") ;
-  int ncRNA_type, mRNA_type, tRNA_type, rRNA_type, Exon_type, CDS_type, gene_type ;
+  int ncRNA_type, mRNA_type, tRNA_type, rRNA_type, Exon_type, CDS_type, gene_type, pseudogene_type ;
   DICT *itemDict, *dict ;
   SHADOW *shadow, *shadow2 ;
   Array shadows ; 
@@ -2390,6 +2390,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   dictAdd (dict, "exon", &Exon_type) ;
   dictAdd (dict, "CDS", &CDS_type) ;
   dictAdd (dict, "gene", &gene_type) ;
+  dictAdd (dict, "pseudogene", &pseudogene_type) ;
 
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai))
@@ -2423,6 +2424,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	cp = "mrna" ;
       if (!strcmp (cp, "pseudogenic_exon"))
 	cp = "exon" ;
+      if (!strcmp (cp, "pseudogene"))
+	cp = "gene" ;
 
       if ( wantGene)
 	{
@@ -2721,7 +2724,9 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	  if (shadow->description)
 	    aceOutf (ao, "Concise_description \"%s\"\n",dictName (dict, shadow->description)) ;
 	  if (shadow->gene_name)
-	    aceOutf (ao, "LocusLink3 \"%s\"\n",dictName (dict, shadow->gene_name)) ;
+	    aceOutf (ao, "LocusLink \"%s\"\n",dictName (dict, shadow->gene_name)) ;
+	  if (0 && shadow->locus_tag)
+	    aceOutf (ao, "WbId \"%s\"\n",dictName (dict, shadow->locus_tag)) ;
 	  if (shadow->Dbxref)
 	    {
 	      char *cq, *cp = strnew (dictName (dict, shadow->Dbxref), h) ;
@@ -2831,7 +2836,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	  for (i = j = 0, shadow = shadow2 = arrp(shadows, i, SHADOW); i < arrayMax (shadows) ; i++, shadow++)
 	    {
 	      if (! shadow->mrna)
-		continue ;
+		shadow->mrna = shadow->Parent ;
 	      if (shadow->mrna && shadow->type == Exon_type)
 		bitSet (bb, shadow->mrna) ;
 	      if (i && shadow->type != Exon_type &&	
@@ -3037,7 +3042,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		     , shadow->x1, shadow->x2
 		     , dictName(sx->selectDict, shadow->target)
 		     , shadow->a1, shadow->a2
-		     , dictName(dict, shadow->gene), showAll ? "" : "_CDS"
+		     , shadow->gene ? dictName(dict, shadow->gene) : ""
+		     , showAll ? "" : "_CDS"
 		     ) ;
 	}
     }
@@ -3176,7 +3182,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	      if (old)
 		{
 		  int dxCDS = 0 ;
-		  int gene, title, note, gene_name ;
+		  int gene, title, note, gene_name, locus_tag ;
 		  aceOutf (ao, "Sequence %s\nSubsequence %s %d %d\n\n"
 			   , dictName(sx->selectDict, target)
 			   , dictName(dict, old)
@@ -3199,7 +3205,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 
 		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
 		  j++ ; shadow2++ ; 
-		  for ( gene = title = note = hasCDS = gene_name = 0 ; j < i ; j++, shadow2++)
+		  for ( gene = title = note = hasCDS = gene_name = locus_tag = 0 ; j < i ; j++, shadow2++)
 		    {
 		      if (! shadow2->mrna)
 			continue ;
@@ -3256,7 +3262,13 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 			  aceOutf (ao, "LocusLink \"%s\"\n"
 				   ,  dictName(dict, gene_name)
 				   ) ;
-			} 
+			}
+		      if (1 && shadow2->locus_tag && !locus_tag)
+			{
+			  locus_tag = shadow2->locus_tag ;
+			  aceOutf (ao, "Locus \"%s\"\n",dictName (dict, shadow2->locus_tag)) ;
+			}
+
 		      if (sx->gffBacteria && shadow2->note && ! note)
 			{
 			  note = shadow2->note ;

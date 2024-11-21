@@ -50,7 +50,7 @@ char *stackorigin ;
 mysize_t stackused (void)
 { char x ;
   if (!stackorigin)          /* ideally should set in main() */
-    stackorigin = &x ;
+    stackorigin = &x ;       /* on purpose we are storing the address of a local variable */
   return stackorigin - &x ;        /* MSDOS stack grows down */
 }
 

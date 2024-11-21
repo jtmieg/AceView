@@ -15,7 +15,7 @@ set sDuo="-sxxNewIntronsFileName  $iDuo "
 
 # export intron with at least 1 percent forking at donor and acceptor sites, and the donor and acceptor are at least 10 percent of the reatained intron 
 if (! -e $iDuo) then
-  tace tmp/INTRON_DB/$chrom <<EOF
+  bin/tace tmp/INTRON_DB/$chrom <<EOF
     find intron 
     date
     select -o $iDuo ii, g, s, av, t, t2, c, c1, c2, dnaD, dnaA from ii in @ where ! ii#is_echo, g in ii->group where g#Intron && g->Intron[1] == $MAGIC, s in g[1] where s >= $sMin, t in ii->type, t2 in ii->Other, av in ii->stype[1], d in ii->D, a in ii->A, dg in d->group where dg == g, ag in a->group where ag == g, d1 in dg[1], d2 in dg[2], d3 in dg[3], a1 in ag[1], a2 in ag[2], a3 in ag[3] where 10*d3 >= d2 && 10*a3 >= a2 && 100 * s > d3 && 100 *s > a3, dnaD in d->motifs, dnaA in a->motifs, c in ii->IntMap, c1 in c[1], c2 in c[2]
@@ -25,7 +25,7 @@ endif
 
 
 if (0) then
-  tace tmp/INTRON_DB/chrIII <<EOF
+  bin/tace tmp/INTRON_DB/chrIII <<EOF
     find intron *_834966_*
     select  ii, g, s, av, t, t2, c, c1, c2, from ii in @ where ! ii#is_echo, g in ii->group where g#Intron && g->Intron[1] == "Good_Long279V", s in g[1] where s >= 3, t in ii->type, t2 in ii->Other, av in ii->stype[1], d in ii->D, a in ii->A, dg in d->group where dg == g, ag in a->group where ag == g, d1 in dg[1], d2 in dg[2], d3 in dg[3], a1 in ag[1], a2 in ag[2], a3 in ag[3] where 10*d3 >= d2 && 10*a3 >= a2 , c in ii->IntMap, c1 in c[1], c2 in c[2]
 EOF

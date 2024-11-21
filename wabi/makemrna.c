@@ -13234,9 +13234,11 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 
   chronoReturn () ;
   chrono ("makeMrnaGeneReextend") ;
-  if (s2m->compositeDesignCovering)
+#ifdef JUNK
+  if (0 && s2m->compositeDesignCovering)
     mrnaDesignSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
   else
+#endif
     mrnaSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
   chronoReturn () ;
   chrono ("makeMrnaGeneSave") ;

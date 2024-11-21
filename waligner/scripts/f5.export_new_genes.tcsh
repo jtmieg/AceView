@@ -142,6 +142,22 @@ bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
    quit
 EOF
 
+## rename
+pushd tmp/X.$MAGIC/$chrom
+  ../../../bin/tacembly  . <<EOF
+    find mrna
+    bql -o f5.names select @
+    quit
+EOF
+  cat f5.names | gawk -F '\t' '{m=$1;m0=m;n=length(mm);if (substr(m,1,n)==mm)next;}/^G_t_/{m=substr(m,5);}{printf("-R mRNA %s %s.%s\n\n-R DNA mRNA:%s mRNA:%s.%s\n\n", m0,mm,m,m0,mm,m);}' mm=magic1 > f5.rename.ace
+  ../../../bin/tacembly  . <<EOF
+    pparse f5.rename.ace
+    save
+    quit
+EOF
+popd
+
+
 ## dump : export all including the cloud
 
 if (-e tmp/X.$MAGIC/$chrom/f5.rename.done) then

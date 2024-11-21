@@ -301,7 +301,7 @@ void dnaAlignGetData (DEFCPT look)
   KEY dummy ; 
   KEYSET ksp, ksq ; 
   KEYSET ks, *kstmp, dna, mar ;
-  char *cdep, buf[60] ;
+  char *cdep, buf[128] ;
   unsigned int test ;
   BOOL depart ;
   Array histdna = 0, mondna, marin, defin ;

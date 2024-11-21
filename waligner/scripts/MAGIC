@@ -10471,7 +10471,7 @@ end
 
 goto phaseLoop
 
-#######################################################################################
+#####################################################################################
 ##  I6: INTRON_DB intron counts
 
 phaseI6:
@@ -10496,7 +10496,7 @@ set ff=tmp/INTRON_DB/$MAGIC.I6.intronCounts
 cat tmp/INTRON_DB/*/$MAGIC.I6.intron_counts.tsf | bin/tsf -I tsf -O tsf -o $ff
 cat $ff.tsf | sort -V | gawk -F '\t' '/^#/{next;}{run=$1;if(run != old) printf("\nAli %s\n", run); old=run;av=$2;nAv=$4;if (nAv==0)nAv=1;nIn=$5;nOut=$6;newG=$7;sp=100.0*nIn/(nIn+nOut);sn=100.0*nIn/nAv;sIn=$8;sOut=$9;printf("Candidate_introns %s %d In_%s %d Not_in_%s %d New_gt_ag %d Sensitivity %.2f Specificity %.2f Known_support %d New_support %d New_minS 3\n", av,nAv,av,nIn,av,nOut,newG,sn,sp,sIn,sOut);}END{printf("\n");}' > $ff.ace
 echo "pparse $ff.ace " | bin/tacembly MetaDB -noprompt
-touch tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts.done
+# touch tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts.done
 
 goto phaseLoop
 
@@ -11996,8 +11996,8 @@ if ($Strategy != RNA_seq) goto phaseLoop
 
 if (! -d TARGET/GTF) mkdir TARGET/GTF
 zcat tmp/$XYH/*/f5.genes.gtf.gz         | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.gtf.gz
- # zcat tmp/$XYH/*/f5.mrnas.fasta.gz    | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/Targets/$species.magic.fasta.gz 
-zcat tmp/$XYH/*/f5.goodMrnas.fasta.gz   | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/Targets/$species.magic.fasta.gz 
+ # zcat tmp/$XYH/*/f5.mrnas.fasta.gz    | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
+zcat tmp/$XYH/*/f5.goodMrnas.fasta.gz   | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
 zcat tmp/$XYH/*/f5.good_product.ace.gz  | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.good_product.ace.gz
 
   if (-e tmp/METADATA/gtf.magic.done) \rm  tmp/METADATA/*magic*
