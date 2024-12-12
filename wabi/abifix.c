@@ -3671,7 +3671,7 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
   if (1)
     for (ii = 0 ; ii < arrayMax (units) ; ii+= 5)
       {
-	int e1, e2, de2, x2, pA = 0, v1 = 1, tail = 0, n = 1 ;
+	int e1, e2, de2 = 0, x2, pA = 0, v1 = 1, tail = 0, n = 1 ;
 	BOOL isMrna, iPriming, polyAPriming, isComposite = FALSE ;
 	OBJ Est ;
 	KEY clone ;
@@ -3684,7 +3684,7 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	if (x2 < m1) /* we are only interested in the terminal exon, downstream of the best/good CDS */
 	  continue ;
 	est = uu[2].k ; 
-	isComposite = keyFindTag (clone, _Composite) ;
+	isComposite = keyFindTag (est, _Composite) ;
 	if (keyFindTag (est, _Is_AM)) 
 	  continue ;
 	Est = bsCreate (est) ;
@@ -3758,6 +3758,17 @@ static BOOL abiFixLabelGatherPolyA (KEY mrna, Array gDna, Array aa5,  Array aa3,
 	  }
 	bsDestroy (Est) ;
 
+	if (iPriming)
+	  continue ;
+	if (iPriming || de2 > (polyAPriming ? 12 : 6))
+	  continue ;
+	if (iPriming || de2 > (polyAPriming ? 12 : 6) || (e1 < e2))
+	  continue ;
+	if (iPriming || de2 > (polyAPriming ? 12 : 6) || (e1 < e2 && !tail && !isMrna))
+	  continue ;
+	if (iPriming || de2 > (polyAPriming ? 12 : 6) || (e1 < e2 && !tail && !isMrna) 
+	    || (e1 > e2 && !tail && !polyAPriming))
+	  continue ;
 	if (iPriming || de2 > (polyAPriming ? 12 : 6) || (e1 < e2 && !tail && !isMrna) 
 	    || (e1 > e2 && !tail && !polyAPriming))
 	  continue ;

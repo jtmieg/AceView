@@ -659,7 +659,7 @@ static int gxSetDAsupport (GX *gx)
 	  AC_TABLE mrnas = ac_obj_bql_table (Donor, "select m,m1 from d in @, ii in d->Intron, m in ii->In_mrna, m1 in m[1]", 0, 0, h1) ; 
 	  int ir, jr ;
 
-	  if (! introns || introns->rows > 12)
+	  if (! introns || introns->rows > 1200)
 	    continue ;
 	  vtxtClear (txt) ;
 	  nn++ ;
@@ -2031,6 +2031,7 @@ int main (int argc, const char **argv)
   if (gx.setDAsupport)
     {
       gxSetDAsupport (&gx) ;
+      ac_db_commit (gx.db) ;
     }
   if (gx.setSponge)
     {

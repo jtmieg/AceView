@@ -10395,9 +10395,11 @@ foreach chrom ($chromSetAll)
     if (-e tmp/INTRON_DB/$chrom/I2.$run.deMrna.gz) continue
     set ok=1
   end
-  if ($ok == 0) continue 
-
-  scripts/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts/I1.intronDB.tcsh $chrom 'deUno deMrna setFeet setDA'"
+  if ($ok == 0) then
+    touch tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
+  else
+    scripts/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts/I1.intronDB.tcsh $chrom 'deUno deMrna setFeet setDA'"
+  endif
 end
 
 goto phaseLoop
@@ -10414,7 +10416,7 @@ phaseI3:
 if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
   if (-e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) continue
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts/I1.intronDB.tcsh $chrom 'setDAsupport'"
+  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts/I1.intronDB.tcsh $chrom setDAsupport"
 end
 
 goto phaseLoop
@@ -10431,7 +10433,7 @@ if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
 
   if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.setDA.done) continue
+  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done) continue
   set ok1=0
   set ok2=0
   foreach run (`cat MetaDB/$MAGIC/RunsList`) 
@@ -10447,7 +10449,9 @@ foreach chrom ($chromSetAll)
     if ($ok2 >= 10) break
   end
   if ($ok2 >= 10) continue
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts/I1.intronDB.tcsh $chrom 'setSponge'" 32G
+  if ($ok1 == 0 && $ok2 ==0) continue
+
+  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts/I1.intronDB.tcsh $chrom setSponge" 32G
 end
 
 goto phaseLoop

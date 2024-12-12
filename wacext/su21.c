@@ -9723,7 +9723,7 @@ static void mu4p (const char *title, int type)
 		
 		if (pass == 1)
 		  printf ("\n(%d,%d,%d,%d)\t", a, b, c, d) ;
-		for (t = 0 ; t < 4 && t < NTYPES ; t++)
+		for (t = 0 ; t < 3 && t < NTYPES ; t++)
 		  {
 		    float complex z = 0 ;
 		    switch (type)
@@ -10525,7 +10525,8 @@ int main (int argc, const char **argv)
   
   getCmdLineInt (&argc, argv, "-N", &NN) ; /* Number of generations >= 2 */
   getCmdLineInt (&argc, argv, "-NN", &NN) ; /* synonim */
-
+  BOOL jacobi = getCmdLineBool (&argc, argv, "-jacobi") ;
+    
   if (getCmdLineBool (&argc, argv, "-R16"))  /* lpto-quark real rep */
     {
       KasimirR16 () ;
@@ -11423,7 +11424,7 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
 
-      if (1)
+      if (jacobi)
 	{
 	  printf ("\n\n\n@@@@@@@@@ 4-tensor vertex, hoping to find zero to match the *F F lagrangian 2024_03\n") ;
 	  if (1)
@@ -11514,30 +11515,31 @@ int main (int argc, const char **argv)
   
   /* superalgebra Jacobi indentities */
   
-  if (0)
+  if (jacobi)
     {
-      
+      muInit (0) ;
+	
       if (0) mu3p ("######### Triple Vector Vertex\n# Lie algebra f-abc vertex,\n# compute the trace anti-symmetrized in bc: Tr(a[bc])\n# we hope to find the Lie algebra f-123 = 4i", 0) ;
       
       if (0) mu3p ("######### Adler-Bardeen Anomalous Triple Vector Vertex\n# d-abc anomalous vertex\n# compute the super-trace symmetrized in bc: STr(a{bc})\n# The anomaly should vanish", 1) ;
 	  if (0) mu3p ("######### Vector Scalar Vertex\n# since  i and j are oriented, do not symmetrized in i,j but use LTr(aij)-RTr(aji)\n# We hope to find the super-algebra d-aij\n", 2) ;
-      if (1) mu3p ("######### Vector Scalar Vertex\n# use Trace (aij - aji), expect zero in f=famille\n", 20) ;
-      if (1) mu3p ("######### Vector Scalar Vertex STr measure\n# use SuperTrace (aij - aji), expect zero in f=famille\n", 21) ;
+      if (0) mu3p ("######### Vector Scalar Vertex\n# use Trace (aij - aji), expect zero in f=famille\n", 20) ;
+      if (0) mu3p ("######### Vector Scalar Vertex STr measure\n# use SuperTrace (aij - aji), expect zero in f=famille\n", 21) ;
       if (0) mu3p ("######### Vector Scalar Vertex Tr measure\n# use Trace (aij - aji), expect irregularities\n", 22) ;
-      if (1) mu3p ("######### Vector Scalar Vertex STr vertex\n# use STrace (aij + aji), expect universal d_aij\n", 23) ;
+      if (0) mu3p ("######### Vector Scalar Vertex STr vertex\n# use STrace (aij + aji), expect universal d_aij\n", 23) ;
       if (0) mu3p ("######### The other types of triple vertices, i.e. f-abi and f-ijk should be zero because they do not conserve the even/odd grading\n", 3) ;
       if (0) mu3p ("######### Vector scalar anomaly, Tr (a [ij]) should vanish\n", 4) ;
-      exit (0) ;
+     
       
       
       
       printf ("\n######### Four vector vertices\n# The 3 types of (abcd) symmetrisations are implied by the trace on the Pauli matrices of the Fermion loop\n") ;
-      if (1) mu4p ("#########  K-abcd 4 vectors\n# [ab] [cd]: standard Lie Algebra vertex g_mn f^m_ab f^n_cd", 0) ;
-      if (1) mu4p ("#########  K-abcd 4 vectors\n# [ab] {cd} should vanish", 1) ;
-      if (1) mu4p ("#########  K-abcd 4 vectors anomaly\n# [abcd]", 2) ;
+      if (0) mu4p ("#########  K-abcd 4 vectors\n# [ab] [cd]: standard Lie Algebra vertex g_mn f^m_ab f^n_cd", 0) ;
+      if (0) mu4p ("#########  K-abcd 4 vectors\n# [ab] {cd} should vanish", 1) ;
+      if (0) mu4p ("#########  K-abcd 4 vectors anomaly\n# [abcd]", 2) ;
       
       printf ("\n######### Two vectors, 2 scalars vertices\n# The scalars are oriented, so we do not symmetrize on (ij)\n") ;
-      if (1) mu4p ("#########  K-abij 2 vectors, 2 scalars\n# abij: Symmetize in {ab}, use Lij+Rji\n# Then add the K-aibj Symmetrize in {ab}, use (-2)(L.i.j+R.j.i)", 3) ;
+      if (0) mu4p ("#########  K-abij 2 vectors, 2 scalars\n# abij: Symmetize in {ab}, use Lij+Rji\n# Then add the K-aibj Symmetrize in {ab}, use (-2)(L.i.j+R.j.i)", 3) ;
       
       printf ("\n######### Four scalars\n# The scalars are oriented,{ij} incoming, {kl} outcoming\n") ;
       if (1) mu4p ("#########  K-ijkl Symmetrize in {ij} and {kl}, use Likjl + Liljk", 4) ;

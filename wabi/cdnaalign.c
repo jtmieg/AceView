@@ -5410,7 +5410,7 @@ static BOOL locateNewExon (KEY clone, HIT *up, HIT *vp, int cmin, int cmax, int 
     nc1best,
     nz1, 
     maxDna = arrayMax (longDna) ;
-  BOOL isComposite = FALSE ;
+
   unsigned int oligo,  mask ;
   char *cp ;
 #ifdef USEASS
@@ -5572,7 +5572,7 @@ static BOOL locateNewExon (KEY clone, HIT *up, HIT *vp, int cmin, int cmax, int 
                 keySet (c1OldKs, c1 - cmin + zmax - z1) = c1 ;
                 c1 = c3 - nn + 1 ; z1 = zmin + pos ;
                 c2 = c1 + nz1 + 10 ; z2 = z1 + nz1 ;
-		isComposite = keyFindTag (up->est, _Composite) ;
+		isComposite |= keyFindTag (up->est, _Composite) ;
 		maxError = isComposite ? -2 :  errmin ;
                 err = aceDnaTrackErrors (cDNA, z1 , &z2, longDna, c1 , &c2, 0, err, 2, maxError, TRUE, 0, FALSE) ;
                 if (0)
@@ -5669,7 +5669,7 @@ static BOOL locateNewExon (KEY clone, HIT *up, HIT *vp, int cmin, int cmax, int 
                 
                 c1 = c3 - pos ; z1 = zmax - nz1 ;
                 c2 = c1 + nz1 + 10 ; z2 = zmax ;
-		isComposite = keyFindTag (vp->est, _Composite) ;
+		isComposite |= keyFindTag (vp->est, _Composite) ;
 		maxError = isComposite ? -2 :  errmin ;
                 err = aceDnaTrackErrors (cDNA, z1 , &z2, longDna, c1 , &c2, 0, err, 2, maxError, TRUE, 0, FALSE) ;
                 nc1 = c2 - c1 ;
@@ -9640,7 +9640,7 @@ void showCHits(Array hits, char *cName)
       else
         lexword2key (cName, &clone, _VcDNA_clone) ;
     }
-  printf("\n") ; /* beauase under debugger this will purge stdout buffer */
+  printf("\n") ; /* because under debugger this will purge stdout buffer */
   if (arrayExists(hits)) 
     for (j = 0  ; j < arrayMax(hits) ; j++)
       {
@@ -11063,7 +11063,7 @@ static KEYSET alignGene2WalledCosmid (KEY cosmid, KEYSET genes, KEYSET reads,
     }
 
   oldr = keySetCopy (reads) ;
-
+  BOOL composite = TRUE ;
   if (z1 > z2) { int dummy = z1 ; z1 = z2 ; z2 = dummy ; }
   if (z1 < 1) z1 = 1 ;
   if (z2 > dnaMax)
@@ -11073,7 +11073,8 @@ static KEYSET alignGene2WalledCosmid (KEY cosmid, KEYSET genes, KEYSET reads,
     {
       if (!doLimit) { myz1 = 0 ; myz2 = dnaMax ; }
       else { myz1 = z1 ; myz2 = z2 ; }
-      
+      if (pass == 0 && composite)
+	continue ;
       oldz1 = myz1 ;
       if (walls)                                 /* forbiden, because it duplicates reads */
         /* hence the walls will still cut the genes but a read can still be aligned just once to the cosmid */
@@ -11120,6 +11121,7 @@ static KEYSET alignGene2WalledCosmid (KEY cosmid, KEYSET genes, KEYSET reads,
   keySetDestroy (oldr2) ;
   keySetDestroy (oldr3) ;
   keySetDestroy (oldr4) ;
+
   return genes ;
 } /*alignGene2WalledCosmid */
 
@@ -11399,7 +11401,9 @@ static KEYSET cDNARealignGenePart (KEY cosmid,
 
   if (genes && debug && keySetMax(genes))
     printf ("Pass 1 %s\n", name(keySet(genes,0))) ;
-  
+  BOOL composite = TRUE ;
+  if (composite)
+    goto done ;
   newr = genes ?
     query (genes,"{ Follow cDNA_clone } $| {Follow Ignored_clone ; IS keepIgnoringThatJunk } ; FOLLOW Read IS_read") :
     keySetCreate () ;
@@ -11435,8 +11439,7 @@ static KEYSET cDNARealignGenePart (KEY cosmid,
       error = keySetMINUS (oldr, newr) ; keySetDestroy (oldr) ; keySetDestroy (newr) ;
       oldr = error ; error = 0 ; 
     }
-  keySetDestroy (oldr) ;
-  
+ done:
   /* look for dead mrna */
   
   keySetDestroy (oldr) ;
@@ -12173,14 +12176,17 @@ static KEYSET cDNARealignCutPart (KEY cosmid, KEY gene,
   if (genes)
     {
       int i ;
-
+      
       for (i = 0 ; i < keySetMax(genes) ; i++)
         {
           if (gene == keySet(genes, i)) 
             { gene = 0 ; break ; }
         }
-      mrnaAnalyseNeighbours (genes) ;
-      mrnaSplitDoubleGenes (genes) ;
+      if (! isComposite)
+	{
+	  mrnaAnalyseNeighbours (genes) ;
+	  mrnaSplitDoubleGenes (genes) ;
+	}
     }
   if (gene)
     {
@@ -12416,7 +12422,7 @@ KEY cDNARealignGene (KEY gene, int z1, int z2, int direction,
           if (newGenes)
             cDNARealignGeneKeySet (newGenes, FALSE, 2, 0, mySplitCloud) ;
         }
-      else  /* (splitCloud ==  0, 1) AND !searchRepeats */
+       else if (! isComposite)  /* (splitCloud ==  0, 1) AND !searchRepeats */
         {
           newGenes = cDNARealignCutPart (cosmid, gene, z1, z2
                                          , direction, doLimit

@@ -218,10 +218,10 @@ setDA:
 echo -n "I1 phase $phase start :"
 date
 
-if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/$MAGIC.I1.setDA.done) then
+if (-d tmp/INTRON_DB/$chrom/database && ! -e tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done) then
   echo "bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC"
         bin/altintrons --setDA --db tmp/INTRON_DB/$chrom -p $MAGIC
-  touch tmp/INTRON_DB/$chrom/$MAGIC.I1.setDA.done
+  touch tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
 endif
 
 goto phaseLoop

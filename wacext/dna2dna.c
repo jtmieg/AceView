@@ -2157,7 +2157,7 @@ static int parseShadowFile (SX *sx, int type)
   const char *ccp ;
   int a1, a2, x1, x2, oldX2 = 0, mrna = 0, oldMrna = 0, gene = 0, target = 0 ;
   char cutter ;
-  SHADOW *up ;
+  SHADOW *up, *vp ;
 
   if (type == 1)
     ai = aceInCreate (sx->shadowFileName, FALSE, h) ;
@@ -2221,6 +2221,53 @@ static int parseShadowFile (SX *sx, int type)
   arraySort (sx->shadowArray, shadowOrder) ;
   arrayCompress (sx->shadowArray) ;
 
+  int ii, jj ;
+  nn = arrayMax (sx->shadowArray) ;
+  for (ii = jj = 0, up = vp = arrayp (sx->shadowArray, 0, SHADOW) ; ii < nn ; ii++, up++)
+    {
+      /* faire un clean up si redondant */
+      /* crash si incoherent */
+      SHADOW *wp = ii < nn - 1 ? up + 1 : 0 ;
+      
+      if (! up->mrna) continue ;
+      if (wp && up->mrna == wp->mrna && up->x2 >= wp->x1) /* potential overlap */
+	{
+	  if (
+	      (up->target != vp->target) ||
+	      (up->a1 < up->a2 && wp->a1 > wp->a2) ||
+	      (up->a1 > up->a2 && wp->a1 < wp->a2) ||
+	      (up->a1 < up->a2 && up->a1 + wp->x1 - up->x1 != wp->a1) ||
+	      (up->a1 > up->a2 && up->a1 - wp->x1 + up->x1 != wp->a1)  ||
+	      (up->a1 < up->a2 && up->a2 + wp->x2 - up->x2 != wp->a2) ||
+	      (up->a1 > up->a2 && up->a2 - wp->x2 + up->x2 != wp->a2)
+	      )
+	    messcrash ("Parse error, distinct overlap in %s::%d:%d %s::%d:%d %s::%d:%d %s::%d:%d %s line %d"
+		       , dictName (sx->shadowDict, up->mrna)
+		       , up->x1, up->x2
+		       , dictName (sx->selectDict, up->target)
+		       , up->a1, up->a2
+		       , dictName (sx->shadowDict, wp->mrna)
+		       , wp->x1, wp->x2
+		       , dictName (sx->selectDict, wp->target)
+		       , wp->a1, wp->a2
+		       , aceInFileName (ai) ? aceInFileName (ai) : "-"
+		       , aceInStreamLine (ai)
+		       ) ;
+	  if (up->a1 <= up->a2) { up->x2 = wp->x1 - 1 ; up->a2 = wp->a1 - 1 ; }
+	  else                  { up->x2 = wp->x1 - 1 ; up->a2 = wp->a1 + 1 ; }
+	}
+      if (vp <= up && up->mrna && up->x1 <= up->x2)
+	{ *vp = *up ; vp++ ; jj++ ;
+	  if (0) fprintf (stderr, "%s %d %d %s %d %d\n"
+			  , dictName (sx->shadowDict, up->mrna)
+			  , up->x1, up->x2
+			  , dictName (sx->selectDict, up->target)
+			  , up->a1, up->a2
+			  ) ;
+	} 
+    }
+  arrayMax (sx->shadowArray) = jj ;
+  arraySort (sx->shadowArray, shadowOrder) ;
  done:
   ac_free (ai) ;
   ac_free (h) ;

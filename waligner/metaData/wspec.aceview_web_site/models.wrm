@@ -739,12 +739,12 @@
                       SL2s_L3 UNIQUE Int
                       SL2s_L4 UNIQUE Int
        Completeness  Complete  // found5p && Found3p && convaincant
-                     Found5p  Transpliced_to  ?Motif ?cDNA_clone
+                     Found5p  Transpliced_to  ?Motif ?cDNA_clone UNIQUE Int // composite support
                               Aggregated_5p_clones  UNIQUE Int
                               Submitted_as_5p_complete ?cDNA_clone 
                               Valid5p Int UNIQUE Int UNIQUE Int // position, spliced position,  nb of supporting clones 
                      Found3p   PolyA_primed_clone
-                               PolyA_found Int ?cDNA_clone
+                               PolyA_found Int ?cDNA_clone UNIQUE Int  // composite support
                                PolyA_Signal AATAAA Int 
                                             Variant Text Int
                                Aggregated_3p_clones  UNIQUE Int
@@ -1985,22 +1985,22 @@
                    ORF_Gap
 
 
-#Splicing_confirmation         Intron                    UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // gt_ag, Length, %d , bp
-                               Exon                      UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number, length,%d, bp
-                               Partial_Exon              UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               First_Exon                UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Last_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Stolen_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Predicted_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Gap                       UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // 'unspanned' length,, bp
-                               ORF_Gap                   UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // 'open'exon number, length,, bp
-                               Alternative_Intron        UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // frame, gt_ag, Length,, bp
-                               Stolen_Intron             UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // frame, gt_ag, Length,, bp
-                               Small_deletion            UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // frame, gt_ag, Length,, bp
-                               Predicted_Intron          UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // frame, gt_ag, Length,, bp
-                               Alternative_Exon          UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Alternative_First_Exon    UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
-                               Alternative_Partial_Exon  UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text  // exon number , length,, bp
+#Splicing_confirmation         Intron                    UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // gt_ag, Length, %d , bp, %d, cover
+                               Exon                      UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number, length,%d, bp, %d, cover
+                               Partial_Exon              UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               First_Exon                UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Last_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Stolen_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Predicted_Exon                 UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Gap                       UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // 'unspanned' length,, bp, %d, cover
+                               ORF_Gap                   UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // 'open'exon number, length,, bp, %d, cover
+                               Alternative_Intron        UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // frame, gt_ag, Length,, bp, %d, cover
+                               Stolen_Intron             UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // frame, gt_ag, Length,, bp, %d, cover
+                               Small_deletion            UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // frame, gt_ag, Length,, bp, %d, cover
+                               Predicted_Intron          UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // frame, gt_ag, Length,, bp, %d, cover
+                               Alternative_Exon          UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Alternative_First_Exon    UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
+                               Alternative_Partial_Exon  UNIQUE Text   UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text // exon number , length,, bp, %d, cover
                                3prime_UTR
                                5prime_UTR
                                UTR_3prime

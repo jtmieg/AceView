@@ -79,23 +79,26 @@ printf "-R Sequence c_$chrom $chrom\n\n" >  tmp/X.$MAGIC/$chrom/f3.rename_chrom.
 EOF
 
 # in Xcds the score is independant of the coverage, it just reflects the length of the CDS, so that all long CDS are shown with all their exons
-set ffcds=tmp/METADATA/gtf.$target.ns.cds.spongeZZZZZ
-if (! -e $ffcds) then
-  set ffcds=tmp/METADATA/$target.ns.cds.sponge
-endif
-echo AAA $ffcds
-if (-e $ffcds) then
-  cat $ffcds ZZZZZ $ffcds | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if (chrom != $3)next;}{a1=$4;a2=$5;ln=a2-a1;if(ln<0)ln = -ln;ln++;}{if(zz<1){t2ln[$1]+=ln;next;}}{nnn=t2ln[$1];if(nnn >= 450)printf("Xcds_%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n",chrom,a1,a2,ln,chrom,a1,a2,nnn);}' chrom=$chrom | sort -u | sort -V >  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2
-    bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 >  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
-    cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 | gawk -F '\t' '{z=$1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6;if($7>nn[z]+0)nn[z]=$7+0;}END{for(z in nn)printf("%s\t%d\n",z,nn[z]);}' > tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3
-    cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3 | gawk -F '\t' '{printf("Sequence %s\ncdna_clone %s\nForward\nColour LIGHTVIOLET\nIntMap %s %d %d\nIs_read\nComposite %d\n\n",$1,$1,$4,$5,$6,$7);}' >  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
-    bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
-      pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
-      pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
-      save
-      quit
+foreach target ($Etargets)
+  if ($target == magic) continue
+  set ffcds=tmp/METADATA/gtf.$target.ns.cds.spongeZZZZZ
+  if (! -e $ffcds) then
+    set ffcds=tmp/METADATA/$target.ns.cds.sponge
+  endif
+  echo AAA $ffcds
+  if (-e $ffcds) then
+    cat $ffcds ZZZZZ $ffcds | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if (chrom != $3)next;}{a1=$4;a2=$5;ln=a2-a1;if(ln<0)ln = -ln;ln++;}{if(zz<1){t2ln[$1]+=ln;next;}}{nnn=t2ln[$1];if(nnn >= 450)printf("Xcds_%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n",chrom,a1,a2,ln,chrom,a1,a2,nnn);}' chrom=$chrom | sort -u | sort -V >  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2
+      bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 >  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
+      cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 | gawk -F '\t' '{z=$1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6;if($7>nn[z]+0)nn[z]=$7+0;}END{for(z in nn)printf("%s\t%d\n",z,nn[z]);}' > tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3
+      cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3 | gawk -F '\t' '{printf("Sequence %s\ncdna_clone %s\nForward\nColour LIGHTVIOLET\nIntMap %s %d %d\nIs_read\nComposite %d\n\n",$1,$1,$4,$5,$6,$7);}' >  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
+      bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
+        pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
+        pparse  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
+        save
+        quit
 EOF
-endif
+  endif
+end
 
     bin/gene2chrom2 -any -gs -i tmp/X.$MAGIC/$chrom  >! tmp/X.$MAGIC/$chrom/f3.g2c.gsi.ace
     bin/gene2chrom2 -any -pg -i tmp/X.$MAGIC/$chrom  >! tmp/X.$MAGIC/$chrom/f3.g2c.pgi.ace
@@ -197,13 +200,24 @@ if (-e MetaDB/$MAGIC/GroupW_strandedList) then
   if ($ggS1 != "") set ggS=$ggS1
 endif
 
+echo " " > tmp/X.$MAGIC/$chrom.tabix.ace
+if ($ggS != "") then
+  echo "Map $chrom\nWiggle $ggS $ggS/$chrom\n\n" >> tmp/X.$MAGIC/$chrom.tabix.ace
+endif
+if ($ggNS != "") then
+  echo "Map $chrom\nWiggle $ggNS $ggNS/$chrom\n\n" >> tmp/X.$MAGIC/$chrom.tabix.ace
+endif
+echo "parse the tabix file"
+echo "pparse tmp/X.$MAGIC/$chrom.tabix.ace" | bin/tacembly tmp/X.$MAGIC/$chrom -no_prompt
+
 set WGR="toto"
 if (-d  tmp/WIGGLEGROUP/$ggNS) set WGR=WIGGLEGROUP
 
 # restore the original data
+echo "restore the original data"
 if (-e tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz) then
   \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u.f.BF.gz
-  \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u4.r.BF.gz
+  \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u.r.BF.gz
 endif
 
 # scripts/wiggle2tabix.tcsh $ggNS $chrom u $chrom
@@ -223,7 +237,7 @@ endif
 ###### grab the coverons and the gene-ends using multiPeaks (XG stranded, XH non stranded)
 \rm  tmp/X.$MAGIC/$chrom/f3.Xends.*
 set WGR=toto
-echo "grab the XG/XH"
+echo "grab the XG/XH: $ggS/$ggNS"
 foreach XGH (XG XH)
   if ($XGH == XG) set stranding=98
   if ($XGH == XG && $ggS == toto) continue 
@@ -277,13 +291,16 @@ foreach fr (ELF ELR ERF ERR)
      if ($fr == ELF) then
        cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$7/100);}' fr=$fr > $ff.shadow
        cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALECYAN\n-D Composite\nComposite %d\nForward\nmForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
-     else if ($fr == ERF) then
+     endif
+     if ($fr == ERF) then
        cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$7/100);}' fr=$fr > $ff.shadow
        cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALEYELLOW\n-D Composite\nComposite %d\nReverse\nmReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
-     else if ($fr == ERR) then
+     endif
+     if ($fr == ERR) then
        cat $ff | gawk -F '\t' '/^#/{next;}{if($2<2)$1=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$3,$2,$4,$1,$3,$2,$7/100);}' fr=$fr > $ff.shadow
        cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALECYAN\n-D Composite\nComposite %d\nForward\nmForward\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
-     else if ($fr == ELR) then
+     endif
+     if ($fr == ELR) then
        cat $ff | gawk -F '\t' '/^#/{next;}{if($2<1)$2=1;printf("Xends_%s.%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n", fr,$1,$2,$3,$4,$1,$2,$3,$7/100);}' fr=$fr > $ff.shadow
        cat $ff.shadow | gawk -F '\t' '{printf("Sequence %s\ncDNA_clone %s\nIs_read\nIntMap %s %d %d\nColour PALEYELLOW\n-D Composite\nComposite %d\nReverse\nmReverse\n\n", $1, $1,$4,$5,$6,$7);}' > $ff.ace
      endif
@@ -341,15 +358,15 @@ EOF
 hello:
 
 # these lines add the RefSeq mapping to this chromosome as additional pseudo composite reads
-if (1) then
- 
+if (0) then
+# this is FATAL ERROR if the NM are also entered as gene models, becuase it contradicts the genome because of the introns
   cat tmp/METADATA/RefSeq.mrna_map_ln_gc_gene_geneid.txt | gawk -F '\t' '{gsub(/\"/,"",$0); split($2,aa,":");if(aa[1] != chrom)next;split(aa[2],bb,"-");m=$1;c[m]=aa[1];a1[m]=bb[1];a2[m]=bb[2];}END{for(m in c)printf("Sequence %s\nIntMap %s %d %d\nForward\nComposite 10\nIs_read\n\n",m,c[m],a1[m],a2[m]);}' chrom=$chrom | gzip > tmp/X.$MAGIC/$chrom/f3.RefSeq.intmap.ace.gz
 
   gunzip -c tmp/X.$MAGIC/$chrom/f3.RefSeq.intmap.ace.gz ZZZZZ.gz $ici/TARGET/Targets/$species.RefSeq.fasta.gz |   gawk '/^ZZZZZ/{zz++;next;}/^Sequence/{okk[$2]=1;next;}{if(zz<1)next;}/^>/{s=substr($1,2);i=index(s,"|");if(i>0)s=substr(s,1,i-1);ok=0;if(okk[s]==1){ok=1;print ">" s;}next;}{if(ok==1)print}' | gzip > tmp/X.$MAGIC/$chrom/f3.RefSeq.fasta.gz
 
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
     pparse tmp/X.$MAGIC/$chrom/f3.RefSeq.intmap.ace.gz
-    pparse tmp/X.$MAGIC/$chrom/f3.RefSeq.fasta.gz
+    // pparse tmp/X.$MAGIC/$chrom/f3.RefSeq.fasta.gz  
 EOF
 
 endif
@@ -446,14 +463,13 @@ EOF
 # les introns mangent 1% de leur soutien sur les zones inclues des XH sur les 2 brins
 
 bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
+    pparse yk2sl.xsl.$chrom.ace
+    pparse yk2sl.xsl.$chrom.fasta
+    save
   quit
 EOF
 
-
-
-
-  touch tmp/X.$MAGIC/$chrom/f3.parse.done
-
+touch tmp/X.$MAGIC/$chrom/f3.parse.done
 endif
 
 exit 0

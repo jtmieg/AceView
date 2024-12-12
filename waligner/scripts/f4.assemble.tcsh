@@ -10,7 +10,7 @@ if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
 
   pushd tmp/X.$MAGIC/$chrom
     if (-e TABIX) \rm TABIX
-    ln -s $ici/tmp/TABIX TABIX
+    ln -s ../../TABIX
     if (! -e tables) ln -s ../../metaData/tables
   popd
   if ($species == worm && ! -e tmp/X.$MAGIC/$chrom/genes.ace) then
@@ -127,6 +127,8 @@ scripts/f3.kill_ct_ac_introns.tcsh $chrom 3
 
 touch  tmp/X.$MAGIC/$chrom/f4.assemble.done
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
+exit 0  # Composite case, exit now, no need for the complications below
+
 
 # suspect 1 finds reverse read starting inside the ORF
 # suspect 2 finds forward polyA read endding inside the ORF

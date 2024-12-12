@@ -377,10 +377,15 @@ float pepPI (Array pep) /* encoded array */
   for (i = n = 0, cp = arrp(pep,0,char) ; i < max ; i++, cp++)
     {
       n = pepDecodeChar[(int)*cp] - 'A' ;
+      if (n < 0)  /* stop = '*'- 'A' = -23 */
+	{
+	  max = i ;
+	  break ;
+	}
       aaCount [n]++ ;
       if (!i)  nTermResidue = n ;
+      cTermResidue = n ;
     }
-  cTermResidue = n ;
   
   for (ii = 0, charge = 1.0 ; 
        ii < MAXLOOP && (phMax - phMin) > EPSI ;

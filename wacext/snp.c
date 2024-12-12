@@ -14,7 +14,7 @@
 #include "aceio.h"
 #include <wiggle.h>
 
-static int SNPDEBUG=0 ;
+/* static int SNPDEBUG=0 ; */
 static void usage (char *message) ;
 
 typedef struct hitStruct { 
@@ -716,7 +716,7 @@ static void showSsm (Array aa)
 } /* showSsm */
   
 /*************************************************************************************/
-
+#ifdef JUNK
 static int ssmOrderBySnp (const void *va, const void *vb)
 {
   const SSM *a = (const SSM *)va, *b = (const SSM *)vb ;
@@ -729,7 +729,7 @@ static int ssmOrderBySnp (const void *va, const void *vb)
 
   return 0 ;
 } /* ssmOrderBySnp */
-
+#endif
 /*************************************************************************************/
 
 static int ssmDeepTableReportOrder (const void *va, const void *vb)
@@ -1846,6 +1846,8 @@ static char *cleanSnpName (const char * ccp, int strand, int *type)
 } /* cleanSnpName */
 
 /*************************************************************************************/
+#ifdef JUNK
+
 /* construct a signature for the quadruplet */
 static int zz (SNP *snp, int run)
 {
@@ -2174,7 +2176,7 @@ static long int snpBRSparseFile (SNP *snp, BOOL forgetRepeats, AC_HANDLE h)
   fprintf (stderr, "// Parsed %ld lines in input file : %s\n", bigArrayMax (snps), timeShowNow ()) ;
   return bigArrayMax (snps) ;
 } /* snpBRSparseFile */
-
+#endif
 /*************************************************************************************/
 
 static int snpParseSnpList (SNP *snp)
@@ -2235,6 +2237,7 @@ static int snpParseSnpList (SNP *snp)
 } /* snpParseSnpList */
 
 /*************************************************************************************/
+#ifdef JUNK
 
 static BOOL  snpBRS2snpName (SNP *snp, SSM *ssm, char* namBuf, char *typeBuf, char *Abuf, char *Bbuf, char *tagBuf, int *deltap, const char *requestedName) 
 {
@@ -2516,6 +2519,7 @@ static BOOL  snpBRS2snpName (SNP *snp, SSM *ssm, char* namBuf, char *typeBuf, ch
 
   return isRepeat ;  
 } /* snpBRS2snpName */
+#endif
 
 /*************************************************************************************/
 /* from wolfram: p = proba (mean - alpha*sigma < x < mean + alpha*sigma)
@@ -2853,7 +2857,7 @@ static void snpNotLowShow (ACEOUT ao, int count, int called, double *zp, double 
 } /* snpNotLowShow */
 
 /*************************************************************************************/
-
+#ifdef JUNK
 static int ssmOrderByC2a (const void *va, const void *vb)
 {
   const SSM *a = (const SSM *)va, *b = (const SSM *)vb ;
@@ -3868,6 +3872,7 @@ static int snpBRS2snp (SNP *snp)
   ac_free (h) ;
   return nn ;
 } /* snpBRS2snp */
+#endif
 
 /*************************************************************************************/
 /*************************************************************************************/
@@ -4208,7 +4213,7 @@ static BOOL snpIsSliding (char *typ, char *buf1, char *buf2, BOOL isRNA, BOOL is
 } /* snpIsSliding */
 
 /*************************************************************************************/
-
+#ifdef JUNK
 static int snpExtendGenomicSnpNet  (SNP *snp)
 {
   AC_HANDLE  h1 = 0, h = ac_new_handle () ;
@@ -4504,7 +4509,7 @@ static int snpExtendGenomicSnpNet  (SNP *snp)
   ac_free (h) ;
   return nn ;
 } /* snpExtendGenomicSnpNet */
-
+#endif
 
 static int snpCompatibleStrands (int cover, int a1, int a2, int b1, int b2, double *zp, double *z1p, double *z2p, int *chiFlagp, int limit)
 {
@@ -8753,7 +8758,7 @@ static void snpBRS2tsf (SNP *snp)
 /*************************************************************************************/
 /******************************* snpBRS2snps end *************************************/
 /*************************************************************************************/
-
+#ifdef JUNK
 static void snpMerge (SNP *snp)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -8882,7 +8887,7 @@ static void snpMerge (SNP *snp)
 
   ac_free (h) ;
 } /* snpMerge */
-
+#endif
 /*************************************************************************************/
 typedef struct runInfoStruct { int machine, sample, system1, system2, tissue1, tissue2 ; } RI ;
 

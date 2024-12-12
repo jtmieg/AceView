@@ -1377,6 +1377,7 @@ static void fMapPick (int box, double x, double y)
   float x1,x2,y1,y2 ;
   int xxx, ii ;
   FMAPLOOKGET ("fMapPick") ;
+  SEG *seg = BOXSEG (box) ;
   
   if (look != selectedfMap)
     fMapSelect (look) ; 
@@ -1408,7 +1409,7 @@ static void fMapPick (int box, double x, double y)
     graphTextEntry (look->zoneBuf,0,0,0,0) ;
   else if (box >= look->minLiveBox &&
 	   box != look->summaryBox && 
-	   BOXSEG (box))
+	   seg)
     {
       if (box == look->activeBox &&
 	  BOXSEG (box)->type != DNA_SEQ &&

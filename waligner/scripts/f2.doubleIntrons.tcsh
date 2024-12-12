@@ -32,6 +32,12 @@ cat $ffc.txt |  gawk  -F '\t' '{c=$2;s=1;if($4<$5)next;nam="XY_" c "__" $4-1 "_"
   # export the fasta
   dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow $ffc.shadow > $ffc.fasta
 
+#  bug dans dna2dna -shadow      2024/12/08 XY.shadow avec donnees redondantes => fausse insertion dans le fasta du XY
+#                                                                                                 gatccaatatgctttatgcagtgtg
+#genome                                                                                       tcaggatccaatatgctttatgcagtgtg                            cacatcgcatcagagataactattga
+#w    ttgcacaaaatgcacatgtacaagtgatggg gtgaaatgtgctttcctgtctcctgactgctcatctcacacaaaagaggcactggctgaggatccaatatgctttatgcagtgtg gatccaatatgctttatgcagtgtg  cacatc
+#w3   gatccaatatgctttatgcagtgtgcacatc gtgaaatgtgctttcctgtctcctgactgctcatctcacacaaaagaggcactggctgag
+
 #########################################
 ##  XA XSL
 # grab the pA and the SL

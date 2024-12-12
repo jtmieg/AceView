@@ -519,7 +519,7 @@ static unsigned int shortComplement(unsigned int rac, int taille)
 static BOOL invariantOligo (char *cp0, int taille)
 { char *cp, *cq ;
   int i, j ;
-  char buf[33] ;
+  char buf[64] ;
 
   if (taille > 16) messcrash("taille > 16 in invariantoligo") ;
   

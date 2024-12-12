@@ -31,6 +31,8 @@
 #include "query.h"
 #include "lex.h"
 
+BOOL isComposite = FALSE ;
+
 /**********************************************************************************/
 /**********************************************************************************/
 /**********************************************************************************/
@@ -2358,14 +2360,22 @@ KEYSET mrnaCreate (int type, KEY cosmid, KEY cosmid1,
       
       if (s2m->bMax && sc->s2mContigs)
         {
+	  KEY gene ;
           smrnas = s2mMakeTranscripts (s2m, sc, sc->s2mContigs) ;
           if (!arrayMax (smrnas))
             continue ; /* feb 2004, could be messcrash, happen in rare low quality cases */
           gmrna = mrnaMakeGene (s2m, sc, sc->s2mContigs, smrnas) ;
           mrnaMakeEstHits (s2m, sc, gmrna) ;
           if (s2m->type == 2 && !mrnaFilterGene (sc))
-            continue ; 
-          keySet (genes, ig++) = makeMrnaGene (s2m, sc, gmrna, smrnas, clipTops, clipEnds, linkPos) ; 
+            continue ;
+	  gene = makeMrnaGene (s2m, sc, gmrna, smrnas, clipTops, clipEnds, linkPos) ;
+	  if (gmrna->genes)
+	    {/* composite method */
+	      for (int i = 0 ; i < keySetMax (gmrna->genes) ; i++)
+		keySet (genes, ig++) = keySet (gmrna->genes, i) ;
+	    }
+	  else
+	    keySet (genes, ig++) = gene ;
         }
     }
   s2mDestroy (s2m) ;

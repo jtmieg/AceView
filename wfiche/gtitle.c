@@ -1279,9 +1279,9 @@ static void gtMolecularWeight (vTXT blkp, AC_OBJ oProduct, AC_OBJ oGF, BOOL show
       ) 
     {
       if (showPi)
-	vtxtPrintf (blkp, " (%.1f kD, pI %.1f)", mw, pI) ;
+	vtxtPrintf (blkp, " (%.1f kDa, pI %.1f)", mw, pI) ;
       else
-	vtxtPrintf (blkp, " (%.1f kD)", mw) ;
+	vtxtPrintf (blkp, " (%.1f kDa)", mw) ;
     }
   ac_free (h) ;
 } /* gtMolecularWeight */

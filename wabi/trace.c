@@ -1578,10 +1578,14 @@ static void traceSelect(LOOK look, int box)
 {
   HINT *hh ;
   
-  if (box < arrayMax(look->hints) &&
-      arrp(look->hints,box, HINT))
-    { hintAccept (look, arrp(look->hints,box, HINT)) ;
-      return ;
+  if (box < arrayMax(look->hints))
+    {
+      hh = arrp(look->hints,box, HINT) ;
+      if (hh)
+	{
+	  hintAccept (look, arrp(look->hints,box, HINT)) ;
+	  return ;
+	}
     }
 
   if (box < arrayMax(look->baseBoxes) &&

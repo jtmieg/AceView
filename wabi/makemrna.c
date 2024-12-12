@@ -18,9 +18,6 @@
 /* %W% %G% */
 #define CHRONO   amounts to 1 minute/ 2 hours for whole chromo 1 worm
 
-#define MINI_LEU2MET 180  /* bp, was 90 until 2006_05_12 */ 
-#define MINI_LEU2END 240  /* bp, minimal leu only ORF 2006_10_07 */
-
 #include "ac.h"
 #include "bitset.h"
 #include "cdna.h"
@@ -44,13 +41,9 @@
 #include "chrono.h"
 #include "../wfiche/biolog.h"
 
-typedef struct { Array dna ; Array hits ; Array introns ; int iDna, topExon, frame, met, leu, 
-                   upStop, downStop, nIntron, nOpen, start, cds, 
-                   nX, upGap, max, stolen, isSL, isBest, uOrf ;} ORFT ;
 
 extern Array getSeqDna (KEY key) ;
 static Array mrnaRefseqMakerDna2Pep (KEY cosmid, Array dna, BOOL isMrna5pComplete) ;
-static void mrnaSavePepAndKantor (KEY product, Array pep) ;
 static int mrnaAnalysePg2Tg (KEY g1, int a1, int a2, BOOL isUp1, KEY g2, int b1, int b2, BOOL isUp2) ;
 static void mrnaAddFirstMetAndUorf (KEY mrna) ;
 static BOOL smrnaDnaDestroy (SMRNA *smrna) ;
@@ -59,7 +52,7 @@ static void mrnaFixNonBestProductTitle (KEY mrna) ;
 static void showOrfs (Array orfs)
 {
   int ii = 0 ;
-  ORFT *orf ;
+  ORFS *orf ;
   
   if (orfs) 
     {
@@ -67,9 +60,9 @@ static void showOrfs (Array orfs)
 
       for (ii = 0 ; ii < arrayMax(orfs) ; ii++)
 	{
-	  orf = arrp (orfs, ii, ORFT) ;
+	  orf = arrp (orfs, ii, ORFS) ;
 	  printf ("orf %d:: d=%2d  f=%1d upStop=%3d met=%3d leu=%3d start=%3d max=%3d downStop=%3d nOpen=%3d cds=%3d nI=%d nX=%3d %s %s\n",
-		  ii, orf->iDna,orf->frame,orf->upStop,orf->met,orf->leu,orf->start,orf->max,orf->downStop,orf->nOpen,orf->cds,orf->nIntron, orf->nX,orf->isSL?"SL ":"", orf->uOrf ? "uORF" : "") ;
+		  ii, orf->iDna,orf->frame,orf->upStop,orf->met,orf->leu,orf->start,orf->max,orf->downStop,orf->nOpen,orf->cds,orf->nIntron, orf->nX,orf->isSL?"SL ":"", orf->isUorf ? "uORF" : "") ;
 	  
 	}
     }
@@ -202,7 +195,7 @@ static int getPleaseNoKantorInfo (void)
 
 /*********************************************************************/
 
-static int mrnaPleaseNameBy (void)
+int mrnaPleaseNameBy (void)
 {
   static int style = -1 ;
 
@@ -547,7 +540,7 @@ static void cDnaGetOneSources (KEYSET sources, KEY gene, int dx)
   int a1, a2, a0 = 0, b1, b2, x1, x2, i, j = keySetMax(sources) ;
   Array aa = 0 ;
   BSunit *uu ;
-
+  KEY _Is_predicted_gene = str2tag("Is_predicted_gene") ;
   source = keyGetKey (gene, _Genomic_sequence) ;
   if (source && (Source = bsCreate (source)))
     {
@@ -580,7 +573,7 @@ static void cDnaGetOneSources (KEYSET sources, KEY gene, int dx)
               uu = arrp (aa, i, BSunit) ;
               b1 = uu[1].i ; b2 = uu[2].i ;
               if (b1 > b2) { int bb = b1 ; b1 = b2 ; b2 = bb ; }
-              if (b1 < a0 + dx && b2 > a0 - dx)
+              if (b1 < a0 + dx && b2 > a0 - dx && ! keyFindTag (uu[0].k, _Is_predicted_gene))
                 keySet (sources, j++) = uu[0].k ; /* register */
             }
           old = source ;
@@ -792,7 +785,7 @@ static KEY mrnaAnalyseExactGenefinder (KEY g1, int a1, int a2, BOOL isUp1, KEY g
 		  {
 		    score += c2 - c1 + 1 ;
 		    exonScore += c2 - c1 + 1 ;
-		    if (i + j == 0 && 2 * score > uu[4].i - uu[3].i ) /* same first exon */
+		    if (i + j == 0 && 2 * score > uu[3].i - uu[2].i ) /* same first exon */
 		      { score += 100 ; endScore++ ; }
 		    if (i + 5 == iMax && j + 4 == jMax && (10 * exonScore > 3* lenA || 10 * exonScore > 3 * lenB)) /* same last exon */
 		      { score += 100 ; endScore++ ; }
@@ -1468,7 +1461,7 @@ void mrnaAnalyseNeighbours (KEYSET tgenes)
 {
   AC_HANDLE h = ac_new_handle () ;
   int dx = 1000000, nn  ;
-  KEYSET sources = 0, tgs = 0,gns = 0, pds = 0, pgs = 0, mrs = 0 ;
+  KEYSET sources = 0, tgs = 0,  pgs = 0, gns = 0, mrnas = 0, prods = 0 ;
 
   Array allTg = 0 ;
   Array allPg = 0 ; 
@@ -1480,9 +1473,10 @@ void mrnaAnalyseNeighbours (KEYSET tgenes)
       tgs = query (sources, "FOLLOW Transcribed_gene") ;
       pgs = query (sources, "{FOLLOW Subsequence ; CLASS Predicted_gene} SETOR {FOLLOW Genes ;Follow genefinder;}") ;
       gns = query (sources, "FOLLOW Genes ") ;
-      mrs = query (tgs, "FOLLOW mRNA") ;
-      pds = query (mrs, "FOLLOW Product") ;
 
+      mrnas = query (tgenes, "FOLLOW mRNA") ;
+      prods = query (mrnas, "FOLLOW Product") ;
+      
       allTg = cDnaGetIntMap (tgs, h) ;
       allPg = cDnaGetIntMap (pgs, h) ;
       allGn = cDnaGetIntMap (gns, h) ;
@@ -1507,20 +1501,20 @@ void mrnaAnalyseNeighbours (KEYSET tgenes)
       catText (s, "\n") ;
     }
 
-  nn = arrayMax (pds) ;
+  nn = arrayMax (prods) ;
   while (nn--)
     {
-      KEY product = keySet (pds, nn) ;
+      KEY product = keySet (prods, nn) ;
       catText (s, messprintf("Product %s\n", name(product))) ;
       catText (s, "-D Identical_to_gene\n") ;
       catText (s, "-D Matching_gene\n") ;
       catText (s, "\n") ;
     }
 
-  nn = arrayMax (mrs) ;
+  nn = arrayMax (mrnas) ;
   while (nn--)
     {
-      KEY mrna = keySet (mrs, nn) ;
+      KEY mrna = keySet (mrnas, nn) ;
       catText (s, messprintf("mRNA %s\n", name(mrna))) ;
       catText (s, "-D Touching_genefinder\n") ;
       catText (s, "-D Matching_genefinder\n") ;
@@ -1532,11 +1526,11 @@ void mrnaAnalyseNeighbours (KEYSET tgenes)
   nn = arrayMax (tgenes) ;
   while (nn--)
     {
-      KEY tgene = keySet (tgenes, nn) ;
-      mrnaAnalyseGenefinder (s, tgene, allPg, allTg, 1) ;
-      mrnaAnalyseGenefinder (s, tgene, allGn, allTg, 3) ;
-      mrnaAnalyseOverlap (s, tgene, allTg) ;
-      mrnaAnalyseNewNames (s, tgene, allTg) ;
+      KEY tg = keySet (tgenes, nn) ;
+      mrnaAnalyseGenefinder (s, tg, allPg, allTg, 1) ;
+      mrnaAnalyseGenefinder (s, tg, allGn, allTg, 3) ;
+      mrnaAnalyseOverlap (s, tg, allTg) ;
+      mrnaAnalyseNewNames (s, tg, allTg) ;
     }
 
   parseBuffer (stackText(s,0), 0) ;
@@ -1544,10 +1538,10 @@ void mrnaAnalyseNeighbours (KEYSET tgenes)
 
   keySetDestroy (sources) ;
   keySetDestroy (tgs) ;
-  keySetDestroy (pds) ;
+  keySetDestroy (prods) ;
   keySetDestroy (pgs) ;
   keySetDestroy (gns) ;
-  keySetDestroy (mrs) ;
+  keySetDestroy (mrnas) ;
   
   ac_free (h) ;
 
@@ -1563,35 +1557,6 @@ void mrnaAnalyseAllNeighbours (void)
   keySetDestroy (tgenes) ;
   return ;
 } /* analyseAllNeighbours */
-
-/*********************************************************************/
-
-static void mrnaSavePepAndKantor (KEY product, Array pep)
-{
-  int checkSum = hashArray (pep) ;
-  char buf[64] ;
-  KEY kantor = 0 ;
-  OBJ Product = 0, Kantor = 0 ;
-  
-  if (checkSum > 0)
-    sprintf (buf, "P%d", checkSum) ;
-  else
-    sprintf (buf, "N%d", - checkSum) ;
-  
-  lexaddkey (buf, &kantor, _VKantor) ;
-  if ((Product = bsUpdate (product)))
-    {
-      bsAddKey (Product, _Kantor, kantor) ;
-      bsSave (Product) ;
-    }
-  if ((Kantor = bsUpdate(kantor)))
-    {
-      bsAddKey (Kantor, _Representative_product, product) ;
-      bsSave (Kantor) ;
-    }
-  peptideStore (kantor, pep) ;
-  peptideStore (product, pep) ;
-} /* mrnaSaveKantor */
 
 /*********************************************************************/
 /* if metp != 0, export from met to stop and report *metp
@@ -1717,7 +1682,7 @@ void mrnaTranslateEst (KEYSET ks)
                 }
               bsSave (Product) ;
             }
-          mrnaSavePepAndKantor (product, pep) ;
+          mrnaDesignSavePepAndKantor (product, pep) ;
           if ((Est = bsUpdate (est)))
             {
               bsAddKey (Est, _EST_translation, product) ;
@@ -1974,7 +1939,7 @@ void mrnaTransferPg2PredictedMrna (KEYSET ks)
           }
       }
 
-      mrnaSavePepAndKantor (product, pep) ;
+      mrnaDesignSavePepAndKantor (product, pep) ;
 
       bsDestroy (Pg) ;
       arrayDestroy (dna) ;
@@ -1992,7 +1957,7 @@ BOOL mrnaTransferRefseqMaker2Product (KEY am)
   int x, iOrf ;
   KEY cosmid, mrna, product = 0, tg, geneBox ;
   Array orfs = 0, mdna = 0, pep = 0 ;
-  ORFT *orf ;
+  ORFS *orf ;
   OBJ Mrna = 0, Product = 0 ;
   KEY geneticCode = 0 ;
   char *translationTable ;
@@ -2020,7 +1985,7 @@ BOOL mrnaTransferRefseqMaker2Product (KEY am)
     orfs = mrnaRefseqMakerDna2Pep (cosmid, mdna, isMrna5pComplete) ;
     if (!orfs || !arrayMax(orfs))
       { arrayDestroy (mdna) ; return FALSE ; }        
-    orf = arrp (orfs, 0, ORFT) ;
+    orf = arrp (orfs, 0, ORFS) ;
   }
 
   
@@ -2033,7 +1998,7 @@ BOOL mrnaTransferRefseqMaker2Product (KEY am)
 
   for (iOrf = 0 ; iOrf < arrayMax(orfs) ; iOrf++)
     {
-      orf = arrp (orfs, iOrf, ORFT) ;
+      orf = arrp (orfs, iOrf, ORFS) ;
       if (! orf->isBest)
         continue ;
       {
@@ -2063,7 +2028,7 @@ BOOL mrnaTransferRefseqMaker2Product (KEY am)
         
         if (pep)
           {
-            mrnaSavePepAndKantor (product, pep) ;
+            mrnaDesignSavePepAndKantor (product, pep) ;
             arrayDestroy (pep) ;
           }
         else
@@ -2703,7 +2668,7 @@ static KEY mrnaNameGeneBySection (SC* sc)
 
 /*********************************************************************/
 
-static KEY mrnaGetGeneName (SC *sc)
+KEY mrnaGetGeneName (SC *sc)
 {
   int n ;
   KEY cGroup = 0, gene = 0 ;
@@ -3393,8 +3358,8 @@ static int smrnaOrderByLengthandBadQuality (const void *a, const void *b)
 
   if (sa->cGroup != sb->cGroup)
     return sa->cGroup - sb->cGroup ; /* baddies after goodies */
-  orfa = sa->orfs && arrayMax(sa->orfs) ? arr (sa->orfs, 0, ORFT).nOpen - arr (sa->orfs, 0, ORFT).nX : 0 ;
-  orfb = sb->orfs && arrayMax(sb->orfs) ? arr (sb->orfs, 0, ORFT).nOpen - arr (sb->orfs, 0, ORFT).nX : 0 ;
+  orfa = sa->orfs && arrayMax(sa->orfs) ? arr (sa->orfs, 0, ORFS).nOpen - arr (sa->orfs, 0, ORFS).nX : 0 ;
+  orfb = sb->orfs && arrayMax(sb->orfs) ? arr (sb->orfs, 0, ORFS).nOpen - arr (sb->orfs, 0, ORFS).nX : 0 ;
   
   return orfb - orfa ;  /* long first */
 }
@@ -3977,6 +3942,8 @@ static void mrnaSetCompletenessFlags (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrn
   for (iii = 0 ; iii < arrayMax(smrnas) ; iii++) 
     {
       smrna = arrp (smrnas, iii, SMRNA) ;
+      if (smrna->composite)
+	continue ;
       if (! smrna->hits)
 	continue ;
       /* search the flags of the first exon */
@@ -4305,7 +4272,7 @@ static void mrnaDoSaveProductCoverage (KEY product, KEY est, int p1, int p2
      
 static void mrnaSaveProductCoverage (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas, SMRNA *smrna)
 {
-  KEY mrna = smrna->gene, product ;
+  KEY mrna = smrna->tr, product ;
   KEYSET ks = keySetCreate () ;
   Array units = arrayCreate (32, BSunit) ;
   Array vnits = arrayCreate (32, BSunit) ;
@@ -4435,9 +4402,9 @@ static void mrnaSaveMicroIntrons (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
             for (jj = 0 ; jj < arrayMax (smrnas) ; jj++)
               { 
                 smrna = arrp (smrnas, jj, SMRNA) ;
-                if (bsFindKey (Gene, _mRNA, smrna->gene) &&
+                if (bsFindKey (Gene, _mRNA, smrna->tr) &&
                     bsGetData (Gene, _bsRight, _Int, &a1) &&
-                    (Mrna = bsUpdate (smrna->gene)))
+                    (Mrna = bsUpdate (smrna->tr)))
                   {
                     /* in principle smrna->a1 is equal to a1 extracted from gene
                      * but we may have stole one base, example 1B33
@@ -5941,7 +5908,8 @@ static void mrnaSaveGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
       bsAddKey (Gene, _mRNA, tr) ;
       bsAddData (Gene, _bsRight, _Int, &(smrna->a1)) ;
       bsAddData (Gene, _bsRight, _Int, &(smrna->a2)) ;
-      smrna->gene = tr ;
+      smrna->gene = gene ;
+      smrna->tr = tr ;
     }
   
   
@@ -6928,7 +6896,7 @@ static void mrnaMakeDnas (S2M *s2m, SC* sc, Array estHits, SMRNA *smrna)
   char nextBase = 0 ; /* a hack to see the stop in vidal clones */
   char nextBase2 = 0 ; /* a hack to see the stop in vidal clones */
   HIT *up ;
-  ORFT *orf ;
+  ORFS *orf ;
   BOOL isSL = FALSE ;
 
   arrayDestroy (smrna->dnas) ;
@@ -6940,7 +6908,7 @@ static void mrnaMakeDnas (S2M *s2m, SC* sc, Array estHits, SMRNA *smrna)
   else
     { longDna = s2m->dnaD  ; offset = sc->a1 + smrna->a1  - 2 ; }
   
-  dnas = arrayHandleCreate (12, ORFT, s2m->h) ;
+  dnas = arrayHandleCreate (12, ORFS, s2m->h) ;
 
   for (ii = 0, up = arrp (smrna->hits, 0, HIT) ; ii < arrayMax(smrna->hits);  up++, ii++)
     if (up->type & gS) { isSL = TRUE ; }
@@ -6960,7 +6928,7 @@ static void mrnaMakeDnas (S2M *s2m, SC* sc, Array estHits, SMRNA *smrna)
 
   for (loop = 0 ; loop < loopMax && loop < (4 << NGAPMAX) ; loop++)
     {
-      n = 0 ; orf = arrayp (dnas, iDna++, ORFT) ; ngap = 0 ;
+      n = 0 ; orf = arrayp (dnas, iDna++, ORFS) ; ngap = 0 ;
       dna = orf->dna = arrayHandleCreate (20000, char, s2m->h) ;
       hits = orf->hits = arrayHandleCopy (smrna->hits, s2m->h) ;
       introns = orf->introns = arrayHandleCreate (120, int, s2m->h) ;
@@ -7038,7 +7006,7 @@ static void mrnaMakeDnas (S2M *s2m, SC* sc, Array estHits, SMRNA *smrna)
    
 static int orfMetOrder (const void *a, const void *b)
 {
-  const ORFT *oa = (const ORFT *)a, *ob = (const ORFT *)b ;
+  const ORFS *oa = (const ORFS *)a, *ob = (const ORFS *)b ;
   int n ;
   
   n = oa->iDna - ob->iDna ;
@@ -7052,7 +7020,7 @@ static int orfMetOrder (const void *a, const void *b)
    
 static int orfOrder (const void *a, const void *b)
 {
-  const ORFT *oa = (const ORFT *)a, *ob = (const ORFT *)b ;
+  const ORFS *oa = (const ORFS *)a, *ob = (const ORFS *)b ;
   int aopen = oa->cds - oa->nX ; /* jan 2004, was before -oa->nX/2 but this favors huge gaps */
   int bopen = ob->cds - ob->nX ;
   int aIntron = oa->nIntron - (oa->nX ? 1 : 0) ; /* count a gap as a negative intron */
@@ -7080,7 +7048,7 @@ orf 3:: iDna= 0  frame=3  topExon= 0  met=150 upStop= 96  downStop=198  nIntron=
 
 static int orfOrderByUpStop (const void *a, const void *b)
 {
-  const ORFT *oa = (const ORFT *)a, *ob = (const ORFT *)b ;
+  const ORFS *oa = (const ORFS *)a, *ob = (const ORFS *)b ;
   return oa->upStop - ob->upStop ;
 }
 
@@ -7088,7 +7056,7 @@ static int orfOrderByUpStop (const void *a, const void *b)
 
 static int orfOrderByCds (const void *a, const void *b)
 {
-  const ORFT *oa = (const ORFT *)a, *ob = (const ORFT *)b ;
+  const ORFS *oa = (const ORFS *)a, *ob = (const ORFS *)b ;
   
   int n ;
 
@@ -7106,7 +7074,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
   Array hits = 0, dna = 0, dnas = smrna->dnas, orfs = 0, orfs2 = 0, introns = 0 ;
   int i, ii, iBase, iDna, j, jj, met, leu, lastStop, start, nOpen, cds, stolen,
     bestCds = 0, bestDna, frame, dMax = arrayMax(dnas), oMax = 0, dnaMax ;
-  ORFT *contig, *orf, *orf2 ;
+  ORFS *contig, *orf, *orf2 ;
   char tt, *cp ;
   int isOpenGap = 0, isGap = 0, lengthOpenGap = 0, nX = 0, nX1 = 0, firstXsinceStop = 0 ;
   HIT *up, *vp ;
@@ -7145,12 +7113,12 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
   if (0) printf(" mrnaLocateOrfs nLocateCall=%d\n",nLocateCall) ;
   if (0 && nLocateCall == 361)
     invokeDebugger() ;
-  orfs = arrayCreate (300 * dMax, ORFT) ; oMax = 0 ;
+  orfs = arrayCreate (300 * dMax, ORFS) ; oMax = 0 ;
 
   for (iDna = 0 ; iDna < dMax ; iDna++)
     {
       bestCds = 0 ;
-      contig = arrp (dnas, iDna, ORFT) ; 
+      contig = arrp (dnas, iDna, ORFS) ; 
       introns = contig->introns ;
       isOpenGap  = isGap = lengthOpenGap = 0 ;
       hits = contig->hits ;
@@ -7178,7 +7146,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
                   if (met < 0 && lastStop >= 0 && lastStop < stolen)
                     lastStop = met ; /* ignore stolen stop */
                   nOpen = iBase - lastStop - 3 ; 
-                  /* discard ORFTs inside ORF-gaps */
+                  /* discard ORFSs inside ORF-gaps */
                   if (isOpenGap)
                     {
                       if (lastStop >= isOpenGap)
@@ -7221,7 +7189,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
                     }
                   if (cds > 3 && (cds > bestCds || cds > 3))
                     {
-                      orf = arrayp (orfs, oMax++, ORFT) ;
+                      orf = arrayp (orfs, oMax++, ORFS) ;
                       orf->iDna = iDna ;
                       orf->nOpen = nOpen ;
                       orf->cds = cds;
@@ -7310,7 +7278,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
             }
           if (cds > 3  && (cds > bestCds || cds > 3))
             {
-              orf = arrayp (orfs, oMax++, ORFT) ;
+              orf = arrayp (orfs, oMax++, ORFS) ;
               orf->iDna = iDna ; 
               orf->nOpen = nOpen ;
               orf->cds = cds;
@@ -7335,7 +7303,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
   for (ii = 0 ; ii < arrayMax(orfs) ; ii++)
     {
       int dx, x;
-      orf = arrp (orfs, ii, ORFT) ;
+      orf = arrp (orfs, ii, ORFS) ;
       if (orf->upStop > 0 && orf->upStop < orf->stolen && (orf->met <= 0 || orf->met > orf->stolen))
         {
           x = orf->upStop + 3 ;
@@ -7349,8 +7317,8 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
   for (ii = 0 ; ii < arrayMax(orfs) ; ii++)
     {
       int i, n = 0, x;
-      orf = arrp (orfs, ii, ORFT) ;
-      contig = arrp (dnas, orf->iDna, ORFT) ; 
+      orf = arrp (orfs, ii, ORFS) ;
+      contig = arrp (dnas, orf->iDna, ORFS) ; 
       if ((introns = contig->introns))
         for (i = n = 0 ; i < arrayMax(introns) ; i++)
           {
@@ -7368,11 +7336,11 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
     {
       for (ii = 0 ; ii < arrayMax(orfs) ; ii++)
 	{
-	  orf = arrp (orfs, ii, ORFT) ;
+	  orf = arrp (orfs, ii, ORFS) ;
 	  if (orf->iDna > iDna) break ;
 	  if (orf->iDna < iDna) continue ;
 	  if (orf->met > 0 && orf->met > orf->stolen && orf->cds > 15)
-	    orf->uOrf = 1 ; 
+	    orf->isUorf = 1 ; 
 	  if (orf->met > 0 && orf->met > orf->stolen) /* only the first ATG can be a uORF */
 	    break ;
 	}
@@ -7381,14 +7349,14 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
   arraySort (orfs, orfOrder)  ;
   /* select a reasonable set of orfs for each dna */
   if (bestCds < 18) bestCds = 18 ; 
-  orfs2 = arrayCreate (arrayMax(orfs) + 1, ORFT) ; /* avoid eventual zero */
+  orfs2 = arrayCreate (arrayMax(orfs) + 1, ORFS) ; /* avoid eventual zero */
   for (ii = jj = 0 ; ii < arrayMax(orfs) ; ii++)
     {
-      orf = arrp (orfs, ii, ORFT) ;
-      if (orf->cds == bestCds || orf->uOrf ||
+      orf = arrp (orfs, ii, ORFS) ;
+      if (orf->cds == bestCds || orf->isUorf ||
           (orf->cds + (orf->nIntron > 0 ? 60 : 0) + (isSL ? 50 : 0) > 150))
         {
-          orf2 = arrayp (orfs2, jj++, ORFT) ;
+          orf2 = arrayp (orfs2, jj++, ORFS) ;
           *orf2 = *orf ;
         }
     } 
@@ -7404,19 +7372,19 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
 
       for (ii = 1 ; ii < dMax ; ii <<= 2)
         bestDna += ii ; /* so that all gaps by default are in frame 1, not zero */
-      for (ii = 0, orf = arrp (orfs, ii, ORFT) ; ii < arrayMax(orfs) ; orf++, ii++)
+      for (ii = 0, orf = arrp (orfs, ii, ORFS) ; ii < arrayMax(orfs) ; orf++, ii++)
         if (orf->cds - orf->nX > bestDnaOpen)
           {  bestDna = orf->iDna ;  bestDnaOpen = orf->cds - orf->nX ; }
             
       /* keep the orfs of the best dna */
-      orfs2 = arrayHandleCreate (arrayMax(orfs), ORFT, s2m->h) ;
+      orfs2 = arrayHandleCreate (arrayMax(orfs), ORFS, s2m->h) ;
       {
         for (ii = jj = 0 ; ii < arrayMax(orfs) ; ii++)
           {
-            orf = arrp (orfs, ii, ORFT) ;
+            orf = arrp (orfs, ii, ORFS) ;
             if (orf->iDna == bestDna) 
               { /* register */
-                orf2 = arrayp (orfs2, jj++, ORFT) ;
+                orf2 = arrayp (orfs2, jj++, ORFS) ;
                 *orf2 = *orf ;
               }
           }
@@ -7426,14 +7394,14 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
     }
 
   /* keep the best */
-  orfs2 = smrna->orfs = arrayHandleCreate (arrayMax(orfs) + 1, ORFT, s2m->h) ;
+  orfs2 = smrna->orfs = arrayHandleCreate (arrayMax(orfs) + 1, ORFS, s2m->h) ;
   {
     int bestStart = 0, bestCds = 0 ;
     for (ii = jj = 0 ; jj < 25 && ii < arrayMax(orfs) ; ii++)
       {
         BOOL ignore = FALSE ;
         
-        orf = arrp (orfs, ii, ORFT) ;            
+        orf = arrp (orfs, ii, ORFS) ;            
         /* keep a single ORF per mrna  ? */
         /* reject if < 600 bp */
         if (jj && singleProduct && orf->cds < 600)
@@ -7444,23 +7412,23 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
         if (orf->nX > 0 && orf->cds - orf->nX < 300)
           continue ;
 	/* the best or any orf not starting 9bp above cannot be considered to be an uOrf */
-        if (!jj) { bestStart = orf->start ; bestCds = orf->cds ; orf->uOrf = 0 ; }
-	else if (bestStart <= orf->start + 9) orf->uOrf = 0 ; 
-	if (orf->uOrf && orf->start < orf->met)
+        if (!jj) { bestStart = orf->start ; bestCds = orf->cds ; orf->isUorf = 0 ; }
+	else if (bestStart <= orf->start + 9) orf->isUorf = 0 ; 
+	if (orf->isUorf && orf->start < orf->met)
 	  {
 	    if (orf->cds < bestCds/4 && orf->cds < 150 && 
 		orf->cds > 15 + orf->met - orf->start && ! (orf->start == orf->leu)) 
 	      { orf->cds -= orf->met - orf->start ; orf->start = orf->met ; }
 	    else
-	      orf->uOrf = 0 ;
+	      orf->isUorf = 0 ;
 	  }
         /* compare to previous accepted, avoiding overlaps */
-        if (! orf->uOrf)
+        if (! orf->isUorf)
 	  for (i = 0 ; !ignore && i < arrayMax(orfs2) ; i++)
 	    {
 	      int a1, a2, b1, b2, c1, c2 ;
 	      
-	      orf2 = arrayp (orfs2, i, ORFT) ;
+	      orf2 = arrayp (orfs2, i, ORFS) ;
 	      a1 =  orf->start ; a2 = orf->max ; /* mieg 2006_10_02, was nOpen */
 	      b1 =  orf2->start ; b2 = orf2->max ;
 	      c1 = a1 > b1 ? a1 : b1 ; c2 = a2 < b2 ? a2 : b2 ;
@@ -7480,7 +7448,7 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
         
         if (!ignore) /* register */
           {
-            orf2 = arrayp (orfs2, jj++, ORFT) ;
+            orf2 = arrayp (orfs2, jj++, ORFS) ;
             *orf2 = *orf ;
             if (jj == 1) orf2->isBest = TRUE ;
             /* if (!orf->nX) hasNoGap = TRUE ; */
@@ -7497,8 +7465,8 @@ static void mrnaLocateOrfs (S2M *s2m, int maxSmrnas, SMRNA *smrna, BOOL isMrna5p
         * doing this, we allow fusion to other partial exons
         * but we lose the orf-gap annotation
         */
-      orf = arrayp (orfs2, 0, ORFT) ;
-      contig = arrp (dnas, bestDna, ORFT) ; 
+      orf = arrayp (orfs2, 0, ORFS) ;
+      contig = arrp (dnas, bestDna, ORFS) ; 
       hits = contig->hits ;
       for (up = 0, i = 0 ; i < arrayMax (hits) ; i++)
         {
@@ -7569,6 +7537,8 @@ static BOOL mrnaConstructOrfs  (S2M *s2m, SC *sc, SMRNA *gmrna, Array smrnas)
   for (ii = 0 ; ii < arrayMax(smrnas) ; ii++)
     {
       smrna = arrp (smrnas, ii, SMRNA) ;
+      if (smrna->composite)
+	continue ;
       if (smrna->hits)
 	{
 	  /*       printf(" makeMrnaGene nCall = %d\n",nMrnaCall) ; */
@@ -7597,7 +7567,7 @@ static Array mrnaRefseqMakerDna2Pep (KEY cosmid, Array dna, BOOL isMrna5pComplet
   AC_HANDLE h = handleCreate () ;
   SMRNA *smrna ;
   S2M *s2m ; 
-  ORFT *contig ;
+  ORFS *contig ;
   Array orfs = 0 ;
 
   smrna = (SMRNA *) halloc (sizeof (SMRNA), h) ; /* initialised to zero by halloc */
@@ -7606,10 +7576,10 @@ static Array mrnaRefseqMakerDna2Pep (KEY cosmid, Array dna, BOOL isMrna5pComplet
   s2m->cosmid = cosmid ; 
   s2m->h = h ;
 
-  smrna->dnas = arrayHandleCreate (12, ORFT, s2m->h) ;
+  smrna->dnas = arrayHandleCreate (12, ORFS, s2m->h) ;
   smrna->hits = arrayHandleCreate (12, HIT, s2m->h) ;
 
-  contig = arrayp (smrna->dnas, 0, ORFT) ; 
+  contig = arrayp (smrna->dnas, 0, ORFS) ; 
   contig->hits = arrayHandleCreate (12, HIT, s2m->h) ;
   contig->dna = dna ;
     
@@ -8234,7 +8204,7 @@ static BOOL mrnaLocateBestProduct (OBJ Mrna, Array units, int *x1p, int *x2p)
 
 /*********************************************************************/
 /* mRNA tiling_path */
-static BOOL mrnaTiling (SC *sc, KEY mrna, BOOL useErrors)
+BOOL mrnaTiling (SC *sc, KEY mrna, BOOL useErrors)
 {
   Array tiling = arrayCreate (60, HIT) ;
   Array cfrom = arrayCreate (60, HIT) ;
@@ -8977,7 +8947,7 @@ static BOOL mrnaDoAddKantorInfo (KEY mrna, KEY product)
 	  int w = pepWeight (pep) ;
 	  w = (w + 49.0)/100.0 ; 
 	  w = 100 * w ;
-	  weight = w/10.0 ;
+	  weight = w/1000 ; /* weight = w/10.0 ; 2024_11_28, why should we divide by 10 ? */
 	  pI = pepPI (pep) ;
 	  if (bsIsTagInClass (class(kantor), str2tag("Michel")))
 	    {
@@ -10029,7 +9999,7 @@ static void mrnaAddFirstMetAndUorf (KEY mrna)
   return ;
 } /* mrnaAddFirstMetAndUorf */
 
-/*********************************************************************/
+ /*********************************************************************/
 /* non best product should not inherit the gene title */
 static void mrnaFixNonBestProductTitle (KEY mrna)
 {
@@ -10163,9 +10133,150 @@ static int mrnaCountCloneError (int a1, int a2, Array errDown, Array errUp)
 
 /*********************************************************************/
 
-static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *smrna)
+void mrnaSaveMrnaCoding (SMRNA *smrna)
 {
-  KEY tr = smrna->gene ;
+  KEY tr = smrna->tr ;
+  OBJ Transcript = bsUpdate (tr) ;
+  KEY map = 0 ;
+  int dmap1 = 0 ;
+  int dmap2 = 0 ;
+  int givenBack = smrna->givenBack ;
+  int stolen = smrna->stolen ;
+
+  if (bsGetKey (Transcript, _IntMap, &map) &&
+      bsGetData (Transcript, _bsRight, _Int, &dmap1))
+    bsGetData (Transcript, _bsRight, _Int, &dmap2) ;
+  /*** Coding, comes after exporting the products ! ***/
+  if (smrna->orfs && arrayMax(smrna->orfs))
+  {
+    int ii, nn, iProd, a1, a2, x1, x2 ;
+    HIT *up, *vp, *prod = 0 ;
+    ORFS *orf ;
+    BSunit *uu ;
+    OBJ Product = 0 ;
+    Array prods = arrayCreate (12, HIT) ;  /* coords of products */
+    Array units = 0, cHits = 0 , hits = 0 ;
+    Stack s = stackCreate (64) ;
+
+    /* collect the coords of all products */
+    orf = arrp (smrna->dnas, smrna->bestDna, ORFS) ;  
+    hits = orf->hits ;
+
+    cHits =  arrayCopy (hits) ;
+    units = arrayReCreate (units, 12, BSunit) ;
+    bsGetArray (Transcript, _Product, units, 3) ;
+    for (ii = 0, iProd = 0 ; ii < arrayMax (units) ; ii += 3)
+      {
+        uu = arrp (units, ii, BSunit) ;
+        prod = arrayp (prods, iProd++, HIT) ;
+        prod->est = uu[0].k ;
+        prod->x1 = uu[1].i + givenBack ; prod->x2 = uu[2].i  + givenBack ;
+      }
+
+    /* subdivide the exons on product boundaries */
+    for (iProd = 0 ; iProd < arrayMax(prods) ; iProd++)
+      {
+        prod = arrp (prods, iProd, HIT) ;
+        for (ii = 0 ; ii < arrayMax (cHits) ; ii++)
+          {
+            up = arrayp (cHits, ii, HIT) ;
+            if (!ii && stolen && (up->type & gX)) up->x1 -= stolen ;
+            if (up->x1 < prod->x1 && up->x2 >= prod->x1)
+              {
+                vp = arrayp (cHits, arrayMax(cHits) , HIT) ;
+                up = arrp (cHits, ii, HIT) ; /* possible relocation of cHits */
+                *vp = *up ;
+                nn = prod->x1 - up->x1 ;
+                up->a2 = up->a1 + nn - 1 ; vp->a1 = up->a1 + nn ;
+                up->x2 = prod->x1 - 1 ; vp->x1 = prod->x1 ;
+              }
+            if (up->x1 <= prod->x2 && up->x2 > prod->x2)
+              {
+                vp = arrayp (cHits, arrayMax(cHits) , HIT) ;
+                up = arrp (cHits, ii, HIT) ; /* possible relocation of cHits */
+                *vp = *up ;
+                nn = prod->x2 - up->x1 + 1 ;
+                if (!ii && stolen && (up->type & gX)) nn -= stolen ;
+                up->a2 = up->a1 + nn - 1 ; vp->a1 = up->a1 + nn ;
+                up->x2 = prod->x2 ; vp->x1 = prod->x2 + 1 ;
+              }
+          }
+      }
+
+    arraySort (cHits, cDNAOrderGloballyByA1) ;
+
+    /* export the results */
+    for (ii = 0 ; ii < arrayMax (cHits) ; ii++)
+      {
+        up = arrp (cHits, ii, HIT) ;
+         
+        if (! (up->type & gX) && /* pick also the ORF_GAP */
+            !(prod && prod->x1 <= up->x1 && prod->x2 >= up->x2)) 
+          continue ; 
+          
+        a1 = up->a1 + stolen ; a2 = up->a2 + stolen ;
+        if (!ii) a1 -= stolen ;
+        x1 = up->x1 - givenBack ; x2 = up->x2 - givenBack ;
+        if (a2 - a1 >= 0)
+          {
+            bsAddData (Transcript, _Coding, _Int, &a1) ;
+            bsAddData (Transcript, _bsRight, _Int, &a2) ;
+            bsAddData (Transcript, _bsRight, _Int, &x1) ;
+            bsAddData (Transcript, _bsRight, _Int, &x2) ;
+            bsPushObj (Transcript) ;
+
+            stackClear (s) ;
+            for (iProd = 0 ; iProd < 25 && iProd < arrayMax(prods) ; iProd++)
+              {
+                prod = arrp (prods, iProd, HIT) ;
+                if (up->x2 < prod->x1)
+                  catText (s, messprintf ("5%c ",'A' + iProd)) ;
+                else if (up->x1 > prod->x2)
+                  catText (s, messprintf ("3%c ",'A' + iProd)) ;
+                else
+                  {
+                    if (!prod->a1 || a1 < prod->a1) prod->a1 = a1 ;
+                    if (!prod->a2 || a2 > prod->a2) prod->a2 = a2 ;
+                    catText (s, messprintf ("%c ",'A' + iProd)) ;
+                  }
+              }
+            bsAddData (Transcript, _bsRight, _Text, stackText (s, 0)) ;
+            bsGoto (Transcript, 0) ;
+          }
+      }
+ 
+    for (iProd = 0 ; iProd < arrayMax(prods) ; iProd++)
+      if (map && dmap1 && dmap2 && (Product = bsUpdate (prod->est)))
+        /* this is bugged, because i do not include the lenghts of the introns
+           it should be done inside the coding section 
+           but corrected for stolen length
+        */
+        {
+          int m1, m2 ;
+          bsAddKey (Product, _IntMap, map) ;
+          if (dmap1 < dmap2)
+            { m1 = prod->a1 + dmap1 - 1 - stolen ; m2 = prod->a2 + dmap1 - 1 ; }
+          else
+            { m1 = dmap1 - prod->a1 + 1 + stolen ; m2 = dmap1 - prod->a2 + 1 ; }
+          bsAddData (Product, _bsRight, _Int, &m1) ;
+          bsAddData (Product, _bsRight, _Int, &m2) ;
+          bsSave (Product) ;
+        }
+          
+    stackDestroy (s) ;
+    arrayDestroy (prods) ;
+    arrayDestroy (cHits) ;
+  }
+  bsSave (Transcript) ;
+
+  return ;
+} /* mrnaSaveMrnaCoding */
+
+/*********************************************************************/
+
+void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *smrna, BOOL composite)
+{
+  KEY tr = smrna->tr ;
   OBJ Transcript = 0 ;
   KEY map = 0, cosmid = s2m->cosmid1 ? s2m->cosmid1 : s2m->cosmid ;
   OBJ Cosmid = 0 ;
@@ -10237,7 +10348,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   /*** SMAP: Splicing ***/
   {
     int nExons, nIntrons, gapl, ll, ifeet = 0, ngt_ag = 0, ngc_ag = 0,  nv_rep = 0, nfuzzy = 0 ;
-    HIT *up, *vp, *wp, *fp; ORFT *orf ;
+    HIT *up, *vp, *wp, *fp; ORFS *orf ;
     Array hits = 0 ;
     KEY _v_rep = str2tag ("V_repeat"), actualFoot ;
     KEY _Fuzzy_gt_ag = str2tag ("Fuzzy_gt_ag") ;
@@ -10246,7 +10357,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
     units = arrayReCreate  (units, 60, BSunit) ;
     nExons = nIntrons = mrnaLength = gapl = 0 ;
      
-    orf = smrna->dnas && smrna->bestDna >=0 && smrna->bestDna < arrayMax (smrna->dnas) ? arrp (smrna->dnas, smrna->bestDna, ORFT) : 0 ;  
+    orf = smrna->dnas && smrna->bestDna >=0 && smrna->bestDna < arrayMax (smrna->dnas) ? arrp (smrna->dnas, smrna->bestDna, ORFS) : 0 ;  
     hits = orf ? orf->hits : 0 ;
 
     for (ii = 0, up = hits ? arrp (hits, 0, HIT) : 0  ; hits && ii < arrayMax (hits) ; up++, ii++)
@@ -10423,7 +10534,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                       } while (Tg && bsGetData (Tg, _bsDown, _Int, &u1)) ;
                 tgDone:
                   bsSave (Tg) ;
-                }
+               }
               bsMarkFree (tgmark) ;
             }
           }
@@ -10527,7 +10638,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   if (smrna->dnas && smrna->bestDna < arrayMax (smrna->dnas))
     {
     Array sHits ;
-    ORFT *orf ;
+    ORFS *orf ;
     int jj, x1, x2, a1, a2, b1, b2, sMax, eMax = arrayMax (estHits) ;
     HIT *up, *vp, *wp ;
     KEYSET ks = keySetCreate () ;
@@ -10538,7 +10649,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
     KEY _Not_real_5prime = str2tag ("Not_real_5prime") ;
     OBJ Est = 0, Clone = 0 ;
 
-    orf = arrp (smrna->dnas, smrna->bestDna, ORFT) ; /* ici ... */
+    orf = arrp (smrna->dnas, smrna->bestDna, ORFS) ; /* ici ... */
     sHits = orf->hits ;
     sMax = arrayMax (sHits) ;
     cloneHits = arrayCreate (200, HIT) ;
@@ -10754,7 +10865,6 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
               {
                 int i, pure = 0 ;
                 BSunit *uu ;
-		BOOL isComposite = TRUE ;
 		
                 units = arrayReCreate (units, 800, BSunit) ;
                 if (bsGetArray (Est,  str2tag("Transpliced_to"), units, 2))
@@ -10767,9 +10877,13 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                             up->a1 > smrna->a1 - dx && up->a1 < smrna->a1 + dx &&        /* cluster at top of mrna */
                             !strncasecmp ("SL", name(uu[0].k), 2))
                           {
-                            bsAddKey (Transcript, str2tag("Transpliced_to"), uu[0].k) ;
+                            int s = 0 ;
+			    bsGetData (Est, str2tag("Composite"), _Int, &s) ;
+			    bsAddKey (Transcript, str2tag("Transpliced_to"), uu[0].k) ;
                             bsAddKey (Transcript, _bsRight, up->cDNA_clone) ;
-                            
+			    if (s)
+			      bsAddData (Transcript, _bsRight, _Int, &s) ;
+			    
                             if (!strcasecmp ("SL0", name(uu[0].k))) /* av=61.7 sd=19 susuki EMBO report 2001 */
                               pure |=  1 ;
                             else if (!strcasecmp ("SL1", name(uu[0].k)))
@@ -10932,8 +11046,12 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
                 if (/* b2 > mrnaLength + stolen - 20 && stupid, preventslater flagging of internal_priming */
                     x > x2 - 5 && x < x2 + 5)
                   {
+		    int s = 0 ;
+		    bsGetData (Est, str2tag("Composite"), _Int, &s) ;
                     bsAddData (Transcript, str2tag ("PolyA_found"), _Int, &a2) ;
                     bsAddKey (Transcript, _bsRight, up->cDNA_clone) ;
+		    if (s)
+		      bsAddData (Transcript, _bsRight, _Int, &s) ;
                     complete3 = TRUE ;
                   }
 		/* int aaa2 = 1000000 + a2 ;  debugging */
@@ -10993,7 +11111,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
       for (ii = 0 ; ii < 1 ; ii++)
 	{
 	  BOOL isNh2Complete = FALSE ;
-	  ORFT * orf = arrp (smrna->orfs, ii, ORFT) ;
+	  ORFS * orf = arrp (smrna->orfs, ii, ORFS) ;
 	  int jj ;
 	  HIT *up ;
 	  KEY lib ;
@@ -11083,7 +11201,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
       prod_array = arrayCreate (12, HIT) ;
       for (ii = iProd = 0 ; ii < oMax ; ii++)
 	{
-	  ORFT * orf = arrp (smrna->orfs, ii, ORFT) ;
+	  ORFS * orf = arrp (smrna->orfs, ii, ORFS) ;
 	  KEY product = 0 ;
 	  OBJ Product = 0 ;
 	  int jj, x, x1, x2, u1, u2 ;
@@ -11095,6 +11213,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 	      (
 	       orf->isSL || 
 	       bsFindTag (Transcript, str2tag("Transpliced_to")) ||
+	       bsFindTag (Transcript, str2tag("Found5p")) ||
 	       (
 		(bsFindTag (Transcript, str2tag("Submitted_as_5p_complete")) ||
 		 bsFindTag (Transcript, str2tag("Aggregated_5p_clones"))
@@ -11151,14 +11270,14 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 	    {
 	      KEY M_mProduct ;
 	      
-	      Array mdna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
+	      Array mdna = arr (smrna->dnas, orf->iDna, ORFS).dna ;
 	      KEY geneticCode = 0 ;
 	      char *translationTable = pepGetTranslationTable (s2m->cosmid1 ? s2m->cosmid1 : s2m->cosmid, &geneticCode) ;
 	      
 	      if (geneticCode)
 		bsAddKey (Transcript, _Genetic_code, geneticCode) ;
 	      
-	      if (orf->uOrf)
+	      if (orf->isUorf)
 		bsAddTag (Product, str2tag("uORF_candidate")) ;
 	      bsAddTag (Product, _CDS) ;
 	      lexaddkey ("Product", &M_mProduct, _VMethod) ;
@@ -11298,10 +11417,10 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 	      /* peptide after the save Product */
 	      {
 		int lastu2 = 0 ;
-		ORFT *orf ;
+		ORFS *orf ;
 		Array hits ;
 		
-		orf = arrp (smrna->dnas, smrna->bestDna, ORFT) ;  
+		orf = arrp (smrna->dnas, smrna->bestDna, ORFS) ;  
 		hits = orf->hits ;
 		
 		bsRemoveTag (Product, _Source_Exons) ;
@@ -11347,7 +11466,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		  char *cp ;
 		  Array mdna = 0 ;
 		  
-		  mdna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
+		  mdna = arr (smrna->dnas, orf->iDna, ORFS).dna ;
 		  /* jmax = arrayMax(mdna) ; */
 		  
 		  j = orf->start  - 1 ;
@@ -11384,7 +11503,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		{
 		  int j, k, nn = 0 ;
 		  char *cp, *cq ;
-		  Array mdna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
+		  Array mdna = arr (smrna->dnas, orf->iDna, ORFS).dna ;
 		  
 		  j = orf->start - 1 ;  /* will start in frame */
 		  nn = orf->cds ;
@@ -11412,7 +11531,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 		}
 	      if (pep)
 		{
-		  mrnaSavePepAndKantor (product, pep) ;
+		  mrnaDesignSavePepAndKantor (product, pep) ;
 		  arrayDestroy (pep) ;
 		}
 	    }
@@ -11563,128 +11682,12 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 
   }
 
-  /*** Coding, comes after exporting the products ! ***/
-  if (smrna->orfs && arrayMax(smrna->orfs))
-  {
-    int nn, iProd, a1, a2, x1, x2 ;
-    HIT *up, *vp, *prod = 0 ;
-    ORFT *orf ;
-    BSunit *uu ;
-    OBJ Product = 0 ;
-    Array prods = arrayCreate (12, HIT) ;  /* coords of products */
-    Array cHits = 0 , hits = 0 ;
-    Stack s = stackCreate (64) ;
-
-    /* collect the coords of all products */
-    orf = arrp (smrna->dnas, smrna->bestDna, ORFT) ;  
-    hits = orf->hits ;
-
-    cHits =  arrayCopy (hits) ;
-    units = arrayReCreate (units, 12, BSunit) ;
-    bsGetArray (Transcript, _Product, units, 3) ;
-    for (ii = 0, iProd = 0 ; ii < arrayMax (units) ; ii += 3)
-      {
-        uu = arrp (units, ii, BSunit) ;
-        prod = arrayp (prods, iProd++, HIT) ;
-        prod->est = uu[0].k ;
-        prod->x1 = uu[1].i + givenBack ; prod->x2 = uu[2].i  + givenBack ;
-      }
-
-    /* subdivide the exons on product boundaries */
-    for (iProd = 0 ; iProd < arrayMax(prods) ; iProd++)
-      {
-        prod = arrp (prods, iProd, HIT) ;
-        for (ii = 0 ; ii < arrayMax (cHits) ; ii++)
-          {
-            up = arrayp (cHits, ii, HIT) ;
-            if (!ii && stolen && (up->type & gX)) up->x1 -= stolen ;
-            if (up->x1 < prod->x1 && up->x2 >= prod->x1)
-              {
-                vp = arrayp (cHits, arrayMax(cHits) , HIT) ;
-                up = arrp (cHits, ii, HIT) ; /* possible relocation of cHits */
-                *vp = *up ;
-                nn = prod->x1 - up->x1 ;
-                up->a2 = up->a1 + nn - 1 ; vp->a1 = up->a1 + nn ;
-                up->x2 = prod->x1 - 1 ; vp->x1 = prod->x1 ;
-              }
-            if (up->x1 <= prod->x2 && up->x2 > prod->x2)
-              {
-                vp = arrayp (cHits, arrayMax(cHits) , HIT) ;
-                up = arrp (cHits, ii, HIT) ; /* possible relocation of cHits */
-                *vp = *up ;
-                nn = prod->x2 - up->x1 + 1 ;
-                if (!ii && stolen && (up->type & gX)) nn -= stolen ;
-                up->a2 = up->a1 + nn - 1 ; vp->a1 = up->a1 + nn ;
-                up->x2 = prod->x2 ; vp->x1 = prod->x2 + 1 ;
-              }
-          }
-      }
-
-    arraySort (cHits, cDNAOrderGloballyByA1) ;
-
-    /* export the results */
-    for (ii = 0 ; ii < arrayMax (cHits) ; ii++)
-      {
-        up = arrp (cHits, ii, HIT) ;
-         
-        if (! (up->type & gX) && /* pick also the ORF_GAP */
-            !(prod && prod->x1 <= up->x1 && prod->x2 >= up->x2)) 
-          continue ; 
-          
-        a1 = up->a1 + stolen ; a2 = up->a2 + stolen ;
-        if (!ii) a1 -= stolen ;
-        x1 = up->x1 - givenBack ; x2 = up->x2 - givenBack ;
-        if (a2 - a1 >= 0)
-          {
-            bsAddData (Transcript, _Coding, _Int, &a1) ;
-            bsAddData (Transcript, _bsRight, _Int, &a2) ;
-            bsAddData (Transcript, _bsRight, _Int, &x1) ;
-            bsAddData (Transcript, _bsRight, _Int, &x2) ;
-            bsPushObj (Transcript) ;
-
-            stackClear (s) ;
-            for (iProd = 0 ; iProd < 25 && iProd < arrayMax(prods) ; iProd++)
-              {
-                prod = arrp (prods, iProd, HIT) ;
-                if (up->x2 < prod->x1)
-                  catText (s, messprintf ("5%c ",'A' + iProd)) ;
-                else if (up->x1 > prod->x2)
-                  catText (s, messprintf ("3%c ",'A' + iProd)) ;
-                else
-                  {
-                    if (!prod->a1 || a1 < prod->a1) prod->a1 = a1 ;
-                    if (!prod->a2 || a2 > prod->a2) prod->a2 = a2 ;
-                    catText (s, messprintf ("%c ",'A' + iProd)) ;
-                  }
-              }
-            bsAddData (Transcript, _bsRight, _Text, stackText (s, 0)) ;
-            bsGoto (Transcript, 0) ;
-          }
-      }
- 
-    for (iProd = 0 ; iProd < arrayMax(prods) ; iProd++)
-      if (map && dmap1 && dmap2 && (Product = bsUpdate (prod->est)))
-        /* this is bugged, because i do not include the lenghts of the introns
-           it should be done inside the coding section 
-           but corrected for stolen length
-        */
-        {
-          int m1, m2 ;
-          bsAddKey (Product, _IntMap, map) ;
-          if (dmap1 < dmap2)
-            { m1 = prod->a1 + dmap1 - 1 - stolen ; m2 = prod->a2 + dmap1 - 1 ; }
-          else
-            { m1 = dmap1 - prod->a1 + 1 + stolen ; m2 = dmap1 - prod->a2 + 1 ; }
-          bsAddData (Product, _bsRight, _Int, &m1) ;
-          bsAddData (Product, _bsRight, _Int, &m2) ;
-          bsSave (Product) ;
-        }
-          
-    stackDestroy (s) ;
-    arrayDestroy (prods) ;
-    arrayDestroy (cHits) ;
-  }
-
+  bsSave (Transcript) ;
+  smrna->stolen = stolen ;
+  smrna->givenBack = givenBack ;
+  mrnaSaveMrnaCoding (smrna) ;
+  Transcript = bsUpdate (tr) ;
+  
   /*** cdna_clones: Best, Specific, Complete_CDS ***/
   if (smrna->orfs && arrayMax(smrna->orfs) && smrna->clones)
   {
@@ -11875,8 +11878,8 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
 	   keyFindTag (product, str2tag("COOH_Complete"))
 	   ))
 	{
-	  ORFT * orf = arrp (smrna->orfs, 0, ORFT) ;
-	  Array dna = arr (smrna->dnas, orf->iDna, ORFT).dna ;
+	  ORFS * orf = arrp (smrna->orfs, 0, ORFS) ;
+	  Array dna = arr (smrna->dnas, orf->iDna, ORFS).dna ;
 	  unsigned char polyASignal[7] = { A_,A_,T_,A_,A_,A_, 0} ;
 	  unsigned char polyASignal2[7] = { A_,T_,T_,A_,A_,A_, 0} ;
 	  int nn = 0, n1 = 0, n2, debut = 0, dx ;
@@ -11925,7 +11928,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   if (smrna->orfs && arrayMax(smrna->orfs))
   {
     int a1, a2, x1, x2, a21, a12, n, nerr, x, ii, jj1, jj, jj2 ; 
-    Array dna1 = arr (smrna->dnas, smrna->bestDna, ORFT).dna ;
+    Array dna1 = arr (smrna->dnas, smrna->bestDna, ORFS).dna ;
     KEYSET clones = queryKey (tr, ">cDNA_clone") ;
     KEY est, clone ;
     Array errUp = 0, errDown = 0 ;
@@ -12037,7 +12040,7 @@ static void mrnaSaveMrna (S2M *s2m, SC* sc, Array estHits, Array smrnas, SMRNA *
   {
     Array dna1, dna2 = 0 ;
 
-    dna1 = arr (smrna->dnas, smrna->bestDna, ORFT).dna ;
+    dna1 = arr (smrna->dnas, smrna->bestDna, ORFS).dna ;
     if (dna1 && arrayMax(dna1))
       {
         dna2 = dnaCopy (dna1) ;
@@ -13047,7 +13050,7 @@ static void makeMrnaFilterGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
   BOOL doDiscard = FALSE ;
   SMRNA *smrna ;
   KEYSET goodClones = 0, ks = 0 ;
-  ORFT * orf ;
+  ORFS * orf ;
   
   if (minLength < 0) 
     { minLength *= -1 ; doDiscard = TRUE ; }
@@ -13060,7 +13063,7 @@ static void makeMrnaFilterGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
       smrna = arrp (smrnas, ii, SMRNA) ;
       if (smrna->bestDna < 0  || !smrna->orfs || !arrayMax(smrna->orfs))
         continue ;
-      for (cds = i = 0, orf = arrp (smrna->orfs, 0, ORFT) ; 
+      for (cds = i = 0, orf = arrp (smrna->orfs, 0, ORFS) ; 
            i < arrayMax (smrna->orfs) ; orf++, i++)
         if (cds < orf->cds)
           cds = orf->cds ;
@@ -13158,9 +13161,9 @@ void showSmrnas (S2M *s2m, Array smrnas, char *mm)
         printf("\n") ;
         if (smrna->orfs && arrayMax(smrna->orfs))
           printf ("Longest ORF %d %d %d\n"
-                  , smrna->orfs && arrayMax(smrna->orfs) > 0 ?  arr (smrna->orfs, 0, ORFT).nOpen : 0
-                  , smrna->orfs && arrayMax(smrna->orfs) > 1 ?  arr (smrna->orfs, 1, ORFT).nOpen : 0
-                  , smrna->orfs && arrayMax(smrna->orfs) > 2 ?  arr (smrna->orfs, 2, ORFT).nOpen : 0
+                  , smrna->orfs && arrayMax(smrna->orfs) > 0 ?  arr (smrna->orfs, 0, ORFS).nOpen : 0
+                  , smrna->orfs && arrayMax(smrna->orfs) > 1 ?  arr (smrna->orfs, 1, ORFS).nOpen : 0
+                  , smrna->orfs && arrayMax(smrna->orfs) > 2 ?  arr (smrna->orfs, 2, ORFS).nOpen : 0
                   ) ;
         if (0 && mm != (char*)1) showHits(smrna->hits) ;        
         printf("\n") ;
@@ -13174,7 +13177,7 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
                   KEYSET clipTops, KEYSET clipEnds, Array linkPos)
 {
   int ii, nn, nLoop, ii1, ii2 ;
-  KEY mycosmid, mycosmid1, geneBox ;
+  KEY mycosmid = 0, mycosmid1 = 0, geneBox = 0 ;
   SMRNA *smrna ;
   BOOL useAm, debug = FALSE ;
   KEYSET genes = 0 ;
@@ -13188,6 +13191,7 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
     sessionClose (TRUE) ;
   cdnaReExtendHits (s2m, sc, gmrna, clipTops, clipEnds) ;
   mrnaGrignotte (s2m, sc, gmrna, smrnas, -1, FALSE) ;  /* grignotte all */
+  chronoReturn () ;
 
   chrono ("makeMrnaGeneRedundant") ; 
 
@@ -13211,7 +13215,7 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 	mrnaGrignotte (s2m, sc, gmrna, smrnas, -1, bigGap) ;  /* grignotte all, needed a second time  */ 
       if (0) showSmrnas (s2m, smrnas, 0) ;
     }
-
+  chronoReturn () ;
   chrono ("makeMrnaGeneSteal") ;
   if (mrnaPleaseStealFromPrediction())
     { ii1 = 0 ; ii2 = 3 ; } /* 0,1: from variant, 2 from predictions */
@@ -13220,7 +13224,6 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
   for (ii =ii1 ; ii < ii2 ; ii++)
     mrnaStealFromAlternative (s2m, sc, gmrna, smrnas, ii, linkPos) ;
   mrnaFillLastGap (smrnas, 100) ; /* 2009_04_06,  smmal gaps are frequent in deep sequencing experiments */
-  chronoReturn () ;
 
   /* loop because until now gaps between 5p 3p read pairs 
    * have remained incompatible with introns
@@ -13229,87 +13232,79 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 
   if (0) showSmrnas (s2m, smrnas, 0) ;
 
-  if (1)
+  s2m->composite = isComposite = TRUE ;
+  if (s2m->composite)
     mrnaDesignUsingCompositeStrategy (s2m, sc, gmrna, smrnas) ;
-
-  chronoReturn () ;
-  chrono ("makeMrnaGeneReextend") ;
-#ifdef JUNK
-  if (0 && s2m->compositeDesignCovering)
-    mrnaDesignSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
-  else
-#endif
-    mrnaSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
-  chronoReturn () ;
-  chrono ("makeMrnaGeneSave") ;
-  chronoReturn () ;
-  
-  /* construct the ORFs */
-  mrnaConstructOrfs (s2m, sc, gmrna, smrnas) ;
-  arraySort (smrnas, smrnaOrderByLengthandBadQuality) ;
-  if (0) showSmrnas (s2m, smrnas, 0) ;
-  if (0) showOrfs (0) ; /* to please the compiler */
 
   /* keep only a reasonable number of best models */
   /* set smrna->bestDna = -1 to remove it */
-  if (doFilter)
-    makeMrnaFilterGene (s2m, sc, gmrna, smrnas) ;
-  makeMrnaFilterGeneHits (s2m, sc, gmrna, smrnas) ;
-
-  /* save the remaining mrnas */
-  if (0) showSmrnas (s2m, smrnas, 0) ;
-  arraySort (smrnas, smrnaOrderByLengthandBadQuality) ;
-  if (0) showSmrnas (s2m, smrnas, 0) ;
-
-  /* unfortunate hack, selectCosmid alters sc->s2m because it was conceived for a single sc contig */
-  mycosmid =  sc->s2m->cosmid ;
-  mycosmid1 =  sc->s2m->cosmid1 ;
-  /*
-    mysca1 = sc->a1 ;
-    mysca2 = sc->a2 ;
-  */
-  if (1) mrnaSelectCosmid (sc) ;  /* attributes gene to best adequate cosmid */
-  sc->gene = mrnaGetGeneName (sc) ;
-
-  if (doFilter == 0 || arrayMax(smrnas))   /* could be zero because of filtergene */
+  if (! s2m->composite)
     {
-      if (0) /* that function is not yet reliable */
-	mrnaCountErrors (s2m, sc, gmrna->estHits) ;
-      mrnaSaveGene (s2m, sc, gmrna, smrnas) ;
-      if ((geneBox = keyGetKey (sc->gene, str2tag("Gene"))) &&
-	  keyFindTag (geneBox, str2tag("Use_AM")))
-	useAm = TRUE ;
-      else
-	useAm = FALSE ;
-      for (ii = 0 ; ii < arrayMax(smrnas) ; ii++)
+      mrnaSetCompletenessFlags (s2m, sc, gmrna, smrnas) ;
+      
+  /* construct the ORFs */
+      mrnaConstructOrfs (s2m, sc, gmrna, smrnas) ;
+      arraySort (smrnas, smrnaOrderByLengthandBadQuality) ;
+      if (0) showSmrnas (s2m, smrnas, 0) ;
+      if (0) showOrfs (0) ; /* to please the compiler */
+
+      if (doFilter)
+	makeMrnaFilterGene (s2m, sc, gmrna, smrnas) ;
+      makeMrnaFilterGeneHits (s2m, sc, gmrna, smrnas) ;
+      /* save the remaining mrnas */
+      if (0) showSmrnas (s2m, smrnas, 0) ;
+      arraySort (smrnas, smrnaOrderByLengthandBadQuality) ;
+      if (0) showSmrnas (s2m, smrnas, 0) ;
+
+      /* unfortunate hack, selectCosmid alters sc->s2m because it was conceived for a single sc contig */
+      mycosmid =  sc->s2m->cosmid ;
+      mycosmid1 =  sc->s2m->cosmid1 ;
+      
+      if (1) mrnaSelectCosmid (sc) ;  /* attributes gene to best adequate cosmid */
+      sc->gene = mrnaGetGeneName (sc) ;
+
+      
+      if (doFilter == 0 || arrayMax(smrnas))   /* could be zero because of filtergene */
 	{
-	  BOOL addOneSuccess ;
-
-	  smrna = arrp (smrnas, ii, SMRNA) ;
-	  if (! smrna->hits)
-	    continue ;
-	  if (!(smrna->bestDna >= 0 && smrna->cGroup < 2))
-	    continue ;
-
-	  mrnaSaveMrna (s2m, sc, gmrna->estHits, smrnas, smrna) ;
-	  mrnaSaveProductCoverage (s2m, sc, gmrna, smrnas, smrna) ;
-	   
-	  mrnaAddKantorInfo (smrna->gene) ; 
-	  addOneSuccess = mrnaAddOneTiling (sc, smrna->gene) ;
-	  if (useAm)
+	  if (0) /* that function is not yet reliable */
+	    mrnaCountErrors (s2m, sc, gmrna->estHits) ;
+	  mrnaSaveGene (s2m, sc, gmrna, smrnas) ;
+	  if ((geneBox = keyGetKey (sc->gene, str2tag("Gene"))) &&
+	      keyFindTag (geneBox, str2tag("Use_AM")))
+	    useAm = TRUE ;
+	  else
+	    useAm = FALSE ;
+	  for (ii = 0 ; ii < arrayMax(smrnas) ; ii++)
 	    {
-	      if (addOneSuccess)
+	      BOOL addOneSuccess ;
+	      
+	      smrna = arrp (smrnas, ii, SMRNA) ;
+	      if (! smrna->hits)
+		continue ;
+	      if (!(smrna->bestDna >= 0 && smrna->cGroup < 2))
+		continue ;
+
+	      mrnaSaveMrna (s2m, sc, gmrna->estHits, smrnas, smrna, FALSE) ;
+	      mrnaSaveProductCoverage (s2m, sc, gmrna, smrnas, smrna) ;
+	      
+	      mrnaAddKantorInfo (smrna->tr) ;
+	      addOneSuccess = mrnaAddOneTiling (sc, smrna->tr) ;
+	      
+	      if (useAm)
 		{
-		  mrnaTransferRefseqMaker2Product (keyGetKey(smrna->gene, str2tag("RefSeqMaker"))) ;
-		  mrnaSaveProductCoverage (s2m, sc, gmrna, smrnas, smrna) ;
-		  mrnaAddKantorInfo (smrna->gene) ; 
-		  mrnaAddOneTiling (sc, smrna->gene) ; /* after kantor info */
+		  if (addOneSuccess)
+		    {
+		      mrnaTransferRefseqMaker2Product (keyGetKey(smrna->tr, str2tag("RefSeqMaker"))) ;
+		      mrnaSaveProductCoverage (s2m, sc, gmrna, smrnas, smrna) ;
+		      mrnaAddKantorInfo (smrna->tr) ; 
+		      mrnaAddOneTiling (sc, smrna->tr) ; /* after kantor info */
+		    }
+		  else
+		    if (debug) messout ("Cannot construct mrna %s from the cDNA sequence because of a tiling error, sorry",
+					name (smrna->tr)) ;
 		}
-	      else
-		if (debug) messout ("Cannot construct mrna %s from the cDNA sequence because of a tiling error, sorry",
-				    name (smrna->gene)) ;
 	    }
-	  mrnaMrnaScore (smrna->gene) ;	       /* after tiling */
+	  mrnaMrnaScore (smrna->tr) ;	       /* after tiling */
 	}
       mrnaSaveMrnaHierarchy (sc->gene) ;
       if (mrnaPleaseKillNonBest ())
@@ -13338,16 +13333,13 @@ KEY makeMrnaGene (S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas,
 	  mrnaSaveGeneTitle (genes) ;
 	}
       keySetDestroy (genes) ;
+
+      sc->s2m->cosmid = mycosmid ;
+      sc->s2m->cosmid1 = mycosmid1 ;
     }
   
   chronoReturn () ; 
 
-  sc->s2m->cosmid = mycosmid ;
-  sc->s2m->cosmid1 = mycosmid1 ;
-  /* 
-     sc->a1 = mysca1 ;
-     sc->a2 = mysca2 ;
-  */
   return sc->gene ;
 } /* makeMrnaGene */
 
