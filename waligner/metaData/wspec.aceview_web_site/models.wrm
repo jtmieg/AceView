@@ -740,14 +740,14 @@
                       SL2s_L4 UNIQUE Int
        Completeness  Complete  // found5p && Found3p && convaincant
                      Found5p  Transpliced_to  ?Motif ?cDNA_clone UNIQUE Int // composite support
-                              Aggregated_5p_clones  UNIQUE Int
+                              Aggregated_5p_clones  UNIQUE Int UNIQUE Int
                               Submitted_as_5p_complete ?cDNA_clone 
                               Valid5p Int UNIQUE Int UNIQUE Int // position, spliced position,  nb of supporting clones 
                      Found3p   PolyA_primed_clone
                                PolyA_found Int ?cDNA_clone UNIQUE Int  // composite support
                                PolyA_Signal AATAAA Int 
                                             Variant Text Int
-                               Aggregated_3p_clones  UNIQUE Int
+                               Aggregated_3p_clones  UNIQUE Int UNIQUE Int // supprt, position relative to end of mRNA 0=identical, -1 above
                                Submitted_as_3p_complete ?cDNA_clone
                      Multi3p   PolyA_primed_clone_seen Int ?cDNA_clone
                                PolyA_seen Int ?cDNA_clone

@@ -384,7 +384,7 @@ static void mrnaDesignCleanExons (SC *sc, Array ss)
 /* get the X Composite and their counts */
 static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
 {
-  BOOL debug = TRUE ; /* tyty TRUE ; */
+  BOOL debug = FALSE ; /* tyty TRUE ; */
   HIT *up, *up1 ;
   DSX *ssp ;
   int i1, ii, jj, iMax = 0, ir, iss = 0 ;
@@ -1663,7 +1663,7 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 
 /**********************************************************************************/
 /* extend the path Down via the best supported route */
-static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxScore, int flag)
+static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxCover, int flag)
 { 
   int length = 0 ;
   int a2, ii, nn, score = 0 ;
@@ -1679,9 +1679,8 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
 	{
 	  if (vp->type & gI)
 	    break ;
-	  int score2 = ((vp->type & gI) ? vp->score/3 :  vp->score) ;
-	  if (bestScore < score2)
-	    bestScore = score2 ;
+	  if (bestScore < vp->score)
+	    bestScore = vp->score ;
 	}
     }
 
@@ -1689,8 +1688,8 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
     {
       if (vp->a1 != a2) continue ;
       if ((vp->flag & flag) != flag) continue ;
-      int score2 = ((vp->type & gI) ? vp->score/1 :  vp->score) ;
-      if (score < score2) { score = score2 ; nn = vp->nn ; wp = vp ; }
+      if (1 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore && 200 * vp->end < bestScore) continue ;
+      if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
     }
 
   if (! score)
@@ -1729,15 +1728,17 @@ static int mrnaDesignExtendDownRaw (SC *sc, DS *ds, Array segs, KEYSET ks, int p
   score = ((wp->type & gI) ? wp->score/3 :  wp->score) ;
   if (score > bestScore)
     bestScore = score ;
+  if (wp->cover > maxCover)
+    maxCover = wp->cover ;
   if (0) fprintf (stderr, "Path=%d  %d:%d >> %d:%d\n", path, up->a1, up->a2, wp->a1, wp->a2) ;
-  length += mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore, flag) ;
+  length += mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxCover, flag) ;
 
   return length ;
 } /* mrnaDesignExtendDownRaw */
 
 /***********/
 
-static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxScore, int flag)
+static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0, int nIntron, int nStart, int nStop, int bestScore, int maxCover, int flag)
 { 
   int length = 0 ;
   int a2, ii, nn, score = 0 ; 
@@ -1751,37 +1752,41 @@ static int mrnaDesignExtendDownLoopCDS (SC *sc, DS *ds, Array segs, KEYSET ks, i
       {
 	if (vp->a1 != a2) continue ;
 	if ((vp->flag & flag) != flag) continue ;
+	if (0 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore) continue ;
+	if (1 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore && 200 * vp->end < bestScore) continue ;
 	if (! (vp->type &  (gCompleteCDS)))
 	  continue ;
 	if (score < vp->cover) { score = vp->cover ; nn = vp->nn ; wp = vp ; }
       }
   if (! score)
-    return   mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn0, nIntron, nStart, nStop, bestScore, maxScore, flag) ;
+    return   mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn0, nIntron, nStart, nStop, bestScore, maxCover, flag) ;
 
   length = vp->a2 - vp->a1 + 1 ;
   keySet (ks, arrayMax(ks)) = nn ;
   wp->donor = path ;
   if (score > bestScore)
     bestScore = score ;
-  length += mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore, flag) ;
+  if (wp->cover > maxCover)
+    maxCover = wp->cover ;
+  length += mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxCover, flag) ;
 
   return length ;
 } /* mrnaDesignExtendDownLoopCDS */
 
 /***********/
 
-static int mrnaDesignExtendDown (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn, int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxScore, int flag)
+static int mrnaDesignExtendDown (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn, int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxCover, int flag)
 {
   if (useCDS)
-    return mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore, flag) ;
+    return mrnaDesignExtendDownLoopCDS (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxCover, flag) ;
 
-  return mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxScore, flag) ;
+  return mrnaDesignExtendDownRaw (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, bestScore, maxCover, flag) ;
 } /* mrnaDesignExtendDown */
 
 /**********************************************************************************/
 /* extend the path Up via the best supported route */
 static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, int nn0
-			       , int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxScore, int flag)
+			       , int nIntron, int nStart, int nStop, int useCDS, int bestScore, int maxCover, int flag)
 { 
   int length = 0 ;
   int a1, ii, nn = 0, score = 0 ;
@@ -1799,6 +1804,8 @@ static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, 
 	if ((vp->flag & flag) != flag) continue ;
 	if (! (vp->type &  (gCompleteCDS)))
 	  continue ;
+	if (0 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore) continue ;
+	if (1 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore && 200 * vp->end < bestScore) continue ;
 	if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
     }
   if (! score)
@@ -1808,6 +1815,7 @@ static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, 
 	{
 	  if (vp->a2 != a1) continue ;
 	  if ((vp->flag & flag) != flag) continue ;
+	  if (1 && ! (vp->type &  (gA | gS | gReal3p | gReal5p)) && 200 * vp->score < bestScore && 200 * vp->end < bestScore) continue ;
 	  if (score < vp->score) { score = vp->score ; nn = vp->nn ; wp = vp ; }
 	}
     }
@@ -1865,8 +1873,10 @@ static int mrnaDesignExtendUp (SC *sc, DS *ds, Array segs, KEYSET ks, int path, 
     }
   if (wp->cover > bestScore)
     bestScore = wp->cover ;
+  if (wp->cover > maxCover)
+    maxCover = wp->cover ;
   if (0) fprintf (stderr, "Path=%d  %d:%d << %d:%d\n", path, up->a1, up->a2, wp->a1, wp->a2) ;
-  length += mrnaDesignExtendUp (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, useCDS, bestScore, maxScore, flag) ;
+  length += mrnaDesignExtendUp (sc, ds, segs, ks, path, nn, nIntron, nStart, nStop, useCDS, bestScore, maxCover, flag) ;
 
   return length ;
 } /* mrnaDesignExtendUp */
@@ -1995,14 +2005,33 @@ static int mrnaDesignExport (S2M *s2m, SC *sc, DS *ds, Array segs, KEYSET ks, in
 	vp->clipTop = up->end ;
       if (up->type & gReal3p)
 	vp->clipEnd = up->end ;
+      if (up->type & gReal3p)
+	{
+	  HIT *pA ;
+	  if (! smrna->pA)
+	    smrna->pA = arrayHandleCreate (8, HIT, ds->h) ;
+	  pA = arrayp (smrna->pA, arrayMax (smrna->pA), HIT) ;
+	  pA->a2 = up->a2 ; 
+	  pA->type = gReal3p ; pA->est = up->endKey ; pA->cDNA_clone = up->cDNA_clone ;
+	  if (up->cDNA_clone)
+	    {
+	      KEY est = keyGetKey (up->cDNA_clone, _Read) ;
+	      pA->zone = keyGetInt (est, _Composite) ;
+	    }
+	}
       if (up->type & gA)
 	{
 	  HIT *pA ;
 	  if (! smrna->pA)
 	    smrna->pA = arrayHandleCreate (8, HIT, ds->h) ;
 	  pA = arrayp (smrna->pA, arrayMax (smrna->pA), HIT) ;
-	  pA->a2 = up->a2 ; pA->zone = up->end ;
+	  pA->a2 = up->a2 ; 
 	  pA->type = gA ; pA->est = up->endKey ; pA->cDNA_clone = up->cDNA_clone ;
+	  if (up->cDNA_clone)
+	    {
+	      KEY est = keyGetKey (up->cDNA_clone, _Read) ;
+	      pA->zone = keyGetInt (est, _Composite) ;
+	    }
 	}
       if (up->type & gS)
 	{
@@ -2010,20 +2039,40 @@ static int mrnaDesignExport (S2M *s2m, SC *sc, DS *ds, Array segs, KEYSET ks, in
 	  if (! smrna->pA)
 	    smrna->pA = arrayHandleCreate (8, HIT, ds->h) ;
 	  pA = arrayp (smrna->pA, arrayMax (smrna->pA), HIT) ;
-	  pA->a1 = up->a1 ; pA->zone = up->end ;
+	  pA->a1 = up->a1 - smrna->a1 + 1 ;
 	  pA->type = gS ;
 	  pA->est = keyGetKey (up->slKey, _Transpliced_to) ;
-	  pA->zone = keyGetInt (up->slKey, _Composite) ;
 	  if (pA->est)
 	    pA->cDNA_clone = keyGetKey (up->slKey, _cDNA_clone) ;
 	  else
 	    lexaddkey ("SLz", &pA->est, _VMotif) ;
+	  if (up->cDNA_clone)
+	    {
+	      KEY est = keyGetKey (up->cDNA_clone, _Read) ;
+	      pA->zone = keyGetInt (est, _Composite) ;
+	    }
 	}
       if (vp->zone < up->cover) vp->zone = up->cover ;
       vp->type |= ( up->type  & (~ gFF)) ;
       if (jj > 1)
 	vp->type &= (~ (gS | gS0 | gD | gReal5p | g5 | g3 | gDF)) ;
     }
+   if (smrna->pA)
+     {
+       for (ii = 0 ; ii < arrayMax (smrna->pA) ; ii++)
+	 {
+	   HIT *pA = arrayp (smrna->pA, ii, HIT) ;
+	   if (pA->type == gReal3p)
+	     pA->a2 = pA->a2 - smrna->a2 ;
+	   if (pA->type == gA)
+	     {
+	       pA->a2 = pA->a2 - smrna->a2 ;
+	       if (pA->a2 < - 100 || pA->a2 > 20)
+		 pA->type = 0 ;
+	     }
+	 }
+     }
+
   for (ii = 0 ; ii < jj - 1 ; ii++)
     {
       vp = arrayp (smrna->hits, ii, HIT) ;
@@ -2099,7 +2148,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 	      if (ssp->cover < minCover) minCover = ssp->cover ;
 	    }
 	}
-      if (200 * minCover < maxCover)
+      if (200 * minCover < 1 * maxCover)
 	ok = FALSE ;
       if (nI + nEnds == 0)
 	ok = FALSE ;
@@ -2147,6 +2196,10 @@ static int mrnaDesignFlagDescendants (Array ss, int ii, int flag)
   up->flag |= flag ;
   for (jj = ii + 1, vp = up + 1 ; jj < iMax ; vp++, jj++)
     {
+      if (vp->a1 > a1)
+	break ;
+      if (vp->flag & flag)
+	continue ;
       if (vp->a1 == a1)
 	mrnaDesignFlagDescendants (ss, jj , flag) ;
       n++ ;
@@ -2167,6 +2220,8 @@ static int mrnaDesignFlagAscendants (Array ss, int ii, int flag)
   up->flag |= flag ;
   for (jj = ii - 1, vp = up - 1 ; jj >= 0 ; vp--, jj--)
     {
+      if (vp->flag & flag)
+	continue ;
       if (vp->a2 == a2)
 	mrnaDesignFlagAscendants (ss, jj , flag) ;
       n++ ;
@@ -2221,7 +2276,7 @@ static void mrnaDesignSetEndShades (KEYSET light, KEYSET dark)
 
 static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array starts, Array stops)
 {
-  BOOL debug = FALSE ;
+  BOOL debug = TRUE ;
   AC_HANDLE h = ac_new_handle () ;
   DSX *up, *up2, *vp = 0, *wp = 0, *sFlag = 0 ;
   int i, iMax = arrayMax (ss), iStart = 0, iStop = 0, startCover = 0, stopCover = 0 ;
@@ -2614,7 +2669,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 
 static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
-  BOOL debug = FALSE ;
+  BOOL debug = TRUE ;
   int iFlag, path, path0, tested, nIntron, nStart, nStop, useCDS ;
   int eeMax = ssHappyFew (ds->exons) ;
   Array segs, segs2 ;
@@ -2659,7 +2714,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	  flag = sFlag->flag ;
 	  vp2 = arrp (segs2, 0, DSX) ;
 	  int bigScore = 0 ;
-	  int maxScore = 0 ;
+	  int maxCover = 0 ;
 	  int mask = (1 << 16) - 1 ;
 	  int flag1 = flag & mask ;
 	  int flag2 = flag ^ flag1 ;
@@ -2701,7 +2756,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	      vp2 = arrp (segs2, sFlag->nn, DSX) ;
 	      vp = arrp (segs, vp2->nn, DSX) ;
 	      bestIi2 = sFlag->nn ;
-	      maxScore = vp->score ;
+	      maxCover = vp->cover ;
 	      sFlag->nn = 0 ;
 	      /* sFlag->nn = 0 ;  tyty */
 	    }
@@ -2733,9 +2788,9 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 		/* do not start on a mini exon */
 		if (vp->a2 < vp->a1 + 10 && (vp->type & gX) && (!(vp->type & (gS | gA))))
 		  continue ;
-		if (vp->cover > maxScore)
+		if (vp->cover > maxCover)
 		  {
-		    maxScore = vp->cover ;
+		    maxCover = vp->cover ;
 		    bestIi2 = ii2 ;
 		  }
 	      }
@@ -2751,7 +2806,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	  path++ ;
 	  if (0 || debug)
 	    {
-	      fprintf (stderr, "+++New path %d, flag = %d/%d, start on %d %d score=%d maxScore=%d\n", path, flag & mask, flag >> 16, vp->a1, vp->a2, vp->score, maxScore) ;
+	      fprintf (stderr, "+++New path %d, flag = %d/%d, start on %d %d score=%d maxCover=%d\n", path, flag & mask, flag >> 16, vp->a1, vp->a2, vp->score, maxCover) ;
 	    }
 	  ks = keySetReCreate (ks) ;
 	  keySet (ks, 0) = vp->nn ;
@@ -2762,10 +2817,10 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	      nIntron = (vp->type & gI) ? 3 : 0 ;
 	      nStart = 1 ;
 	      nStop = (vp->type & (gA | gReal3p)) ? 1 : 0 ;
-	      mrnaDesignExtendDown (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, bestScore, maxScore, flag) ;
+	      mrnaDesignExtendDown (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, bestScore, maxCover, flag) ;
 	      nStart = (vp->type & gS) ? 1 : 0 ;
 	      nStop = 1 ;
-	      mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, bestScore, maxScore, flag) ;
+	      mrnaDesignExtendUp (sc, ds, segs, ks, path, vp->nn, nIntron, nStart, nStop, useCDS, bestScore, maxCover, flag) ;
 	      if (mrnaDesignIsNewPath (segs, ksPaths, ks, path, tested, xStart, xStop, ds->h))
 		mrnaDesignExport (s2m, sc, ds, segs, ks, path, smrnas) ;
 	      else
@@ -3017,8 +3072,8 @@ static void mrnaDesignSetOneMrnaOrf (S2M *s2m, SC* sc, DS *ss, SMRNA *gmrna, Arr
 		  leu = iBase ;
 		}
 	      break ;
-	    case '9':
-	      if (smrna->isCOOHComplete) /* do not register a 3' open ORF */
+	    case 0:
+	      if (0 && smrna->isCOOHComplete) /* do not register a 3' open ORF */
 		break ;
 	      dx = 0 ;
 	      /* fall thru */
@@ -3056,8 +3111,21 @@ static void mrnaDesignSetOneMrnaOrf (S2M *s2m, SC* sc, DS *ss, SMRNA *gmrna, Arr
 		  orf->codingLn = orf->p2 - orf->p1 + 1 + dx - 3 ;
 		  orf->openLn = orf->p2 - lastStop - 3 + dx - 3 ;
 		  if (firstATG >= 0) orf->firstATG = 1 + (firstATG - start)/3 ;
-		  if (orf->p2 - orf->p1 + 1 > bestOrfLn)
-		    { bestOrfLn = orf->p2 - orf->p1 + 1 ; bestOrf = nOrf - 1 ; }
+		  if (smrna->isCOOHComplete && ! orf->hasStop)
+		    {
+
+		      if (orf->p2 - orf->p1 + 1 > bestOrfLn + 100 )
+			{
+			  bestOrfLn = orf->p2 - orf->p1 + 1 ; bestOrf = nOrf - 1 ;
+			}
+		    }
+		  else
+		    {
+		      if (orf->p2 - orf->p1 + 1 > bestOrfLn)
+			{
+			  bestOrfLn = orf->p2 - orf->p1 + 1 ; bestOrf = nOrf - 1 ;
+			}
+		    }
 		  orf->weight = pepWeight (orf->pep)/1000.0 ; /* kDalton */
 		  orf->pI = pepPI (orf->pep) ;
 		  orf->quality = orf->codingLn ;
@@ -3073,7 +3141,7 @@ static void mrnaDesignSetOneMrnaOrf (S2M *s2m, SC* sc, DS *ss, SMRNA *gmrna, Arr
 	      start = -3 + frame ; /* behind a stop i must find a Met */
 	      firstATG = -1 ;
 	      lastStop = iBase ;
-	      if (lastStop > maxStop)
+	      if (bestOrf == nOrf && lastStop > maxStop)
 		maxStop = lastStop ;
 	      isLeu = FALSE ;
 	      isMet = FALSE ;
@@ -3089,7 +3157,9 @@ static void mrnaDesignSetOneMrnaOrf (S2M *s2m, SC* sc, DS *ss, SMRNA *gmrna, Arr
     {  /* reclip */
       int dx = dnaMax - maxStop - 3 ;
       if (dx < 0) dx = 0 ;
-      if (dx >= dnaRab) /* reclip the rab */
+      if (! maxStop)
+	;
+      else if (dx >= dnaRab) /* reclip the rab */
 	arrayMax (mDna) = dnaMax - dnaRab ; 
       else
 	{
@@ -3097,6 +3167,15 @@ static void mrnaDesignSetOneMrnaOrf (S2M *s2m, SC* sc, DS *ss, SMRNA *gmrna, Arr
 	  arrayMax (mDna) = dnaMax - dx ;
 	  up = arrp (smrna->hits, iMax -1, HIT) ;
 	  up->a2 += dy ; /* extend the mrna exon */
+	  if (smrna->pA)
+	    {
+	      for (int i = 0 ; i < arrayMax (smrna->pA) ; i++)
+		{
+		  HIT *pA = arrayp (smrna->pA, i, HIT) ;
+		  if (pA->type == gReal3p || pA->type == gA)
+		    pA->a2 -= dy ;
+		}
+	    }
 	}
     }
   
@@ -3340,8 +3419,6 @@ static void mrnaDesignSaveOneMrnaSplicing (SMRNA *mm, OBJ Mrna)
 	    bsAddData (Mrna, _bsRight, _Int, &k) ;
 	    bsAddData (Mrna, _bsRight, _Int, &up->clipTop) ;
 	  }
-	  if (up->clipEnd)
-	    bsAddData (Mrna, str2tag ("Aggregated_3p_clones"), _Int, &up->clipEnd) ;
 	  
 	  a1 = up->a1 - a0 + 1 ;
 	  a2 = up->a2 - a0 + 1 ;
@@ -3388,7 +3465,7 @@ static void mrnaDesignSaveOneMrnaSplicing (SMRNA *mm, OBJ Mrna)
 		    bsAddData (Mrna, _bsRight, _Int, &pA->zone) ;
 		  }
 	      }
-	    if (pA->type & gS)
+	    if ((pA->type & gS) && pA->a1 == 1)
 	      {
 		bsAddKey (Mrna, str2tag ("Transpliced_to"), pA->est) ;
 		if (pA->cDNA_clone)
@@ -3397,7 +3474,12 @@ static void mrnaDesignSaveOneMrnaSplicing (SMRNA *mm, OBJ Mrna)
 		    bsAddData (Mrna, _bsRight, _Int, &pA->zone) ;
 		  }
 	      }
-	  }		  
+	    if (pA->type & gReal3p)
+	      {
+		bsAddData (Mrna, str2tag ("Aggregated_3p_clones"), _Int, &pA->zone) ;
+		bsAddData (Mrna, _bsRight, _Int, &pA->a2) ;
+	      }
+	  }
       
       mrnaDesignSaveOneEstHits (mm->estHits, Mrna) ;
       mrnaDesignSaveOneIntrons (mm->introns, Mrna) ;
@@ -4292,6 +4374,8 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
   const char *qq2 = "select a1, a2, r, x1, x2 from a1 in @->Assembled_from, a2 in a1[1], r in a2[1], x1 in r[1], x2 in x1[1]" ;
   AC_TABLE afrom = ac_obj_bql_table (Gene, qq2, 0, &errors, h) ;
   AC_TABLE covers = 0 ;
+  const char *qqGreen2Gene = "select green, gene, cov, a1, a2, c1, c2 from green in @, gene in  green->From_gene, cov in gene->covers, a1 in gene->assembled_from, a2 in a1[1], r in a1[2] where r == green, c1 in r[1], c2 in r[2]"  ;
+  AC_TABLE green2gene = ac_obj_bql_table (Green, qqGreen2Gene, "-4", &errors, h) ;
   int ir, g1 = 0, g2 = 0, gr1 = 0, gr2 = 0, z1 = 0, z2 = 0, dz = 0, xStop = 0, xStart = 0 ;
   const char *rStart = "Xends_ELF" ;
   const char *rStop  = "Xends_ERF" ;
@@ -4299,7 +4383,12 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
   int nGoodBreaks = 0 ;
   KEYSET breaks = keySetHandleCreate (h) ;
   KEYSET bCovers = keySetHandleCreate (h) ;
-  
+  Array tgStart = arrayHandleCreate (12, int, h) ;
+  Array tgStop = arrayHandleCreate (12, int, h) ;
+  char *dna = ac_obj_dna (Green, h) ;
+  int d2 = strlen (dna) ;
+  vTXT txt = vtxtHandleCreate (h) ;
+    
   for (ir = 0 ; map && ir < map->rows ; ir++)
     {
       g1 = ac_table_int (map, ir, 1, 0) ;
@@ -4352,7 +4441,7 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 	  if (xStop && xStop < xStart + 30)
 	    {
 	      int bb = (xStop + xStart) / 2 ;
-	      if (bb > z1 + 50 && bb < z2 - 50)
+	      if (bb > z1 + 10 && bb < z2 - 10)
 		{
 		  keySet (breaks, nBreaks) = bb - dz ;
 		  keySet (bCovers, nBreaks) = -100 ;
@@ -4370,7 +4459,7 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 	  if (xStop && xStop < xStart + 30)
 	    {
 	      int bb = (xStop + xStart) / 2 ;
-	      if (bb > z1 + 50 && bb < z2 - 50)
+	      if (bb > z1 + 10 && bb < z2 - 10)
 		{
 		  keySet (breaks, nBreaks) = bb - dz ;
 		  keySet (bCovers, nBreaks) = (cStop + cStart) / 2 ;
@@ -4381,13 +4470,13 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 	}
     }
 
+  
+  const char *qq1 = "select x1, x2, c from x1 in @->Composite, x2 in x1[1], c in x2[1]" ;
+  covers = ac_obj_bql_table (Green, qq1, 0, &errors, h) ;
   if (nBreaks)
     { /* check if the candidate breakpoint falls in an exon cover dip */
-      const char *qq1 = "select x1, x2, c from x1 in @->Composite, x2 in x1[1], c in x2[1]" ;
       int ir = 0 ;
 
-      keySet (breaks, nBreaks++) = z2 ;
-      covers = ac_obj_bql_table (Green, qq1, 0, &errors, h) ;
       for (int ib = 0 ; ib < nBreaks ; ib++)
 	{
 	  int u1, u2, c, bb = keySet (breaks, ib) ;
@@ -4431,54 +4520,132 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 	}
     }
 
+  /* get green offset in other genes */
+  for (int itg = 0 ; itg < green2gene->rows ; itg++)
+      { /* green coords in tg */
+	KEY tg = ac_table_key (green2gene, itg, 1, 0) ;
+	int cov = ac_table_int (green2gene, itg, 2, 0) ;
+	int u1 = ac_table_int (green2gene, itg, 3, 0) ;
+	int u2 = ac_table_int (green2gene, itg, 4, 0) ;
+	int v1 = ac_table_int (green2gene, itg, 5, 0) ;
+	int v2 = ac_table_int (green2gene, itg, 6, 0) ;
+
+	fprintf (stderr , "################ %s %d %d %d %d %d\n", name(tg), cov, u1, u2, v1, v2) ;
+	array (tgStart, itg, int) = v1 - u1 + 1 ;
+	array (tgStop, itg, int) = v1 - u1 + 2 + cov - 1 ;
+	if (itg > 0 && array (tgStop, itg - 1, int) < array (tgStart, itg, int) + cov/3)
+	  {
+	    int bb = (array (tgStop, itg - 1, int) + array (tgStart, itg, int))/2 ;
+	    keySet (breaks, nBreaks++) = bb ;
+	    nGoodBreaks++ ;
+	  }
+      }
+
+  /* remove green from overlapping genes */
+  for (int itg = 0 ; itg < green2gene->rows - 1 ; itg++)
+    { /* green coords in tg */
+      KEY tg = ac_table_key (green2gene, itg, 1, 0) ;
+      if (  /* itg includes itg+1 */
+	    d2 > array (tgStart, itg, int) &&
+	    1 < array (tgStop, itg, int) &&
+	    d2 > array (tgStart, itg+1, int) &&
+	    1 < array (tgStop, itg+1, int) &&
+	    array (tgStop, itg, int) >  array (tgStop, itg + 1, int)
+	    )
+	vtxtPrintf (txt, "Transcribed_gene %s\n-D Read %s\n-D cdna_clone %s\n\n"
+		    , name (tg), name (green)  , name (green)
+		    ) ;
+    }
+  
  done:
+  nBreaks = 0 ;
   if (nGoodBreaks)
+    { /* compress */
+      int jb = 0, bb0 = 10 ;
+      
+      keySetSort (breaks) ;
+      for (int ib = 0 ; ib < keySetMax(breaks) ; ib++)
+	{
+	  int bb = keySet (breaks, ib) ;
+	  if (bb && bb > bb0 && bb < d2 - 10)
+	    { keySet (breaks, jb++) = bb ; bb0 = bb + 10 ; }
+	}
+      keySet (breaks, jb++) = d2 ;
+      nGoodBreaks = nBreaks = keySetMax (breaks) = jb ;
+    }
+
+
+  if (nBreaks)
     {
-      char *dna = ac_obj_dna (Green, h) ;
-      int d2 = strlen (dna) ;
-      int d11 = 1, d12 ;
-      vTXT txt = vtxtHandleCreate (h) ;
+      keySet (breaks, nBreaks++) = d2 ;
 
       vtxtPrintf (txt, "Sequence %s\n-D Is_read\n-D From_gene\n-D In_mRNA\n\n", name (green)) ;
       vtxtPrintf (txt, "cDNA_clone %s\n-D From_gene\n-D In_mRNA\n\n", name (green)) ;
       vtxtPrintf (txt, "-D DNA %s\n\n", name (green)) ;
       vtxtPrintf (txt, "-D cDNA_clone %s\n\n", name (green)) ;
       vtxtPrintf (txt, "-D Sequence %s\n\n", name (green)) ;
-      /* compress */
-      keySetSort (breaks) ;
-      int jb = 0, bb0 = 50 ;
-      for (int ib = 0 ; ib < nBreaks ; ib++)
-	{
-	  int bb = keySet (breaks, ib) ;
-	  if (bb && bb > bb0 && bb < z2 - 50)
-	    { keySet (breaks, jb++) = bb ; bb0 = bb + 50 ; }
-	}
-      keySet (breaks, jb++) = z2 ;
-      nBreaks = keySetMax (breaks) = jb ;
-      for (int ib = 0 ; ib < nBreaks ; ib++)
-	{
-	  char *nam = hprintf (h, "%s.%d", name (green), ib) ;
-	  int bb = keySet (breaks, ib) ;
 
+      /* remove green from all genes */
+      for (int itg = 0 ; itg < green2gene->rows ; itg++)
+	{ /* green coords in tg */
+	  KEY tg = ac_table_key (green2gene, itg, 1, 0) ;
+	  int u1 = ac_table_int (green2gene, itg, 3, 0) ;
+	  int u2 = ac_table_int (green2gene, itg, 4, 0) ;
+	  
+	  vtxtPrintf (txt, "Transcribed_gene %s\n-D Assembled_from %d %d %s\n\n", name(tg), u1, u2, name(green)) ;
+	}
+
+      int d11 = 1, d12 ;
+      for (int ib = 0 ; ib < nBreaks ; ib++)
+	{
+	  char *nam = hprintf (h, "%s.%d", name (green), ib+1) ;
+	  int bb = keySet (breaks, ib) ;
+	  
+	  if (bb < d11)
+	    continue ;
+	  if (bb > d2)
+	    continue ;
 	  fprintf (stderr, "Breaking %s at position %d\n", name (green), bb) ;
 	  
-	  d12 = bb - 10 ;
+	  d12 = bb ;
 	  if (d12 < 1)
 	    d12 = 1 ;
-	  if (d12 > d2)
-	    d12 = d2 ;
-	  dna = ac_zone_dna (Green, d11, d12, h) ;
-
-	  vtxtPrintf (txt, "DNA %s\n%s\n\n", nam, dna) ;
-	  vtxtPrintf (txt, "cDNA_clone %s\nRead %s\nFRom_gene %s\n\n", nam, nam, name (gene)) ;
-	  vtxtPrintf (txt, "Sequence %s\nIs_read\nForward\n", nam) ;
+	  if (d12 < d2)
+	    d12 -= 10 ;
+	  /* char *dnaZone = ac_zone_dna (Green, d11, d12, h) ; */
+	  dna[d12]=0 ;
+	  vtxtPrintf (txt, "DNA %s\n%s\n\n", nam, dna + d11 - 1) ;
+	  
+	  for (int itg = 0 ; itg < green2gene->rows ; itg++)
+	    { /* green coords in tg */
+	      KEY tg = ac_table_key (green2gene, itg, 1, 0) ;
+	      if (d12 > array (tgStart, itg, int) &&
+		  d11 < array (tgStop, itg, int)
+		  )
+		{
+		  if (itg < green2gene->rows - 1 &&
+		      d12 > array (tgStart, itg+1, int) &&
+		      d11 < array (tgStop, itg+1, int) &&
+		      array (tgStop, itg, int) >  array (tgStop, itg + 1, int) /* itg includes itg+1 */
+		      )
+		    ;
+		  else
+		    {
+		      vtxtPrintf (txt, "cDNA_clone %s\nRead %s\nFrom_gene %s\n\n", nam, nam, name (tg)) ;
+		      int u1 = d11 - array (tgStart, itg, int) + 1 ;
+		      int u2 = d12 - array (tgStart, itg, int) + 1 ;
+		      vtxtPrintf (txt, "Transcribed_gene %s\nRead %s\nAssembled_from %d %d %s %d %d\n\n", name(tg), nam, u1, u2, nam, d11 - d11 + 1, d12 - d11 + 1) ;
+		    }
+		}
+	    }
+	  vtxtPrintf (txt, "Sequence %s\nIs_read\nForward\nColour GREEN3\n", nam) ;
 	  if (map->rows)
 	    vtxtPrintf (txt, "IntMap %s %d %d\n"
 			, ac_table_printable (map, 0, 0, 0)
 			, gr1 < gr2 ? gr1 + d11 - 1 : gr1 - d11 + 1
 			, gr1 < gr2 ? gr1 + d12 - 1 : gr1 - d12 + 1
 			) ;
-
+	  
 	  for (int ir = 0; ir < covers->rows ; ir++)
 	    {
 	      int u1 = ac_table_int (covers, ir, 0, 0) ;
@@ -4493,16 +4660,13 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 	    }
 	  vtxtPrintf (txt, "\n") ;
 	  d11 = bb + 10 ;
-	  if (d11 < 1)
-	    d11 = 1 ;
-	  if (d11 > d2)
-	    d11 = d2 ;
-
 	}
-      if (vtxtPtr (txt))
-	ac_parse (db, vtxtPtr (txt), &errors, 0, h) ;
     }
-  
+  if (vtxtPtr (txt))
+    {
+      ac_parse (db, vtxtPtr (txt), &errors, 0, h) ;
+      fprintf (stderr, "%s\n\n", vtxtPtr (txt)) ;
+    }
   if (ks)
     keySet (ks, nn++) = green ;
   ac_free (h) ;

@@ -10962,7 +10962,7 @@ abort:
 
 static KEYSET getReads (KEY gene)
 {
-  KEYSET kClones = queryKey (gene,"{ Follow cDNA_clone } $| {Follow Ignored_clone } ; { IS *} $| {>fuse_to_clone} ; >Read ; ! discarded && Is_read") ;
+  KEYSET kClones = queryKey (gene,"Follow read ; Follow from_gene ; { Follow cDNA_clone } $| {Follow Ignored_clone } ; Follow read ; { IS *} $| {>fuse_to_clone} ; ! discarded && Is_read") ;
 
   if (keySetMax(kClones) > 300)
     printf ("Gene %s %u reads", name(gene), keySetMax(kClones)) ; 

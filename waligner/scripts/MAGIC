@@ -519,8 +519,9 @@ cat <<EOF > _x.awk
   if (a0 > 0) ph = ph " a0 " ;
   if (a0 > 0 && a > 0)  ph = ph " wait " ;
   if (small + a > 0) ph = ph " a0C wait a0D wait "
+  if (small > 0) ph = ph " mi1 mi2 mi3 mi4 mi5 mi6 "
   if (a > 0) ph = ph " a0W wait a1W wait a123 a0P a0Ba mi3 wait a0Br a0Bua c1 c2 wsig1 vir1 mi4 wait c3 c4 c5 wsig2 vir2 wait a0Bur c6 wsig3  " ;
-  if (a + small > 0) ph = ph " c7 wait "
+  if (a > 0) ph = ph " c7 wait "
   if (ix > 0) ph = ph " ii2a wait ii2b wait ii2c wait ii2d wait ii3a wait ii3b "
 # d3 is obsolete
 # d4 must run after ii2d twice, once per run in parallel, once to cumulate the results
@@ -1368,7 +1369,7 @@ echo '      across all tested individuals. see the in RESULTS/SNV'
 echo '    REARRANGEMENTS:  search and report rearrangements (in development)'
 echo ' '
 echo 'Examples'
-echo '  MAGIC ALIGN GENE WIGGLE INTRON SNV'
+echo '  MAGIC ALIGN GENE WIGGLE INTRON SNV SMALL_RNA'
 echo '  '    
 echo ' '
 echo '      Some analyses imply others, for example ALIGN is implied in all cases'
@@ -2571,7 +2572,7 @@ if (! -e tmp/ClippedFastc/mi4.$MAGIC.10.tc) then
   end
  
   date
-  cat tmp/ClippedFastc/toto.10 | sort | gawk -F '\t' '{if($1 != old) {if(old)printf("%s\t%d\n",old,n);n=0;old=$1;}n+=$2;}END{if(old)printf("%s\t%d\n",old,n);}' | sort -k 2nr | gawk -F '\t' '{k++;printf("%s\t%d\tn.%d#%d\n",$1,$2,k,$2);}' > tmp/ClippedFastc/mi4.RatMicro.10.tc
+  cat tmp/ClippedFastc/toto.10 | sort | gawk -F '\t' '{if($1 != old) {if(old)printf("%s\t%d\n",old,n);n=0;old=$1;}n+=$2;}END{if(old)printf("%s\t%d\n",old,n);}' | sort -k 2nr | gawk -F '\t' '{k++;printf("%s\t%d\tn.%d#%d\n",$1,$2,k,$2);}' > tmp/ClippedFastc/mi4.$MAGIC.10.tc
   date
   cat tmp/ClippedFastc/toto.100 ZZZZZ tmp/ClippedFastc/mi4.$MAGIC.10.tc  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1)print;}' > tmp/ClippedFastc/mi4.$MAGIC.100.tc
   cat tmp/ClippedFastc/toto.1000 ZZZZZ tmp/ClippedFastc/mi4.$MAGIC.100.tc  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]==1)print;}' > tmp/ClippedFastc/mi4.$MAGIC.1000.tc

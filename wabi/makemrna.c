@@ -640,11 +640,12 @@ static KEY mrnaAnalyseExactGenefinder (KEY g1, int a1, int a2, BOOL isUp1, KEY g
   int i, j, itr, score, bestScore = 0, exonScore, intronScore, endScore ;
   KEYSET mrnas = queryKey (g1, "Follow Mrna") ;
   KEY mrna = 0, exactMrna = 0, approximateMrna = 0 ;
+  KEY _PolyA_found = str2tag ("PolyA_found") ;
   BOOL ok = FALSE ;
   BOOL isMirLike = isPredictedGeneMirLike (g2) ;
   OBJ G1, G2 ;
   BSunit *uu, *vv ;
-  static Array aa = 0, bb = 0, map = 0 ;
+  static Array aa = 0, pA = 0, bb = 0, map = 0 ;
 
   for (itr = 0 ; itr < keySetMax (mrnas) ; itr++)
     {
@@ -654,6 +655,7 @@ static KEY mrnaAnalyseExactGenefinder (KEY g1, int a1, int a2, BOOL isUp1, KEY g
       G1 = bsCreate (mrna) ; 
       G2 = bsCreate (g2) ; 
       aa = arrayReCreate (aa, 40, BSunit) ;
+      pA = arrayReCreate (pA, 40, BSunit) ;
       bb = arrayReCreate (bb, 40, BSunit) ;
       map = arrayReCreate (map, 4, BSunit) ;
       bsGetArray (G1, _Splicing, aa, 5) ;
@@ -668,6 +670,19 @@ static KEY mrnaAnalyseExactGenefinder (KEY g1, int a1, int a2, BOOL isUp1, KEY g
       for (i = 0 ; i < arrayMax(aa) ; i += 5)
 	{
           uu = arrp (aa, i, BSunit) ;
+	  if (i == arrayMax (aa) - 5)
+	    {
+	      /* last mRNA exons, reclip on the polyA */
+	      int dx = 0, maxA = 0 ;
+	      bsGetArray (G1, _PolyA_found, pA, 3) ;
+	      for (int j = 0 ; j < arrayMax (pA) ; j+= 3)
+		{
+		  BSunit *pp = arrp (pA, j, BSunit) ;
+		  if (pp[2].i > maxA)
+		    { dx = pp[0].i ; maxA = pp[2].i ; }
+		}
+	      uu[1].i += dx ;
+	    }
           if (a1 < a2)
             { uu[0].i = a1 + uu[0].i - 1 ; uu[1].i = a1 + uu[1].i - 1 ; }
 	  else

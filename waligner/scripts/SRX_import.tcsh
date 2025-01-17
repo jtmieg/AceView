@@ -827,6 +827,22 @@ EOF
 cat subIsDate.txt | gawk -F '\t' '{printf("Biosample %s\n-D Submission %s\nSubmission_date %s\n\n", $2,$1,$1);}' > subIsDate.ace1
 cat subIsDate.txt | gawk -F '\t' '{printf("Sample %s\n-D Submission %s\nSubmission_date %s\n\n", $2,$1,$1);}' > subIsDate.ace
 
+tbly MetaDB <<EOF
+  select -o r2srr2s.txt run,srr,sample from run in ?run, srr in run->srr, sample in srr->sample where sample
+  select -o r2srr2s2.txt run,srr,sample from run in ?run, run2 in run->sublibraries,  srr in run2->srr, sample in srr->sample where sample
+EOF
+
+cat r2srr2s.txt r2srr2s2.txt | gawk -F '\t' '{printf ("Run %s\nSample %s\n\n", $1, $3) ;} ' > run2sample.ace
+tace SRX_DB <<EOF
+  find keyset
+  show -a -f ks.ace
+EOF
+tbly MetaDB <<EOF
+  parse run2sample.ace
+  parse ks.ace
+  save
+  quit
+EOF
 goto phaseLoop
 
 #######################################################

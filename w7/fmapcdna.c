@@ -3764,34 +3764,38 @@ void fMapcDNAShowTranscribedgene  (LOOK look, float *offset)
 
       if (seg->key == seg->parent) /* the overall transcribedgene, do not draw */
 	{ int dy = 1 ;
-	  if (seg->data.i & 0x1)
+	  if (seg->data.i)
 	    {
-	      if (seg->type == TRANSCRIBEDGENE)
-		graphText ("*", *offset, MAP2GRAPH(look->map,seg->x1) - 1) ;
-	      else if (seg->type == TRANSCRIBEDGENE_UP)
-		graphText ("*", *offset, MAP2GRAPH(look->map,seg->x2) + 1) ; 
-	    }
-	  if (seg->data.i & 0x1) dy = 2 ;
-	  if (seg->data.i & 2)
-	    {
-	      if (seg->type == TRANSCRIBEDGENE)
-		graphText ("SL1", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
-	      else if (seg->type == TRANSCRIBEDGENE_UP)
-		graphText ("SL1", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
-	    }
-	  if (seg->data.i & 4)
-	    {
-	      if (seg->type == TRANSCRIBEDGENE)
-		graphText ("SL2", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
-	      else if (seg->type == TRANSCRIBEDGENE_UP)
-		graphText ("SL2", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
-	    }
-	  if (seg->data.i & 8)
-	    {
-	      if (seg->type == TRANSCRIBEDGENE)
-		graphText ("SL1&2", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
-	      else if (seg->type == TRANSCRIBEDGENE_UP)
-		graphText ("SL1&2", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
+	      SEQINFO *sinf = arrayp (look->seqInfo, seg->data.i, SEQINFO) ;
+	      if (sinf->flags & 0x1)
+		{
+		  if (seg->type == TRANSCRIBEDGENE)
+		    graphText ("*", *offset, MAP2GRAPH(look->map,seg->x1) - 1) ;
+		  else if (seg->type == TRANSCRIBEDGENE_UP)
+		    graphText ("*", *offset, MAP2GRAPH(look->map,seg->x2) + 1) ; 
+		}
+	      if (sinf->flags & 0x1) dy = 2 ;
+	      if (sinf->flags & 2)
+		{
+		  if (seg->type == TRANSCRIBEDGENE)
+		    graphText ("SL1", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
+		  else if (seg->type == TRANSCRIBEDGENE_UP)
+		    graphText ("SL1", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
+		}
+	      if (sinf->flags & 4)
+		{
+		  if (seg->type == TRANSCRIBEDGENE)
+		    graphText ("SL2", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
+		  else if (seg->type == TRANSCRIBEDGENE_UP)
+		    graphText ("SL2", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
+		}
+	      if (sinf->flags & 8)
+		{
+		  if (seg->type == TRANSCRIBEDGENE)
+		    graphText ("SL1&2", *offset, MAP2GRAPH(look->map,seg->x1) - dy) ;
+		  else if (seg->type == TRANSCRIBEDGENE_UP)
+		    graphText ("SL1&2", *offset, MAP2GRAPH(look->map,seg->x2) + dy) ;
+		}
 	    }
 	  continue ;
 	}
@@ -5313,8 +5317,15 @@ lao:
 	    gene = keySet(aa,0) ;
 	    keySetKill (aa) ;
 	    Gene = bsUpdate (gene) ;
-	    if (Gene) for (j = 0 ; j < keySetMax(clones) ; j++)
-	      bsAddKey (Gene, _cDNA_clone, keySet(clones, j)) ;
+	    if (Gene)
+	      {
+		KEYSET reads = query (clones, ">Read") ;
+		for (j = 0 ; j < keySetMax(clones) ; j++)
+		    bsAddKey (Gene, _cDNA_clone, keySet(clones, j)) ;
+		for (j = 0 ; j < keySetMax(reads) ; j++)
+		  bsAddKey (Gene, _Read, keySet(reads, j)) ;
+		keySetDestroy (reads) ;
+	      }
 	    bsAddKey (Gene, _Genomic_sequence, cosmid);
 	    if (bsFindTag (Gene, str2tag("To_be_fused_with")))
 	      bsRemove (Gene) ; /* no more fusions than what i did here */

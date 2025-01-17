@@ -44,6 +44,10 @@ EOF
       cdna_1 $chrom
       quit
     save
+    acembly
+      cdna_71
+      quit
+    save
 
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect1.txt  -f tables/10.polyAsuspect1.def
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect2.txt  -f tables/10.polyAsuspect2.def
@@ -74,7 +78,7 @@ endif
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 # kill echo ct_ac introns
 scripts/f3.kill_ct_ac_introns.tcsh $chrom 2
-# find all antisence gene, with non classic or ct_ac intron supported 5 times less than an approximately antisense g[tc]_ag intron
+# find all antisens gene, with non classic or ct_ac intron supported 5 times less than an approximately antisense g[tc]_ag intron
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
      table -o tmp/X.$MAGIC/$chrom/f4.killEchoIntron.out -f tables/f4.killEchoIntron.def
      quit
@@ -237,6 +241,15 @@ EOF
     list -a -f f4.tg.list
     query find transcribed_gene Intron_boundaries
     list -a -f f4.spliced_tg.list
+    save
+    quit
+EOF
+
+  $ici/bin/tacembly . << EOF
+    find transcribed_gene
+    acem
+      cdna_71
+      quit
     save
     quit
 EOF
