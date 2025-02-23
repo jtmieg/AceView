@@ -77,7 +77,7 @@ endif
 
 
 
-
 touch  $ddc/f2.done
+sleep 10
 
 exit 0

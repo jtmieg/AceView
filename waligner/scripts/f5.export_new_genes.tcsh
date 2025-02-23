@@ -124,7 +124,20 @@ bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
       save
       quit
 EOF
- 
+
+  pushd tmp/X.$MAGIC/$chrom 
+  ../../../bin/tacembly . <<EOF 
+    bql -o f5.g2pg2ll select g,pg,ll from g in ?gene, pg in g->genefinder, ll in pg->LocusLink where ll
+    quit
+EOF
+  cat f5.g2pg2ll | gawk -F '\t' '{printf("Gene %s\nLocusLink %s\n\n",$1,$3);}'  > f5.g2pg2ll.ace
+  ../../../bin/tacembly . <<EOF 
+    pparse f5.g2pg2ll.ace
+    save
+    quit
+EOF
+popd  
+
 ## try to rename using the geneboxes 
 ## recompute since we now have the geneboxes
 bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
@@ -134,7 +147,7 @@ bin/tacembly tmp/X.$MAGIC/$chrom <<EOF
   edit name_by_gene
   find tg
   acembly 
-    // cdna_71 -locally
+    // cdna_71 -split_cloud
     quit
   save
   query find clone strategy
@@ -229,3 +242,5 @@ exit 0
 
 bin/clipalign -i Fastc/SRR077419/f.17.fastc.gz -gzo    -t TARGET/Targets/Dmelanogaster.DNASpikeIn.fasta.gz  -maxHit 10 -clipPolyA  -clipPolyT -minEntropy 16 -seedLength 16 -probeMinLength 24  -clipN 2 -minAli 24 -splice         -targetBonus 0     -seedOffset 1 -seedShift 5 -intronMaxLength  100000 -o toto  -showTargetPrefix -target_class 1_DNASpikeIn  -exitAdaptor ACACGCAAACTTCTCAACAGGCCGTACCAATATCCGCAGCTGGTCTCCAAGGTGA,AGGGCAGAGGATGGATGCAAGGATAAGT,AGGTTTGGTCCTAGCCTTTGTATTAGCT,AGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCTAGCT     -showOverhang -strategy RNA_seq
 
+foreach chrom ($chromSetAll)
+  end

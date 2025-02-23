@@ -1947,7 +1947,6 @@ static void  testWilcoxon (void)
 
 struct regExpStruct {
   int magic ;
-  BOOL getPos ;
   regex_t *regex;
   const char *pattern ;
 } ;
@@ -1967,7 +1966,7 @@ static void regExpFinalise (void *vp)
 
 /*******************************************************************/
 /* 0: bad bql, !NULL: use in regExpFind, then call regExpDoFree */
-RegExp regExpCreate (const char *pattern, BOOL getPos, AC_HANDLE h)
+RegExp regExpCreate (const char *pattern, AC_HANDLE h)
 {
   int nn ;
   RegExp br ;
@@ -1982,13 +1981,12 @@ RegExp regExpCreate (const char *pattern, BOOL getPos, AC_HANDLE h)
     {
       br->magic = 623562 ;
       br->regex = halloc (sizeof (regex_t), h) ;
-      br->getPos = getPos ;
       br->pattern = strnew (pattern, 0) ;
 
       blockSetFinalise (br, regExpFinalise) ;
           
       /* man regcomp for details */
-      if (getPos)
+      if (0)
 	nn = regcomp (br->regex, pattern, REG_EXTENDED | REG_ICASE) ;
       else
 	nn = regcomp (br->regex, pattern, REG_EXTENDED | REG_ICASE | REG_NOSUB ) ;
@@ -2014,14 +2012,12 @@ int regExpFind (RegExp br, const char *data)
       regmatch_t pmatch ;
       int nn = 0 ;
 
-      if (br->getPos)
-	nn = regexec (br->regex, data, 1, &pmatch, 0) ;
-      
+      nn = regexec (br->regex, data, 1, &pmatch, 0) ;
       if (nn) 
 	ok = 0 ; /* pattern not found */
       else  /* match found */ 
 	{ 	     
-	  if (br->getPos)
+	  if (1)
 	    ok = 1 + pmatch.rm_so ;
 	  else
 	    ok = 1 ;
@@ -2032,13 +2028,13 @@ int regExpFind (RegExp br, const char *data)
 
 /*******************************************************************/
 
-int regExpMatch (const char *data, const char *pattern, BOOL getPos)
+int regExpMatch (const char *data, const char *pattern)
 {
   int ok = 0 ;
   
   if (pattern && data && *pattern && *data)
     {
-      RegExp br = regExpCreate (pattern, getPos, 0) ;
+      RegExp br = regExpCreate (pattern, 0) ;
       if (br)
 	{
 	  ok = regExpFind (br, data) ; /* 0: not found, >0 position */

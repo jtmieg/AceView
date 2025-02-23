@@ -168,6 +168,15 @@ BlastN
 Blixem_X	
 Blixem_N	
 
+Method : "Encode"
+Colour	 MIDBLUE
+Show_up_strand	
+Cluster	
+Right_priority	 1.8
+Web_right_priority	 9
+Show_text	
+EMBL_feature	 "CDS"
+
 Method "curated"
 Colour	 MIDBLUE
 Show_up_strand	
@@ -222,7 +231,7 @@ Web_right_priority	 9
 Show_text	
 EMBL_feature	 "CDS"
 
-Method "RefSeq"A
+Method "RefSeq"
 Colour	 MIDBLUE
 Show_up_strand	
 Bumpable	

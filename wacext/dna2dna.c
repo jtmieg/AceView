@@ -2302,7 +2302,9 @@ static DICT *gtf2ace (BOOL isGff3, DICT *dict, KEYSET ks, char *buf, AC_HANDLE h
       if (*cp)
 	{
 	  cr = ac_unprotect (cp, h) ;
-	  if (0) url_decode_inplace(cr) ;	
+	  if (0) url_decode_inplace(cr) ;
+	  if (1 && ! strcmp (cr, "protein_coding"))
+	    cr = "CDS" ;
 	  dictAdd (dict, cr, &n) ;
 	  keySet (ks, item) = n ;
 	}
@@ -2408,8 +2410,13 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   BOOL hasCDS = FALSE ;
   BOOL wantGene = !strcasecmp (featureType, "gene") ;
   BOOL wantMRNA = !strcasecmp (featureType, "mRNA") ;
+  BOOL wantrRNA = !strcasecmp (featureType, "rRNA") ;
+  BOOL wanttRNA = !strcasecmp (featureType, "tRNA") ;
+  BOOL wantncRNA = !strcasecmp (featureType, "ncRNA") ;
+  BOOL wantmiRNA = !strcasecmp (featureType, "miRNA") ;
+  BOOL wantpre_miRNA = !strcasecmp (featureType, "pre_miRNA") ;
   BOOL wantExon = !strcasecmp (featureType, "exon") ;
-  int ncRNA_type, mRNA_type, tRNA_type, rRNA_type, Exon_type, CDS_type, gene_type, pseudogene_type ;
+  int mRNA_type, tRNA_type, rRNA_type, ncRNA_type, miRNA_type, pre_miRNA_type, Exon_type, CDS_type, gene_type, pseudogene_type ;
   DICT *itemDict, *dict ;
   SHADOW *shadow, *shadow2 ;
   Array shadows ; 
@@ -2427,6 +2434,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   if (! sx->shadowArray)
     sx->shadowArray = arrayHandleCreate (10000, SHADOW, sx->h) ;
   shadows = sx->shadowArray ;
+  if (0) arrayMax (shadows) = 0 ;
   nShadow = arrayMax (shadows) ;
 
   dictAdd (dict, "ZERO", 0) ;
@@ -2434,6 +2442,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
   dictAdd (dict, "tRNA", &tRNA_type) ;
   dictAdd (dict, "rRNA", &rRNA_type) ;
   dictAdd (dict, "ncRNA", &ncRNA_type) ;
+  dictAdd (dict, "miRNA", &miRNA_type) ;
+  dictAdd (dict, "pre_miRNA", &pre_miRNA_type) ;
   dictAdd (dict, "exon", &Exon_type) ;
   dictAdd (dict, "CDS", &CDS_type) ;
   dictAdd (dict, "gene", &gene_type) ;
@@ -2457,21 +2467,31 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
       aceInStep (ai, '\t') ;
       cp = aceInWordCut (ai, "\t", &cutter) ;
       if (! cp)	continue ;
-      if (!strcmp (cp, "transcript_region"))
+      if (!strcasecmp (cp, "transcript_region"))
 	cp = "mrna" ;
-      if (!strcmp (cp, "antisense_lncRNA"))
+      if (!strcasecmp (cp, "antisense_lncRNA"))
+	cp = "ncrna" ;
+      if (!strcasecmp (cp, "antisense_RNA"))
 	cp = "mrna" ;
-      if (!strcmp (cp, "antisense_RNA"))
+      if (!strcasecmp (cp, "lnc_RNA"))
+	cp = "ncrna" ;
+      if (!strcasecmp (cp, "ncRNA"))
+	cp = "ncrna" ;
+      if (!strcasecmp (cp, "tRNA"))
+	cp = "trna" ;
+      if (!strcasecmp (cp, "rRNA"))
+	cp = "rrna" ;
+      if (!strcasecmp (cp, "miRNA"))
+	cp = "mirna" ;
+      if (!strcasecmp (cp, "pre_miRNA"))
+	cp = "pre_mirna" ;
+      if (!strcasecmp (cp, "pseudogenic_transcript"))
 	cp = "mrna" ;
-      if (!strcmp (cp, "lnc_RNA"))
-	cp = "mrna" ;
-      if (!strcmp (cp, "ncRNA"))
-	cp = "mrna" ;
-      if (!strcmp (cp, "pseudogenic_transcript"))
-	cp = "mrna" ;
-      if (!strcmp (cp, "pseudogenic_exon"))
+      if (!strcasecmp (cp, "exon"))
 	cp = "exon" ;
-      if (!strcmp (cp, "pseudogene"))
+      if (!strcasecmp (cp, "pseudogenic_exon"))
+	cp = "exon" ;
+      if (!strcasecmp (cp, "pseudogene"))
 	cp = "gene" ;
 
       if ( wantGene)
@@ -2486,15 +2506,42 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 	  if (strcasecmp (cp, "mRNA"))
 	    continue ;
 	}
+      else if (wantrRNA)
+	{
+	  if (strcasecmp (cp, "rRNA"))
+	    continue ;
+	}
+      else if (wanttRNA)
+	{
+	  if (strcasecmp (cp, "tRNA"))
+	    continue ;
+	}
+      else if (wantncRNA)
+	{
+	  if (strcasecmp (cp, "ncRNA"))
+	    continue ;
+	}
+      else if (wantmiRNA)
+	{
+	  if (strcasecmp (cp, "miRNA"))
+	    continue ;
+	}
+      else if (wantpre_miRNA)
+	{
+	  if (strcasecmp (cp, "pre_miRNA"))
+	    continue ;
+	}
       else if (wantCDS)
 	{
+	  if (!strcasecmp (cp, "stop_codon"))
+	    cp = "cds" ;
 	  if (strcasecmp (cp, "cds") &&
 	      (! sx->gffBacteria || strcasecmp (cp, "mrna"))
 	      )
 	    continue ;
 	}
       else
-	{ 
+	{
 	  if (! strcasecmp (cp, "cds")) 
 	    continue ;
 	  
@@ -3122,7 +3169,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
     }
   ac_free (ao) ;
 
-  if (1)
+  if (! strcasecmp (fileSuffix, ".mrnaRemap"))
     {
       int typ ;
       BOOL isDown = FALSE, cds = FALSE ;
@@ -3236,7 +3283,7 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 			   , a1, a2
 			   ) ;
 		  
-		  aceOutf (ao, "Sequence %s\n-D source_exons\nIntMap %s %d %d\n"
+		  aceOutf (ao, "Sequence %s\nIntMap %s %d %d\n"
 			   , dictName(dict, old)
 			   , dictName(sx->selectDict, target)
 			   , a1, a2 
@@ -3247,7 +3294,8 @@ static void parseGtfFeature (SX *sx, const char *featureType, const char *fileSu
 		      int dx = a2 - a1 ;
 		      if (dx < 0) dx = -dx ;
 		      dx++ ;
-		      aceOutf (ao, "-D Source_exons\nSource_exons 1 %d CDS\n", dx) ;
+		      if (0) aceOutf (ao, "-D Source_exons\n") ;
+		      aceOutf (ao, "Source_exons 1 %d CDS\n", dx) ;
 		    }
 
 		  for (j = i - 1, shadow2 = shadow - 1 ; j >= 0 &&  (! shadow2->mrna || shadow2->mrna == old) ; j--, shadow2--)  {} ;
@@ -3559,10 +3607,11 @@ static void parseGtfFile (SX *sx)
 	}
       else
 	{
-	  parseGtfFeature (sx, "cds",  ".cdsRemap",  0, TRUE,  mrna2gene) ; /* CDS */
+	  parseGtfFeature (sx, "CDS",  ".cdsRemap",  0, TRUE,  mrna2gene) ; /* CDS */
 	  parseGtfFeature (sx, "exon", ".mrnaRemap", 1, FALSE,  mrna2gene) ; /* mrna */
 	}
-      parseGtfFeature (sx, "pre_miRNA", ".mirnaRemap", 1, FALSE,  mrna2gene) ; /* mrna */
+      parseGtfFeature (sx, "pre_miRNA", ".pre_mirnaRemap", 1, FALSE,  mrna2gene) ; /* mrna */
+      parseGtfFeature (sx, "miRNA", ".mirnaRemap", 1, FALSE,  mrna2gene) ; /* mrna */
       parseGtfFeature (sx, "rRNA", ".rRNA", 1, FALSE,  mrna2gene) ; /* mrna */
       parseGtfFeature (sx, "tRNA", ".tRNA", 1, FALSE,  mrna2gene) ; /* mrna */
       parseGtfFeature (sx, "ncRNA", ".ncRNA", 1, FALSE,  mrna2gene) ; /* mrna */

@@ -10664,7 +10664,7 @@ static void wordFrequencyConstructTable (CLIPALIGN *pp)
 	  arrayMax (dna) = n = 0 ;
 	}
     }
-  wordFrequencyRegister (pp, dna) ;
+  if (n) wordFrequencyRegister (pp, dna) ;
   wordFrequencyReport (pp) ;
   wordFrequencyExport (pp) ;
   

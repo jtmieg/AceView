@@ -160,7 +160,7 @@ EOF
         #\rm -rf tmp.Sort.$target
       endif
     endif
-    # ATTENTION -gzo crashes on mouse (although it works on rat), we must gzip as a postpocessing, probbaly the files are too large
+    # ATTENTION -gzo crashes on mouse (although it works on rat), we must gzip as a postpocessing, probaly the files are too large
     if (-e  tmp/METADATA/gtf.$target.r.sponge.gz) then
       gunzip -c tmp/METADATA/gtf.$target.f.sponge.gz | gawk -F '\t' '{if($1==old)printf("Intron %s__%d_%d\n%s\nSupports %s\n\n",$3,a2+1,$4-1,target,$1);old=$1;a2=$5;}' target=$target > tmp/METADATA/gtf.$target.f.intron.ace
       gunzip -c tmp/METADATA/gtf.$target.r.sponge.gz | gawk -F '\t' '{if($1==old)printf("Intron %s__%d_%d\n%s\nSupports %s\n\n",$3,a2-1,$4+1,target,$1);old=$1;a2=$5;}' target=$target > tmp/METADATA/gtf.$target.r.intron.ace

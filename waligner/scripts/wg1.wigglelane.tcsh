@@ -15,8 +15,11 @@ endif
 
 set param="-O BV $out_step"
 set stranded=""
-if ($s == strand) set stranded="-strand"
-if ($s == antistrand) set stranded="-antistrand"
+if ($NO_INTRON == 0) then
+  set stranded=""
+  if ($s == strand) set stranded="-strand"
+  if ($s == antistrand) set stranded="-antistrand"
+endif
 
 echo "$run strand=$stranded $param"
 
@@ -39,7 +42,7 @@ cp scripts/target2target_class.txt $mytmp
 set remapon=""
 echo $Strategy
 echo RNAtargets="$RNAtargets"
-  if ($Strategy == RNA_seq && "$RNAtargets" != "") then
+  if ($Strategy == RNA_seq && $NO_INTRON == 0 && "$RNAtargets" != "") then
 echo hello1a
     if (-e tmp/METADATA/mrnaRemap.gz) then
       set remapon="  -mapon  tmp/METADATA/mrnaRemap.gz "
@@ -194,7 +197,7 @@ if ($Strategy == RNA_seq) set frs="f r ELF ELR ERF ERR"
 gzip  $mytmp/$lane/K.mapped.*.BV
 mv $mytmp/$lane/K.*.gz tmp/WIGGLELANE/$lane
 # optionally
-mv $mytmp/$lane/* tmp/WIGGLELANE/$lane
+# mv $mytmp/$lane/* tmp/WIGGLELANE/$lane
 
 end  # chrom/target
 

@@ -1725,6 +1725,7 @@
                            Corona
                 AceView UNIQUE Int
 		RefSeq UNIQUE Int
+                Eco UNIQUE Int
                 FlyBase UNIQUE Int
                 RvY UNIQUE Int
                 Magic UNIQUE Int
@@ -1800,6 +1801,7 @@
                            UCSC
                            EBI
                            Magic
+			   Eco
                            FlyBase
                 AceView UNIQUE Int
                 RefSeq UNIQUE Int
@@ -1835,6 +1837,7 @@
                            UCSC
                            EBI
                            Magic
+			   Eco
                            FlyBase
                    AceView UNIQUE Int
                    RefSeq UNIQUE Int
@@ -2597,6 +2600,7 @@
                             pg
                             RefSeq
                             magic
+			    Eco
                             FlyBase
                             UCSC
                             mito
@@ -3430,6 +3434,7 @@
                             Age UNIQUE Text
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
+              Replicate UNIQUE ?text
               Treatment UNIQUE  ?Text
               Genotype UNIQUE  ?Text
               Disease UNIQUE ?Disease XREF Sample ?Text
@@ -3524,6 +3529,7 @@
                             Age  Text
                             No_stage  // non applicable, example in Cell lines samples
           Bio Control UNIQUE  ?Text
+              Replicate UNIQUE ?text
               Treatment UNIQUE  ?Text
               Genes Gene ?Gene // XREF SRR UNIQUE ?Text
                     Gene_down ?Gene // XREF SRR_down UNIQUE ?Text
@@ -3727,6 +3733,10 @@
                       Genes_with_index_over_12 ?Target UNIQUE Int
                       Genes_with_index_over_15 ?Target UNIQUE Int
                       Genes_with_index_over_18 ?Target UNIQUE Int
+                      Genes_with_index_over_21 ?Target UNIQUE Int
+                      Genes_with_index_over_24 ?Target UNIQUE Int
+                      Genes_with_index_over_27 ?Target UNIQUE Int
+                      Genes_with_index_over_30 ?Target UNIQUE Int
 		      Genes_expressed_in_at_least_one_run  ?Target UNIQUE Int
                       mRNA_with_index ?Target UNIQUE Int
 		      mRNA_expressed_in_at_least_one_run  ?Target  UNIQUE Int
@@ -3745,6 +3755,8 @@
                       Intergenic_density UNIQUE Float UNIQUE Text 
                       Known_introns ?Target UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text 
                       Candidate_introns  ?Target UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text  UNIQUE Float UNIQUE Text UNIQUE Float
+		      Candidate_starts UNIQUE Int
+		      Candidate_ends UNIQUE Int
                       Accessible_length UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_8kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_5kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover

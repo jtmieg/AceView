@@ -17,6 +17,9 @@
  */
 
 /* %W% %G% */
+#define ARRAY_CHECK
+#define MALLOC_CHECK
+
 
 #include "acembly.h"
 #include "freeout.h"
@@ -12464,6 +12467,7 @@ static void cDNARealignGeneKeySet (KEYSET ks, BOOL doFuse, int locally, int sear
         continue ;
       searchGene = 0 ;
       cDNARealignGene (keySet(ksa, i), 0, 0, 0, doFuse, locally, searchRepeats, splitCloud) ;
+      messalloccheck() ;
       if (! ++k%30)
         { alignEst2Cosmid (0, 0, 0, 0, 9999, 0, 0, 0, 0, 0) ; }
       if (k == 200) /* check time every 200 genes */
@@ -16207,7 +16211,7 @@ void fMapcDNADoSelect (KEY k, KEYSET ks, KEYSET taceKs)
             if (!strcasecmp (cp, "-clean_killed_mRNA"))
               doClean_killed_mRNA = 1 ;
             if (!strcasecmp (cp, "-split_cloud"))
-              { doSplitCloud = 1 ; locally = 2 ; doFuse = FALSE ; }
+              { doSplitCloud = 2 ; locally = 2 ; doFuse = FALSE ; }
             if (!strcasecmp (cp, "-repeats"))
               searchRepeats = 1 ;
             if (!strcasecmp (cp, "-rubber"))

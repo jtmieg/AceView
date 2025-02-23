@@ -1387,7 +1387,7 @@ static BOOL bqlCheckVariableDeclarations (BQL *bql, NODE *node, int pass)
 	  vtxtPrintf (bql->errTxt, "// ... no pattern visible to the right of \'like\' or \'=~\' string matching request.\nPossibly your regexp involves [] or other symbols as in\n      x =~ a[bc].*\nand you should quote it or double quote it as in\n      x =~ \'a[bc].*\'\n") ;
 	  return FALSE ;
 	}
-      node->br = regExpCreate (cp0, FALSE, bql->h) ;
+      node->br = regExpCreate (cp0, bql->h) ; 
       if (! node->br)
 	{
 	  vtxtPrintf (bql->errTxt, "// ... bad no pattern found to the right of a LIKEREGEXP =~ operator, expecting a Unix regular expression, found %s", cp0) ;

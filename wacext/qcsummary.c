@@ -28,6 +28,8 @@ typedef struct qcStruct {
   const char *outFileName ;
   BOOL gzi, gzo ;
   BOOL hasSL ;
+  BOOL noIntron ;
+  BOOL hasCapture ;
   BOOL TT ; /* limit counts to targeted genes */
   const char *externalFiles ;
   Array eTitles, eAaa, eCaptions ;
@@ -149,7 +151,38 @@ static int qcShowTable (QC *qc, AC_TABLE tt, int nw)
 	    if (!strncasecmp (ccp, "sra", 3)) ccp += 3 ;
 	    if (!strcasecmp (ccp, "sraUnspecified_RNA"))
 	      continue ;
-	    aceOutf (qc->ao, "%s%s", nw++ ? ", " : "",  ccp) ;			  
+	    if (! jr)
+	      { /* reformat the stage to allow ordering in excell, Danielle, 2025_01_18 */
+		int n = 0 ;
+	        if (!strcmp (ccp, "EE")) n = 10 ;
+	        if (!strcmp (ccp, "L1")) n = 20 ;
+	        if (!strcmp (ccp, "L2")) n = 30 ;
+	        if (!strcmp (ccp, "L3")) n = 40 ;
+	        if (!strcmp (ccp, "L4")) n = 50 ;
+	        if (!strcmp (ccp, "YA")) n = 60 ;
+	        if (!strcmp (ccp, "OA")) n = 70 ;
+	        if (!strcmp (ccp, "Adult")) n = 80 ;
+	        if (!strcmp (ccp, "Mixed_stages")) n = 90 ;
+	        if (!strcmp (ccp, "Mixed_embryo")) n = 13 ;
+		if (!strcmp (ccp, "Embryo")) n = 12 ;
+	        if (!strcmp (ccp, "Molt")) n = 29 ;
+	        if (!strcmp (ccp, "Dauer")) n = 35 ;
+		if (n) aceOutf (qc->ao, "%d ", n) ;
+	      }
+	    switch (jr)
+	      {
+	      case 0:
+		if (nw) aceOut (qc->ao, "; ") ;
+		break ;
+	      case 1:
+		aceOut (qc->ao, ": ") ;
+		break ;
+	      default:
+		aceOut (qc->ao, ": ") ;
+		break ;
+	      }		
+	    aceOut (qc->ao, ccp) ;
+	    nw++ ;
 	  }
       }
   return nw ;
@@ -250,6 +283,24 @@ static void qcSetAli (QC *qc, RC *rc)
     { 0, 0, 0, 0, 0 }
   } ;
   rc->ali = ac_tag_obj (rc->run, "Ali", rc->h) ;
+  if (rc && rc->run && ! rc->srr) 
+    rc->srr = ac_tag_obj (rc->run, "SRR", rc->h) ;
+  if (rc && rc->run && ! rc->srx) 
+    rc->srx = ac_tag_obj (rc->run, "SRX", rc->h) ;
+  if (rc && rc->run && ! rc->srp) 
+    rc->srp = ac_tag_obj (rc->run, "SRP", rc->h) ;
+  if (rc && rc->run && ! rc->sample) 
+    rc->sample = ac_tag_obj (rc->run, "Sample", rc->h) ;
+  if (rc && !rc->srr  && rc->run && ac_has_tag (rc->run, "Sublibraries"))
+    {
+      AC_OBJ subrun = ac_tag_obj (rc->run, "Sublibraries", rc->h) ;
+      rc->srr = subrun ? ac_tag_obj (subrun, "SRR", rc->h) : 0 ;
+      if (!rc->srp)
+	rc->srp = subrun ? ac_tag_obj (subrun, "SRP", rc->h) : 0 ;
+      if (!rc->sample)
+	rc->sample = subrun ? ac_tag_obj (subrun, "Sample", rc->h) : 0 ;
+      ac_free (subrun) ;
+    }
 
   for (ti = tts ; ti->tag ; ti++)
     qcShowTag (qc, rc, ti) ;
@@ -270,41 +321,6 @@ static void qcSetAli (QC *qc, RC *rc)
   if (rc->var[T_Raw] == 0) rc->var[T_Raw] = rc->var[T_Read] +  rc->var[T_Rejected] ;
   if (rc->var[T_RawA] == 0) rc->var[T_RawA] = rc->var[T_Read] ;
   if (rc->var[T_RawKb] == 0) rc->var[T_RawKb] = rc->var[T_kb] ;
-
-
-
-  if (rc && rc->run && ! rc->srr) 
-    rc->srr = ac_tag_obj (rc->run, "SRR", rc->h) ;
-  if (rc && rc->run && ! rc->srx) 
-    rc->srx = ac_tag_obj (rc->run, "SRX", rc->h) ;
-  if (rc && rc->run && ! rc->srp) 
-    rc->srp = ac_tag_obj (rc->run, "SRP", rc->h) ;
-  if (rc && rc->run && ! rc->sample) 
-    rc->sample = ac_tag_obj (rc->run, "Sample", rc->h) ;
-
-  if (rc && !rc->srr  && rc->run && ac_has_tag (rc->run, "Sublibraries"))
-    {
-      AC_OBJ subrun = ac_tag_obj (rc->run, "Sublibraries", rc->h) ;
-      rc->srr = subrun ? ac_tag_obj (subrun, "SRR", rc->h) : 0 ;
-      if (!rc->srp)
-	rc->srp = subrun ? ac_tag_obj (subrun, "SRP", rc->h) : 0 ;
-      if (!rc->sample)
-	rc->sample = subrun ? ac_tag_obj (subrun, "Sample", rc->h) : 0 ;
-      ac_free (subrun) ;
-    }
-  if (rc && rc->srr && ! rc->srx) 
-    rc->srx = ac_tag_obj (rc->srr, "SRX", rc->h) ;
-  if (rc && rc->srr && ! rc->srp) 
-    rc->srp = ac_tag_obj (rc->srr, "SRP", rc->h) ;
-  if (rc && rc->srx && ! rc->srp) 
-    rc->srp = ac_tag_obj (rc->srx, "SRP", rc->h) ;
-  if (rc && rc->srx && ! rc->srr) 
-    rc->srr = ac_tag_obj (rc->srx, "SRR", rc->h) ;
-  if (rc && rc->srr && ! rc->sample) 
-    rc->sample = ac_tag_obj (rc->srr, "Sample", rc->h) ;
-
-
-
 } /* qcSetAli */
 
 /*************************************************************************************/
@@ -819,6 +835,7 @@ static void  qcStrandedness (QC *qc, RC *rc)
   for (ti = tts ; ti->tag ; ti++)
     {
       int nw = 0 ;
+      int readLn = 1 ;
       char buf[256] ;
       char buf2[256] ;
 
@@ -829,7 +846,12 @@ static void  qcStrandedness (QC *qc, RC *rc)
 	  cp = strchr (buf, ':') ;
 	  if (ti->col > 100)
 	    {
-	      aceOutf (qc->ao, "\t%s %s", ti->title, qc->Etargets[(((ti->col-1) % 100)%3) & 0x3]) ;
+	      int c = (((ti->col-1) % 100)%3) & 0x3 ;
+	      const char *E  = qc->Etargets[c] ;
+	      if (qc->noIntron)
+		E = (c == 0 ? "P_genome" : qc->Etargets[c+1]) ;
+	      if (E)
+		aceOutf (qc->ao, "\t%s %s", ti->title, E) ;
 	    }
 	  else if (!cp)
 	    aceOutf (qc->ao, "\t%s", buf) ;
@@ -867,9 +889,23 @@ static void  qcStrandedness (QC *qc, RC *rc)
 	      strncpy (buf, ti->title, 255) ;
 	      { char *cp = strchr (buf, ':') ;
 		if (cp) *cp = 0 ;
-	      } 
+	      }
+
 	      if (ti->col > 100)
-		strncpy (buf, qc->Etargets[(((ti->col-1) % 100) % 3) & 0x3], 255) ;
+		{
+		  int c = (((ti->col-1) % 100)%3) & 0x3 ;
+		  const char *E  = qc->Etargets[c] ;
+		  if (qc->noIntron)
+		    {
+		      if (c == 0)
+			readLn = 5 + 10 * (1000 *  rc->var[T_kb] / ( rc->var[T_Read] ?  rc->var[T_Read] : 1)) ;
+		      E = (c == 0 ? "P_genome" : qc->Etargets[c+1]) ;
+		    }
+		  if (E)
+		    strncpy (buf, E, 250) ;
+		  else
+		    break ;
+		}
 	      for (ir = 0 ; tt && ir < tt->rows; ir++)
 		{
 		  strncpy (buf2, ac_table_printable (tt, ir, 0, ""), 255) ;
@@ -893,7 +929,7 @@ static void  qcStrandedness (QC *qc, RC *rc)
 		      if (ti->format == F_p10)
 			aceOutPercent (qc->ao, 100.00 * uz/up) ;
 		      else
-			aceOutf (qc->ao, "%.2f", uz) ;
+			aceOutf (qc->ao, "%.2f", uz/readLn) ;
 		    }
 		}
 
@@ -1919,6 +1955,413 @@ static float qcShowGeneExp (QC *qc, AC_TABLE tt, const char *target, const char 
 
 /*************************************************************************************/
 
+static void qcProject (QC *qc, RC *rc)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  AC_TABLE  tt ;
+  const char *ccp ;
+  TT *ti, tts[] = {
+    { "Spacer", "", 0, 0, 0} ,
+    { "Compute", "Project", 40, 0, 0} ,
+    { "Compute", "Project abstract", 41, 0, 0} ,
+    { "Compute", "Project description", 42, 0, 0} ,
+    { "Author", "Laboratory, Author when available", 0, 0, 0} ,
+    { "Compute", "Reference", 6, 0, 0} ,    
+    { "Compute", "Design", 12, 0, 0} ,
+    { "Compute", "Sequencing protocol", 13, 0, 0} ,
+    {  "Paired_end", "Single or Paired end", 0, 0, 0} ,
+    { "Compute", "SRA date", 11, 0, 0} ,
+    
+   {  0, 0, 0, 0, 0}
+  } ; 
+
+  const char *caption =
+    "Project"
+    ;
+  if (rc == (void *) 1)
+    return  qcChapterCaption (qc, tts, caption) ;
+
+  if (rc && rc->run && ! rc->srr) 
+    rc->srr = ac_tag_obj (rc->run, "SRR", rc->h) ;
+  if (rc && rc->run && ! rc->srx) 
+    rc->srx = ac_tag_obj (rc->run, "SRX", rc->h) ;
+  if (rc && rc->run && ! rc->srp) 
+    rc->srp = ac_tag_obj (rc->run, "SRP", rc->h) ;
+  if (rc && rc->run && ! rc->sample) 
+    rc->sample = ac_tag_obj (rc->run, "Sample", rc->h) ;
+
+  for (ti = tts ; ti->tag ; ti++)
+    {
+      int nw = 0 ;
+      if (rc == 0)
+	{
+	  aceOutf (qc->ao, "\t%s", ti->title) ;
+	}
+       else if (! strcmp (ti->tag, "TITLE"))
+	{
+	  const char *ccp = ac_tag_printable (rc->run, "Title", 0) ;
+	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
+	  continue ;
+	}
+      else if (! strcmp (ti->tag, "Compute"))
+	{
+	  DICT *papDict = 0 ;
+
+	  aceOutf (qc->ao, "\t") ;
+	  switch (ti->col)
+	    {
+	    case 1000:  /* RunId */
+	      if (ac_has_tag (rc->run, "RunId"))
+		tt = ac_tag_table (rc->run, "RunId", h) ;
+	      else
+		tt = ac_keyset_table (ac_objquery_keyset (rc->run, ">Union_of ; >RunId", h), 0, 0, 0, h) ;
+	      if (tt && tt->rows) 
+		{
+		  if (tt->rows > 30)
+		    aceOutf (qc->ao, "%d > 300 runs, list skipped", tt->rows) ;
+		  else
+		    qcShowMultiTag (qc, tt) ; 
+		}
+	      else
+		aceOutf (qc->ao, "%s", ac_name (rc->run)) ;
+	      break ;
+	    case 1:  /* SRR */
+	      tt = ac_tag_table (rc->run, "SRR", h) ;
+	      if (! tt)
+		tt = ac_tag_table (rc->run, "SRX", h) ;
+	      if (! tt)
+		tt = ac_tag_table (rc->run, "sublibraries", h) ;
+	      if (! tt)
+		aceOutf (qc->ao, EMPTY) ;
+	      else 
+		qcShowMultiTag (qc, tt) ;
+	      break ;
+	    case 2:  /* Author */
+	      if (rc->srr)
+		{
+		  ccp = rc->run ? ac_tag_printable (rc->run, "Author", 0) : 0 ;
+		  if (! ccp) 
+		    ccp = rc->srr ? ac_tag_printable (rc->srr, "Magic_Author2", 0) : 0 ;
+		  if (! ccp) 
+		    ccp = rc->srr ? ac_tag_printable (rc->srr, "Author", EMPTY) : EMPTY ;
+		  aceOutf (qc->ao, "%s", ccp) ;
+		}
+	      else
+		{
+		  int nAuthor = 0 ;
+		  vTXT txt = vtxtHandleCreate (h) ;
+
+		  ccp = rc->run ? ac_tag_printable (rc->run, "Author", 0) : 0 ;
+		  if (ccp)
+		    {
+		      vtxtPrintf (txt, "%s", ccp) ;
+		      nAuthor++ ;
+		    }
+		   ccp = rc->run ? ac_tag_printable (rc->run, "Sequencing_laboratory", 0) : 0 ;
+		   if (ccp && (!nAuthor ||  ! strstr (vtxtPtr (txt), ccp)))
+		    {
+		      vtxtPrintf (txt, "%s%s"
+				  , nAuthor++ ? ", " : ""
+				  , ccp
+				  ) ;
+		    }
+		   ccp = rc->run ? ac_tag_printable (rc->run, "Nucleic_prep_author", 0) : 0 ;
+		   if (ccp && (!nAuthor ||  ! strstr (vtxtPtr (txt), ccp)))
+		    {
+		      vtxtPrintf (txt, "%s%s"
+				  , nAuthor++ ? ", " : ""
+				  , ccp
+				  ) ;
+		    }
+		   if (nAuthor)
+		     aceOutf (qc->ao, "%s", vtxtPtr (txt)) ;
+
+		   txt = vtxtHandleCreate (h) ;
+		   nAuthor = 0 ;
+		   ccp = ac_tag_printable (rc->run, "Submission_date", 0) ;
+		   if (ccp && (!nAuthor ||  ! strstr (vtxtPtr (txt), ccp)))
+		     {
+		       vtxtPrintf (txt, "%s%s"
+				   , nAuthor++ ? ", " : ""
+				   , ccp
+				   ) ;
+		     }		    
+		   ccp = ac_tag_printable (rc->run, "Library_date", 0) ;
+		   if (ccp && (!nAuthor ||  ! strstr (vtxtPtr (txt), ccp)))
+		     {
+		       vtxtPrintf (txt, "%s library prep %s"
+				   , nAuthor++ ? ", " : ""
+				   , ccp
+				   ) ;
+		     }		    
+		   ccp = ac_tag_printable (rc->run, "Sequencing_date", 0) ;
+		   if (ccp && (!nAuthor ||  ! strstr (vtxtPtr (txt), ccp)))
+		     {
+		       vtxtPrintf (txt, "%s Sequencing %s"
+				   , nAuthor++ ? ", " : ""
+				   , ccp
+				   ) ;
+		     }		    
+		   if (nAuthor)
+		     aceOutf (qc->ao, " [%s]", vtxtPtr (txt)) ;
+	
+		}	      
+	      break ;
+	    case 11:  /* Date */
+	      mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
+	      mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
+	      char buf25[25] ;
+	      if (d2 && d2 < d1) d1 = d2 ;
+	      if (d1)
+		aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+	      break ;
+	    case 3:  /* Species */
+	      ccp = rc->run ? ac_tag_printable (rc->run, "Species", EMPTY) : EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
+	      break ;
+	    case 13:  /* Sequencing protocol */
+	      tt = rc->srr ? ac_tag_table (rc->srr, "Nucleic_Acid_Extraction", h) : 0 ;
+	      if (! tt)
+		 tt = rc->srr ? ac_tag_table (rc->srr, "sraNucleic_Acid_Extraction", h) : 0 ;
+	      if (tt)
+		{
+		  DICT *dict = dictHandleCreate (128,h) ;
+		  int ir, jr ;
+		  for (ir = 0 ; ir < tt->rows ; ir++)
+		    for (jr = 0 ; jr < tt->cols ; jr++)
+		      {
+			ccp = ac_table_printable (tt, ir, jr, 0) ;
+			if (ccp && ! dictFind (dict, ccp, 0))
+			  {
+			    dictAdd (dict, ccp, 0) ;
+			    if (!strncasecmp (ccp, "sra", 3)) ccp += 3 ;
+			    if (!strcasecmp (ccp, "sraUnspecified_RNA"))
+			      continue ;
+			    aceOutf (qc->ao, "%s%s", nw++ ? ", " : EMPTY, ccp) ;			  
+			  }
+		      }
+		  ac_free (dict) ;
+		}
+	      ccp = rc->srr ? ac_tag_printable (rc->srr, "Annotated_strandedness", 0) : 0 ;
+	      if (ccp) 
+		aceOutf (qc->ao, ", %s", ccp) ;
+
+	      break ;
+
+	    case 12:  /* Design */
+	      ccp = rc->srx ?  ac_tag_printable (rc->srx, "Design", 0) : 0 ;
+	      if (ccp) 
+		{ aceOutf (qc->ao, "%s ", ccp) ; nw++ ; }
+	      ccp = rc->srx ?  ac_tag_printable (rc->srx, "Construction_protocol", 0) : 0 ;
+	      if (ccp) 
+		{ aceOut (qc->ao, ccp) ; nw++ ; }
+	      if (! nw) 
+		aceOut (qc->ao, EMPTY) ;
+	      break ;
+	      
+	    case 40:  /* SRP-Project */
+	      if (rc->srp) aceOutf (qc->ao, "%s", ac_name (rc->srp)) ;
+	      break ;
+	    case 41:  /* SRP-Project title */
+	      ccp = rc->srp ? ac_tag_printable (rc->srp, "Title", EMPTY) : EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
+	      break ;
+	    case 42:  /* SRP-Project description */
+	      ccp = rc->srp ? ac_tag_printable (rc->srp, "Abstract", EMPTY) : EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
+	      break ;
+	    case 6:  /* Reference */
+	      tt = rc->run ? ac_tag_table (rc->run, "Reference", h) : 0 ;
+	      if (!tt) tt = rc->srp ? ac_tag_table (rc->srp, "Reference", h) : 0 ; 
+	      if (tt)
+		{
+		  int ir ;
+		  for (ir = 0 ; ir < tt->rows ; ir++)
+		    {
+		      AC_OBJ pap = ac_table_obj (tt, ir, 0, h) ;
+		      if (! papDict)
+			papDict = dictHandleCreate (32, h) ;
+		      if (! dictAdd (papDict, ac_name(pap), 0))
+			continue ;			
+		      aceOutf (qc->ao, "%sPMID: %s", nw ? "; " : EMPTY, ac_name(pap)+(!strncmp( ac_name(pap),"pm",2) ? 2 : 0)) ;
+		      ccp = pap ? ac_tag_printable (pap, "Title", 0) : 0 ; 
+		      if (ccp) 
+			{ aceOutf (qc->ao, " : %s", ccp) ; nw++ ; }
+		      ccp = pap ? ac_tag_printable (pap, "Citation", 0) : 0 ;
+		      if (ccp) aceOutf (qc->ao, "%s%s", nw ? ", " : ": ", ccp) ;
+		      ccp = pap ? ac_tag_printable (pap, "Author", 0) : 0 ;
+		      if (ccp) 
+			{
+			  AC_TABLE tt1 = ac_tag_table (pap, "Author", h) ;
+			  aceOutf (qc->ao, ", %s", ccp) ;
+			  if (tt1 && tt1->rows > 1) aceOutf (qc->ao, " et al.") ;
+			}
+		    }
+		}
+	      tt = rc->srp ? ac_tag_table (rc->srp, "Reference", h) : 0 ; 
+	      if (tt)
+		{
+		  int ir ;
+		  for (ir = 0 ; ir < tt->rows ; ir++)
+		    {
+		      AC_OBJ pap = ac_table_obj (tt, ir, 0, h) ;
+		      if (! papDict)
+			papDict = dictHandleCreate (32, h) ;
+		      if (! dictAdd (papDict, ac_name(pap), 0))
+			continue ;			
+		      aceOutf (qc->ao, "%sPMID: %s", nw ? "; " : EMPTY, ac_name(pap)+(!strncmp( ac_name(pap),"pm",2) ? 2 : 0)) ;
+		      ccp = pap ? ac_tag_printable (pap, "Title", 0) : 0 ; 
+		      if (ccp) 
+			{ aceOutf (qc->ao, " : %s", ccp) ; nw++ ; }
+		      ccp = pap ? ac_tag_printable (pap, "Citation", 0) : 0 ;
+		      if (ccp) aceOutf (qc->ao, "%s%s", nw ? ", " : ": ", ccp) ;
+		      ccp = pap ? ac_tag_printable (pap, "Author", 0) : 0 ;
+		      if (ccp) 
+			{
+			  AC_TABLE tt1 = ac_tag_table (pap, "Author", h) ;
+			  aceOutf (qc->ao, ", %s", ccp) ;
+			  if (tt1 && tt1->rows > 1) aceOutf (qc->ao, " et al.") ;
+			}
+		    }
+		}
+	      tt = rc->srx ? ac_tag_table (rc->srx, "Reference", h) : 0 ; 
+	      if (tt)
+		{
+		  int ir ;
+		  for (ir = 0 ; ir < tt->rows ; ir++)
+		    {
+		      AC_OBJ pap = ac_table_obj (tt, ir, 0, h) ;
+		      if (! papDict)
+			papDict = dictHandleCreate (32, h) ;
+		      if (! dictAdd (papDict, ac_name(pap), 0))
+			continue ;			
+		      
+		      aceOutf (qc->ao, "%sPMID: %s", nw ? "; " : EMPTY, ac_name(pap)+(!strncmp( ac_name(pap),"pm",2) ? 2 : 0)) ;
+		      ccp = pap ? ac_tag_printable (pap, "Title", 0) : 0 ; 
+		      if (ccp) 
+			{ aceOutf (qc->ao, " : %s", ccp) ; nw++ ; }
+		      ccp = pap ? ac_tag_printable (pap, "Citation", 0) : 0 ;
+		      if (ccp) aceOutf (qc->ao, "%s%s", nw ? ", " : ": ", ccp) ;
+		      ccp = pap ? ac_tag_printable (pap, "Author", 0) : 0 ;
+		      if (ccp) 
+			{
+			  AC_TABLE tt1 = ac_tag_table (pap, "Author", h) ;
+			  aceOutf (qc->ao, ", %s", ccp) ;
+			  if (tt1 && tt1->rows > 1) aceOutf (qc->ao, " et al.") ;
+			}
+		    }
+		}
+	      tt = rc->srr ? ac_tag_table (rc->srr, "Reference", h) : 0 ; 
+	      if (tt)
+		{
+		  int ir ;
+		  for (ir = 0 ; ir < tt->rows ; ir++)
+		    {
+		      AC_OBJ pap = ac_table_obj (tt, ir, 0, h) ;
+		      if (! papDict)
+			papDict = dictHandleCreate (32, h) ;
+		      if (! dictAdd (papDict, ac_name(pap), 0))
+			continue ;			
+		      
+		      aceOutf (qc->ao, "%sPMID: %s", nw ? "; " : EMPTY, ac_name(pap)+(!strncmp( ac_name(pap),"pm",2) ? 2 : 0)) ;
+		      ccp = pap ? ac_tag_printable (pap, "Title", 0) : 0 ; 
+		      if (ccp) 
+			{ aceOutf (qc->ao, " : %s", ccp) ; nw++ ; }
+		      ccp = pap ? ac_tag_printable (pap, "Citation", 0) : 0 ;
+		      if (ccp) aceOutf (qc->ao, "%s%s", nw ? ", " : ": ", ccp) ;
+		      ccp = pap ? ac_tag_printable (pap, "Author", 0) : 0 ;
+		      if (ccp) 
+			{
+			  AC_TABLE tt1 = ac_tag_table (pap, "Author", h) ;
+			  aceOutf (qc->ao, ", %s", ccp) ;
+			  if (tt1 && tt1->rows > 1) aceOutf (qc->ao, " et al.") ;
+			}
+		    }
+		}
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+	      ac_free (papDict) ;
+	      break ;
+
+	    case 20:   /* sample */
+	      if (rc->sample)
+		{
+		  ccp = ac_tag_printable (rc->sample, "Title", 0) ;
+		  if (! ccp)
+		    ccp = ac_name (rc->sample) ;
+		}
+	      else
+		{
+		  ccp = ac_tag_printable (rc->run, "Sample", 0) ;
+		}
+	      if (! ccp) ccp = EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
+	      break ;
+	    case 7:   /* first line */
+	      ccp = ac_tag_printable (rc->run, "First_line", 0) ;
+	      if (! ccp) ccp = EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
+	      break ;
+	    case 21:   /* stage */
+	      tt = rc->sample? ac_tag_table (rc->sample, "Stage", h) : 0 ;
+	      nw = qcShowTable (qc, tt, 0) ;
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+	      break ;
+	    case 22:   /* system */
+	      tt = rc->sample? ac_tag_table (rc->sample, "Tissue", h) : 0 ;
+	      nw = qcShowTable (qc, tt, 0) ;
+	      tt = rc->sample? ac_tag_table (rc->sample, "Systm", h) : 0 ;
+	      nw += qcShowTable (qc, tt, nw) ;
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+              break ;
+	    case 23: /* bio */
+	      tt = rc->run ? ac_tag_table (rc->run, "CT", h) : 0 ;
+	      nw = qcShowTable (qc, tt, nw) ;
+	      tt = rc->run ? ac_tag_table (rc->run, "Bio", h) : 0 ;
+	      nw += qcShowTable (qc, tt, nw) ;
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+	      break ;
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+	      break ;
+	    case 24: /* sex */
+	      tt = rc->sample? ac_tag_table (rc->sample, "Sex", h) : 0 ;
+	      nw = qcShowTable (qc, tt, nw) ;
+	      if (! nw)
+		aceOutf (qc->ao, EMPTY) ;
+	      break ;
+	    }
+	}
+      else if (! strcmp (ti->tag, "Paired_end"))
+	{ 
+	  aceOutf (qc->ao, "\t") ;
+	  if (ac_has_tag (rc->run, "Is_run"))
+	    aceOutf (qc->ao, rc->Paired_end ? "Paired_end" : "Single-end") ;
+	  else
+	    {
+	      int n1, n2 ;
+	      n1 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ;>Runs ;   Paired_end", h)) ;
+	      n2 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ; ! Paired_end", h)) ;
+	      if (n1 > 0 && n2 > 0)
+		aceOutf (qc->ao, "Mix") ;
+	      else if (n1 > 0 && n2 == 0)
+		aceOutf (qc->ao, "Paired_end") ;
+	      else if (n1 == 0 && n2 > 0)
+		aceOutf (qc->ao, "Single-end") ;
+	    }
+	}
+      else
+	qcShowTag (qc, rc, ti) ;
+    }
+  ac_free (h) ;
+  return;
+}  /* qcProject */
+
+/*************************************************************************************/
+
 static void qcMainResults1 (QC *qc, RC *rc)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -1929,14 +2372,17 @@ static void qcMainResults1 (QC *qc, RC *rc)
     { "TITLE", "Title", 10, 0, 0} ,
     { "Compute", "Million raw reads", 20, 0, 0} ,  /* copied from qcBeforeAli */
     { "Compute", !qc->TT ? "Million reads aligned on any target by Magic" : "Million reads aligned on targeted genes" , 30, 0, 0 } , /* copied from qcAvLengthAli */
+    { "Compute", "Megabases sequenced", 57, 0, 0} ,
+    { "Compute", "Mb aligned on any target", 52, 0, 0 } , /* copied from qcAvLengthAli */
     { "Compute", "Average fragment multiplicity, high numbers reflect PCR amplification or very short reads", 40, 0, 0} ,  /* copied from qcBeforeAli */
     { "Compute", "Average read length after clipping adaptors and barcodes (nt)", 50, 0, 0 } , /* copied from qcAvLengthAli */
     { "Compute", "Average length aligned per read (nt)", 60, 0, 0 } , /* copied from qcAvLengthAli */
+    { "Compute", "Average length aligned per fragment (nt)", 61, 0, 0 } , /* copied from qcAvLengthAli */
     {  0, 0, 0, 0, 0}
   } ; 
   
   const char *caption =
-    "Reads, multiplicity and length"
+    "Reads, Megabases, multiplicity and length"
     ;
   if (rc == (void *) 1)
     return  qcChapterCaption (qc, tts, caption) ;
@@ -2013,7 +2459,30 @@ static void qcMainResults1 (QC *qc, RC *rc)
 	      ac_free (tt) ;
 	      break ;
 	      
-	    case 60: /* Million reads aligned on any target by magic */
+	    case 52: /* Million reads aligned on any target by magic */
+	      ccp = EMPTY ;
+	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+ 	      z = zb = zc = 0 ;
+ 	      if (tt)
+		for (ir = 0 ; tt && ir < tt->rows ; ir++)
+		  {
+		    ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+		    if (! strcasecmp (ccp, "any"))
+		      {
+			z = ac_table_float (tt, ir, 3, 0) ;
+			zb = ac_table_float (tt, ir, 5, 0) ;
+			zc = ac_table_float (tt, ir, 7, 0) ;
+		      }
+		  } 
+	      aceOutf (qc->ao, "\t%.3f", zb/1000) ; /* Mb aligned on any target */
+	      ac_free (tt) ;
+	      break ;
+
+	    case 57:
+	      aceOutf (qc->ao, "\t%.3f", rc->var[T_kb]/1000) ;   
+	      break ;
+
+	    case 60: /* Average length aligned per read */
 	      ccp = EMPTY ;
 	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
  	      z = zb = zc = 0 ;
@@ -2029,6 +2498,26 @@ static void qcMainResults1 (QC *qc, RC *rc)
 		      }
 		  } 
 	      aceOutf (qc->ao, "\t%.2f", zc) ;  /* average length aligned */
+	      ac_free (tt) ;
+	      break ;
+
+	    case 61: /* Average length aligned per fragment */
+	      ccp = EMPTY ;
+	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+ 	      z = zb = zc = 0 ;
+ 	      if (tt)
+		for (ir = 0 ; tt && ir < tt->rows ; ir++)
+		  {
+		    ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+		    if (! strcasecmp (ccp, "any1") || ! strcasecmp (ccp, "any2"))
+		      {
+			zc++ ;
+			z += ac_table_float (tt, ir, 3, 0) ;
+			zb += ac_table_float (tt, ir, 5, 0) ;
+		      }
+		  }
+	      if (zc > 0) z = 1000.0 * zb * zc / z ;
+	      aceOutf (qc->ao, "\t%.2f", z) ;  /* average length aligned per fragment */
 	      ac_free (tt) ;
 	      break ;
 	    }     
@@ -2048,7 +2537,7 @@ static void qcMainResults2 (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,  
     { "TITLE", "Title", 10, 0, 0} ,
-    { "Compute", "% Mb aligned on any target before clipping\t% length aligned on average before clipping", 54, 0, 0} , 
+    { "Compute", "% Mb aligned on any target", 54, 0, 0} , 
     { "Compute", "% length aligned after clipping adaptors and barcodes", 55, 0, 0 } ,
     { "Compute", "% Reads aligned on any target", 56, 0, 0 } ,
 
@@ -2095,14 +2584,7 @@ static void qcMainResults2 (QC *qc, RC *rc)
  		    }
  		} 
 
-	      aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned on any target before clipping */
-	      {
-		float z1 = rc->var[T_kb], z2 = 0 ;
-		AC_TABLE tt2 = ac_tag_table (rc->ali, "Unaligned", h) ;
-		z2 = tt2 ? ac_table_float (tt2, 0, 4,0) : 0 ; /* kb Unaligned */
-		aceOutf (qc->ao, "\t%.2f ", 100*zb/(z1 - z2)) ;  /* % length aligned on average before clipping */
-	      }
-	   
+	      aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned on any target after clipping */
 	      ac_free (tt) ;
 	      break ;
 
@@ -2480,6 +2962,10 @@ static void qcMainResults5 (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,  /* Quality features */
     { "TITLE", "Title", 10, 0, 0} ,
+    { "Ends", "Supported known starts", 41, 0, 0} , 
+    { "Ends", "Candidate starts", 42, 0, 0} ,
+    { "Ends", "Supported known ends", 43, 0, 0} ,
+    { "Ends", "Candidate ends", 44, 0, 0} ,
     { "Compute", "Supported known exon-exon junctions", 10, 0, 0} ,
     { "Compute", "Candidate new exon-exon junctions", 20, 0, 0} ,
     { "Compute", "Supports of known exon-exon junctions", 30, 0, 0} ,
@@ -2492,7 +2978,7 @@ static void qcMainResults5 (QC *qc, RC *rc)
   } ; 
 
   const char *caption =
-    "Exon junctions"
+    "Transcripts starts, transcripts ends, and exon junctions"
     ;
   float z10 = 0, z30 = 0 ;
   float zg = -1 ;
@@ -2538,6 +3024,19 @@ static void qcMainResults5 (QC *qc, RC *rc)
 	    z10 = z ;
 	  if (ti->col == 30)
 	    z30 = z ;
+	}
+      else if (! strcmp (ti->tag, "Ends"))
+	{
+	  int k = 0 ;
+	  switch (ti->col)
+	    {
+	    case 41: tag = "Known_starts" ; break ;
+	    case 42: tag = "Candidate_starts" ; break ;
+	    case 43: tag = "Known_ends" ; break ;
+	    case 44: tag = "Candidate_ends" ; break ;
+	    }
+	  k = ac_tag_int (rc->ali, tag, 0) ;
+	  aceOutf (qc->ao, "\t%d", k) ;
 	}
       else if (! strcmp (ti->tag, "Compute2"))
 	{
@@ -2624,18 +3123,13 @@ static void qcTitles (QC *qc, RC *rc)
     {  "Other_title", "Other title", 0, 0, 0} ,
     {  "Sorting_title", "Sorting_title 1", 0, 0, 0} ,
     {  "Sorting_Title_2", "Sorting title 2", 0, 0, 0} ,  
-    {  "Download error", "ERROR", 0, 0, 0} ,
-    { "Compute", "Sample (summarized from biosample or manual)", 20, 0, 0} ,
-    { "Compute", "Stage and experimental summary", 21, 0, 0} , 
-    { "Compute", "System or Tissue", 22, 0, 0} ,
-    { "Compute", "Bio", 23, 0, 0} ,
+    {  "ERROR", "Download error", 0, 0, 0} ,
+    /*    { "Compute", "Sample (summarized from biosample or manual)", 20, 0, 0} , */
+    { "Compute", "Stage", 21, 0, 0} , 
+    { "Compute", "Tissue, System or cell type", 22, 0, 0} ,
+    { "Compute", "Bio: control or treatment, genotype, number of replicates", 23, 0, 0} ,
     { "Compute", "Sex", 24, 0, 0} ,
-
-    { "Author", "Laboratory, Author when available, submission date", 0, 0, 0} ,
     { "Compute", "Species", 3, 0, 0} ,
-    { "Compute", "Project", 4, 0, 0} ,
-    { "Compute", "Project description", 5, 0, 0} ,
-    { "Compute", "Reference", 6, 0, 0} ,
    {  0, 0, 0, 0, 0}
   } ; 
 
@@ -2762,27 +3256,28 @@ static void qcTitles (QC *qc, RC *rc)
 	
 		}	      
 	      break ;
+	    case 11:  /* Date */
+	      mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
+	      mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
+	      char buf25[25] ;
+	      if (d2 && d2 < d1) d1 = d2 ;
+	      if (d1)
+		aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+	      break ;
 	    case 3:  /* Species */
 	      ccp = rc->run ? ac_tag_printable (rc->run, "Species", EMPTY) : EMPTY ;
 	      aceOutf (qc->ao, "%s", ccp) ;
 	      break ;
-	    case 4:  /* SRP-Project */
+	    case 40:  /* SRP-Project */
+	      if (rc->srp) aceOutf (qc->ao, "%s", ac_name (rc->srp)) ;
+	      break ;
+	    case 41:  /* SRP-Project title */
 	      ccp = rc->srp ? ac_tag_printable (rc->srp, "Title", EMPTY) : EMPTY ;
 	      aceOutf (qc->ao, "%s", ccp) ;
-	      if (rc->srp) aceOutf (qc->ao, "[%s]", ac_name (rc->srp)) ;
 	      break ;
-	    case 5:  /* SRP-Project description */
-	      {
-		AC_OBJ lt = rc->srp ? ac_tag_obj (rc->srp, "Abstract", h) : 0 ;
-
-		ccp = 0 ;
-		ccp = lt ? ac_longtext (lt, h) : 0 ;
-		if (! ccp || !strcmp (ccp, "NA"))
-		  ccp = rc->srp ? ac_tag_printable (rc->srp, "Description", EMPTY) : EMPTY ;
-
-		aceOutf (qc->ao, "%s", ccp) ;
-		ac_free (lt) ;
-	      }
+	    case 42:  /* SRP-Project description */
+	      ccp = rc->srp ? ac_tag_printable (rc->srp, "Abstract", EMPTY) : EMPTY ;
+	      aceOutf (qc->ao, "%s", ccp) ;
 	      break ;
 	    case 6:  /* Reference */
 	      tt = rc->run ? ac_tag_table (rc->run, "Reference", h) : 0 ; 
@@ -2922,16 +3417,18 @@ static void qcTitles (QC *qc, RC *rc)
 		aceOutf (qc->ao, EMPTY) ;
 	      break ;
 	    case 22:   /* system */
-	      tt = rc->sample? ac_tag_table (rc->sample, "Systm", h) : 0 ;
-	      nw = qcShowTable (qc, tt, 0) ;
 	      tt = rc->sample? ac_tag_table (rc->sample, "Tissue", h) : 0 ;
+	      nw = qcShowTable (qc, tt, 0) ;
+	      tt = rc->sample? ac_tag_table (rc->sample, "Systm", h) : 0 ;
 	      nw += qcShowTable (qc, tt, nw) ;
 	      if (! nw)
 		aceOutf (qc->ao, EMPTY) ;
               break ;
 	    case 23: /* bio */
-	      tt = rc->sample? ac_tag_table (rc->sample, "Bio", h) : 0 ;
+	      tt = rc->run ? ac_tag_table (rc->run, "CT", h) : 0 ;
 	      nw = qcShowTable (qc, tt, nw) ;
+	      tt = rc->run ? ac_tag_table (rc->run, "Bio", h) : 0 ;
+	      nw += qcShowTable (qc, tt, nw) ;
 	      if (! nw)
 		aceOutf (qc->ao, EMPTY) ;
 	      break ;
@@ -2955,7 +3452,6 @@ static void qcTitles (QC *qc, RC *rc)
 
 /*************************************************************************************/
 
-
 static void qcProtocol (QC *qc, RC *rc)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -2966,8 +3462,6 @@ static void qcProtocol (QC *qc, RC *rc)
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
 
-    { "Compute", "Sequencing protocol", 10, 0, 0} ,
-    { "Compute", "Design", 11, 0, 0} ,
     { "Compute", "Sequencing platform and Machine type", 12, 0, 0} ,
     {  "Compute", "Experiment type", 1, 0, 0} ,
     {  "Compute", "Sequencing_date" , 13, 0, 0} ,
@@ -2980,7 +3474,6 @@ static void qcProtocol (QC *qc, RC *rc)
 
     /* {  "Machine", "Machine", 0, 0, 0} , */
    /*   {  "Compute", "Strand", 12, 0, 0} , */
-    {  "Paired_end", "Single or Paired end", 0, 0, 0} ,
     {  0, 0, 0, 0, 0}
   } ; 
 
@@ -3041,45 +3534,6 @@ static void qcProtocol (QC *qc, RC *rc)
 		}
 	      else
 		 aceOutf (qc->ao, EMPTY) ;
-	      break ;
-	    case 10:  /* Stranded paired end */
-	      tt = rc->srr ? ac_tag_table (rc->srr, "Nucleic_Acid_Extraction", h) : 0 ;
-	      if (! tt)
-		 tt = rc->srr ? ac_tag_table (rc->srr, "sraNucleic_Acid_Extraction", h) : 0 ;
-	      if (tt)
-		{
-		  DICT *dict = dictHandleCreate (128,h) ;
-		  int ir, jr ;
-		  for (ir = 0 ; ir < tt->rows ; ir++)
-		    for (jr = 0 ; jr < tt->cols ; jr++)
-		      {
-			ccp = ac_table_printable (tt, ir, jr, 0) ;
-			if (ccp && ! dictFind (dict, ccp, 0))
-			  {
-			    dictAdd (dict, ccp, 0) ;
-			    if (!strncasecmp (ccp, "sra", 3)) ccp += 3 ;
-			    if (!strcasecmp (ccp, "sraUnspecified_RNA"))
-			      continue ;
-			    aceOutf (qc->ao, "%s%s", nw++ ? ", " : EMPTY, ccp) ;			  
-			  }
-		      }
-		  ac_free (dict) ;
-		}
-	      ccp = rc->srr ? ac_tag_printable (rc->srr, "Annotated_strandedness", 0) : 0 ;
-	      if (ccp) 
-		aceOutf (qc->ao, ", %s", ccp) ;
-
-	      break ;
-
-	    case 11:  /* Design */
-	      ccp = rc->srx ?  ac_tag_printable (rc->srx, "Design", 0) : 0 ;
-	      if (ccp) 
-		{ aceOutf (qc->ao, "%s ", ccp) ; nw++ ; }
-	      ccp = rc->srx ?  ac_tag_printable (rc->srx, "Construction_protocol", 0) : 0 ;
-	      if (ccp) 
-		{ aceOut (qc->ao, ccp) ; nw++ ; }
-	      if (! nw) 
-		aceOut (qc->ao, EMPTY) ;
 	      break ;
 	    case 12:  /* Machine */
 	      aks = ac_objquery_keyset (rc->run, "{Machine} SETOR {>sublibraries; Machine}", h) ;
@@ -3186,24 +3640,6 @@ static void qcProtocol (QC *qc, RC *rc)
 	    qcShowMultiTag (qc, tt) ;
 	  else
 	    aceOutf (qc->ao, EMPTY) ;
-	}
-      else if (! strcmp (ti->tag, "Paired_end"))
-	{ 
-	  aceOutf (qc->ao, "\t") ;
-	  if (ac_has_tag (rc->run, "Is_run"))
-	    aceOutf (qc->ao, rc->Paired_end ? "Paired_end" : "Single-end") ;
-	  else
-	    {
-	      int n1, n2 ;
-	      n1 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ;>Runs ;   Paired_end", h)) ;
-	      n2 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ; ! Paired_end", h)) ;
-	      if (n1 > 0 && n2 > 0)
-		aceOutf (qc->ao, "Mix") ;
-	      else if (n1 > 0 && n2 == 0)
-		aceOutf (qc->ao, "Paired_end") ;
-	      else if (n1 == 0 && n2 > 0)
-		aceOutf (qc->ao, "Single-end") ;
-	    }
 	}
       else
 	qcShowTag (qc, rc, ti) ;
@@ -3869,6 +4305,7 @@ static void qcOther (QC *qc, RC *rc)
 /* captured genes */
 static void qcCapture (QC *qc, RC *rc)
 {
+  if (! qc->hasCapture) return ;
   AC_HANDLE h = ac_new_handle () ;
   AC_TABLE tt1 = 0, ttAli = 0 ;
   TT *ti, tts[] = {
@@ -4484,10 +4921,9 @@ static void qcGeneExpression1 (QC *qc, RC *rc)
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
  
-    { "Compute1", "Number of %s genes\tNumber of %s genes touched\t%s genes significantly expressed\t%s genes with expression index >= 10 (sFPKM >= 1)\t%s genes with index >= 12  (sFPKM >= 4)\t%s genes with index >= 15 (sFPKM >= 32)\t%s genes with index >= 18 (sFPKM >= 256)\tReads in %s genes\tReads in pairs in %s genes\tOrphan reads in %s genes\tMulti-aligned reads in %s genes\tMismatches in %s genes\tA>G in %s genes",  100, 0, 0 },
-
-
-    {  0, 0, 0, 0, 0}
+    { "Compute1", "Number of %s genes touched\t%s genes significantly expressed\t%s genes with expression index >= 10 (sFPKM >= 1)\t%s genes with index >= 12  (sFPKM >= 4)\t%s genes with index >= 15 (sFPKM >= 32)\t%s genes with index >= 18 (sFPKM >= 256)\t%s genes with index >= 21 (sFPKM >= 2k)",  100, 0, 0 },
+    /* %s genes with index >= 24 (sFPKM >= 16k)\t%s genes with index >= 27 (sFPKM >= 128k)\t%s genes with index >= 30 (sFPKM >= 1M) */
+    { 0, 0, 0, 0, 0}
   }; 
 
   const char *caption =
@@ -4531,12 +4967,6 @@ static void qcGeneExpression1 (QC *qc, RC *rc)
 	      if (qc->TT)
 		target2 = hprintf (h, "Captured_%s", target) ;
 	      aceOutf (qc->ao, buf
-		       , qc->TT ? "targeted ": ""
-		       , target2
-		       , target2
-		       , target2
-		       , target2
-		       , target2
 		       , target2
 		       , target2
 		       , target2
@@ -4561,19 +4991,29 @@ static void qcGeneExpression1 (QC *qc, RC *rc)
 	  const char *tag, *target = qc->Etargets [0] ;
 
 	  tt = ac_tag_table (rc->ali, "Gene_expression" , h) ;
-	  tag = "Targeted_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  /*	  tag = "Targeted_genes" ; qcShowGeneExp (qc, tt, target, tag) ; */
 	  tag = "Genes_touched" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Genes_with_index" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Genes_with_index_over_10" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Genes_with_index_over_12" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Genes_with_index_over_15" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Genes_with_index_over_18" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Reads_in_pairs_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Orphan_reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Multi_aligned_reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Mismatches_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "A2G_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  tag = "Genes_with_index_over_21" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  /*
+	    tag = "Genes_with_index_over_24" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Genes_with_index_over_27" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Genes_with_index_over_30" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  
+	    suppressed 6 columns 2025_02_06
+	    \tReads in %s genes\tReads in pairs in %s genes\tOrphan reads in %s genes\tMulti-aligned reads in %s genes\tMismatches in %s genes\tA>G in %s genes
+
+	    tag = "Reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Reads_in_pairs_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Orphan_reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Multi_aligned_reads_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "Mismatches_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	    tag = "A2G_in_genes" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  */
 	}
       else
 	qcShowTag (qc, rc, ti) ;
@@ -5751,9 +6191,10 @@ static void qcDrosoZhenXia (QC *qc, RC *rc)
 
 /*************************************************************************************/
 
-static const char *allMethods = "S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
+static const char *allMethods = "0S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
 static MM methods [] = {
   {'S', &qcSortingTitles} ,
+  {'0', &qcProject} ,
   {'1', &qcMainResults1} ,
   {'2', &qcMainResults2} ,
   {'3', &qcMainResults3} ,
@@ -5869,8 +6310,10 @@ static int qcGetEtargets (QC *qc)
   AC_HANDLE h = ac_new_handle () ; 
   const char *ccp, *ccq ;
   int n = 0 ;
-
+  
   memset (qc->Etargets, 0, sizeof (qc->Etargets)) ;
+  ccp = getenv ("NO_INTRON") ;
+  if (ccp && *ccp == '1') qc->noIntron = TRUE ;
   ccp = getenv ("Etargets") ;
   fprintf (stderr, "etargets = %s", ccp ? ccp : "NA") ; 
   if (! ccp || ! *ccp) ccp = "av" ;
@@ -5959,6 +6402,9 @@ static int qcGetRuns (QC *qc)
 		      run2 = ac_objquery_obj (run, "COUNT {>ali; SLS == SL*} > 0", h1) ;
 		      if (run2 )
 			qc->hasSL = TRUE ;		      
+		      run2 = ac_objquery_obj (run, "COUNT {>ali; Capture} > 0", h1) ;
+		      if (run2 )
+			qc->hasCapture = TRUE ;		      
 		    }
 		  else
 		    ac_free (h1) ;

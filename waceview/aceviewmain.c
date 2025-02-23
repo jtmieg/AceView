@@ -66,7 +66,8 @@ static DBCF dbConfig[] =
 
   { "coli", 'c'     , VERSION , "ace01", 2342001, "coli",                  "June 2015" } ,
   
-  { "debug", 'h'     , VERSION , "acedev01", 12345, "worm",                  "April 2007" } ,
+  { "debug", 'h'     , VERSION , "acedev01", 12345, "worm",                  "Jan 2025" } ,
+  { "droso", 'h'     , VERSION , "acedev01", 54321, "droso",                  "Jan 2025" } ,
 
   { "test01", 'h'     , VERSION , "ace01", 12345, "human",                  "Aug 2010" } , 
   { "test31", 'h'     , VERSION , "ace31", 12345, "human",                  "April 2007" } ,

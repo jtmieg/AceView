@@ -47,11 +47,11 @@
 #define DEF_REGULAR_H
 
 
-/*
-#define MEM_DEBUG 
-#define MALLOC_CHECK 
-#define ARRAY_CHECK 
-*/
+
+/* #define MEM_DEBUG  */
+/* #define MALLOC_CHECK  */
+/* #define ARRAY_CHECK */
+
 				/* library EXPORT/IMPORT symbols */
 #if defined (WIN32)
 #include "win32libspec.h"  /* must come before mystdlib.h...*/

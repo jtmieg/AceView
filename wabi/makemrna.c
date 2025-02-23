@@ -2273,7 +2273,7 @@ void mrnaAnalyseClusterAllPg (char *cp)
             continue ;
           if (a2 < h2->a2) a2 = h2->a2 ;
           same = FALSE ;
-          for (k = i ; k < j ; k++)
+          for (k = i ; 0 && k < j ; k++) /* Ecoli identical coordinates yet count as distinct */
             { 
               h3 = arrp (allTg, k, HIT) ;
               if (h3->cDNA_clone != master)
@@ -9670,6 +9670,8 @@ static int mrnaDoAddFirstMet (KEY mrna, KEY product, int x1, int x2
   strcpy (ntgType, "...NNN.") ;
   *cdsp = *u3p = *u5p = 0 ; *bp = FALSE ;
   if (!dna)
+    goto abort ;
+  if (arrayMax(dna) < x2)
     goto abort ;
   if ((x2 - x1 + 1) % 3)
     {

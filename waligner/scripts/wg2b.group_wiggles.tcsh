@@ -58,7 +58,7 @@ if (! -e $out/wg2b.done) then
           endif
         endif
       end
-      echo "ok=$ok"
+      echo "ok=$ok uu=$uu"
       if ($ok == 1) then
           # contruct the combined wiggles
         if (-e  $out/$fr.$uu.genes.list) then
@@ -96,6 +96,41 @@ if (! -e $out/wg2b.done) then
     endif
   
   end
+
+
+    set WG=WIGGLEGROUP
+    set tt=tmp/$WG/$group/projected.stranding.tsf
+    echo '#' > $tt
+    echo '#' > $tt.1
+      set ok=0
+      foreach chrom ($chromSetAll)
+        set sBV=TARGET/CHROMS/$chrom.stranding.BV
+	if (! -e $sBV) continue
+        set wf=tmp/$WG/$group/$chrom/R.chrom.u.f.BF.gz
+        set wr=tmp/$WG/$group/$chrom/R.chrom.u.r.BF.gz
+	if (! -e $wf || ! -e $wr) continue
+        bin/wiggle -i $wf -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tf\tii\t%d\t0\n",$1,$2);}' > $tt.a
+        bin/wiggle -i $wr -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tr\tii\t0\t%d\n",$1,$2);}' > $tt.b
+        cat $tt.a $tt.b | bin/tsf -I tsf -O tsf -s ns >$tt.c
+
+        if (0) then   # do this once using run==the stranded group
+          cat $tt.c | gawk -F '\t' '/^#/{next;}{x=$1;p=($4+20)/($4+$5+20);q=int(100*p);printf("%d\t%d\n",x,q);}' > $tt.d
+	  cat $tt.d | gawk '{p=$2;if(p>90 || p < 10) print;}' > $sBV
+        endif
+	
+        cat $sBV $tt.c | gawk -F '\t' '/^#/{next}{if(NF==2){pp[$1]=2*($2-50);next;}}{p=pp[$1];if(p>97){sp+=$4;sm+=$5;};if(p<-97){sp+=$5;sm+=$4;}}END{printf("%s\t%s\tiif\t%d\t%d\t%.2f\n",run,chrom,sp,sm,100*sp/(sp+sm+.001));}' run=$group chrom=$chrom >> $tt.1
+	set ok=1
+	\rm $tt.a $tt.b $tt.c
+      end
+    if ($ok == 1) then
+      bin/tsf -I tsf -O tsf  -i $tt.1 -s any | gawk -F '\t' '/^#/{next;}{sp=$4;sm=$5;printf("%s\tP_genome\tiif\t%d\t%d\t%.3f\n",run,sp,sm,100*sp/(sp+sm+.001));}' run=$group >> $tt
+      \rm $tt.1
+    endif
+
+
+    echo "Construct the transcriptsEnds  $WG/$group"
+    echo "  bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5"
+            bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5
 
 endif
 

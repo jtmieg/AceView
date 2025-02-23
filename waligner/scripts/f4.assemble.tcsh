@@ -45,7 +45,7 @@ EOF
       quit
     save
     acembly
-      cdna_71
+      cdna_71 -split_cloud
       quit
     save
 
@@ -113,15 +113,17 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
      key  tmp/X.$MAGIC/$chrom/f4.killEchoIntron.tg.list
      acem
-        cdna_73
+        cdna_73 -split_cloud
         quit
      query find mrna DNA:2 > 10000 ; > from_gene
      acem
-        cdna_73 // 2017_03_11 a hack to rm stupid extra long empty exons
+        cdna_73 -split_cloud // 2017_03_11 a hack to rm stupid extra long empty exons
         quit
      save
      find clone
      list -a -f tmp/X.$MAGIC/$chrom/f4.killEchoIntron.done
+     query find transcribed_gene Intron
+     list -a -f f4.spliced_tg.list
      quit
 EOF
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
@@ -133,6 +135,18 @@ touch  tmp/X.$MAGIC/$chrom/f4.assemble.done
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 exit 0  # Composite case, exit now, no need for the complications below
 
+foreach chrom ($chromSetAll)
+  bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
+     query find transcribed_gene Intron
+     list -a -f tmp/X.$MAGIC/$chrom/f4.spliced_tg.list
+     query find predicted_gene Intron ; >model_of
+     list -a -f tmp/X.$MAGIC/$chrom/f4.spliced_pg.list
+     quit
+EOF
+end
+
+wc tmp/X.$MAGIC/*/f4.spliced_pg.list
+wc tmp/X.$MAGIC/*/f4.spliced_tg.list
 
 # suspect 1 finds reverse read starting inside the ORF
 # suspect 2 finds forward polyA read endding inside the ORF
@@ -165,7 +179,7 @@ pushd tmp/X.$MAGIC/$chrom
     edit -D Flipped
     query find tg ct_ac
     acem
-      cdna_73  // restore missing flags gt_ag in est
+      cdna_73  -split_cloud // restore missing flags gt_ag in est
       quit
     comment "FlipAllGenes"
     acembly
@@ -177,7 +191,7 @@ pushd tmp/X.$MAGIC/$chrom
     query follow from_gene
     comment "realign, will kill all the non_best_mrna and resize"
     acem
-      cdna_73 // will kill all the non_best_mrna and resize and fuse a first time
+      cdna_73 -split_cloud // will kill all the non_best_mrna and resize and fuse a first time
       quit 
     find tg
     comment cDNA_Flag_suspected_internal_deletion
@@ -187,7 +201,7 @@ pushd tmp/X.$MAGIC/$chrom
     query find tg to_be_fused_with
     comment "fuse_genes"
     acem
-      cdna_73 // -locally incompatible avec to_be_fused_with
+      cdna_73 -split_cloud // -locally incompatible avec to_be_fused_with
       quit
     query find mrna NOT from_gene
     spush
@@ -245,14 +259,16 @@ EOF
     quit
 EOF
 
+if (0) then
   $ici/bin/tacembly . << EOF
     find transcribed_gene
     acem
-      cdna_71
+      cdna_71 -split_cloud
       quit
     save
     quit
 EOF
+endif
 
 popd
 

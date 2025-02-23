@@ -63,8 +63,8 @@ typedef struct compareStruct {
 
 typedef struct rcStruct { 
   int run, runid, sample, machine, title, otherTitle, sortingTitle, sortingTitle2, nRuns ; 
-  int Genes_with_index,  Genes_with_reliable_index,  Genes_with_one_reliable_index, Genes_with_index_over_8, Genes_with_index_over_10, Genes_with_index_over_12, Genes_with_index_over_15, Genes_with_index_over_18 ;
-  int captured_genes_with_index,  captured_genes_with_reliable_index,  captured_genes_with_one_reliable_index, captured_genes_with_index_over_8, captured_genes_with_index_over_10, captured_genes_with_index_over_12, captured_genes_with_index_over_15, captured_genes_with_index_over_18 ;
+  int Genes_with_index,  Genes_with_reliable_index,  Genes_with_one_reliable_index, Genes_with_index_over_8, Genes_with_index_over_10, Genes_with_index_over_12, Genes_with_index_over_15, Genes_with_index_over_18, Genes_with_index_over_21, Genes_with_index_over_24, Genes_with_index_over_27, Genes_with_index_over_30 ;
+  int captured_genes_with_index,  captured_genes_with_reliable_index,  captured_genes_with_one_reliable_index, captured_genes_with_index_over_8, captured_genes_with_index_over_10, captured_genes_with_index_over_12, captured_genes_with_index_over_15, captured_genes_with_index_over_18, captured_genes_with_index_over_21, captured_genes_with_index_over_24, captured_genes_with_index_over_27, captured_genes_with_index_over_30 ;
   double Low_index, zeroIndex, NA_crossover_index, geneTags, genomicKb, intergenicKb, intergenicDensity, targetKb, prunedTargetKb, bigGenesKb, capturedBigGenesKb, anyTargetKb, X2, alpha, beta1, beta2, fineTune ; 
   double seqs, tags, kb ;
   double captured_seqs, captured_tags, captured_kb ;
@@ -200,7 +200,7 @@ typedef struct gxStruct {
   float ratio_bound, minVariance ;
   float genomeLengthInKb ;
   int histo_shifting, maxGenePlus ;
-  BOOL isINTRON, isTranscript, isSNP, isMRNAH, isMicroRNA, keepIndex, medianCenter, noHisto, exportDiffGenes, hasSelectedVariance, skipEmptyGenes ;
+  BOOL isINTRON, isTranscript, isSNP, isMRNAH, isMicroRNA, keepIndex, medianCenter, noHisto, exportDiffGenes, hasSelectedVariance, skipEmptyGenes, deepTsf ;
   BOOL hasRunId, hasRunSample, hasMachine, hasRunTitle, hasRunOtherTitle, hasRunSortingTitle, hasRunSortingTitle2, hasGroup, hasCompare, hasTitration ;
   BOOL hasGeneAffy, hasGeneId, hasGeneModel, hasGeneNm, hasGeneType, hasGeneTitle, hasGeneAlias, hasGeneLength, hasGeneBoxLength,hasGeneChrom, hasIntronType, hasIntronShared,hasKnownDonorAcceptor,hasFromGene, hasFromTranscript, hasRefSeqAv, hasGoodProduct, hasCapture, hasCaptureTouch ;
   BOOL hasAccessibleLength ;
@@ -2459,6 +2459,124 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 
   return nn ;
 } /* gxAceParse */
+
+/*************************************************************************************/
+/* parse the procaryote tsf file run->deep and run->Length */
+static int gxDeepTsfParse (GX *gx, const char* fileName,BOOL metaData)
+{
+  AC_HANDLE h = ac_new_handle () ; 
+  ACEIN ai ; 
+  Array aa ;
+  int nn = 0, gene, run, a1, a2 ;
+  float tags, kb ;
+  const char *ccp ;
+  DC *dc = 0 ;  
+  RC *rc = 0 ;
+  GC *gc = 0 ;
+
+  /*   Stack buf = stackHandleCreate (1000,h) ; */
+  DICT *markerSelectDict = 0 ;
+  DICT *markerRejectDict = 0 ;
+
+  if (gx->markerSelectFileName)
+    {
+      ai = aceInCreate (gx->markerSelectFileName, gx->gzi, h) ;
+      markerSelectDict = dictHandleCreate (10000, h) ;
+      while (aceInCard (ai)) 
+	{ 
+	  ccp = aceInWord (ai) ;
+	  if (ccp) dictAdd (markerSelectDict, ccp, 0) ;
+	}
+
+      ac_free (ai) ;
+    }
+  if (gx->markerRejectFileName)
+    {
+      ai = aceInCreate (gx->markerRejectFileName, gx->gzi, h) ;
+      markerRejectDict = dictHandleCreate (10000, h) ;
+      while (aceInCard (ai)) 
+	{ 
+	  ccp = aceInWord (ai) ;
+	  if (ccp) dictAdd (markerRejectDict, ccp, 0) ;
+	}
+
+      ac_free (ai) ;
+    }
+
+
+  ai = aceInCreate (fileName, gx->gzi, h) ;
+  if (! ai)
+    messcrash ("cannot open input file -deep %s", fileName ? fileName : "stdin") ;
+  aceInSpecial (ai, "\"\n\t") ;
+
+  while (aceInCard (ai)) 
+    { /* parse the tsf file */
+      ccp = aceInWord (ai) ; /* gene */
+      if (!ccp || *ccp == '#' || *ccp == '/') continue ;
+
+      if (gx->maskDict &&  dictFind (gx->maskDict, ccp, 0))
+	continue ;
+      if (gx->keepIndex && gx->userGivenGenePlusMinusDict && ! dictFind (gx->userGivenGenePlusMinusDict, ccp, 0))
+	continue ;
+      if (markerSelectDict && ! dictFind(markerSelectDict, ccp, 0))
+	continue ;
+      if (markerRejectDict && dictFind(markerRejectDict, ccp, 0))
+	continue ;
+
+      dictAdd (gx->geneDict, ccp, &gene) ;
+      gc = arrayp (gx->genes, gene, GC) ; /* make room */
+
+      ccp = aceInWord (ai) ; /* run */
+      if (! ccp) continue ;
+      
+      run = 0 ;
+      if (! gx->runListFileName)
+	dictAdd (gx->runDict, ccp, &run) ;
+      else
+	dictFind (gx->runDict, ccp, &run) ;
+      if (run <= 0)
+	continue ;
+
+      rc = arrayp (gx->runs, run, RC) ;
+      rc->cumulDone = TRUE ;
+      aa = rc->aa ;
+      if (! aa)
+	aa = rc->aa = arrayHandleCreate (50000, DC, gx->h) ;
+
+
+      ccp = aceInWord (ai) ; /* format  ignore */
+      ccp = aceInWord (ai) ; /* chrom  ignore */
+      aceInInt (ai, &a1) ;   /* gene coordinates ignore */
+      aceInInt (ai, &a2) ;   /* gene coordinates ignore */
+
+      aceInFloat (ai, &kb) ; /* kb */
+      nn++ ;
+      dc = arrayp (aa, gene, DC) ;
+      tags = 10 * kb ; /* assume 100 bases */
+      dc->seqs += tags ;
+      dc->tags += tags ;
+      dc->kb += kb ;
+
+      rc->geneTags += tags ;
+      rc->nReads += tags ;
+      rc->nReadsOk += tags ;
+      rc->kb += kb ;
+
+      gc->tags += tags ;
+      if (gc->capturedIntronGene)
+	rc->captured_tags += tags ;
+      gc->isGood = TRUE ;
+      if (tags) rc->hasData = TRUE ;
+
+    }
+  {
+    int mx ;
+    messAllocMaxStatus (&mx) ;   
+    fprintf (stderr, ", %s\tmax memory %d Mb\n", timeShowNow(), mx) ;
+  }
+
+  return nn ;
+} /* gxDeepTsfParse */
 
 /*************************************************************************************/
 
@@ -4790,6 +4908,10 @@ static void gxNumberOfGenesPerRunAboveGivenIndexDo (GX *gx, BOOL show, BOOL isCa
 	  rc->Genes_with_index_over_12 = array (hh2, 12, int) ;
 	  rc->Genes_with_index_over_15 = array (hh2, 15, int) ;
 	  rc->Genes_with_index_over_18 = array (hh2, 18, int) ;
+	  rc->Genes_with_index_over_21 = array (hh2, 21, int) ;
+	  rc->Genes_with_index_over_24 = array (hh2, 24, int) ;
+	  rc->Genes_with_index_over_27 = array (hh2, 27, int) ;
+	  rc->Genes_with_index_over_30 = array (hh2, 30, int) ;
 	}
       else
 	{
@@ -4800,6 +4922,10 @@ static void gxNumberOfGenesPerRunAboveGivenIndexDo (GX *gx, BOOL show, BOOL isCa
 	  rc->captured_genes_with_index_over_12 = array (hh2, 12, int) ;
 	  rc->captured_genes_with_index_over_15 = array (hh2, 15, int) ;
 	  rc->captured_genes_with_index_over_18 = array (hh2, 18, int) ;
+	  rc->captured_genes_with_index_over_21 = array (hh2, 21, int) ;
+	  rc->captured_genes_with_index_over_24 = array (hh2, 24, int) ;
+	  rc->captured_genes_with_index_over_27 = array (hh2, 27, int) ;
+	  rc->captured_genes_with_index_over_30 = array (hh2, 30, int) ;
 	}
     }
   if (! isCapture)
@@ -8394,7 +8520,7 @@ static void gxBigGenesDo (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL is
 	}
       ac_free (h) ;
     }
-}  /* gxBigGenes */
+}  /* gxBigGenesDo */
 
 /********/
 
@@ -8405,7 +8531,7 @@ static void gxBigGenes (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL isAc
   gxBigGenesDo (ao, gx, rc, target, isAce, FALSE) ;
   if (isAce && gx->hasCapture && rc->capturedBigGenes)
     gxBigGenesDo (ao, gx, rc, target, isAce, TRUE) ;
-}
+} /* gxBigGenes */
 
 /*************************************************************************************/
 
@@ -8833,6 +8959,46 @@ static void gxExportTableHeader  (GX *gx, ACEOUT ao, int type)
 	      for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
 		{
 		  aceOutf (ao, "\t%d", rc->Genes_with_index_over_18) ;
+		}
+	    }
+
+	  gxExportTableHeaderLegend (gx, ao, hprintf (h, "%s with index >= 21" , GM), type) ;
+	  for (run = 1, rc = arrayp (gx->runs, run, RC); run < runMax ; rc++, run++) 
+	    {
+	      if (rc->private || ! rc->aa || (type == 3 && run > 1 && ! rc->runs) || (type == 5 && ! rc->selectedVariance)) continue ;
+	      for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
+		{
+		  aceOutf (ao, "\t%d", rc->Genes_with_index_over_21) ;
+		}
+	    }
+
+	  gxExportTableHeaderLegend (gx, ao, hprintf (h, "%s with index >= 24" , GM), type) ;
+	  for (run = 1, rc = arrayp (gx->runs, run, RC); run < runMax ; rc++, run++) 
+	    {
+	      if (rc->private || ! rc->aa || (type == 3 && run > 1 && ! rc->runs) || (type == 5 && ! rc->selectedVariance)) continue ;
+	      for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
+		{
+		  aceOutf (ao, "\t%d", rc->Genes_with_index_over_24) ;
+		}
+	    }
+
+	  gxExportTableHeaderLegend (gx, ao, hprintf (h, "%s with index >= 27" , GM), type) ;
+	  for (run = 1, rc = arrayp (gx->runs, run, RC); run < runMax ; rc++, run++) 
+	    {
+	      if (rc->private || ! rc->aa || (type == 3 && run > 1 && ! rc->runs) || (type == 5 && ! rc->selectedVariance)) continue ;
+	      for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
+		{
+		  aceOutf (ao, "\t%d", rc->Genes_with_index_over_27) ;
+		}
+	    }
+
+	  gxExportTableHeaderLegend (gx, ao, hprintf (h, "%s with index >= 30" , GM), type) ;
+	  for (run = 1, rc = arrayp (gx->runs, run, RC); run < runMax ; rc++, run++) 
+	    {
+	      if (rc->private || ! rc->aa || (type == 3 && run > 1 && ! rc->runs) || (type == 5 && ! rc->selectedVariance)) continue ;
+	      for (iDoubleTitle = 0 ; iDoubleTitle < doubleTitle ; iDoubleTitle++)
+		{
+		  aceOutf (ao, "\t%d", rc->Genes_with_index_over_30) ;
 		}
 	    }
 
@@ -9495,18 +9661,23 @@ static int gxExportGeneAceFileSummary (GX *gx, int type)
 	    continue ;
 
 	  aceOutf (ao, "Ali%s \"%s\"\n", subsamp, dictName (gx->runDict, run)) ;
-	  aceOutf (ao, "Zero_index %s %.1f\nLow_index  %s %.1f\nCross_over_index  %s %.1f\nGenes_touched  %s %d\nGenes_with_index %s  %d\nGenes_with_index_over_10 %s  %d\nGenes_with_index_over_12  %s %d\nGenes_with_index_over_15 %s  %d\nGenes_with_index_over_18  %s %d\n"
-		   , target2 , rc->zeroIndex
-		   , target2 , rc->Low_index
-		   , target2 , rc->NA_crossover_index
-		   , target2 , rc->Genes_with_index
-		   , target2 , rc->Genes_with_reliable_index
-		   , target2 , rc->Genes_with_index_over_10
-		   , target2 , rc->Genes_with_index_over_12
-		   , target2 , rc->Genes_with_index_over_15
-		   , target2 , rc->Genes_with_index_over_18
-		   ) ;
-
+	  if (rc->Genes_with_index)
+	    aceOutf (ao, "Zero_index %s %.1f\nLow_index  %s %.1f\nCross_over_index  %s %.1f\nGenes_touched  %s %d\nGenes_with_index %s  %d\nGenes_with_index_over_10 %s  %d\nGenes_with_index_over_12  %s %d\nGenes_with_index_over_15 %s  %d\nGenes_with_index_over_18  %s %d\nGenes_with_index_over_21  %s %d\nGenes_with_index_over_24  %s %d\nGenes_with_index_over_27  %s %d\nGenes_with_index_over_30  %s %d\n"
+		     , target2 , rc->zeroIndex
+		     , target2 , rc->Low_index
+		     , target2 , rc->NA_crossover_index
+		     , target2 , rc->Genes_with_index
+		     , target2 , rc->Genes_with_reliable_index
+		     , target2 , rc->Genes_with_index_over_10
+		     , target2 , rc->Genes_with_index_over_12
+		     , target2 , rc->Genes_with_index_over_15
+		     , target2 , rc->Genes_with_index_over_18
+		     , target2 , rc->Genes_with_index_over_21
+		     , target2 , rc->Genes_with_index_over_24
+		     , target2 , rc->Genes_with_index_over_27
+		     , target2 , rc->Genes_with_index_over_30
+		     ) ;
+	  
 	      aceOutf (ao, "Reads_in_genes %s %.0f\n"
 		       , target2, rc->nReads
 		       ) ;
@@ -9528,7 +9699,7 @@ static int gxExportGeneAceFileSummary (GX *gx, int type)
 
 	  if (rc->captured_genes_with_index)
 	    {	      
-	      aceOutf (ao, "Targeted_genes %s %d\nGenes_touched  Captured_%s %d\nGenes_with_index Captured_%s  %d\nGenes_with_index_over_10 Captured_%s  %d\nGenes_with_index_over_12  Captured_%s %d\nGenes_with_index_over_15 Captured_%s  %d\nGenes_with_index_over_18  Captured_%s %d\n-D High_genes  Captured_%s \n"
+	      aceOutf (ao, "Targeted_genes %s %d\nGenes_touched  Captured_%s %d\nGenes_with_index Captured_%s  %d\nGenes_with_index_over_10 Captured_%s  %d\nGenes_with_index_over_12  Captured_%s %d\nGenes_with_index_over_15 Captured_%s  %d\nGenes_with_index_over_18  Captured_%s %d\nGenes_with_index_over_21  Captured_%s %d\nGenes_with_index_over_24  Captured_%s %d\nGenes_with_index_over_27  Captured_%s %d\nGenes_with_index_over_30  Captured_%s %d\n-D High_genes  Captured_%s \n"
 		       , dictName (gx->captureDict, rc->capture) , keySet (gx->targeted_genes, rc->capture)
 		       , target2 , rc->captured_genes_with_index
 		       , target2 , rc->captured_genes_with_reliable_index
@@ -9536,6 +9707,10 @@ static int gxExportGeneAceFileSummary (GX *gx, int type)
 		       , target2 , rc->captured_genes_with_index_over_12
 		       , target2 , rc->captured_genes_with_index_over_15
 		       , target2 , rc->captured_genes_with_index_over_18
+		       , target2 , rc->captured_genes_with_index_over_21
+		       , target2 , rc->captured_genes_with_index_over_24
+		       , target2 , rc->captured_genes_with_index_over_27
+		       , target2 , rc->captured_genes_with_index_over_30
 		       , target2
 		       ) ;
 	      aceOutf (ao, "Reads_in_genes Captured_%s %.0f\n"
@@ -15081,6 +15256,7 @@ int main (int argx, const char **argv)
 
   gx.intronGeneMix = getCmdLineBool (&argx, argv, "-intronGeneMix");
   getCmdLineOption (&argx, argv, "-deepGene", &gx.deepFileName) ;
+  gx.deepTsf = getCmdLineBool (&argx, argv, "-deepTsf") ;
   getCmdLineOption (&argx, argv, "-snpCorrelation", &gx.snpFileName) ;
   getCmdLineOption (&argx, argv, "-snpCovariance", &gx.snpFileName) ;
   if (getCmdLineOption (&argx, argv, "-deepIntron", &gx.deepFileName))
@@ -15240,9 +15416,18 @@ int main (int argx, const char **argv)
 
       if (gx.geneGroupFileName)
 	gxParseGeneGroup (&gx, gx.geneGroupFileName) ;
-      if (! gxAceParse (&gx, gx.deepFileName,FALSE))
-	messcrash ("Cannot parse the .ace file %s given as intput, expecting run->Deep counts\n"
+      if (gx.deepTsf)
+	{
+	  if (! gxDeepTsfParse (&gx, gx.deepFileName,FALSE))
+	    messcrash ("Cannot parse the .tsf file %s given as intput, expecting run->Deep counts\n"
 		   , gx.deepFileName ? gx.deepFileName : "stdin" ) ;
+	}
+      else
+	{
+	  if (! gxAceParse (&gx, gx.deepFileName,FALSE))
+	    messcrash ("Cannot parse the .ace file %s given as intput, expecting run->Deep counts\n"
+		       , gx.deepFileName ? gx.deepFileName : "stdin" ) ;
+	}
       if (gx.subsample)
 	gxSubsample (&gx) ;
       if (gx.geneClustersFileName)

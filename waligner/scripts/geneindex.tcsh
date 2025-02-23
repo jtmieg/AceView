@@ -1236,9 +1236,20 @@ if ($ok == 0) continue
          endif
      end
    endif
-
+   
+   set deepTsf=""
+   if ($phase == g4sp && ! -e tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) then
+     set deepTsf="-deepTsf"
+     foreach run (`cat MetaDB/$MAGIC/RunsList `)
+       foreach WG (WIGGLERUN WIGGLEGROUP)
+         if (! -d tmp/$WG/$run) continue
+         set tt=tmp/$WG/$run/$target.noCapture.tsf
+         if (-e $tt) cat $tt >> tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
+       end
+     end
+   endif
    if ($phase == g4sp && ! -e tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) then 
-     if (-e tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) \rm tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
+     if (-e                   tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) \rm tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
              # if case 2 exist do not retry by using the OTHER_RUNS symbolic link below
      foreach run (`cat MetaDB/$MAGIC/RunsList `)
          set long=`cat MetaDB/$MAGIC/RunNanoporeList  MetaDB/$MAGIC/RunPacBioList |gawk '{if($1==run)ok=1;}END{print ok+0;}' run=$run`
@@ -1380,7 +1391,7 @@ endif
          # we cannot do this here, it must be done in phase g2a: collect hits per gene in pgm bestali
          set splitM="-split_mRNAs TARGET/GENES/$species.$target.split_mrnas.txt"
        endif
-       set params="-$dg $myace -$uu $mask $chromAlias -runList MetaDB/$MAGIC/GroupsRunsListSorted -runAce tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace  -o  tmp/GENEINDEX/Results/$out -gzo  -pA $method $selectSNP  $shA $sg $capt $refG  $tgcl $GeneGroup $correl $compare  $rjm  -htmlSpecies $species $splitM  -export aitvz "
+       set params="-$dg $myace -$uu $mask $chromAlias -runList MetaDB/$MAGIC/GroupsRunsListSorted -runAce tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace $deepTsf -o  tmp/GENEINDEX/Results/$out -gzo  -pA $method $selectSNP  $shA $sg $capt $refG  $tgcl $GeneGroup $correl $compare  $rjm  -htmlSpecies $species $splitM  -export aitvz "
      endif
 
      if (1) then
@@ -1587,7 +1598,7 @@ mv RESULTS/Expression/unique/$target/ZFAND6.expressio.MRNAH.txt RESULTS/Expressi
 endif
 
 
-  if (-e RESULTS/Expression/AceFiles/$out.withIndex.ace.gz && $uu == u && ($phase == g4 || $phase == m4H)) then 
+  if (-e RESULTS/Expression/AceFiles/$out.withIndex.ace.gz && $uu == u && ($phase == g4 || $phase == m4H || $phase == g4sp)) then 
        echo "pparse RESULTS/Expression/AceFiles/$out.withIndex.ace.gz" | bin/tacembly MetaDB -no_prompt
   endif
 

@@ -140,6 +140,8 @@ if (! -e $tmp/c1.raw.done) then
 
   if ( -e $outDir/first_line.ace) \rm Fastc/first_line.ace
 
+  set zcatPass=1
+lao:
   foreach nn (1 2 3 4 5)
     if ($nn <= $nFiles) then
       set file = `echo $files | gawk '{split($1,aa,"_____");print aa[nn]}' nn=$nn`
@@ -177,6 +179,13 @@ if (! -e $tmp/c1.raw.done) then
     echo "merge paired end $files into >< format"
     set nf1 = `cat $tmp/cumul/f1 | wc | gawk '{print $1;}'`
     set nf2 = `cat $tmp/cumul/f2 | wc | gawk '{print $1;}'`
+
+    if ($zcatPass == 1 && $nf1 > 0 && $nf2 > 0 && $nf1 != $nf2) then
+      echo "TRY AGAIN in makeFastc Number of reads in f1 files not similar to number in f2 files : $nf1 :: $nf2   in $files"
+      set zcatPass=2
+      sleep 300
+      goto lao
+    endif
 
     if ($nf1 > 0 && $nf2 > 0 && $nf1 != $nf2) then
       echo "FATAL ERROR in makeFastc Number of reads in f1 files not equal to number in f2 files : $nf1 :: $nf2   in $files"

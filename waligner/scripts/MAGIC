@@ -368,6 +368,8 @@ if (-e ./LIMITS) then
   source ./LIMITS   # this will override the defaults in a user-project specific way
 endif
 
+setenv wordFrequency wordFrequency.$species.15 
+
 if (! $?MAGIC_COUNT_DIR) setenv MAGIC_COUNT_DIR COUNT
 if ($USEMAGICBLAST == 1)  setenv MAGIC_COUNT_DIR MAGICBLAST
 
@@ -508,7 +510,7 @@ cat <<EOF > _x.awk
   ix = index(z, "INTRON") ;
   # iv = index(z, "INTRON_VALIDATION") ;
   cnv = index(z, "CNV") ;
-  snp  = index(z, "SNV") ;
+  snp  = index(z, "SNV") + index(z, "SNP") ;
   pA = index(z, "polyA") ;
   rr = index(z, "REARRANGEMENTS") ;
   small = index(z, "SMALL_RNA") ;
@@ -532,7 +534,7 @@ cat <<EOF > _x.awk
   if (tsnp > 0) ph = ph "tsnp0 tsnp1a " ;
   if (ix > 0) ph = ph " t1 tgf1  SLpA1 wait t2 tgf2 SLpA2" ;
   if (ix > 0) ph = ph " wait tgf3  SLpA3 " ;
-  if (w > 0) ph = ph " wg1 wait wg2a wait wg2ba wait wg2bb wait wg3a wait wg3b  wait wg4 wg4b wait  wg4c wg5 wait wg6 wg4d sponge1 wait sponge2 wait sponge3 wait " ;
+  if (w > 0) ph = ph " wg1 wait wg2a wait wg2as wait wg2ba wait wg2bb wait wg3a wait wg3b  wait wg4 wg4b wait  wg4c wg5 wait wg6 wg4d sponge1 wait sponge2 wait sponge3 wait " ;
 # s2c (extend, must come after s3a (detect) and would influence the BRS, so we would do s1 s2a s2b s3a,  extend which would create a modified BRS file, then s3b:count
   if (ix > 0) ph = ph " I1 wait I2 wait I3 wait I4 wait I5 wait I6"
   if (cnv > 0)  ph = ph " cnv wait cnv "
@@ -545,8 +547,8 @@ cat <<EOF > _x.awk
   if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (snp > 0) ph = ph "wait snp4 " ;
   if (iv > 0) ph = ph " wait d6 wait d7 wait d8 " ;
-  if (w > 1000)       ph = ph "  g4sp " ;
-  if (gx + mx > 0) ph = ph "  wait  c7 g4 " ;
+  if (gx > 0)       ph = ph "  g4sp " ;
+  if (gx + mx > 1000) ph = ph "  wait  c7 g4 " ;
   if (mx > 1000)       ph = ph "  wait  c7 m4H " ;
   if (gx + mx > 1  )  ph = ph " g10 g11 g12a wait g12b FDR1 wait FDR2 " ;
   if (a + small + qc +gx + mx + ix + snp + w > 0) ph = ph " wait c7 "
@@ -1091,6 +1093,7 @@ if ($phase == ma3) goto phasema3
 
 if ($phase == wg1) goto phasewg1
 if ($phase == wg2a) goto phasewg2a
+if ($phase == wg2as) goto phasewg2as
 if ($phase == wg2ba) goto phasewg2ba
 if ($phase == wg2bb) goto phasewg2bb
 if ($phase == wg2bm) goto phasewg2bm
@@ -1430,13 +1433,14 @@ echo "r2g4:   Run gene predictions using  RNA-editing counts"
 echo "WIGGLES"
 echo '   wg1: Export the genomic Wiggle per run and per chromosome, or mito, rrna, SpikeIn'
 echo '   wg2a: Combine the lane wiggles per run'
+echo '   wg2as: ReStrand the wiggles'
 echo '   wg2ba: Combine the sublib wiggles into run wiggles (for groups with tag Wiggle in MetaDB)'
 echo '   wg2bb: Combine the run wiggles into group wiggles (for groups with tag Wiggle in MetaDB)'
 echo '   wg2bm: Just do the ERCC per groups, requires phases s1m, s2am and s2bm'
 echo '   wg3a: Construct the coverome used for exon discovery'
 echo '   wg3b: Combine and report the coverome used for exon discovery'
 echo '   wg4: report the coverome coverage'
-echo '   wg4b: compute the ETargets capture genebox coverage'
+echo '   wg4b: compute the ETargets projected wiggle (no)capture genebox coverage'
 echo '   wg4c: cumulate the ETargets capture genebox coverage'
 echo '   wg4d: parse the ETargets capture genebox coverage'
 echo '   wg5: Convert the group wiggles to TABIX format'  
@@ -1446,7 +1450,7 @@ echo '   cnv: Differential CNV analysis, using class compare: tag CNV'
 
 echo '   wgh: Export the histo of  genomic Wiggle '
 echo '   sponge1: manual only, analyze which new exons touch which gene, construct a heat-map'
-echo '   sponge2: count the tags in the shadow of the genes/CDS/transcripts '
+echo '   sponge2: count the tags in the shadow of the genes/CDS/transcripts see also wg4 '
 echo '   sponge3: sponge statistics, construct RESULTS/Coverage_and_exons/sea_level.ace'
 
 echo '   wsig1: export pre run the signature wiggles (tissues and 3prime bias)'
@@ -2297,6 +2301,14 @@ goto phaseLoop
 phasea0C: 
 echo -n "phasea0C:count the sequences in each run "
 date
+
+if (-e TARGET/Targets/$species.genome.fasta.gz && ! -e $wordFrequency) then
+  echo -n "Construct $wordFrequency :"
+  date
+  bin/clipalign -t TARGET/Targets/$species.genome.fasta.gz -wordFrequencyConstructTable $wordFrequency -wfSize 15
+  echo -n " done :"
+  date
+endif
 
 set ok=1
 foreach run (`cat MetaDB/$MAGIC/RunList`)
@@ -4711,7 +4723,7 @@ phases1any:
      end
    endif
  end
-
+ if ($NO_INTRON == 1) set geneSNPTarget=genome
 phases1xxx:
 # fan out the bin/bestalignment per zone
 
@@ -4740,7 +4752,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   endif
 
   if (! -e tmp/SNP_BRS/$run/s1.done && ! ($justMito == 1 && -e tmp/SNP_BRS/$run/s1.justMito.done)) then
-    echo  "scripts/s1.snp_accumulate.tcsh $run justMito=$justMito $geneSNPTarget minAli=$minAli"
+    echo                               "scripts/s1.snp_accumulate.tcsh $run justMito=$justMito $geneSNPTarget minAli=$minAli"
     scripts/submit tmp/SNP_BRS/$run/s1 "scripts/s1.snp_accumulate.tcsh $run $justMito $geneSNPTarget"
   endif
 end
@@ -4753,22 +4765,26 @@ goto phaseLoop
 phaseSnp0:
 phaseTSnp0:
 
-
- set geneSNPTarget=xx
- foreach target ($Etargets $RNAtargets)
-   if ($Strategy == RNA_seq && $geneSNPTarget == xx) then
-     foreach target2 ($RNAtargets)
+ # Find the first Etarget which is also an RNAtarget
+set geneSNPTarget=xx
+if ($NO_INTRON == 1) then
+  set geneSNPTarget=genome
+else
+  foreach target ($Etargets $RNAtargets)
+    if ($Strategy == RNA_seq && $geneSNPTarget == xx) then
+      foreach target2 ($RNAtargets)
        if ($geneSNPTarget == xx && $target2 == $target)  set geneSNPTarget=$target
-     end
-   endif
- end
+      end
+    endif
+  end
+endif
 
 if (! -d tmp/SNP_ZONE) then
   mkdir tmp/SNP_ZONE
 
   set strategyOk=0
-  if (! -e  tmp/SNP_ZONE/fasta.done  &&  ($Strategy == Exome || $Strategy == Genome)) then
-    # new simpler method, look at genome legth and create sections < 100M 
+  if (! -e  tmp/SNP_ZONE/fasta.done  &&  ($NO_INTRON == 1 || $Strategy == Exome || $Strategy == Genome)) then
+    # new simpler method, look at genome length and create sections < 100M 
     set strategyOk=1
     cat tmp/METADATA/genome.ns.sponge | gawk -F '\t' '{N=30000000;if($4<$5){n=1+int($5/N);oldx2=0;for(i=1;i<=n;i++){u=substr("abcdefghijklm",i,1);x1=1+(i-1)*N;x2=i*N+1000000;if(i==n)x2=$5;if(x2 > oldx2)printf("%s\t%d\t%d\t%s_%s\n",$3,x1,x2,$3,u);oldx2=x2;}}}' > tmp/SNP_ZONE/_allG
     echo $targets | gawk '/mito/{m=1;}END{cp=" ";if(m==1)cp="mito";print cp}' >  tmp/SNP_ZONE/ZoneList
@@ -4781,7 +4797,7 @@ if (! -d tmp/SNP_ZONE) then
 
 endif
 
-if ($Strategy == RNA_seq) then
+if ($NO_INTRON == 0 && $Strategy == RNA_seq) then
     set target=$geneSNPTarget
     set strategyOk=1
     if (! -e tmp/SNP_ZONE/_allr) then
@@ -4808,7 +4824,7 @@ endif
 
 
 
-if ($Strategy == RNA_seq && -e TARGET/GENES/av.gene.ace  && ! -e tmp/SNP_ZONE/zoneg.999.fasta.gz) then
+if ($NO_INTRON == 0 && $Strategy == RNA_seq && -e TARGET/GENES/av.gene.ace  && ! -e tmp/SNP_ZONE/zoneg.999.fasta.gz) then
   echo "collect the profiling gene set"
   scripts/s1.CreateGeneSet.tcsh
 endif
@@ -4832,16 +4848,15 @@ EOF
   set toto=tmp/TSNP_DB/Genes/_r
     echo "read-models" > $toto
 
-    echo "pparse tmp/METADATA/av.MRNA.info.ace" >> $toto
-    echo "pparse tmp/METADATA/av.GENE.info.ace" >> $toto
-    if (-e tmp/METADATA/c7.av.captured_genes.ace) echo "pparse tmp/METADATA/c7.av.captured_genes.ace" >> $toto
+    echo "//" | gzip >    tmp/TSNP_DB/Genes/mrna.fasta.gz
     foreach target ($Etargets)
+      echo "pparse tmp/METADATA/$target.MRNA.info.ace" >> $toto
+      echo "pparse tmp/METADATA/$target.GENE.info.ace" >> $toto
+      if (-e tmp/METADATA/c7.$target.captured_genes.ace) echo "pparse tmp/METADATA/c7.$target.captured_genes.ace" >> $toto
       if (-e TARGET/GTF/$species.$target.goodProduct.ace.gz) echo "pparse  TARGET/GTF/$species.$target.goodProduct.ace.gz" >> $toto
-      zcat TARGET/Targets/$species.$target.fasta.gz | sed -e 's/^>/>mRNA:/' -e 's/|/ /' | gzip > tmp/TSNP_DB/Genes/mrna.fasta.gz
-      # zcat TARGET/Targets/$species.$target.fasta.gz | sed  -e 's/|/ /' | gzip > tmp/TSNP_DB/Genes/mrna.fasta.gz
-      break
+      zcat TARGET/Targets/$species.$target.fasta.gz | sed -e 's/^>/>mRNA:/' -e 's/|/ /' | gzip >> tmp/TSNP_DB/Genes/mrna.fasta.gz
+      if (-e TARGET/MRNAS/$species.$target.mrna2product.ace ) echo "pparse TARGET/MRNAS/mrna2product.ace" >> $toto
     end 
-    if (-e TARGET/MRNAS/mrna2product.ace ) echo "pparse TARGET/MRNAS/mrna2product.ace" >> $toto
     if (-e TARGET/MRNAS/good_product.ace ) echo "pparse TARGET/MRNAS/good_product.ace" >> $toto
     if (-e TARGET/MRNAS/very_good_product.ace ) echo "pparse TARGET/MRNAS/very_good_product.ace" >> $toto
     if (-e TARGET/MRNAS/best_product.ace ) echo "pparse TARGET/MRNAS/best_product.ace" >> $toto
@@ -4853,10 +4868,6 @@ EOF
 
   touch tmp/TSNP_DB/Genes/tsnp0.parse.done
 endif
-
-
-
-
  
 if (strategyOk == 0) then
     echo "Unknown Strategy $Strategy in phase s1"
@@ -5872,7 +5883,7 @@ phasesnp4:
 echo "phase snp4: Prediction using the SNPs"
 
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
-  if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf4) continue
+  if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf) continue
   scripts/submit tmp/TSNP_DB/$zone/s21 "scripts/snp3.tcsh G $zone"
 end
 
@@ -8773,9 +8784,42 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d  tmp/WIGGLERUN/$run)$mkDir WIGGLERUN $run
   foreach uu (u nu pp)
     if (-e tmp/WIGGLERUN/$run/wg2a.$uu.done) continue
-    scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run $uu"
+    scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run $uu lane2run"
   end
 end
+
+goto phaseLoop
+
+###############################################################
+## phase wg2as: restrand the wiggle
+
+phasewg2as:
+ echo -n "Phase wg2as restrand the wiggles "
+ date
+
+if ($Strategy == RNA_seq) then
+  foreach chrom ($chromSetAll)
+    set sBV=TARGET/CHROMS/$chrom.stranding.BV
+    if (! -e $sBV) then
+      zcat tmp/METADATA/gtf.RefSeq.f.cds_sponge.gz | gawk -F '\t' '{if($3==chrom){x=10*int(($4+9)/10); y=10*int(($5-9 )/10) ;for (z=x;z<=y;z+=10) printf("%d\t100\n",z) ;}}' chrom=$chrom > sBV.f
+      zcat tmp/METADATA/gtf.RefSeq.r.cds_sponge.gz | gawk -F '\t' '{if($3==chrom){x=10*int(($4+9)/10); y=10*int(($5-9 )/10) ;for (z=x;z<=y;z+=10) printf("%d\t100\n",z) ; }' chrom=$chrom > sBV.r
+      cat sBV.f sBV.r | sort -k 1n > $sBV
+      \rm sBV.[fr]
+    endif
+  end
+
+
+
+  foreach run (`cat MetaDB/$MAGIC/RunList`)
+    set ok=1
+    foreach uu (u nu pp)
+      if (! -e tmp/WIGGLERUN/$run/wg2a.$uu.done) set ok=0
+    end
+    if ($ok == 0) continue
+    if (-e tmp/WIGGLERUN/$run/wg2a.restrand.done) continue
+    scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run u restrand"
+  end
+endif
 
 goto phaseLoop
 
@@ -8841,10 +8885,12 @@ endif
 
 if (! -d tmp/WIGGLEGROUP) mkdir tmp/WIGGLEGROUP
 
-cat MetaDB/$MAGIC/runs.ace | gawk 'BEGIN{x=-1;}/^Run[ \t]/{gsub(/\"/,"",$2);ok=0;run=$2;next;}/^Observed_strandedness_in_ns_mapping/{x=$3;if((x>=0 && x < 35) || (x>=65 && x <=100))ss[run]=1;next;}/^Paired_end/{pp[run]=1;next;}END{for (run in ss)if(pp[run]<1)print run}' >  MetaDB/$MAGIC/WiggleDropEndList
+cat MetaDB/$MAGIC/runs.ace | gawk 'BEGIN{x=-1;}/^Run[ \t]/{gsub(/\"/,"",$2);ok=0;run=$2;next;}/^Observed_strandedness_in_ns_mapping/{x=$3;if((x>=0 && x < 35) || (x>=65 && x <=100))ss[run]=1;next;}/^Paired_end/{pp[run]=1;next;}/^Group/{pp[run]=1;next;}END{for (run in ss)if(pp[run]<1)print run}' >  MetaDB/$MAGIC/WiggleDropEndList
 
 
 foreach level (`seq 1 1 $groupLevelMax`)
+  # wait so that subgroups are already computed
+  scripts/submit wait
   echo "$phase level=$level"
   set okk=0
   foreach group (`cat $WRGG`)
@@ -9018,9 +9064,68 @@ goto phaseLoop
 
 phasewg4:
 
+echo -n "phasewg4 start :"
+date
+
+# create the procryote P_genome stranding
+set toto=tmp/$MAGIC.projected.stranding.ace
+echo ' ' > $toto
+foreach run (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList`)
+  foreach WG (WIGGLERUN WIGGLEGROUP)
+    if (! -d tmp/$WG/$run) continue
+    set tt=tmp/$WG/$run/projected.stranding.tsf
+    if (-e $tt) then
+      cat $tt | gawk -F '\t' '/^#/{next;}{printf("Ali %s\nStranding P_genome %s %s plus %s minus\n\n", $1,$6,$4,$5) ;}' >> $toto
+      cat $tt | gawk -F '\t' '/^#/{next;}{printf("Run %s\nObserved_strandedness_in_ns_mapping P_genome %s %s plus %s minus\n\n", $1,$6,$4,$5) ;}' >> $toto
+    endif
+    cat tmp/$WG/$run/*/wg2a.ELF.transcriptsEnds tmp/$WG/$run/*/wg2a.ERR.transcriptsEnds | gawk '/^#/{next;}{n++;}END{printf("Ali %s\nCandidate_starts %d\n", run, n);}' run=$run > tmp/$WG/$run/wg2a.ends.ace
+    cat tmp/$WG/$run/*/wg2a.ELR.transcriptsEnds tmp/$WG/$run/*/wg2a.ERF.transcriptsEnds  | gawk '/^#/{next;}{n++;}END{printf("Candidate_ends %d\n\n", n);}'  >> tmp/$WG/$run/wg2a.ends.ace
+    if (-e tmp/$WG/$run/wg2a.ends.ace) then
+      cat tmp/$WG/$run/wg2a.ends.ace >> $toto
+    endif    
+  end
+end
+echo "pparse $toto" | tace MetaDB -no_prompt
+
+#######
+# create the StartEnd database
+if (! -d tmp/StartEnd) then
+  mkdir tmp/StartEnd
+  pushd tmp/StartEnd
+  foreach chrom ($chromSetAll)
+    mkdir $chrom
+    pushd $chrom
+      mkdir database
+      ln -s ../../../metaData/wspec
+      ../../../bin/tacembly . <<EOF
+y
+        save
+        quit
+EOF
+    popd
+  end
+  popd
+endif
+
+# Populate the StartEnd database
+foreach chrom ($chromSetAll)
+  set toto=tmp/StartEnd/$chrom/wg4.counts
+  echo ' ' > $toto
+  echo '# StartEnd\tRun\tFormat\tmaxCover\taverageCover\t' > $toto.tsf
+  foreach run (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList`)
+    foreach WG (WIGGLERUN WIGGLEGROUP)
+      if (! -d tmp/$WG/$run) continue
+      cat tmp/$WG/$run/$chrom/wg2a.ELF.transcriptsEnds | gawk -F '\t'  '/^#/{next;}{chrom=$1;a1=$2;a2=$3;a=(a1+a2)/2;a=100*int((a+50)/100);printf("%s.%d.f\t%s\tii\t%d\t%.1f\n", chrom,a,run,$5,$6);}' run=$run >> $toto.tsf
+    end
+  end
+end
+
+foreach chrom ($chromSetAll)
+  set toto=tmp/StartEnd/$chrom/wg4.counts
+  cat $toto.tsf | sort | gawk -F '\t' '{if ($1 != se){se=$1;printf ("\nStartEnd %s\n",se);}printf("eCounts %s %.0f %.0f\n", $2,$4,$5);}' > $toto.tsf.s
+end
 
 #####
-
 if (1) then
 
 set toto4=tmp/WIGGLEGROUP/$MAGIC.coveron_length_histogram.txt
@@ -9197,17 +9302,19 @@ phasewg4b:
  echo -n "Phase wg4b compute the ETargets genebox coverage "
  date
 
-foreach capture ($CAPTURES)
- foreach target ($Etargets)
-  foreach run (`cat MetaDB/$MAGIC/RunsList`)
-    if (-d tmp/WIGGLERUN/$run && ! -e tmp/WIGGLERUN/$run/wg4b.$target.ns.any_genebox.$capture.sponge.count) then
-      scripts/submit tmp/WIGGLERUN/$run/wg4b "scripts/wg4b.gene_sponge.tcsh WIGGLERUN $target $run $capture"
-    endif
-    if (-d tmp/WIGGLEGROUP/$run && ! -e tmp/WIGGLEGROUP/$run/wg4b.$target.ns.any_genebox.$capture.sponge.count) then
-      scripts/submit tmp/WIGGLEGROUP/$run/wg4b "scripts/wg4b.gene_sponge.tcsh WIGGLEGROUP $target $run $capture"
-    endif
+foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupWiggleList`)
+  foreach WG (WIGGLERUN WIGGLEGROUP)
+    if (! -d tmp/$WG/$run) continue
+    foreach target ($Etargets)
+      set spongeF=tmp/METADATA/gtf.$target.f.sponge.gz
+      if (! -e $spongeF) continue
+      foreach capture (noCapture $CAPTURES)
+        set tt=tmp/$WG/$run/$target.$capture.tsf
+        if (-e $tt) continue
+        scripts/submit tmp/WIGGLERUN/$run/wg4b "scripts/wg4b.gene_sponge.tcsh $capture $WG $run $target"
+      end
+    end
   end
- end
 end
 
 goto phaseLoop
@@ -9219,7 +9326,7 @@ phasewg4c:
 
  echo -n "Phase wg4c gene_sponge capture Cumul "
  date
-
+goto phaseLoop
 scripts/submit tmp/WIGGLERUN/wg4b.$MAGIC  "scripts/wg4b.gene_sponge.tcsh Cumul"
 goto phaseLoop
 
@@ -9230,7 +9337,7 @@ phasewg4d:
 
  echo -n "Phase wgc gene_sponge capture Parse "
  date
-
+goto phaseLoop
 scripts/wg4b.gene_sponge.tcsh Parse
 goto phaseLoop
 
@@ -10432,7 +10539,6 @@ phaseI4:
 
 if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
-
   if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
   if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done) continue
   set ok1=0
@@ -10450,8 +10556,7 @@ foreach chrom ($chromSetAll)
     if ($ok2 >= 10) break
   end
   if ($ok2 >= 10) continue
-  if ($ok1 == 0 && $ok2 ==0) continue
-
+  if ($ok1 > 0 && $ok2 > 0) continue
   scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts/I1.intronDB.tcsh $chrom setSponge" 32G
 end
 
@@ -10887,10 +10992,10 @@ goto phaseLoop
 
 #######################################################################################
 #######################################################################################
-## phase t1: collect the RNA-seq transloc
+# phase t1: collect the RNA-seq transloc
 
 phaset1:
-goto phaseLoop
+#goto phaseLoop
   echo -n "Phase t1 collect the translocations runs: "
   date
 if (! -d RESULTS/Transloc) mkdir RESULTS/Transloc
@@ -11813,6 +11918,8 @@ goto phaseLoop
 phasef1:
  date
 echo $chromSetAll
+echo $MAGIC
+
 
 if (0 && $Strategy != RNA_seq) goto phaseLoop
 
@@ -11858,7 +11965,7 @@ if (! -d tmp/X.$MAGIC) mkdir tmp/X.$MAGIC
 
 # consolidate the de uno introns in a single pass
 foreach chrom ($chromSetAll)
-  echo $chrom 
+  echo $chrom  tmp/X.$MAGIC/$chrom
   if (! -d tmp/X.$MAGIC/$chrom) mkdir tmp/X.$MAGIC/$chrom
 end
 
@@ -11884,7 +11991,8 @@ goto phaseLoop
 ## phase f2: Construct the new exons introns using the wiggles
 
 phasef2:   
-echo -n "Phase f2: collate the double introns"
+echo -n "Phase f2: collate the double introns : "
+date
 if (! -d tmp/X.$MAGIC) goto phaseLoop
 if ($Strategy != RNA_seq) goto phaseLoop
 
@@ -11910,15 +12018,16 @@ if (! -e $ff.gz) then
   # collate the data 
   if (-e $ff) \rm $ff
   foreach run (`cat MetaDB/$MAGIC/RunList`)
+    set n=`ls tmp/PHITS_genome/$run/*.doubleintrons.gz | & grep doubleintrons | gawk '{n++}END{print n+0}'`
+    if ($n == 0) continue
     gunzip -c tmp/PHITS_genome/$run/*.doubleintrons.gz | grep DOUBLEINTRON | sort -k 2,2 -k 4,4n -k 5,5n -k 6,6n -k 7,7n | gawk -F '\t' '/^DOUBLEINTRON/{c=$2;a=$2 "\t" $4 "\t" $5 "\t" $6 "\t" $7; nn[a]+=$9;x=$3;if ($5<$6 && (x1[a]+0==0 || x1[a]>x)){if(x<$4-30)x=$4-30;x1[a]=x;}if ($5>$6 && (x1[a]+0==0 || x1[a]<x)){if(x>$1+30)x=$1+30;x1[a]=x;}x=$8;if ($5<$6 && (x2[a]+0==0 || x2[a]<x)){if(x>$7+30)x=$7+30;x2[a]=x;}if ($5>$6 && (x2[a]+0==0 || x2[a]<x)){if(x<$7-30)x=$7-30;x2[a]=x;}}END{for(a in nn){split(a,aa,"\t");printf("DOUBLEINTRON\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",aa[1],x1[a],aa[2],aa[3],aa[4],aa[5],x2[a],nn[a]);}}' |  sort -k 2,2 -k 4,4n -k 5,5n -k 6,6n -k 7,7n  >> $ff
   end
   cat $ff | sort -V | gzip >  $ff.gz
   \rm $ff
 endif
 
-
 foreach chrom ($chromSetAll)
-  if (! -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  ls -ls tmp/X.$MAGIC/$chrom/f1.done
   if (-e tmp/X.$MAGIC/$chrom/f2.done) continue
   scripts/submit "tmp/X.$MAGIC/$chrom/f2" "scripts/f2.doubleIntrons.tcsh $chrom"
 end
@@ -11977,7 +12086,7 @@ phasef5:
 if ($Strategy != RNA_seq) goto phaseLoop
 
 foreach chrom ($chromSetAll)
-  if (1 || (-e tmp/X.$MAGIC/$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/$chrom/f5.dump.done)) then
+  if (0 || (-e tmp/X.$MAGIC/$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/$chrom/f5.dump.done)) then
     scripts/submit tmp/X.$MAGIC/$chrom/f5.export  "scripts/f5.export_new_genes.tcsh  $chrom"
   endif
 end
@@ -12022,7 +12131,7 @@ phasek2:
  # kantorize the products given the Kantor data
 phasek9:
  # launch kantor search in external DB
-
+setenv ici `pwd`
 if ($Strategy != RNA_seq) goto phaseLoop
 
 echo -n "Export/Import the Kantor phase $phase : start "

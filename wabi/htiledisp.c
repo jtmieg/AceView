@@ -45,7 +45,7 @@ static AC_DB ac_db = 0 ;
 #define slxFormatNint 162
 #define slxFormatNfloat SOLEXAMAX2
 
-static int solexaStep = 10 ;
+static int solexaStep = 10 ; /* agnostic, will be set by first acces to a wiggle */
 
 typedef struct HtileStruct *Htile ;
 
@@ -2417,12 +2417,12 @@ static void htileDrawMusicalScale (Htile look, float offset)
   s = 0 ;
   zoom = look->zoom ;
 #ifdef BOU_DEF
-  if (look->index) zoom = look->zoom * .005 ; /* so that 100 gives 10char size when ratio zoom == 20 */
+  if (look->index) zoom = look->zoom * .005 ; /* so that 100 gives 10 char size when ratio zoom == 20 */
 #endif
-  for (i = 1, j0 = -1 ; s == 0 && i < 1000000000 ; i*= 10)
+  for (x = 1, j0 = -1 ; s == 0 && x < 1e30 ; x*= 10)
     for (j = 0 ;  s == 0 && j < 3 ; j++)
       {
-	s = i * ss[j]/1000.0 ;
+	s = x * ss[j]/1000.0 ;
 	if (s * zoom < ds) s = 0 ;
 	else j0 = j ;
       }
@@ -2462,7 +2462,12 @@ static void htileDrawMusicalScale (Htile look, float offset)
   graphColor (BLACK) ;
   y = offset - zoom * s ; 
   if (y > 0) 
-    graphText (messprintf ("%g", s), 1, y) ; 
+    {
+      int box = graphBoxStart () ;
+      graphText (messprintf (" %g ", 10 * s), 1, y) ;
+      graphBoxEnd () ;
+      graphBoxDraw (box, BLACK, WHITE) ;
+    }
   if (! look->hideMusic)
     graphLine (3, y, look->map->graphWidth -1, y) ;
   if (!look->index)
@@ -2470,8 +2475,8 @@ static void htileDrawMusicalScale (Htile look, float offset)
       y = offset + zoom * s ; 
       if (! look->hideMusic && y < look->map->graphHeight)
 	{
-	  graphText (messprintf ("%g", -s), 1, y) ; 
 	  graphLine (3, y, look->map->graphWidth -1, y) ;
+	  graphText (messprintf ("%g", - 10 * s), 1, y) ;
 	}
     }
   oldw = graphLinewidth (.3) ;
@@ -2892,7 +2897,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 		    }
 		  if (1 && filCheckName(fNam, 0, "r"))
 		    {
-		      Array aa = sxGetWiggleZone (0, fNam, "TABIX", solexaStep, name(look->intMap), look->a1, look->a2, h) ;
+		      Array aa = sxGetWiggleZone (0, fNam, "TABIX", &solexaStep, name(look->intMap), look->a1, look->a2, h) ;
 		      if (aa && arrayMax (aa))
 			htileWiggleConvert (look, pnx, ns, aa) ;
 		    }
@@ -4508,6 +4513,7 @@ static void htileDrawScale (Htile look, float offset)
       else
 	graphLine (u3, y1, u3, y2) ;
     }
+
   sc3 = v1 + i0*sc1 ;
   u3 = TMAP2GRAPH (look->map, sc3 - look->map->a1 + 1) ;
   sc4 = 10*sc1 + look->map->a1 ; ;
@@ -4662,7 +4668,7 @@ static void htileDrawGenes (Htile look, float offset, BOOL isUp)
 	      break ;
 	    case 3:
 	      {
-		AC_KEYSET kpg = ac_objquery_keyset (tile, ">Genes;>Genefinder;>Source;>subsequence;Is_predicted_gene;NOT Method=\"Sasha*\" AND NOT Method=\"Vega*\"",h) ;
+		AC_KEYSET kpg = ac_objquery_keyset (tile, ">Genes;{>Transcribed_gene;>Matching_genefinder_gene} SETOR{>Genefinder};>Source;>subsequence;Is_predicted_gene;NOT Method=\"Sasha*\" AND NOT Method=\"Vega*\"",h) ;
 		tgs = ac_keyset_table (kpg, 0, -1, 1, h) ;
 	      }
 	      y1 = offset + (isUp ? -5 : 5) ; y2 = y1 + .6 ;   /* Defines thickness of the gene. Was set to .6 originally*/
@@ -6326,7 +6332,7 @@ static void htileDraw (void)
   if (look->showRZones)
     htileDrawRZone (look, offset) ;
 #endif
-  htileDrawMusicalScale (look, offset) ;
+  if (0)   htileDrawMusicalScale (look, offset) ;
 #ifdef BOU_DEF
   if (look->showMask)
     htileDrawMask (look, offset) ;
@@ -6338,6 +6344,7 @@ static void htileDraw (void)
   if (look->showGenes && ! look->hideHeader)
     graphLine (xx, y0, xx, look->map->graphHeight) ;
   graphColor (BLACK) ;
+  if (1)   htileDrawMusicalScale (look, offset) ;
   graphRedraw () ;
   graphRegister (KEYBOARD, tmapKbd) ;
 }

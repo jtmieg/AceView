@@ -4221,8 +4221,8 @@ static int sxxPaOrder (const void *a, const void *b)
 } /* sxxPaOrder */
 
 /*************************************************************************************/
-#define SOLEXA_STEP 10 
-static Array sxNewExonsGetWiggle (SX *sx, const char *fileName, AC_HANDLE h0)
+
+static Array sxNewExonsGetWiggle (SX *sx, int *stepp, const char *fileName, AC_HANDLE h0)
 {
   AC_HANDLE h = ac_new_handle () ;
   Array aa = 0, wiggle = arrayHandleCreate (100000, SXW, h0) ;
@@ -4248,12 +4248,13 @@ static Array sxNewExonsGetWiggle (SX *sx, const char *fileName, AC_HANDLE h0)
 	type = "BV" ;
     
       /* parse a collection of sponge files */
+      *stepp = 0 ; /* start agnostic , but the first file imposes the step of the other ones */
       while (cp)
 	{
 	  cq = strstr (cp, ",") ;
 	  if (cq)
 	    *cq++ = 0 ;
-	  aa = sxGetWiggleZone (aa, cp, type, SOLEXA_STEP, 0, 0, 0, h) ;
+	  aa = sxGetWiggleZone (aa, cp, type, stepp, 0, 0, 0, h) ;
 	  cp = cq ;
 	}
     }
@@ -6463,6 +6464,7 @@ static void sxNewExonsStrandedWiggleRemoveEchoes (SX *sx, Array w_f, Array w_r)
 } /* sxNewExonsStrandedWiggleRemoveEchoes */
 
 /*************************************************************************************/
+int SOLEXA_STEP = 0 ; /* agnostic */
 static int sxNewExons (SX *sx)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -6478,14 +6480,14 @@ static int sxNewExons (SX *sx)
   /* get the stranded wiggles */
    if (sx->wiggleFileName_f && sx->wiggleFileName_r)
     {
-      w_f = sxNewExonsGetWiggle (sx, sx->wiggleFileName_f, h) ;
-      w_r = sxNewExonsGetWiggle (sx, sx->wiggleFileName_r, h) ;
+      w_f = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, sx->wiggleFileName_f, h) ;
+      w_r = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, sx->wiggleFileName_r, h) ;
       if (w_f && w_r)
 	sxNewExonsStrandedWiggleRemoveEchoes (sx, w_f, w_r) ; /* remove echoes */
     }
 
 
-  if ((wiggle = sxNewExonsGetWiggle (sx, sx->wiggleFileName_ns, h)))        /* parse the wiggle file */
+  if ((wiggle = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, sx->wiggleFileName_ns, h)))        /* parse the wiggle file */
     {
       if (debug) fprintf (stderr, "get wiggle done %d\n", arrayMax (wiggle)) ;
       sxNewExonsRollingMedian (sx->delta ? sx->delta : 3, wiggle) ;         /* add the rolling median */
@@ -6925,9 +6927,9 @@ static long int sxSponge (SX *sx)
       seg = arrp (segsNR, jjMax - 1, SPONGE) ;
       chromExtent = seg->a2 ;
     }
-  if ((wiggle = sxNewExonsGetWiggle (sx, sx->wiggleFileName, h)) &&
+  if ((wiggle = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, sx->wiggleFileName, h)) &&
       arrayMax (wiggle)
-      )        /* parse the wiggle file */
+      )        /* parse the wiggle file and set SOLEXA_STEP */
     {
       /* add a segment for the whole wiggle */
       wiggleExtent = arr (wiggle, arrayMax(wiggle) - 1, SXW).a1 - arr (wiggle, 0, SXW).a1 ;
@@ -7701,7 +7703,7 @@ static int sxSpongeWindowHisto (SX *sx)
 	}
     }
 
-  sxNewExonsGetWiggle (sx, sx->wiggleFileName_f, h) ;
+  sxNewExonsGetWiggle (sx, &SOLEXA_STEP, sx->wiggleFileName_f, h) ;
   
   messcrash ("2013_01_29: This code is incomplete, the direct parsing of stdin must be replaced by analysing the w_f array") ;
   ai = aceInCreate (0, 0, h) ;
@@ -8713,19 +8715,19 @@ static void sxFlagTranscriptEnds (SX *sx)
     messcrash ("Option -flagTranscriptEnds requires option -wiggle fileName") ;
   
   cp = hprintf (h, "%s.ELF.BF.gz", sx->wiggleFileName) ;
-  if (! (w_LF = sxNewExonsGetWiggle (sx, cp, h)))
+  if (! (w_LF = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, cp, h)))
     messcrash ("-flagTranscriptEnds: missing ELF wiggle file %s\n", cp) ;
       
   cp = hprintf (h, "%s.ELR.BF.gz", sx->wiggleFileName) ;
-  if (! (w_LR = sxNewExonsGetWiggle (sx, cp, h)))
+  if (! (w_LR = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, cp, h)))
     messcrash ("-flagTranscriptEnds: missing ELR wiggle file %s\n", cp) ;
       
   cp = hprintf (h, "%s.ERF.BF.gz", sx->wiggleFileName) ;
-  if (! (w_RF = sxNewExonsGetWiggle (sx, cp, h)))
+  if (! (w_RF = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, cp, h)))
     messcrash ("-flagTranscriptEnds: missing ERF wiggle file %s\n", cp) ;
       
   cp = hprintf (h, "%s.ERR.BF.gz", sx->wiggleFileName) ;
-  if (! (w_RR = sxNewExonsGetWiggle (sx, cp, h)))
+  if (! (w_RR = sxNewExonsGetWiggle (sx, &SOLEXA_STEP, cp, h)))
     messcrash ("-flagTranscriptEnds: missing ERR wiggle file %s\n", cp) ;
       
   for (isDown = 1 ; isDown >= 0 ; isDown--)

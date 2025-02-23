@@ -1194,10 +1194,19 @@ static void tsnpRemap0 (TSNP *tsnp)
   if (tsnp->db)
     {
       if (tsnp->force)
-	iter = ac_query_iter (tsnp->db, TRUE, "find variant ", 0, h) ;
+	{
+	  if (tsnp->remap2genome)
+	    iter = ac_query_iter (tsnp->db, TRUE, "find variant Found_in_mRNA", 0, h) ;
+	  if (tsnp->remap2genes)
+	    iter = ac_query_iter (tsnp->db, TRUE, "find variant Found_in_genome", 0, h) ;
+	}
       else
-	iter = ac_query_iter (tsnp->db, TRUE, "find variant Found_in_mRNA && ! mRNA ", 0, h) ;
-
+	{
+	  if (tsnp->remap2genome)
+	    iter = ac_query_iter (tsnp->db, TRUE, "find variant Found_in_mRNA && ! IntMap ", 0, h) ;
+	  if (tsnp->remap2genes)
+	    iter = ac_query_iter (tsnp->db, TRUE, "find variant Found_in_genome && ! mRNA ", 0, h) ;
+	}
       while (ac_free (variant), ac_free (h1), variant = ac_iter_obj (iter))
 	{
 	  h1 = ac_new_handle () ;
@@ -1227,9 +1236,20 @@ static void tsnpRemap0 (TSNP *tsnp)
 	  if (Bbuf[0] == '~')   continue ;
 	  if (Abuf[0] == '~')   continue ;
 
-	  vtxtPrintf (txt, "\nVariant \"%s\"\nmRNA\nSite\nFound_in_mRNA\n", ac_name (variant)) ;
-	  vtxtPrintf (txt, "Parent_sequence \"%s\"\n", seqNam) ;
+	  vtxtPrintf (txt, "\nVariant \"%s\"\n", ac_name (variant)) ;
 	  vtxtPrintf (txt, "-D Type\n-D Seq\n-D VCF_hg38\n-D Site\n") ;
+	  if (tsnp->remap2genes)
+	    {
+	      vtxtPrintf (txt, "Found_in_genome\n") ;
+	      vtxtPrintf (txt, "Parent_sequence \"%s\"\n", seqNam) ;
+	    }
+	  if (tsnp->remap2genome)
+	    {
+	      vtxtPrintf (txt, "Found_in_mRNA\n") ;
+	      vtxtPrintf (txt, "-D mRNA\nmRNA \"%s\"\n", seqNam) ;
+	    }
+
+
 
 	  if (!strcasecmp (typeBuf, "Sub")) 
 	    {
@@ -1262,7 +1282,19 @@ static void tsnpRemap0 (TSNP *tsnp)
 	  else
 	    continue ;
 	  nn2++ ;
-	  vtxtPrintf (txt, "mRNA \"%s\" %d %d\n\n", seqNam, a1, a2) ;
+	  if (tsnp->remap2genes)
+	    {
+	      vtxtPrintf (txt, "Site\nFound_in_genome\n") ;
+	      vtxtPrintf (txt, "Parent_sequence \"%s\"\n", seqNam) ;
+	      vtxtPrintf (txt, "IntMap \"%s\" %d %d\n", seqNam, a1, a2) ;
+	    }
+	  if (tsnp->remap2genome)
+	    {
+	      vtxtPrintf (txt, "Site\nFound_in_mRNA\n") ;
+	      vtxtPrintf (txt, "mRNA \"%s\" %d %d\n", seqNam, a1, a2) ;
+	    }
+
+	  vtxtPrintf (txt, "\n") ;
 	}
       ac_parse (tsnp->db, vtxtPtr (txt), &errors, 0, h) ; 
     }
@@ -1425,9 +1457,9 @@ static int tsnpRemap2 (TSNP *tsnp)
   const char *errors = 0 ;
   
   if (tsnp->force)
-    iter = ac_query_iter (tsnp->db, TRUE, "find variant IntMap ", 0, h) ;
+    iter = ac_query_iter (tsnp->db, TRUE, "find variant found_in_genome ", 0, h) ;
   else
-    iter = ac_query_iter (tsnp->db, TRUE, "find variant IntMap && ! geneBox", 0, h) ;
+    iter = ac_query_iter (tsnp->db, TRUE, "find variant found_in_genome && ! geneBox", 0, h) ;
   while (ac_free (variant), ac_free (h1), variant = ac_iter_obj (iter))
     {
       h1 = ac_new_handle () ;
@@ -2450,10 +2482,12 @@ static int tsnpDbRun2groups (TSNP *tsnp)
   return dictMax (runDict) ;
 } /* tsnpDbRun2groups */
 
+/*************************************************************************************/
 /* export a tsf file per run and group counting supported snps */
 static void tsnpDbSnpProfile (TSNP *tsnp)
 {
   AC_HANDLE h = ac_new_handle () ;
+  AC_HANDLE h1 = 0 ;
   AC_DB db = tsnp->db ;
   AC_ITER iter ;
   AC_OBJ Snp = 0 ;
@@ -2475,9 +2509,10 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   else
     iter = ac_query_iter (db, TRUE, "Find Variant typ && BRS_counts", 0, h) ;
   
-  while (ac_free (Snp), Snp = ac_iter_obj (iter))
+  while (ac_free (Snp), ac_free (h1), Snp = ac_iter_obj (iter))
     {
-      AC_TABLE tbl = ac_tag_table (Snp, "BRS_counts", h) ;
+      AC_HANDLE h1 = ac_new_handle () ;
+      AC_TABLE tbl = ac_tag_table (Snp, "BRS_counts", h1) ;
       int irmc = 0, ir, irMax = tbl ? tbl->rows : 0 ;
       RMC *rmc ;  
       char typ2[256] ;
@@ -3399,7 +3434,7 @@ static int tsnpSetGName (vTXT txt, TSNP *tsnp, AC_OBJ Snp, AC_HANDLE h0)
 		    am2 = am1 + 2 ;
 		    fs = -1 ; 
 
-		    vtxtPrintf (txt, "mRNA %s %d %d \"Base %c %d is deleted\"\n", name (mrna), m1, m2, (*del)[3], m1+1) ;
+		    if (mrna) vtxtPrintf (txt, "mRNA %s %d %d \"Base %c %d is deleted\"\n", name (mrna), m1, m2, (*del)[3], m1+1) ;
 		    if (a1 < a2)
 		      vtxtPrintf (txt, "-D IntMap\nIntMap %s %d %d \"Base %c %d is deleted\"\n", name (seq), a1, a2, (*del)[3], a1+1) ;
 		    else
@@ -6573,7 +6608,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "//      --force : remap all variants, default: remmap on those lacking the GeneBox tag\n"
 	   "//   --db_translate --db ACEDB [--select snp_name]\n"
 	   "//      Translate all [matching] mRNA variants (or genome variants remapped to mRNAs) if they map to a protein coding exon\n"
-	   "//   --db_count_types  --db ACEDB  : count per run the number of SNP passing the cover/count/frquency thresholds of each type sub/indels/transition ...\n"
+	   "//   --db_count_types  --db ACEDB  : count per run the number of SNP passing the cover/count/frequency thresholds of each type sub/indels/transition ...\n"
 	   "//   --db_group_count  --db ACEDB  : add up the counts per group\n"
 	   "// GENE FUSION\n"
 	   "//   --target_class : target class (KT_RefSeq ET_av...) [default ET_av]\n"
@@ -6723,12 +6758,14 @@ int main (int argc, const char **argv)
     tsnp.minSnpCount =  tsnp.minSnpCover ;
 
   tsnp.mergeCounts = getCmdLineBool (&argc, argv, "--merge") ;
-  tsnp.dbReport = getCmdLineBool (&argc, argv, "--db_report") ;
-  tsnp.dbSnpProfile = getCmdLineBool (&argc, argv, "--db_snp_profile") ;
   tsnp.dbTranslate = getCmdLineBool (&argc, argv, "--db_translate") ;
   tsnp.dbGroupCount = getCmdLineBool (&argc, argv, "--db_group_count") ;
   tsnp.dbGGG = getCmdLineBool (&argc, argv, "--db_GGG") ;
   tsnp.dropMonomodal = getCmdLineBool (&argc, argv, "--dropMonomodal") ;
+
+  tsnp.dbReport = getCmdLineBool (&argc, argv, "--db_report") ;
+  tsnp.dbSnpProfile = getCmdLineBool (&argc, argv, "--db_snp_profile") ;
+
   if (tsnp.dbName)
     {
       const char *errors ;
@@ -6826,12 +6863,12 @@ int main (int argc, const char **argv)
       if (1) tsnpRemap0 (&tsnp) ; 
       if (1) tsnpCreateAtlas (&tsnp) ;
       if (1) tsnpRemap1 (&tsnp) ; 
-      if (1) tsnpRemap2 (&tsnp) ;    
     }
   if (tsnp.remap2genes)
     {
-      tsnpCreateAtlas (&tsnp) ;
-      messcrash ("tsnpRemap2genes  not programmed") ;
+      if (1) tsnpRemap0 (&tsnp) ;
+      if (1) tsnpCreateAtlas (&tsnp) ;
+      if (1) tsnpRemap2 (&tsnp) ;    
     }
   if (tsnp.dbTranslate)
     {

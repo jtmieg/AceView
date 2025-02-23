@@ -54,7 +54,7 @@ date
 
   set foundIn=Found_in_genome
   set mapIn=IntMap
-  if ($Strategy == RNA_seq)  then
+  if ($NO_INTRON == 0 && $Strategy == RNA_seq)  then
     set foundIn=Found_in_mRNA
     set mapIn=mRNA
   endif
@@ -158,7 +158,7 @@ endif
 date
   mv $toto.ace $toto.preace
   cat $toto.preace | gawk '/^-/{next}{print}' > $toto.ace
-
+  \rm $toto.preace
   bin/tace tmp/TSNP_DB/$zone <  $toto
 
   if (! -e tmp/TSNP_DB/$zone/av.parse.doneZZZ) then
@@ -188,7 +188,6 @@ EOF
       pparse tmp/TSNP_DB/$zone/mrna.ace
       find gene toto
       query find mrna ; ! DNA ; > Variant
-      kill
       save
       quit
 EOF
@@ -204,12 +203,17 @@ date
 
 done1:
   set remap2g=remap2genes
-  if ($Strategy == RNA_seq) then
+  if ($NO_INTRON == 0 && $Strategy == RNA_seq) then
     set remap2g=remap2genome
-# if -o filename is not provided, tsnp directly edits the database
-    bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone --force 
-    bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC
   endif
+# if -o filename is not provided, tsnp directly edits the database
+  bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone 
+  bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC
+
+#          bin/tsnp --db_report --db tmp/TSNP_DB/$zone  -p $MAGIC
+#    bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone  -p $MAGIC
+#    bin/tsnp --db_group_count --db tmp/TSNP_DB/$zone  -p $MAGIC
+
 # phase may be snp2a (BRS) or tsnp2a) tricoteur
 touch tmp/TSNP_DB/$zone/$MAGIC.$phase.done
 echo -n "tsnp2a: done "

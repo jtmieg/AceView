@@ -114,9 +114,9 @@ int fetch_and_add (int *variable, int value) ; /* x86 specific multithread-safe 
 
 typedef struct regExpStruct *RegExp ;
 
-RegExp regExpCreate (const char *pattern, BOOL getPos, AC_HANDLE h) ;
+RegExp regExpCreate (const char *pattern, AC_HANDLE h) ;
 int regExpFind (RegExp br, const char *data) ;
-int regExpMatch (const char *data, const char *pattern, BOOL getPos) ; 
+int regExpMatch (const char *data, const char *pattern) ; 
 
 /* Usage
  * br = regExpCreate (pattern, 0, h) ;

@@ -34,6 +34,9 @@ echo "$mytmp"
 if (! $?targets) then
   setenv targets "$DNAtargets $RNAtargets"
 endif
+if ($NO_INTRON == 1) then
+  setenv targets "$DNAtargets"
+endif
 
 echo "$mytmp\ntarget=$targets"
 \cp MetaDB/$MAGIC/*  $mytmp/MetaDB/$MAGIC

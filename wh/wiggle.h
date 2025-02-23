@@ -95,6 +95,6 @@ void sxWiggleMultiplyLocally (WIGGLE *sx, Array bbb, Array aaa1) ;
 void sxWiggleCopy (WIGGLE *sx) ;
 void sxWiggleExport (WIGGLE *sx) ;
 
-Array sxGetWiggleZone (Array aa, const char *fNam, char *type, int step, const char *chrom, int a1, int a2, AC_HANDLE h) ; /* returns an array of WIGGLEPOINT */
+Array sxGetWiggleZone (Array aa, const char *fNam, char *type, int *stepp, const char *chrom, int a1, int a2, AC_HANDLE h) ; /* returns an array of WIGGLEPOINT */
 
 #endif

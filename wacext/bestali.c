@@ -9558,7 +9558,7 @@ int main (int argc, const char **argv)
         /* synchronize with bin/target2target_class.txt with c5.h_Ali.awk and with baExportAliProfile() */
       const char **cl ;
       const char *classes[] = { "0_SpikeIn", "1_DNASpikeIn", "A_mito", "B_rrna", "C_chloro", "D_transposon"
-				, "DT_magic", "ET_av", "FT_av2008", "FT_extra", "FT_simul", "FT_cloud", "KT_RefSeq", "LT_RefSeqCurrent",  "LT_seqc", "LT_magic", "LT_UCSC", "MT_EBI", "MT_Gaj", "NT_miRNA", "NT_MiT",  "NT_HINV", "NT_FBK", "NT_FlyBase", "OT_rnaGene", "PT_tRNA", "QT_smallRNA"
+				, "DT_magic", "ET_av", "FT_av2008", "FT_extra", "FT_simul", "FT_cloud", "FT_Eco", "FT_Tjaden", "KT_RefSeq", "LT_RefSeqCurrent",  "LT_seqc", "LT_magic", "LT_UCSC", "MT_EBI", "MT_Gaj", "NT_miRNA", "NT_MiT",  "NT_HINV", "NT_FBK", "NT_FlyBase", "OT_rnaGene", "PT_tRNA", "QT_smallRNA"
 				, "S_est", "U_introns", "W_Line", "X_Bami", "Y_Pfluo", "Z_genome", "b_bacteria", "v_virus", "z_gdecoy"
 			       , 0 } ;
       for (cl = classes ; *cl ; cl++)

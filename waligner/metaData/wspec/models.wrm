@@ -137,19 +137,22 @@
                             Mixed_stages UNIQUE   UNIQUE ?Text
                             Age  Text
                             No_stage  // non applicable, example in Cell lines samples
-          Bio Control UNIQUE  ?Text
+          CT  Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
-              Genes Gene ?Gene // XREF SRR UNIQUE ?Text
+              Healthy
+              Condition ?Text
+          Bio Genes Gene ?Gene ?Text // XREF SRR UNIQUE ?Text
                     Gene_down ?Gene // XREF SRR_down UNIQUE ?Text
                     Gene_up ?Gene // XREF SRR_up UNIQUE ?Text
                     Gene_ectopic ?Gene // XREF SRR_ectopic UNIQUE ?Text
                     Marker_gene ?Gene // XREF SRR_marker UNIQUE ?Text
                     Driver_gene ?Gene // XREF SRR_driver UNIQUE ?Text
               Genotype UNIQUE  ?Text
-              Disease UNIQUE ?Disease XREF Run ?Text
+              Disease UNIQUE ?Disease XREF Sample ?Text
               Phenotype ?Phenotype ?Phenotype UNIQUE Float UNIQUE Float
+              Strain ?Strain Text
+              Replicate UNIQUE ?text
           Biosample_attribute Text UNIQUE Text
-          Strain ?Strain Text
       Identifier     Species ?Species  @Title 
                      RunId UNIQUE ?Text  @Quoted_in  // used for the SEQC TGX project
                      First_line Text // First sequence identifier of each original data file (fasta, fastq,...)
@@ -345,6 +348,10 @@
                       Genes_with_index_over_12 ?Target UNIQUE Int
                       Genes_with_index_over_15 ?Target UNIQUE Int
                       Genes_with_index_over_18 ?Target UNIQUE Int
+                      Genes_with_index_over_21 ?Target UNIQUE Int
+                      Genes_with_index_over_24 ?Target UNIQUE Int
+                      Genes_with_index_over_27 ?Target UNIQUE Int
+                      Genes_with_index_over_30 ?Target UNIQUE Int
 		      Genes_expressed_in_at_least_one_run  ?Target UNIQUE Int
                       mRNA_with_index ?Target UNIQUE Int
 		      mRNA_expressed_in_at_least_one_run  ?Target  UNIQUE Int
@@ -363,6 +370,8 @@
                       Intergenic_density UNIQUE Float UNIQUE Text 
                       Known_introns ?Target UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text 
                       Candidate_introns  ?Target UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text  UNIQUE Float UNIQUE Text UNIQUE Float
+		      Candidate_starts UNIQUE Int
+		      Candidate_ends UNIQUE Int
                       Accessible_length UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_8kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_5kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
@@ -494,6 +503,23 @@
          Number_of_introns  UNIQUE Int
          Details ?Text
          
+
+?StartEnd Title UNIQUE ?Text 
+          Project ?Project
+          Type Unique Start
+	              End
+	  Site IntMap ?Map UNIQUE Int UNIQUE Int 
+               Gene ?Gene XREF  StartEnd
+               mRNA  ?mRNA XREF StartEnd UNIQUE Int // mRNA coordinate
+               Genome_strand UNIQUE Forward
+                                    Reverse
+               Method Magic
+	              Ecocyc
+		      Signal Text
+          Counts Monomodal ?Project 
+                 Manual_non_monomodal
+                 eCounts   ?Run UNIQUE Int UNIQUE Int // Forward, Reverse read ends
+                 tCounts   ?Run UNIQUE Int    // Traversing reads
 
 ?Variant  Title UNIQUE ?Text  /* takes precedence as full HGVS name */
           Id  dbSNP ?dbSNP XREF Variant @Details
@@ -724,6 +750,7 @@
          Intron ?Intron XREF Gene
          mRNA ?mRNA  XREF Gene
          Variant ?Variant XREF Gene
+	 StartEnd ?StartEnd XREF Gene
          Boxed_variant ?Variant XREF GeneBox
          NM_id ?NM_id XREF Gene
          Sample ?Sample XREF Gene
@@ -756,6 +783,7 @@
                             pg
                             RefSeq
                             magic
+                            Eco
                             FlyBase
                             RvY
                             UCSC
@@ -833,6 +861,7 @@
        GeneId ?GeneId  XREF mRNA
        Transcribed_gene ?Transcribed_gene  XREF mRNA
        Product ?Product XREF mRNA UNIQUE Int  UNIQUE Int  UNIQUE Int  UNIQUE Int 
+       StartEnd ?StartEnd XREF mRNA
        Variant ?Variant XREF mRNA
        Length UNIQUE Int
        GC_percent UNIQUE Float
@@ -1087,10 +1116,11 @@
                             Mixed_stages UNIQUE ?Text
                             Age UNIQUE Text
                             No_stage  // non applicable, example in Cell lines samples
-          Bio Control UNIQUE  ?Text
+          CT  Control UNIQUE  ?Text
               Treatment UNIQUE  ?Text
-              Replicate UNIQUE  ?Text
-              Genes Gene ?Gene ?Text // XREF SRR UNIQUE ?Text
+              Healthy
+              Condition ?Text
+          Bio Genes Gene ?Gene ?Text // XREF SRR UNIQUE ?Text
                     Gene_down ?Gene // XREF SRR_down UNIQUE ?Text
                     Gene_up ?Gene // XREF SRR_up UNIQUE ?Text
                     Gene_ectopic ?Gene // XREF SRR_ectopic UNIQUE ?Text
@@ -1099,11 +1129,10 @@
               Genotype UNIQUE  ?Text
               Disease UNIQUE ?Disease XREF Sample ?Text
               Phenotype ?Phenotype ?Phenotype UNIQUE Float UNIQUE Float
+              Strain ?Strain Text
+              Replicate UNIQUE ?text
           Biosample_attribute Text UNIQUE Text
           Identifier Text ?Text
-          Strain ?Strain Text
-          Healthy
-          Condition ?Text
           Submission ?Author XREF Sample
           Submission_date DateType
           Release_date UNIQUE DateType    
@@ -1362,8 +1391,7 @@
           Sp_species    ?Sequence XREF Sp_group // used in VirusDB to group similar bacteria
           Source ?Sequence XREF Subsequence
           Subsequence ?Sequence XREF Source UNIQUE Int UNIQUE Int 
-
-
+	  
 ?Clone  Main_Clone
         Strategy MainTitle UNIQUE Text  // appears as main Window title
                  Species UNIQUE Text

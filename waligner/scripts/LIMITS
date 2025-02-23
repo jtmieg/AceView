@@ -15,6 +15,12 @@ if (! $?MOLECULE_TYPE) setenv MOLECULE_TYPE "RNA"
 ## 2: Species
 ## The species is chosen by creating a local link called TARGET
 ## to the TARGET.species directory distributed with the program
+## The species is specified inside the file TARGET/LIMITS
+##
+## 2b: Eucaryote/Procaryote [Default EUCARYOTE]
+## also specifeid inside TARGET/LIMITS
+## Procaryotes do not have introns
+## so there is no need to align on the spliced mRNAs
 
 ##############################################################
 ## 3: Parallel submission
@@ -281,6 +287,9 @@ setenv VIRUS_PROJECT 0
 setenv MAGIC_SAM 0
 setenv USE_MAGIC_BLAST 0
 
+## Eucaryote/Procaryote
+## setenv to 0 in TARGET LIMITS if there are no introns
+setenv NO_INTRON 0
 ###########################################################
 ## The rest of the files deals with adaptors per platform
 ## Define here the different adaptors for each platform

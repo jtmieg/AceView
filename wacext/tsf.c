@@ -1004,29 +1004,32 @@ static BOOL tsfMergeOne (HIT *hit, HIT *hit2, int action)
 static long int tsfMerge (TSF *tsf)
 {
   BigArray hits = tsf->hits ;
-  long int ii, jj, iMax = bigArrayMax (hits) ;
+  long int ii, jj = 0, iMax = bigArrayMax (hits) ;
   HIT *hit, *hit2 ;
   int action = 0 ;
 
   /* sort and cumulate the values */
-  bigArraySort (hits, tsfSampleOrder) ;
-  for (ii = 0, hit = bigArrp (hits, 0, HIT) ; ii < iMax ; ii++, hit++)
+  if (iMax)
     {
-      if ( !hit->sample)
-	continue ;
-      
-      for (jj = ii + 1, hit2 = hit+1 ; jj < iMax && (! hit2->sample || hit2->sample == hit->sample) && hit2->tag == hit->tag ; jj++, hit2++)
-	tsfMergeOne (hit, hit2, action) ;
+      bigArraySort (hits, tsfSampleOrder) ;
+      for (ii = 0, hit = bigArrp (hits, 0, HIT) ; ii < iMax ; ii++, hit++)
+	{
+	  if ( !hit->sample)
+	    continue ;
+	  
+	  for (jj = ii + 1, hit2 = hit+1 ; jj < iMax && (! hit2->sample || hit2->sample == hit->sample) && hit2->tag == hit->tag ; jj++, hit2++)
+	    tsfMergeOne (hit, hit2, action) ;
+	}
+      /* clean up */
+      for (ii = jj = 0, hit2 = hit = bigArrp (hits, ii, HIT) ; ii < iMax ; ii++, hit++)
+	{
+	  if ( !hit->sample)
+	    continue ;
+	  if (hit != hit2)
+	    *hit2 = *hit ;
+	  jj++ ; hit2++ ; 
+	}
     }
-  /* clean up */
-  for (ii = jj = 0, hit2 = hit = bigArrp (hits, ii, HIT) ; ii < iMax ; ii++, hit++)
-    {
-      if ( !hit->sample)
-	continue ;
-      if (hit != hit2)
-	*hit2 = *hit ;
-      jj++ ; hit2++ ; 
-    } 
   bigArrayMax (hits) = jj ;
   return bigArrayMax (hits) ;
 } /* tsfMerge */

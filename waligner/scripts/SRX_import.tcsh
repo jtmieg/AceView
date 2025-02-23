@@ -21,10 +21,12 @@ if ($species == Ecoli) then
   set date=2015_10_03
   set ff=/home/mieg/ACEVIEWHELP/Ecoli_DATA/2015/1734E.coliK12_Oct7_2015_SRApublic_SraRunInfo.txt
   set date=2017_10_05
-  set ff=/home/mieg/ACEVIEWHELP/Ecoli_DATA/Ecoli_RNA_SRA_3449runs_8.2Tb.RunInfo.limit_to_taxon_511145.748_runs.2017_10_05.txt
+  set ff=/home/mieg/ACEVIEWHELP/Ecoli_DATA/2017/Ecoli_RNA_SRA_3449runs_8.2Tb.RunInfo.limit_to_taxon_511145.748_runs.2017_10_05.txt
+  set date=2025_01_25
+  set ff=/home/mieg/ACEVIEWHELP/Ecoli_DATA/2025/Ecoli_RNA_SRA_5852runs_12.8Tb.RunInfo.limit_to_taxon_511145.748_runs.2025_01_25.txt
 endif
 
-if ($species == Dmelanogaster) then
+if ($species == droso) then
   set date=2016_04_19
   set ff=/home/mieg/ACEVIEWHELP/Droso/DATA/Droso_allRNA.2016_04_18.SraRunInfo.txt
   set date=2016_10_12 
@@ -32,7 +34,10 @@ if ($species == Dmelanogaster) then
   set date=2016_10_14
   set ff=/home/mieg/ACEVIEWHELP/Droso/DATA/2016Oct15_Drosophila_melanogaster_Organism_NOT_biomol_dna_Properties_13863_SraRunInfo.txt
   set ff=/home/mieg/ACEVIEWHELP/Droso_DATA/DATA/DrosophilaMelano_2017Mar20_4640RNA_since2016Apr10_PreviousWasApr19_SraRunInfo.txt
+  set date=2025_01_21
+  set ff=/home/mieg/ACEVIEWHELP/Droso_DATA/20250121_DrosoMelano_SraRunInfo.txt
 endif
+
 if ($species == hs) then
   set date=2016_10_14
   set ff='/home/mieg/ACEVIEWHELP/Human_DATA/*SraRunInfo.txt' 
@@ -422,11 +427,10 @@ echo "count the spots in sublibs "
 if (! -e ZZZZZ) echo ZZZZZ > ZZZZZ
 
 tace SRX_DB <<EOF
-  query find project IS $MAGIC
-  select -a -o $dd/SRX_count_spots.txt srx,r,s1,s2,s3,s4,s5,s6,s7,s8,s9 from p in @, srx in ?srr, r in srx->sublibraries where r,s in r#spots where s,s1 in s[1],s2 in s[2],s3 in s[3],s4 in s[4],s5 in s[5],s6 in s[6],s7 in s[7],s8 in s[8],s9 in s[9]
+  query find SRR sublibraries
+  select -a -o $dd/SRX_count_spots.txt srx,r,s1,s2,s3,s4,s5,s6,s7,s8,s9 from srx in @, r in srx->sublibraries where r,s in r#spots where s,s1 in s[1],s2 in s[2],s3 in s[3],s4 in s[4],s5 in s[5],s6 in s[6],s7 in s[7],s8 in s[8],s9 in s[9]
 EOF
 cat  $dd/SRX_count_spots.txt ZZZZZ | gawk -F '\t' '{gsub(/\"/,"",$0);}{if($1 != srx) {if(ns>0){printf("SRX %s\nSpots %d ",srx,ns); if(nb>0) { printf(" bases_in_SRA %d ", nb); if(nA >0){printf(" Average_length %d ",nA); if (nSize > 0){printf(" Insert_size %s ", nSize); if( nMates > 0) printf(" spots_with_mate %d ", nMates);}}} printf("\n\n");} ns = 0 ; nb = 0 ; nA = 0 ; nSize = 0 ; nMates = 0 ;} srx =$1;if ($3 > 0) { ns += $3;nb += $5; nMates += $11; nA = (nA * (ns - $3) + $7 * $3)/(ns); nSize = (nSize * (ns - $3) + $9 * $3)/(ns);}}' >  $dd/SRX_count_spots.ace
-
 
 echo "parse the spots counts"
 tbly SRX_DB <<EOF
@@ -622,50 +626,87 @@ echo ZZZZZ > ZZZZZ
 cat $dd/srr.dump.ace > $dd/srr2run.preace
 
 cat <<EOF > $dd/srr2run.awk
-/^Adult/{next;}
-/^Annotation_problem/{next;}
+/^Adult/{print;next;}
+/^Age/{print;next;}
+/^Annotation_problem/{print;next;}
 /^Biosample/{next;}
 /^Body_site/{next;}
 /^Cap_CAGE_RACE/{print;next;}
-/^Cell_line/{next;}
+/^Carcass/{print;next;}
+/^Cell_line/{print;next;}
 /^Center_name/{next;}
-/^Control/{next;}
+/^Connective/{print;next;}
+/^Control/{print;next;}
 /^Date_received/{print;next;}
-/^Digestive/{next;}
-/^ERROR/{next;}
-/^Embryo/{next;}
-/^Female/{next;}
+/^Dauer/{print;next;}
+/^Digestive/{print;next;}
+/^Driver_gene/{print;next;}
+/^EE/{print;next;}
+/^ERROR/{print;next;}
+/^Embryo/{print;next;}
+/^Epithelium/{print;next;}
+/^Endocrine_gland/{print;next;}
+/^Exocrine_gland/{print;next;}
+/^Endocrine/{print;next;}
+/^Female/{print;next;}
+/^Fetal/{print;next;}
 /^File/{print;next;}
 /^Forward/{next;}
-/^Gene_selection/{next;}
-/^Germline_and_development/{next;}
+/^Genotype/{print;next;}
+/^Gene_selection/{print;next;}
+/^Gene_ectopic/{print;next;}
+/^Gene_down/{print;next;}
+/^Gene_up/{print;next;}
+/^Germline_and_development/{print;next;}
 /^Group/{print ; next;}
-/^Head/{next;}
+/^Head/{print;next;}
 /^Helicos/{print;next;}
+/^Hemic_and_immune/{print;next;}
+/^Hermaphrodite/{print;next;}
 /^Illumina/{print;next;}
 /^Ion_Torrent/{print;next;}
-/^L1/{next;}
-/^L2/{next;}
-/^L3/{next;}
-/^L4/{next;}
+/^Juvenile/{print;next;}
+/^L1/{print;next;}
+/^L2/{print;next;}
+/^L3/{print;next;}
+/^L4/{print;next;}
 /^Any_larva/{next;}
-/^Larva/{next;}
+/^Larva/{print;next;}
 /^Library_name/{next;}
+/^Lymphoid/{print;next;}
 /^Magic_author2/{gsub("Magic_author2" ,"Author", \$0);print; next;}
-/^Male/{next;}
-/^Microbiome/{next;}
+/^Male/{print;next;}
+/^Males_and_females/{print;next;}
+/^Marker_gene/{print;next;}
+/^Membrane/{print;next;}
+/^Microbiome/{print;next;}
+/^Mixed_embryo/{print;next;}
+/^Mixed_larvae/{print;next;}
 /^Mixed_sex/{next;}
-/^Nascent_RNA/{print;next;}
-/^Nerve/{next;}
+/^Mixed_stages/{print;next;}
+/^Molt/{print;next;}
+/^Muscle/{print;next;}
+/^Musculoskeletal_and_cardiovascular/{print;next;}
 /^Nanopore/{print;next;}
+/^Nascent_RNA/{print;next;}
+/^Nerve/{print;next;}
+/^Nervous_and_sense_organ/{print;next;}
+/^No_tissue/{print;next;}
+/^OA/{print;next;}
+/^Other/{print;next;}
 /^Oxford_nanopore/{print "Nanopore";next;}
 /^Paired_end/{print;next;}
 /^PacBio/{print;next;}
+/^Phenotype/{print;next;}
 /^Project/{print;next;}
-/^Pupa/{next;}
+/^Pupa/{print;next;}
 /^RIP_CLIP/{print;next;}
 /^RNA/{print;next;}
 /^Reference/{print;next;}
+/^Release_date/{print;next;}
+/^Replicate/{print;next;}
+/^Respiratory/{print;next;}
+/^Ribosome_profiling/{print;next;}
 /^Roche_454/{print;next;}
 /^Run/{next;printf("\n");print;next;}
 /^SNP/{print;next;}
@@ -680,25 +721,30 @@ cat <<EOF > $dd/srr2run.awk
 /^Sorting_title/{print;next;}
 /^Species/{print;next;}
 /^Spots/{print;next;}
+/^Strain/{print;next;}
 /^Stranded/{next;print "Strand";next;}
 /^Sublibraries/{print;next;}
 /^Sublibrary_of/{print;next;}
 /^Submission_date/{print;next;}
 /^Title/{print;next;}
-/^Treatment/{next;}
+/^Treatment/{print;next;}
 /^Total_RNA/{print;next;}
-/^Total/{next;}
+/^Total/{print "Total_RNA" ; next;}
 /^Union_of/{print;next;}
 /^Unspecified_RNA/{print;next;}
+/^Urogenital/{print;next;}
 /^Warning/{next;}
 /^Whole_genome/{print;next;}
-/^Whole_organism/{next;}
+/^Whole_organism/{print;next;}
+/^YA/{print;next;}
 /^nanopore/{print "Nanopore";next;}
 /^nonStranded/{print;next;}
 /^polyA/{print;next;}
 /^sraUnspecified_RNA/{next;}
 /^sraGenesraGene_selection/{next;}
 /^sraGenesraGenesraPolyA/{next;}
+/^sraPolyA/{next;}
+/^sraUnspecified_RNA/{next;}
 /^sraRIP_CLIP/{next;}
 /^sraSmall_RNA/{next;}
 /^sraUnspecified_RNA/{next;}
@@ -720,6 +766,7 @@ cat  $dd/srr2run.preace | gawk -f $dd/srr2srr.awk >  $dd/srr2srr.ace
 cat <<EOF > $dd/srp2run.awk
 /^Abstract/{print;next;}
 /^Description/{print;next;}
+/^Comment/{print;next;}
 /^GEO/{next;}
 /^Identifier/{print;next;}
 /^Reference/{print;next;}
