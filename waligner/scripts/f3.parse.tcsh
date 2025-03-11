@@ -87,7 +87,7 @@ foreach target ($Etargets)
   endif
   echo AAA $ffcds
   if (-e $ffcds) then
-    cat $ffcds ZZZZZ $ffcds | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if (chrom != $3)next;}{a1=$4;a2=$5;ln=a2-a1;if(ln<0)ln = -ln;ln++;}{if(zz<1){t2ln[$1]+=ln;next;}}{nnn=t2ln[$1];if(nnn >= 450)printf("Xcds_%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n",chrom,a1,a2,ln,chrom,a1,a2,nnn);}' chrom=$chrom | sort -u | sort -V >  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2
+    cat $ffcds ZZZZZ $ffcds | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if (chrom != $3)next;}{a1=$4;a2=$5;ln=a2-a1;if(ln<0)ln = -ln;ln++;}{if(zz<1){t2ln[$1]+=ln;next;}}{nnn=t2ln[$1];if(nnn >= 270)printf("Xcds_%s__%d_%d\t1\t%d\t%s\t%d\t%d\t%d\n",chrom,a1,a2,ln,chrom,a1,a2,nnn);}' chrom=$chrom | sort -u | sort -V >  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2
       bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 >  tmp/X.$MAGIC/$chrom/f3.$target.cds.fasta
       cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt2 | gawk -F '\t' '{z=$1"\t"$2"\t"$3"\t"$4"\t"$5"\t"$6;if($7>nn[z]+0)nn[z]=$7+0;}END{for(z in nn)printf("%s\t%d\n",z,nn[z]);}' > tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3
       cat  tmp/X.$MAGIC/$chrom/f3.$target.cds.txt3 | gawk -F '\t' '{printf("Sequence %s\ncdna_clone %s\nForward\nColour LIGHTVIOLET\nIntMap %s %d %d\nIs_read\nComposite %d\n\n",$1,$1,$4,$5,$6,$7);}' >  tmp/X.$MAGIC/$chrom/f3.$target.cds.ace
@@ -209,7 +209,6 @@ if ($ggNS != "") then
 endif
 echo "parse the tabix file"
 echo "pparse tmp/X.$MAGIC/$chrom.tabix.ace" | bin/tacembly tmp/X.$MAGIC/$chrom -no_prompt
-
 set WGR="toto"
 if (-d  tmp/WIGGLEGROUP/$ggNS) set WGR=WIGGLEGROUP
 
@@ -218,20 +217,6 @@ echo "restore the original data"
 if (-e tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz) then
   \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u.f.BF.gz
   \mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u.r.BF.gz
-endif
-
-# scripts/wiggle2tabix.tcsh $ggNS $chrom u $chrom
-# restranding the non stranded wiggle group using the stranded wiggle group
-# maybe not be a good idea because we already projected on the favorable strands
-if (0 && $ggS != $ggNS && $ggS != toto && $ggNS != toto && $WGR != toto && ! -e  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz) then
-
-  echo "restranding the non stranded wiggle $ggNS using the stranded wiggle $WGR/$ggS"
-  mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u.f.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz
-  mv  tmp/$WGR/$ggNS/$chrom/R.chrom.u.r.BF.gz  tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz
-
-  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.$ggNS.u.f
-  bin/wiggle -wiggleRatioDamper 10 -I BF -O BF  -wiggle1 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.r.BF.gz  -wiggle2 tmp/$WGR/$ggNS/$chrom/R.chrom.u0.f.BF.gz  -swiggle1 tmp/$WGR/$ggS/$chrom/R.chrom.u.r.BF.gz  -swiggle2 tmp/$WGR/$ggS/$chrom/R.chrom.u.f.BF.gz -gzo -o    tmp/$WGR/$ggNS/$chrom/R.chrom.$ggNS.u.r
-
 endif
 
 ###### grab the coverons and the gene-ends using multiPeaks (XG stranded, XH non stranded)
@@ -247,25 +232,25 @@ foreach XGH (XG XH)
   if ($XGH == XH) set stranding=50
   if ($XGH == XH && $ggNS == $ggS) continue
 
-  if (-d  tmp/WIGGLEGROUP/$ggs) set WGR=WIGGLEGROUP
   if (-d  tmp/WIGGLERUN/$ggs) set WGR=WIGGLERUN
+  if (-d  tmp/WIGGLEGROUP/$ggs) set WGR=WIGGLEGROUP
   if (! -d  tmp/$WGR/$ggs) continue
   set ok=0
 
-# exon multipeaks
+echo "# exon multipeaks"
   echo "Construct the multipeaks  $WGR/$ggs"
   echo "  bin/wiggle  -multiPeaks 4 -minCover $minExonCover -I BF -O COUNT -wiggle1 tmp/$WGR/$ggs/$chrom/R.chrom.u.f.BF.gz  -wiggle2 tmp/$WGR/$ggs/$chrom/R.chrom.u.r.BF.gz -stranding 98 -o  tmp/X.$MAGIC/$chrom/f3.$XGH.f"
-# grab the exons from the wiggle
+echo "# grab the exons from the wiggle "
   bin/wiggle  -multiPeaks 4 -minCover $minExonCover -I BF -O COUNT -wiggle1 tmp/$WGR/$ggs/$chrom/R.chrom.u.f.BF.gz  -wiggle2 tmp/$WGR/$ggs/$chrom/R.chrom.u.r.BF.gz -stranding 98 -o  tmp/X.$MAGIC/$chrom/f3.$XGH.f
   bin/wiggle  -multiPeaks 4 -minCover $minExonCover -I BF -O COUNT -wiggle1 tmp/$WGR/$ggs/$chrom/R.chrom.u.r.BF.gz  -wiggle2 tmp/$WGR/$ggs/$chrom/R.chrom.u.f.BF.gz -stranding 98 -o  tmp/X.$MAGIC/$chrom/f3.$XGH.r
 
-  cat tmp/X.$MAGIC/$chrom/f3.$XGH.f.multiPeaks ZZZZZ | scripts/tab_sort -k 1,1 -k 2n |  gawk -F '\t' '/^#/{next;}{if(a10<1)a10=$2;if($1=="ZZZZZ" || $2 >= a2+10){if(a2-a1 > 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$2;score=0;}}c=$1; a1=$2;a2=$3;if(a1<1)a1=1;cov= cov "\nComposite " a1 - a10 + 1 " " a2 - a10 " " int($7); if($6>score)score=int($7);} ' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.f.ace
+  cat tmp/X.$MAGIC/$chrom/f3.$XGH.f.multiPeaks ZZZZZ | scripts/tab_sort -k 1,1 -k 2n |  gawk -F '\t' '/^#/{next;}{if(a10<1)a10=$2;if($1=="ZZZZZ" || $2 >= a2+10){if(a2-a1 > 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$2;score=0;}}c=$1; a1=$2;a2=$3;if(a1<1)a1=1;cov= cov "\nComposite " a1 - a10 + 1 " " a2 - a10 " " int($6); if($6>score)score=int($6);} ' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.f.ace
   wc  tmp/X.$MAGIC/$chrom/f3.$XGH.f.ace
   cat tmp/X.$MAGIC/$chrom/f3.$XGH.f.ace  | gawk '/^Sequence/{split($2,aa,"__");chrom=substr(aa[1],4);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.f.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/$chrom/f3.$XGH.f.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.f.fasta
 
 
-   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.multiPeaks | scripts/tab_sort -k 1,1 -k2nr | gawk -F '\t' '/^ZZZZZ/{next;}{if(a10<1){a1=$3;a10=$3;}if(substr($1,1,11)=="#Chromosome" || $3 <= a2-10){if(a2-a1 < 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$3;score=0;}}c=$1; a1=$3;a2=$2;if(a2<1)a2=1;cov= cov "\nComposite " a10 -a1  + 1 " " a10 -a2 " " int($6); if($7>score)score=int($7); }' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
+   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.multiPeaks | scripts/tab_sort -k 1,1 -k2nr | gawk -F '\t' '/^ZZZZZ/{next;}{if(a10<1){a1=$3;a10=$3;}if(substr($1,1,11)=="#Chromosome" || $3 <= a2-10){if(a2-a1 < 0){color=1;s=score;while (color<7 && s>100){s/=5;color++;}if(score>=1)printf("Sequence %s_%s__%d_%d\nForward\ncDNA_clone %s_%s__%d_%d\nIntMap %s %d %d\nIs_read\nTags %d\nColour Green%d%s\n\n",XGH,c,a10,a2,XGH,c,a10,a2,c,a10,a2,int(score),color,cov);cov="";a10=$3;score=0;}}c=$1; a1=$3;a2=$2;if(a2<1)a2=1;cov= cov "\nComposite " a10 -a1  + 1 " " a10 -a2 " " int($6); if($6>score)score=int($6); }' XGH=$XGH >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
   wc  tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace
   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace  | gawk '/^Sequence/{split($2,aa,"__");chrom=substr(aa[1],4);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.fasta
@@ -423,6 +408,9 @@ EOF
 
 
 ##### parse the RefSeq
+if (-e TARGET/GENES/Ecocyc.ace) then
+  echo "pparse TARGET/GENES/Ecocyc.ace" | bin/tacembly tmp/X.$MAGIC/$chrom -no_prompt
+endif
 
 foreach target ($RNAtargets)
   if ($target == av) continue

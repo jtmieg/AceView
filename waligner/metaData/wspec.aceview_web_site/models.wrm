@@ -678,7 +678,8 @@
                   Nb_stolen_exons  UNIQUE Int
                   Nb_predicted_exons  UNIQUE Int
                   Total_gap_length UNIQUE Int
-                  Intron_boundaries  gt_ag UNIQUE    Int Int Int ?cDNA_clone
+                  StartEnd ?StartEnd XREF Gene
+	          Intron_boundaries  gt_ag UNIQUE    Int Int Int ?cDNA_clone
                                      ct_ac UNIQUE    Int Int Int ?cDNA_clone
                                      gc_ag UNIQUE    Int Int Int ?cDNA_clone
                                      at_ac UNIQUE    Int Int Int ?cDNA_clone
@@ -2764,7 +2765,8 @@
            DbXref Text UNIQUE Text
            Method ?Method          // a vider
            Colour #Colour
-           Element Intron ?Intron XREF Gene  // contains the deep sequencing info
+           Element StartEnd ?StartEnd XREF Gene
+	           Intron ?Intron XREF Gene  // contains the deep sequencing info
                    Fusion1 ?Fusion XREF Gene1 @Support  // contains the deep sequencing info
                    Fusion2 ?Fusion XREF Gene2 @Support  // contains the deep sequencing info
            Structure   nExons  UNIQUE Int
@@ -3971,4 +3973,22 @@
                   Diff_SF31A   Text ?Target UNIQUE Int  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Int
                   Diff_SF31B   Text ?Target UNIQUE Int  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Int
           AUC Text Text UNIQUE Float Text  UNIQUE Float // AUC Gene av 88.3  test 75.7
+
+
+?StartEnd Title UNIQUE ?Text 
+          Project ?Project
+          Type Unique Start UNIQUE Int
+                      End
+          Site IntMap ?Map UNIQUE Int UNIQUE Int 
+               Gene ?Gene XREF  StartEnd
+               mRNA  ?mRNA XREF StartEnd UNIQUE Int // mRNA coordinate
+               Genome_strand UNIQUE Forward
+                                    Reverse
+               Method Magic
+	              Ecocyc UNIQUE Int
+               Binds Text
+               Counts Monomodal ?Project 
+                      Manual_non_monomodal
+                      eCounts   ?Run UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Float // a1 a2 maxcover avereage_cover
+                      tCounts   ?Run UNIQUE Int    // Traversing reads
 

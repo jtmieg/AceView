@@ -10,7 +10,10 @@
 #                  file -> format XML
 
 # please edit the configuration
-set phase = $1
+set phaseSet="$*"
+if ("$phaseSet" == "" || "$phaseSet" == "help"  || "$phaseSet" == "-h" || "$phaseSet" == "--h" || "$phaseSet" == "-help" || "$phaseSet" == "--help") goto usage
+
+set phase=`echo $phaseSet | gawk '{print $1}'`
 
 if ($species == corona) then
   set date=2020_05_02
@@ -141,6 +144,12 @@ if (! -d $dd) mkdir $dd
 cat $ff | sed -e 's/\r//' | grep -v "Synthetic-Long-Read" > $dd/runInfo.tsv
 set ff1=$dd/runInfo.tsv
 
+echo "..... requested phases : $phaseSet"
+foreach  phase ($phaseSet)
+
+echo -n "=== phase $phase start "
+date
+
 
 if ($phase == SRR) goto phaseSRR
 if ($phase == SRP) goto phaseSRP
@@ -158,7 +167,7 @@ if ($phase == Papers) goto phasePapers
 if ($phase == sraDownload) goto phase_sraDownload
 if ($phase == sraDownloadTest) goto phase_sraDownload
 
-
+usage:
 echo "usage: SRX_import.tcsh SRR PRJ SRP GEO Sample SRX Files Papers  Sublibs Titles  srr2srx srr2run |  sraDownload sraDownloadTest"
 goto phaseLoop
 
@@ -272,6 +281,8 @@ foreach geo (`cat $dd/geo.list`)
    if ( -e  $dd/GEO/$geo.html) continue 
    echo "wget -O "$dd"/GEO/"$geo".html  "'"https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc='$geo'"' | grep -v '(' | grep -v ')' >>  $dd/GEO/_wget
 end
+
+if (! -e $dd/GEO/_wget) goto phaseLoop
 
 wc $dd/GEO/_wget
 source  $dd/GEO/_wget
@@ -468,12 +479,17 @@ if (! -d $dd/PAPERS) then
   popd
 endif
 
+if (-e $dd/PAPERS/a5.pmnocit.list) \rm $dd/PAPERS/a5.pmnocit.list
 tbly SRX_DB <<EOF
   query find paper IS pm* AND NOT citation
   list -a -f $dd/PAPERS/a5.pmnocit.list
 EOF
-wc  $dd/PAPERS/a5.pmnocit.list
 
+if (! -e $dd/PAPERS/a5.pmnocit.list) goto phaseLoop
+set n=`wc -l  $dd/PAPERS/a5.pmnocit.list | gawk '{print 0+$1;}'`
+if ($n == 0) goto phaseLoop
+
+wc -l  $dd/PAPERS/a5.pmnocit.list 
 pushd  $dd/PAPERS
   perl  BIBLIO/PmImport/medlineGet.pl < a5.pmnocit.list >! a5.pmnocit.gb
   perl  BIBLIO/PmImport/medline2ace.pl < a5.pmnocit.gb >! a5.pmnocit.preace
@@ -558,6 +574,7 @@ foreach ss (`cat  $dd/SRA/srr.todo`)
   if (! -d Fastc/$srr &&  ! -e $dd/SRA/$srr && ! -e $dd/SRA/$srr.fasta.gz &&  ! -e $dd/SRA/$srr'_1'.fasta.gz && ! -e $dd/SRA/$srr.csfasta.gz &&  ! -e $dd/SRA/$srr'_1'.csfasta.gz) then
     echo $ss >> totosraNeeded
    if ($phase == sraDownload) then
+     echo "scripts/submit $dd/SRA/$srr scripts/SRX_import_fasta.tcsh $dd/SRA $ss"
      scripts/submit $dd/SRA/$srr "scripts/SRX_import_fasta.tcsh $dd/SRA $ss"
      sleep 1
    endif
@@ -929,3 +946,4 @@ cat RESULTS/scoring.2.txt | gawk -F '\t' '/^#/{next;}{printf("Run %s\nScore %s \
 
 phaseLoop:
  date
+end

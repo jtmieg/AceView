@@ -173,7 +173,9 @@ EOF
 
 # reject geneboxes longer than geneBoxMaxLn
 set geneBoxMaxLn=1000000
-    cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '{n=$4-$3;if(n<0)n=-n; if (n<nMax)printf("%s\t1\t%s\t%d\t%d\t%s\n",$1,$2,$3,$4,$1);}' nMax=$geneBoxMaxLn > tmp/METADATA/$target.ns.gene.sponge
+#    cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '{a1=$3;a2=$4;if(a1>a2)next;n=a2-a1;if(n<0){n=-n;} if (n<nMax)printf("%s\t1\t%s\t%d\t%d\t%s\n",$1,$2,a1,a2,$1);}' nMax=$geneBoxMaxLn > tmp/METADATA/$target.f.gene.sponge
+#    cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '{a1=$3;a2=$4;if(a1<a2)next;n=a2-a1;if(n<0){n=-n;} if (n<nMax)printf("%s\t1\t%s\t%d\t%d\t%s\n",$1,$2,a1,a2,$1);}' nMax=$geneBoxMaxLn > tmp/METADATA/$target.r.gene.sponge
+    cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '{a1=$3;a2=$4;n=a2-a1;if(n<0){n=-n;} if (n<nMax)printf("%s\t1\t%s\t%d\t%d\t%s\n",$1,$2,a1,a2,$1);}' nMax=$geneBoxMaxLn > tmp/METADATA/$target.ns.gene.sponge
 
     if (-e  tmp/METADATA/gtf.$target.goodProduct.ace.gz) then
       \rm  tmp/METADATA/gtf.$target.goodProduct.ace.gz
@@ -553,6 +555,24 @@ foreach target ($allRNAtargets)
   endif
 
 end
+
+######################################################
+######################################################
+# Manipulate the known transcript ends
+
+    if (-e TARGET/GENES/Ecocyc.ace  &&  -e tmp/METADATA/Eco.knownEnds.done) then
+      foreach chrom ($chromSetAll)
+          set toto=tmp/METADATA/Eco.knownStarts.$chrom
+          cat TARGET/GENES/Ecocyc.ace | gawk '/^IntMap/{if($2 == chrom){printf("%d\t%d\n",$3,$4);}}' chrom=$chrom > $toto.a
+          cat $toto.a |  gawk '{if($1<$2)print $1; }' | sort -u | sort -k 1n > $toto.f
+          cat $toto.a |  gawk '{if($1>$2)print $1; }'  | sort -u | sort -k 1n > $toto.r
+          set toto1=tmp/METADATA/Eco.knownEnds.$chrom
+          cat $toto.a |  gawk '{if($1<$2)print $2; }' | sort -u | sort -k 1n > $toto1.f
+          cat $toto.a |  gawk '{if($1>$2)print $2;}'  | sort -u | sort -k 1n > $toto1.r
+	  \rm $toto.a
+      end
+      touch tmp/METADATA/Eco.knownEnds.done
+    endif
 
 ######################################################
 ######################################################

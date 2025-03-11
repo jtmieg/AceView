@@ -2407,7 +2407,7 @@ typedef struct HTILEBPstruct { KEY mrna ; int bumpy ;} HTILEBP ;
 static void htileDrawMusicalScale (Htile look, float offset)
 {
   float oldw, s, x, y, zoom ;
-  int i, j, j0, ss[] = { 1, 2, 5 } ;
+  int j, j0, ss[] = { 1, 2, 5 } ;
 #ifdef BOU_DEF
   int *ep, erics[] = {-20, 8, 36, 64, 92, 120, 0} ;
 #endif
@@ -2464,7 +2464,7 @@ static void htileDrawMusicalScale (Htile look, float offset)
   if (y > 0) 
     {
       int box = graphBoxStart () ;
-      graphText (messprintf (" %g ", 10 * s), 1, y) ;
+      graphText (messprintf (" %g ", s), 1, y) ;
       graphBoxEnd () ;
       graphBoxDraw (box, BLACK, WHITE) ;
     }
@@ -2476,7 +2476,7 @@ static void htileDrawMusicalScale (Htile look, float offset)
       if (! look->hideMusic && y < look->map->graphHeight)
 	{
 	  graphLine (3, y, look->map->graphWidth -1, y) ;
-	  graphText (messprintf ("%g", - 10 * s), 1, y) ;
+	  graphText (messprintf ("%g", - s), 1, y) ;
 	}
     }
   oldw = graphLinewidth (.3) ;
@@ -2748,7 +2748,7 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 
 /************************************************************/
 /* the endRatio
- * ATTENTION  synchronize with w1/wigglelib.c:sxWoiggleEndRatio1
+ * ATTENTION  synchronize with w1/wigglelib.c:sxWiggleEndRatio1
  */
 
 static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
@@ -2757,18 +2757,16 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
   int NA = -999 ;
   unsigned int flag1 = 0, flag2 = 0, flag3 = 0, flag4 = 0 ;
   int i, ns1, ns2, ns3, ns4 ;
-  float seuil = .80 ;
-  float zoom = 40 ;
   
   ns1 = ns2 = ns3 = ns4 = NA ;
   if ((pnx0->flag &  PGG_endRatioLF) ==  PGG_endRatioLF)
-    { zoom = 40 ; flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
+    {  flag1 = PGG_ELF ; flag2 = PGG_ERF ;  flag3 = PGG_ELR ; flag4 = PGG_ERR ;}
   if ((pnx0->flag &  PGG_endRatioRF) ==  PGG_endRatioRF)
-    { zoom = 40 ; flag1 = PGG_ERF ; flag2 = PGG_ELF ;  flag3 = PGG_ERR ; flag4 = PGG_ELR ; }
+    {  flag1 = PGG_ERF ; flag2 = PGG_ELF ;  flag3 = PGG_ERR ; flag4 = PGG_ELR ; }
   if ((pnx0->flag &  PGG_endRatioLR) ==  PGG_endRatioLR)
-    { zoom = 40 ; flag1 = PGG_ELR ; flag2 = PGG_ERR ; flag3 = PGG_ELF ; flag4 = PGG_ERF ; }
+    {  flag1 = PGG_ELR ; flag2 = PGG_ERR ; flag3 = PGG_ELF ; flag4 = PGG_ERF ; }
   if ((pnx0->flag &  PGG_endRatioRR) ==  PGG_endRatioRR)
-    { zoom = 40 ; flag1 = PGG_ERR ; flag2 = PGG_ELR ; flag3 = PGG_ERF ; flag4 = PGG_ELF ; }
+    {  flag1 = PGG_ERR ; flag2 = PGG_ELR ; flag3 = PGG_ERF ; flag4 = PGG_ELF ; }
 
   for (i = 0, pnx = pnx0 ; i < NF && ns -i >= 0 ; pnx--, i++)
     if ((pnx->flag & flag1) == flag1) { pnx0->signal = pnx->signal ; ns1 = ns - i ; break ; }
@@ -2789,6 +2787,8 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	{
 	  float x = 0, y = 0, z=0, t=0, u=0 ;
 	  int damper = 10 ;
+	  float seuil = .80 ;
+	  float zoom = 40 ;
 	  int nn = 1 ; /* was 5, so 2n+1 = 110 bases */
 
 	  slx = arrayp (look->map->solexa, ii, SLX) ;
@@ -2800,11 +2800,6 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	      y += slx1->signal[ns2] ;
 	      if (ns3 != NA) z += slx1->signal[ns3] ; 
 	      if (ns4 != NA) t += slx1->signal[ns4] ; 
-	    }
-	  if (0) /* non stranded */
-	    {
-	      x = x + z ; if (x < 0) x = 0 ; x /= 2 ;
-	      y = y + t ; if (y < 0) y = 0 ; y /= 2 ;
 	    }
 	  x /= 2 * nn + 1 ; y /= 2 * nn + 1 ;
 	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
@@ -2860,7 +2855,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 	      wp->x = x ; wp->y = y ;
 	    }
 	  if (aa && arrayMax (aa))
-	    htileWiggleConvert (look, 0 /* was manip, shoukd be a pnx */, ns, aa) ;
+	    htileWiggleConvert (look, 0 /* was manip, should be a pnx */, ns, aa) ;
 	  ir += jr - 1 ;
 	}
     }
@@ -2881,7 +2876,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 	    for (j = 0 ; j < NF ; j++)
 	      if ((pnx->flag & PGG_endRatios) == 0 && (pnx->flag & flag[j])  ==  flag[j])
 		{		  
-		  fNam = hprintf (h, "TABIX/%s/%s.%s.tabix.gz"
+		  fNam = hprintf (h, "TABIX/%s/R.%s.%s.BF.gz"
 				  , pnx->p
 				  , name(look->intMap)
 				  , suffix[j]
@@ -2889,7 +2884,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 		  if (! filCheckName(fNam, 0, "r") && !strncmp (name(look->intMap), "c_", 2))
 		    {
 		      dn = 2 ;
-		      fNam = hprintf (h, "TABIX/%s/%s.%s.tabix.gz"
+		      fNam = hprintf (h, "TABIX/%s/R.%s.%s.BF.gz"
 				      , pnx->p
 				      , name(look->intMap) + dn
 				      , suffix[j]
@@ -2897,7 +2892,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 		    }
 		  if (1 && filCheckName(fNam, 0, "r"))
 		    {
-		      Array aa = sxGetWiggleZone (0, fNam, "TABIX", &solexaStep, name(look->intMap), look->a1, look->a2, h) ;
+		      Array aa = sxGetWiggleZone (0, fNam, "BF", &solexaStep, name(look->intMap), look->a1, look->a2, h) ;
 		      if (aa && arrayMax (aa))
 			htileWiggleConvert (look, pnx, ns, aa) ;
 		    }

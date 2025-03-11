@@ -113,7 +113,6 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
   int *ip, iBuffer[7] ;
   int lnTitle, lnTrackName, lnTarget ;
   int ixx, inxx = 1, xx1[1024], xx2[1024] ;
-  int tabix0 = 0 ;
   long int nBp = 0 ;
   char tagName[1024], oldTagName[1024] ;
   char geneName[1024], oldGeneName[1024] ;
@@ -289,7 +288,6 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
       break ;
     case BF:
     case BV:
-    case TABIX:
       x1 = sx->in_x1 - stepIn ;
       while ((cp = aceInCard (ai)))
 	{
@@ -411,60 +409,10 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
 	      dx = stepOut/2 > 1 ? stepOut/2 - 1 : 0 ;
 	      x1 = (x1 - z1 + dx)/stepOut ; 
 	      x2 = (x2 - z1 + dx)/stepOut ;
-	      if (x1<0) x1 = 0 ;	      if (x2<0) x2 = 0 ;
+	      if (x1<0) x1 = 0 ;
+	      if (x2<0) x2 = 0 ;
 	      { int ny = x2 > x1 ? x2 - x1 : x1 - x2 ; y /= (1+ny) ; } /* since we are spreading the point */
 	      break ;
-
-	    case TABIX:
-	      if (0 && ! map && ! remap) 
-		continue ;  
-	      cp = aceInWord (ai) ;
-	      if (strstr(cp, ",")) continue ;
-	      if (!strncmp (cp, "MRNA:", 5)) cp += 5 ;
-
-	      if (sx->targets)
-		{
-		  if (! dictFind (sx->mapDict, cp, &map))
-		    continue ;
-		}
-	      else
-		{
-		  if (1)
-		    remap = 0 ;
-		  else
-		    dictAdd (sx->remapDict, cp, &remap) ;
-		}
-	      aceInNext (ai) ;
-	      if (! aceInInt (ai, &x0))
-		{
-		  messcrash ("Missing position in TABIX input file %s, line %d:\n"
-			     , sx->inFileName, aceInStreamLine (ai)) ;
-		}
-	      if (tabix0 && x0 > tabix0 && (!sx->out_step || x0 - tabix0 < stepIn))
-		{
-		  stepIn = x0 - tabix0 ;
-		  stepOut = sx->out_step = (sx->out_step  ? sx->out_step : stepIn) ;
-		}
-	      tabix0 = x0 ;
-	      aceInNext (ai) ;
-	      if (! aceInFloat (ai, &y))
-		{
-		  messcrash ("Missing value in TABIX input file %s, line %d:\n"
-			     , sx->inFileName, aceInStreamLine (ai)) ;
-		}
-
-	      inxx = 1 ; xx1[0] = x0 ; xx2[0] = x2 = x0 + span - 1 ;
-	      if (sx->targets && !sxRemap (sx, 0, map, x0, x2, &remap, xx1, xx2, &inxx))
-		continue ;
-	      x1 = xx1[0] ; x2 = xx2[0] ;
-	      if ((sx->strand && x1 > x2) || (sx->antistrand && x1 < x2)) continue ;
-	      dx = stepOut/2 > 1 ? stepOut/2 - 1 : 0 ;
-	      x1 = (x1 - z1 + dx)/stepOut ; 
-	      x2 = (x2 - z1 + (dx > stepIn ? dx - stepIn : 0))/stepOut ;
-	      { int ny = x2 > x1 ? x2 - x1 : x1 - x2 ; y /= (1+ny) ; } /* since we are spreading the point */
-
-	      break ;
-
 
 	    default: /* not applicable */
 	      break ;
@@ -499,7 +447,7 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
 		      }
 		  }
 		  wp = arrayp (*aap, x/stepOut, WIGGLEPOINT) ;
-		  wp->x = z1 + x ;
+		  wp->x = z1 + x  ;
 		  wp->y += y * stepIn/stepOut ; 
 		  nBp +=  y * stepIn ;
 		}
@@ -1027,7 +975,7 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
     aceOutf (ao, "\nAfter dips\n") ;
 
   for (ii = 0, mp = arrp (mmm, ii, MPK) ; ii < imm ; mp++, ii++)
-    aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%ld\t%.1f\t%d\t%d\n"
+    aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%.0f\t%ld\t%d\t%d\n"
 	     , dictName (sx->remapDict, remap)
 	     , mp->x1, mp->x2, mp->ln * step
 	     , mp->yMax, mp->cover * 1.0/(mp->ln), mp->cover * step
@@ -1035,7 +983,7 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
 	     ) ;
 
   /* zero terminate */
-  aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%.1f\t%d\t%d\t%d\n"
+      aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n"
 	   , dictName (sx->remapDict, remap)
 	   , (mp -1)->x2 + 3*step/2, (mp-1)->x2 + 5*step/2, step
 	   , 0, 0, 0
@@ -1735,7 +1683,8 @@ static void sxWiggleEndRatioOne (WIGGLE *sx, Array aa, Array bb)
       Array rr = arrayCreate (iiMax, float) ;
       array (rr, iiMax, float) = 0 ;
 
-      for (ii = 6, wp = arrp (aa, ii, WIGGLEPOINT), zp = arrp (bb, ii, WIGGLEPOINT), rp = arrp (rr,ii, float) ; ii < iiMax - 6 ; ii++, wp++, zp++, rp++) 
+      /* ATTENTION  synchronize with wabi/htiledisp.c:htileSolexaEndRatios */
+	for (ii = 6, wp = arrp (aa, ii, WIGGLEPOINT), zp = arrp (bb, ii, WIGGLEPOINT), rp = arrp (rr,ii, float) ; ii < iiMax - 6 ; ii++, wp++, zp++, rp++) 
 	{
 	  float x = 0, y = 0, u ;
 	  int damper = 10 ;
@@ -1895,7 +1844,7 @@ BOOL sxCheckFormat (const char *io, WFORMAT *ip, const char *ccp, char *ftype)
 {
   int i ;
   const char **f ;
-  const char *ff[] = { "BF", "BV", "BG", "AF", "AM", "AG", "AW", "BHIT", "TABIX", "Count", 0} ;
+  const char *ff[] = { "BF", "BV", "BG", "AF", "AM", "AG", "AW", "BHIT",  "Count", 0} ;
 
   for (i = 0 , f = ff ; *f ; i++, f++)
     if (! strcasecmp (*f, ccp))
@@ -1918,7 +1867,7 @@ Array sxGetWiggleZone (Array aa, const char *fNam, char *type, int *stepp, const
   AC_HANDLE h = 0 ;
   WIGGLE *sx = 0 ;
   char *rtype = 0 ;
-  const char *ccp, *ch ; 
+  const char *ccp ;
 
   ccp = filName (fNam, 0, rtype) ;
   if (! ccp)
@@ -1934,14 +1883,7 @@ Array sxGetWiggleZone (Array aa, const char *fNam, char *type, int *stepp, const
   {
     ccp = sx->inFileName + strlen(sx->inFileName) - 3 ;
     
-    if (chrom && sx->in == TABIX)
-      {
-	ch = chrom ; 
-	if (0 && !strncmp (ch, "CHROMOSOME_", 11))
-	  ch += 11 ;
-	sx->ai = aceInCreateFromPipe (hprintf (h, "tabix %s %s:%d-%d", sx->inFileName,ch,z1,z2), rtype, 0, h) ;
-      }
-    else if (! strcmp (ccp, ".gz"))
+    if (! strcmp (ccp, ".gz"))
       sx->ai = aceInCreateFromPipe (hprintf (h, "gunzip -c %s", sx->inFileName), rtype, 0, h) ;
     else
       sx->ai = aceInCreateFromFile (sx->inFileName, rtype, 0, h) ;

@@ -1160,13 +1160,51 @@ int arrstrcmp(const void *s1, const void *s2)
 /* lexRename relies on the fact that lexstrcmp must fail      */
 /* if the length differ                                       */
 /**************************************************************/
+
+static BOOL lexPureNumber (const char *a, long int *x)
+{
+  int i, k, n = strlen (a) ;
+  long int u = 0 ;
+  const char *p = a ;
+  switch ((int)*p)
+    {
+    case '+' : p++ ; n-- ; break ;
+    case '-' : p++ ; n-- ; break ;
+    }
+  for (i = 0 ; i < n ; p++, i++)
+    {
+      k = (*p) - '0' ;
+      if (k>=0 && k <=9)
+	u = 10 * u + k ;
+      else
+	return FALSE ;
+      if (u < 0)
+	return FALSE ;
+    }
+  if (*a == '-')
+    u = -u ;
+  *x = u ;
+  return TRUE ;
+} /* lesPureNumber */
+
+/**********/
+
 int lexstrcmp(const char *a, const char *b)
 { 
   register char c,d ;
   register const char *p,*q ;
   register int  nbza, nbzb ; /* nb de zeros en tete */
   register int  nbzReturn = 0 ;
-
+  long x ,y ;
+  
+  if (lexPureNumber (a, &x) && lexPureNumber (b, &y) )
+    { /* mieg added 20250302 :    -7 should sort before +2 */
+      if (a < b) return -1 ;
+      if (a > b) return 1 ;
+      if  (strlen(a) > strlen(b)) return -1 ;
+      if  (strlen(a) < strlen(b)) return 1 ;
+      return 0 ;
+    }
   while (*a)
     {                /* Bond007< Bond07 < Bond7 < Bond68 */
       if (isdigit((int)*a) && isdigit((int)*b))

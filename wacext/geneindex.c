@@ -8493,6 +8493,12 @@ static void gxBigGenesDo (ACEOUT ao, GX *gx, RC *rc, const char *target, BOOL is
 {
   KEYSET bigG = isCapture ?  rc->capturedBigGenes : rc->bigGenes ;
 
+  if (target)
+    aceOutf (ao, "-D High_genes %s%s\n"
+	     , isCapture ? "Captured_" : ""
+	     , target
+	     ) ;
+  
   if (bigG && keySetMax (bigG))
     {
       AC_HANDLE h = ac_new_handle () ;

@@ -1450,7 +1450,7 @@ echo '   cnv: Differential CNV analysis, using class compare: tag CNV'
 
 echo '   wgh: Export the histo of  genomic Wiggle '
 echo '   sponge1: manual only, analyze which new exons touch which gene, construct a heat-map'
-echo '   sponge2: count the tags in the shadow of the genes/CDS/transcripts see also wg4 '
+echo '   sponge2: count the tags in the shadow of the genes/transcripts/CDS see also wg4 '
 echo '   sponge3: sponge statistics, construct RESULTS/Coverage_and_exons/sea_level.ace'
 
 echo '   wsig1: export pre run the signature wiggles (tissues and 3prime bias)'
@@ -4723,7 +4723,7 @@ phases1any:
      end
    endif
  end
- if ($NO_INTRON == 1) set geneSNPTarget=genome
+ if ($NO_INTRON > 0) set geneSNPTarget=genome
 phases1xxx:
 # fan out the bin/bestalignment per zone
 
@@ -4767,7 +4767,7 @@ phaseTSnp0:
 
  # Find the first Etarget which is also an RNAtarget
 set geneSNPTarget=xx
-if ($NO_INTRON == 1) then
+ if ($NO_INTRON > 0) then
   set geneSNPTarget=genome
 else
   foreach target ($Etargets $RNAtargets)
@@ -4783,7 +4783,7 @@ if (! -d tmp/SNP_ZONE) then
   mkdir tmp/SNP_ZONE
 
   set strategyOk=0
-  if (! -e  tmp/SNP_ZONE/fasta.done  &&  ($NO_INTRON == 1 || $Strategy == Exome || $Strategy == Genome)) then
+  if (! -e  tmp/SNP_ZONE/fasta.done  &&  ($NO_INTRON > 0 || $Strategy == Exome || $Strategy == Genome)) then
     # new simpler method, look at genome length and create sections < 100M 
     set strategyOk=1
     cat tmp/METADATA/genome.ns.sponge | gawk -F '\t' '{N=30000000;if($4<$5){n=1+int($5/N);oldx2=0;for(i=1;i<=n;i++){u=substr("abcdefghijklm",i,1);x1=1+(i-1)*N;x2=i*N+1000000;if(i==n)x2=$5;if(x2 > oldx2)printf("%s\t%d\t%d\t%s_%s\n",$3,x1,x2,$3,u);oldx2=x2;}}}' > tmp/SNP_ZONE/_allG
@@ -5124,7 +5124,7 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) goto phaseLoop
   if (-e tmp/TSNP_DB/$zone/$MAGIC.tsnp3.snp_profile.tsf.gz) continue
   set ok=0
-  scripts/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/$MAGIC.tsnp3 --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC"
+  scripts/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/$MAGIC.tsnp3 --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC" 
   if (-e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) \rm  tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz  
 end
 if ($ok == 1 && ! -e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) then
@@ -8737,8 +8737,14 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   set s=`cat MetaDB/$MAGIC/runs.ace | gawk 'BEGIN{x=-1;}/^Run[ \t]/{gsub(/\"/,"",$2);ok=0;if($2==run)ok=1;next;}/^Observed_strandedness_in_ns_mapping/{if(ok==1)x=$3;next;}END{print int(100*x)}' run=$run`
 # 2019_12_16, in SILVER a few of the reads are standed (contaminant Oligo) but the experiment is non stranded
 # by swithcing at 60% we maintain the strand of the contaminants
-  if ($s >= 0 && $s < 4000) set stranded="antistrand"
-  if ($s >= 6000 && $s <= 10000) set stranded="strand"
+  if ($s >= 0 && $s < 4000) then
+    set stranded="antistrand"
+    touch tmp/WIGGLELANE/$run/wg1.antistranded
+  endif
+  if ($s >= 6000 && $s <= 10000) then
+    set stranded="strand"
+    touch tmp/WIGGLELANE/$run/wg1.stranded
+  endif
   echo "wgi.wigglelane $run $stranded"
   set paired="singlets"
   foreach run2 (`cat MetaDB/$MAGIC/RunPairedList`)
@@ -8784,6 +8790,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d  tmp/WIGGLERUN/$run)$mkDir WIGGLERUN $run
   foreach uu (u nu pp)
     if (-e tmp/WIGGLERUN/$run/wg2a.$uu.done) continue
+    if (-d tmp/SPONGE/$run) \rm -rf tmp/SPONGE/$run
     scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run $uu lane2run"
   end
 end
@@ -8942,6 +8949,7 @@ echo "XXXXX Modification of group $group ...  $n new runs"
       if (-e tmp/WIGGLEGROUP/$group/$chrom/wg2b.out) \rm  tmp/WIGGLEGROUP/$group/$chrom/wg2b.out
       set okk=1
       \cp tmp/WIGGLEGROUP/$group/RunList tmp/WIGGLEGROUP/$group/$chrom
+      if (-d tmp/SPONGE/$run) \rm -rf tmp/SPONGE/$group
       scripts/submit "tmp/WIGGLEGROUP/$group/$chrom/wg2b" "scripts/wg2b.group_wiggles.tcsh $group $chrom $justMito " 
     end
     touch tmp/WIGGLEGROUP/$group/$phase.done
@@ -9070,21 +9078,46 @@ date
 # create the procryote P_genome stranding
 set toto=tmp/$MAGIC.projected.stranding.ace
 echo ' ' > $toto
-foreach run (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList`)
+set totoh=tmp/$MAGIC.histo
+echo '#Run\tdx\thisto' > $totoh.start.tsf
+echo '#Run\tdx\thisto' > $totoh.end.tsf
+foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupList`)
   foreach WG (WIGGLERUN WIGGLEGROUP)
     if (! -d tmp/$WG/$run) continue
     set tt=tmp/$WG/$run/projected.stranding.tsf
-    if (-e $tt) then
+    echo 'toto' | gawk '{printf("Ali %s\n-D Stranding P_genome\n\n",run) ;}' run=$run >> $toto
+    if (0 && -e $tt) then
+      # in wg1 wiggle:ventilate, the non stranded reads are implicitly restranded, and the wrongly stranded discarded, so this measure is artificial
       cat $tt | gawk -F '\t' '/^#/{next;}{printf("Ali %s\nStranding P_genome %s %s plus %s minus\n\n", $1,$6,$4,$5) ;}' >> $toto
       cat $tt | gawk -F '\t' '/^#/{next;}{printf("Run %s\nObserved_strandedness_in_ns_mapping P_genome %s %s plus %s minus\n\n", $1,$6,$4,$5) ;}' >> $toto
     endif
-    cat tmp/$WG/$run/*/wg2a.ELF.transcriptsEnds tmp/$WG/$run/*/wg2a.ERR.transcriptsEnds | gawk '/^#/{next;}{n++;}END{printf("Ali %s\nCandidate_starts %d\n", run, n);}' run=$run > tmp/$WG/$run/wg2a.ends.ace
-    cat tmp/$WG/$run/*/wg2a.ELR.transcriptsEnds tmp/$WG/$run/*/wg2a.ERF.transcriptsEnds  | gawk '/^#/{next;}{n++;}END{printf("Candidate_ends %d\n\n", n);}'  >> tmp/$WG/$run/wg2a.ends.ace
-    if (-e tmp/$WG/$run/wg2a.ends.ace) then
-      cat tmp/$WG/$run/wg2a.ends.ace >> $toto
-    endif    
+    set tutu=tmp/$WG/$run/wg2a.ends.ace
+    cat tmp/$WG/$run/*/wg2a.ELF.transcriptsEnds tmp/$WG/$run/*/wg2a.ERR.transcriptsEnds | gawk '/^#/{next;}{n++;}END{printf("Candidate_starts %d\n", n);}'  > $tutu
+    cat tmp/$WG/$run/*/wg2a.ELR.transcriptsEnds tmp/$WG/$run/*/wg2a.ERF.transcriptsEnds  | gawk '/^#/{next;}{n++;}END{printf("Candidate_ends %d\n", n);}'  >> $tutu
+
+    if (-e tmp/METADATA/Eco.knownEnds.done) then
+      foreach chrom ($chromSetAll)
+          cat tmp/METADATA/Eco.knownStarts.$chrom.f  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ELF.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;a2=$3;while(k>0 && a[k]>a2)k--;while (k<kk && a[k]<a1)k++;if (a1<=a[k] && a2>=a[k])nn++;}END{printf ("Confirmed_starts %d %d\n",nn+0,kk);}' chrom=$chrom >> $tutu
+          cat tmp/METADATA/Eco.knownStarts.$chrom.r ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ERR.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;a2=$3;while(k>0 && a[k]>a2)k--;while (k<kk && a[k]<a1)k++;if (a1<=a[k] && a2>=a[k])nn++;}END{printf ("Confirmed_starts %d %d\n",nn+0,kk);}' chrom=$chrom >> $tutu
+          cat tmp/METADATA/Eco.knownEnds.$chrom.f  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ERF.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;a2=$3;while(k>0 && a[k]>a2)k--;while (k<kk && a[k]<a1)k++;if (a1<=a[k] && a2>=a[k])nn++;}END{printf ("Confirmed_ends %d %d\n",nn+0,kk);}' chrom=$chrom >> $tutu
+          cat tmp/METADATA/Eco.knownEnds.$chrom.r  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ELR.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;a2=$3;while(k>0 && a[k]>a2)k--;while (k<kk && a[k]<a1)k++;if (a1<=a[k] && a2>=a[k])nn++;}END{printf ("Confirmed_ends %d %d\n",nn+0,kk);}' chrom=$chrom >> $tutu
+          cat tmp/METADATA/Eco.knownStarts.$chrom.f  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ELF.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;while(k>0 && a[k]>a1)k--;n1=a1-a[k];while (k<kk && a[k]<a1)k++;n2=a[k]-a1;if(n1>n2)n1=-n2;nn[n1]++;}END{for(k in nn)printf ("%s\t%08d\ti\t%d\n",run,k,nn[k]);}' chrom=$chrom run=$run  | sort -k 2n >> $totoh.start.tsf
+          cat tmp/METADATA/Eco.knownStarts.$chrom.r ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ERR.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$3;while(k>0 && a[k]>a1)k--;n1=a1-a[k];while (k<kk && a[k]<a1)k++;n2=a[k]-a1;if(n1>n2)n1=-n2;nn[-n1]++;}END{for(k in nn)printf ("%s\t%08d\ti\t%d\n",run,k,nn[k]);}' chrom=$chrom run=$run  | sort -k 2n >> $totoh.start.tsf
+          cat tmp/METADATA/Eco.knownEnds.$chrom.f  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ERF.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$3;while(k>0 && a[k]>a1)k--;n1=a1-a[k];while (k<kk && a[k]<a1)k++;n2=a[k]-a1;if(n1>n2)n1=-n2;nn[n1]++;}END{for(k in nn)printf ("%s\t%08d\ti\t%d\n",run,k,nn[k]);}' chrom=$chrom run=$run  | sort -k 2n >> $totoh.end.tsf
+          cat tmp/METADATA/Eco.knownEnds.$chrom.r  ZZZZZ   tmp/$WG/$run/$chrom/wg2a.ELR.transcriptsEnds | gawk -F '\t' '/^ZZZZZ/{zz++;k=0;next;}{if(zz<1){kk++;a[kk]=$1;next;}if($1!=chrom)next;a1=$2;while(k>0 && a[k]>a1)k--;n1=a1-a[k];while (k<kk && a[k]<a1)k++;n2=a[k]-a1;if(n1>n2)n1=-n2;nn[-n1]++;}END{for(k in nn)printf ("%s\t%08d\ti\t%d\n",run,k,nn[k]);}' chrom=$chrom run=$run  | sort -k 2n >> $totoh.end.tsf
+       end
+    endif
+    echo "\nAli $run" >> $toto
+    cat $tutu | gawk '{t=$1;a[t]+=$2;b[t]+=$3;}END{for(t in a) {printf("%s %d ", t, a[t]);if(b[t]>0)printf(" %d ",b[t]);printf("\n");}}' >> $toto
+    echo ' ' >> $toto
   end
 end
+tsf -i $totoh.end.tsf  -g any -I tsf -O tsf | wc
+tsf -i $totoh.start.tsf -t any -I tsf -O tsf | sort -k 2n  >  $totoh.any_start.tsf
+tsf -i $totoh.end.tsf -t any -I tsf -O tsf | sort -k 2n  >  $totoh.any_end.tsf
+cat $totoh.any_start.tsf  $totoh.start.tsf  | tsf -I tsf -O table --transpose > RESULTS/$MAGIC.Starts.table.txt
+cat $totoh.any_end.tsf  $totoh.end.tsf  | tsf -I tsf -O table --transpose > RESULTS/$MAGIC.Ends.table.txt
+
 echo "pparse $toto" | tace MetaDB -no_prompt
 
 #######
@@ -9109,22 +9142,24 @@ endif
 
 # Populate the StartEnd database
 foreach chrom ($chromSetAll)
-  set toto=tmp/StartEnd/$chrom/wg4.counts
+  set toto=tmp/StartEnd/$chrom/wg4.start_ends
   echo ' ' > $toto
-  echo '# StartEnd\tRun\tFormat\tmaxCover\taverageCover\t' > $toto.tsf
+  echo '# StartEnd\tRun\tFormat\ta1\ta2\tmaxCover\taverageCover\t' > $toto.tsf
   foreach run (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList`)
     foreach WG (WIGGLERUN WIGGLEGROUP)
       if (! -d tmp/$WG/$run) continue
-      cat tmp/$WG/$run/$chrom/wg2a.ELF.transcriptsEnds | gawk -F '\t'  '/^#/{next;}{chrom=$1;a1=$2;a2=$3;a=(a1+a2)/2;a=100*int((a+50)/100);printf("%s.%d.f\t%s\tii\t%d\t%.1f\n", chrom,a,run,$5,$6);}' run=$run >> $toto.tsf
+      cat tmp/$WG/$run/$chrom/wg2a.ELF.transcriptsEnds | gawk -F '\t'  '/^#/{next;}{chrom=$1;a1=$2;a2=$3;a=(a1+a2)/2;a=100*int((a+50)/100);printf("%s.%d.f\t%s\tii\t%d\t%d\t%d\t%.1f\n", chrom,a,run,a1,a2,$5,$6);}' run=$run >> $toto.tsf
+      cat tmp/$WG/$run/$chrom/wg2a.ERR.transcriptsEnds | gawk -F '\t'  '/^#/{next;}{chrom=$1;a1=$3;a2=$2;a=(a1+a2)/2;a=100*int((a+50)/100);printf("%s.%d.r\t%s\tii\t%d\t%d\t%d\t%.1f\n", chrom,a,run,a1,a2,$5,$6);}' run=$run >> $toto.tsf
     end
   end
 end
 
 foreach chrom ($chromSetAll)
-  set toto=tmp/StartEnd/$chrom/wg4.counts
-  cat $toto.tsf | sort | gawk -F '\t' '{if ($1 != se){se=$1;printf ("\nStartEnd %s\n",se);}printf("eCounts %s %.0f %.0f\n", $2,$4,$5);}' > $toto.tsf.s
+  set toto=tmp/StartEnd/$chrom/wg4.start_ends
+  echo ' ' > $toto.ace
+  cat $toto.tsf | sort | gawk -F '\t' '/^#/{next;}{if ($1 != se){se=$1;if ($6<1)next;printf ("\nStartEnd %s\n",se);}if($4<$5)printf("Forward\n");else printf("Reverse\n") ;printf("eCounts %s %d %d %.0f %.0f\n", $2,$4,$5,$6,$7);}' >> $toto.ace
 end
-
+echo "pparse $toto.ace" | bin/tacembly tmp/StartEnd/$chrom -no_prompt
 #####
 if (1) then
 
@@ -9310,7 +9345,10 @@ foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupWiggleList`)
       if (! -e $spongeF) continue
       foreach capture (noCapture $CAPTURES)
         set tt=tmp/$WG/$run/$target.$capture.tsf
-        if (-e $tt) continue
+        if (-e $tt) then
+	  set n=`wc $tt | gawk '{print $1;}'`
+	  if ($n > 10) continue
+	endif
         scripts/submit tmp/WIGGLERUN/$run/wg4b "scripts/wg4b.gene_sponge.tcsh $capture $WG $run $target"
       end
     end
@@ -9392,9 +9430,7 @@ phasewg6:
  foreach chrom ($chromSetAll mito)
   echo "Map $chrom" >  tmp/TABIX/$MAGIC/$chrom.tabix.ace
   foreach group (`cat MetaDB/$MAGIC/RunWiggleList MetaDB/$MAGIC/GroupWiggleList`)
-    ls -ls  tmp/TABIX/$group/$chrom.u.f.tabix.gz
-    ls -ls  tmp/TABIX/$group/$chrom.u.r.tabix.gz
-    if (! -e tmp/TABIX/$group/$chrom.u.f.tabix.gz && ! -e  tmp/TABIX/$group/$chrom.u.r.tabix.gz) continue
+    if (! -e tmp/TABIX/$group/R.$chrom.u.f.BF.gz && ! -e  tmp/TABIX/$group/R.$chrom.u.r.BF.gz) continue
     echo "Wiggle $group $group/$chrom" >>  tmp/TABIX//$MAGIC/$chrom.tabix.ace
   end
   echo >> tmp/TABIX/$MAGIC/$chrom.tabix.ace
@@ -9608,13 +9644,14 @@ foreach target ($Etargets)
   break
 end
 
-foreach target ($Etargets)
+# 2025_03_10, Etargets -> mainTarget
+foreach target ($mainTarget)
   set mask=$mask",$target""_CDS:tmp/METADATA/$target.ns.cds.sponge"
 end
-foreach target ($Etargets)
+foreach target ($mainTarget)
   set mask=$mask",$target""_transcripts:tmp/METADATA/$target.ns.mrna.sponge"
 end
-foreach target ($Etargets)
+foreach target ($mainTarget)
   set mask=$mask",$target""_gene:tmp/METADATA/$target.ns.gene.sponge"
 end
 

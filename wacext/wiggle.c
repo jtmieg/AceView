@@ -391,7 +391,7 @@ static void sxVentilate (WIGGLE *sx)
 	      else  a1 -= dx ;
 	    }
 	}
-      /* memorize BEFORE rejecting on the basis of the starnd */ 
+      /* memorize BEFORE rejecting on the basis of the strand */ 
       oldX1 = x1 ; oldX2 = x2 ; oldA1 = a1; oldA2 = a2 ; oldScore = score ; oldMap = map ; oldtc = target_class ;
 
       /***********************************/
@@ -1150,7 +1150,7 @@ int main (int argc, const char **argv)
     case COUNT:
       sx.out_step = 10 ;
       break ;
-    default: /* BF, BV, AM, AG, AW,  TABIX */
+    default: /* BF, BV, AM, AG, AW  */
       sx.out_step = 10 ;
       break ;
     }

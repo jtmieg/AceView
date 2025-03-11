@@ -2660,7 +2660,7 @@ void fMapcDNADoShowMrna (LOOK look, float *offset, BOOL isPredicted)
   int TR_COLOR3 =  PALEBLUE ; /* YELLOW LIGHTGREEN ;  palemagenta for the web */
   int TR_COLOR4 =  PALEORANGE ; /* YELLOW LIGHTGREEN ;  palemagenta for the web */
   KEY _Valid3p = str2tag ("Valid3p") ;
-  KEY _Valid5p = str2tag ("Valid5p") ;
+  KEY _Valid5p = str2tag ("Valid5p") ; /* RED YELLOW */
 
   cDNAAlignInit () ; 
 
@@ -2875,10 +2875,14 @@ void fMapcDNADoShowMrna (LOOK look, float *offset, BOOL isPredicted)
 	    case 0: color = WHITE ; break ;  /* utr */
 	    case 1: color = WHITE ; break ;  /* non best product */
 	    case 2:
+	      color = TR_COLOR2 ; color = YELLOW ; break ;
 	    case 3:
-	      color = TR_COLOR2 ; break ; /* best product */
-	    case 4: color = TR_COLOR3 ; break ;
-	    case 5: color = TR_COLOR4 ; break ;
+	      color = TR_COLOR2 ; color=RED ; break ; /* best product */
+	    case 6: color = TR_COLOR3 ; color=GREEN ; break ;
+	    case 7: color = TR_COLOR4 ; color=ORANGE ; break ;
+	    case 10: color = TR_COLOR4 ; color=PALECYAN ; break ;
+	    case 14: color = TR_COLOR4 ; color=GREEN3 ; break ;
+	    case 15: color = TR_COLOR4 ; color=PALEYELLOW ; break ;
 	    }
 	  if (0 && useAm)
 	    color = TR_COLOR ;	      

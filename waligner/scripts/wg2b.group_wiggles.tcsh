@@ -38,13 +38,14 @@ if (! -e $out/wg2b.done) then
             if ($drop == 1) continue 
           endif
 	endif
-        if (-e      tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
-          echo -n " tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz " >>   $out/$fr.$uu.chrom.list
-          set ok=1
-        endif
         if (-e      tmp/WIGGLEGROUP/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
           echo -n " tmp/WIGGLEGROUP/$run/$chrom/R.chrom.$uu.$fr.BF.gz " >>   $out/$fr.$uu.chrom.list
           set ok=1
+        else
+	  if (-e      tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz) then
+            echo -n " tmp/WIGGLERUN/$run/$chrom/R.chrom.$uu.$fr.BF.gz " >>   $out/$fr.$uu.chrom.list
+            set ok=1
+	  endif
         endif
 
         if ($Strategy != Exome && $justMito == 1) then

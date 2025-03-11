@@ -372,6 +372,8 @@
                       Candidate_introns  ?Target UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Int UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text  UNIQUE Float UNIQUE Text UNIQUE Float
 		      Candidate_starts UNIQUE Int
 		      Candidate_ends UNIQUE Int
+		      Confirmed_starts UNIQUE Int UNIQUE Int
+		      Confirmed_ends UNIQUE Int UNIQUE Int
                       Accessible_length UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_8kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 8kb transcripts used, # 8kb candidates, #average cumulated cover
                       Accessible_length_5kb UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int // length, # 5kb transcripts used, # 5kb candidates, #average cumulated cover
@@ -506,20 +508,20 @@
 
 ?StartEnd Title UNIQUE ?Text 
           Project ?Project
-          Type Unique Start
-	              End
-	  Site IntMap ?Map UNIQUE Int UNIQUE Int 
+          Type Unique Start UNIQUE Int
+                      End
+          Site IntMap ?Map UNIQUE Int UNIQUE Int 
                Gene ?Gene XREF  StartEnd
                mRNA  ?mRNA XREF StartEnd UNIQUE Int // mRNA coordinate
                Genome_strand UNIQUE Forward
                                     Reverse
                Method Magic
-	              Ecocyc
-		      Signal Text
-          Counts Monomodal ?Project 
-                 Manual_non_monomodal
-                 eCounts   ?Run UNIQUE Int UNIQUE Int // Forward, Reverse read ends
-                 tCounts   ?Run UNIQUE Int    // Traversing reads
+	              Ecocyc UNIQUE Int
+               Binds Text
+               Counts Monomodal ?Project 
+                      Manual_non_monomodal
+                      eCounts   ?Run UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Float // a1 a2 maxcover avereage_cover
+                      tCounts   ?Run UNIQUE Int    // Traversing reads
 
 ?Variant  Title UNIQUE ?Text  /* takes precedence as full HGVS name */
           Id  dbSNP ?dbSNP XREF Variant @Details

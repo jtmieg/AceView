@@ -1106,7 +1106,7 @@ static void mrnaAnalyseGenefinder (Stack s, KEY gene, Array allPg, Array allTg, 
 		    KEYSET touchingMrnasTer = 0 ;
 
 		    mrna = mrnaAnalyseExactGenefinder (gene, a1, a2, isUp, hh->gene, b1, b2, hh->reverse, &isExact, exactMrnas, matchingMrnas, touchingMrnas, mirLike) ;          
-                    if (mrna)
+                    if (mrna) 
                       {
 			matchingMrnasBis = keySetMINUS (matchingMrnas, exactMrnas) ;
 			touchingMrnasBis = keySetMINUS (touchingMrnas, matchingMrnas) ;
@@ -1257,19 +1257,23 @@ static int mrnaAnalyseAntisens (KEY g1, int a1, int a2, BOOL isUp1, KEY g2, int 
 
 static int mrnaAnalysePg2Tg (KEY g1, int a1, int a2, BOOL isUp1, KEY g2, int b1, int b2, BOOL isUp2)
 {  
-  int dx = 0, i, j;
+  int dx = 0, i, j, k ;
   OBJ G1, G2 ;
   BSunit *uu, *vv ;
+  HIT *up, *vp ;
   static Array aa = 0, bb = 0 ;
+  static Array h1 = 0, h2 = 0 ;
 
   G1 = bsCreate (g1) ; 
   G2 = bsCreate (g2) ; 
   aa = arrayReCreate (aa, 40, BSunit) ;
   bb = arrayReCreate (bb, 40, BSunit) ;
+  h1 = arrayReCreate (h1, 40, HIT) ;
+  h2 = arrayReCreate (h2, 40, HIT) ;
   bsGetArray (G1, _Source_Exons, aa, 4) ;
   bsGetArray (G2, _Splicing, bb, 4) ;
 
-  for (i = 0 ; i < arrayMax(aa) ; i += 4)
+  for (i = k = 0 ; i < arrayMax(aa) ; i += 4)
     {
       uu = arrp (aa, i, BSunit) ;
       if (! isUp1)
@@ -1277,36 +1281,41 @@ static int mrnaAnalysePg2Tg (KEY g1, int a1, int a2, BOOL isUp1, KEY g2, int b1,
       else
         { int tmp = a2 - uu[0].i + 1 ; uu[0].i = a2 - uu[1].i + 1 ; uu[1].i = tmp ; }
       uu[2].k = _Exon ; uu[3].i = 1 ;
+      up = arrayp (h1, k++, HIT) ;
+      up->a1 = a1 ; up->a2 = a2 ;
     }
 
-  for (j = 0 ; j < arrayMax(bb) ; j += 4)
+  for (j = k = 0 ; j < arrayMax(bb) ; j += 4)
     {
       vv = arrp (bb, j, BSunit) ;
-      if (! isUp2)
-        { vv[0].i = b1 + vv[0].i - 1 ; vv[1].i = b1 + vv[1].i - 1 ; }
-      else
-        { int tmp = b2 - vv[0].i + 1 ; vv[0].i = b2 - vv[1].i + 1 ; vv[1].i = tmp ; }
-      if (strstr (name(vv[2].k),"xon")) vv[3].i = 1 ;
-      else vv[3].i = 0 ;
+      if (strstr (name(vv[2].k),"xon"))
+	{
+	  if (! isUp2)
+	    { vv[0].i = b1 + vv[0].i - 1 ; vv[1].i = b1 + vv[1].i - 1 ; }
+	  else
+	    { int tmp = b2 - vv[0].i + 1 ; vv[0].i = b2 - vv[1].i + 1 ; vv[1].i = tmp ; }
+	  vp = arrayp (h2, k++, HIT) ;
+	  vp->a1 = a1 ; vp->a2 = a2 ;
+	}
     }
-
-  for (i = 0 ; i < arrayMax(aa) ; i += 4)
+  
+  arraySort (h1, cDNAOrderByA1) ;
+  arraySort (h2, cDNAOrderByA1) ;
+  for (i = 0 ; i < arrayMax(h1) ; i++)
     {
-      uu = arrp (aa, i, BSunit) ;  
-      if (!uu[3].i) continue ;
-      for (j = 0 ; j < arrayMax(bb) ; j += 4)
+      up = arrp (h1, i, HIT) ;
+      for (j = 0 ; j < arrayMax(h2) ; j ++)
         {
           int u1, u2 ;
-          vv = arrp (bb, j, BSunit) ;
-          if (!vv[3].i) continue ;
-          u1 = uu[0].i > vv[0].i ?  uu[0].i : vv[0].i ;
-          u2 = uu[1].i < vv[1].i ?  uu[1].i : vv[1].i ;
+	  vp = arrp (h2, j, HIT) ;
+          u1 = up->a1 > vp->a1 ? up->a1 : vp->a1 ;
+	  u2 = up->a2 < vp->a2 ? up->a2 : vp->a2 ;
           if (u2 >= u1)
             dx += u2 - u1 + 1 ;
-	  if (!isUp2 && vv[0].i > uu[1].i) break ;
-	  if (isUp2 && vv[0].i < uu[1].i) break ;
-	  if ( uu[0].i == vv[0].i ||  uu[1].i == vv[1].i) dx += 100 ;
+	  if ( up->a1 == vp->a1 || up->a2 == vp->a2)
+	    dx += 100 ;
 	  if (dx > 80) break ;
+	  if (up->a2 < vp->a1) break ;
         }
       if (dx > 80) break ;
     }

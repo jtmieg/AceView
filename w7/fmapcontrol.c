@@ -3145,7 +3145,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	  bsGetArray (obj, str2tag ("Coding"), units, 5))
 	{ 
 	  char bestP[1024], *bp, *cp ;
-	  int ibp = 0, nbp = 0, isExon ;
+	  int ibp = 0, nbp = 0, isExon, nX = 0 ;
 	  KEY prod ;
 	  BSunit *uu ;
 
@@ -3197,7 +3197,7 @@ BOOL fMapConvert (LOOK look, BOOL force)
 	      seg1->key = M_mRNA ;
 	      seg1->type = (isDown) ? MRNA : MRNA_UP ;
 	    }
-	  seg1->parent = seg->key ; 
+	  seg1->parent = seg->key ;
 
 	  for (i = 0 ; i < arrayMax (units) ; i += 5)
 	    { 
@@ -3227,7 +3227,20 @@ BOOL fMapConvert (LOOK look, BOOL force)
 		seg1->type = (isDown) ? MRNA : MRNA_UP ;
 	      seg1->data.i = 0 ;
 	      if (isExon)
-		seg1->data.i |= 2 ;
+		{		     
+		     switch (nX % 7)
+		       {
+		       case 0: seg1->data.i = 2 ; break ;
+		       case 1: seg1->data.i = 3 ; break ;
+		       case 2: seg1->data.i = 6 ; break ;
+		       case 3: seg1->data.i = 7 ; break ;
+		       case 4: seg1->data.i = 10 ; break ;
+		       case 5: seg1->data.i = 14 ; break ;
+		       case 6: seg1->data.i = 15 ; break ;
+		       }
+		     nX++ ; /* RED YELLOW */
+		}
+
 	    }
 	}
 

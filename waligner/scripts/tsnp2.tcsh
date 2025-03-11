@@ -207,8 +207,10 @@ done1:
     set remap2g=remap2genome
   endif
 # if -o filename is not provided, tsnp directly edits the database
-  bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone 
-  bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC
+  echo "  bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone "
+          bin/tsnp --db_$remap2g  tmp/METADATA/mrnaRemap.gz  --db tmp/TSNP_DB/$zone 
+  echo "  bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC"
+          bin/tsnp --db_translate --db tmp/TSNP_DB/$zone  -p $MAGIC
 
 #          bin/tsnp --db_report --db tmp/TSNP_DB/$zone  -p $MAGIC
 #    bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone  -p $MAGIC

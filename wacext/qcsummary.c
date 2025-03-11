@@ -1320,7 +1320,7 @@ static void qcSnpTypesDo (QC *qc, RC *rc, BOOL isRejected)
 
   memset (zSub, 0, sizeof (zSub)) ;
   /*
-Distribution of mismatches in best unique alignments, abslute, oberved, counts
+Distribution of mismatches in best unique alignments, absolute, observed, counts
 */
 
   for (ti = tts ; ti->tag ; ti++)
@@ -1593,6 +1593,7 @@ static void qcSnpCoding (QC *qc, RC *rc)
 	      nT = ac_tag_int (rc->ali, "Tested_sites", 0) ;
 	      nnM = ac_tag_int (rc->ali, "Not_measurable_sites", 0) ; 
 	      nR = ac_tag_int (rc->ali, "Rejected_sites", 0) ;
+	      nT += nnM ;
 	      if (nT > 0)
 		{
 		  nC = nT - nnM ;
@@ -2511,12 +2512,11 @@ static void qcMainResults1 (QC *qc, RC *rc)
 		    ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
 		    if (! strcasecmp (ccp, "any1") || ! strcasecmp (ccp, "any2"))
 		      {
-			zc++ ;
-			z += ac_table_float (tt, ir, 3, 0) ;
 			zb += ac_table_float (tt, ir, 5, 0) ;
 		      }
 		  }
-	      if (zc > 0) z = 1000.0 * zb * zc / z ;
+	      zc = ac_tag_float (rc->ali,  "Aligned_fragments", 0) ;
+	      if (zc > 0) z = 1000.0 * zb / zc ;
 	      aceOutf (qc->ao, "\t%.2f", z) ;  /* average length aligned per fragment */
 	      ac_free (tt) ;
 	      break ;
@@ -3030,9 +3030,9 @@ static void qcMainResults5 (QC *qc, RC *rc)
 	  int k = 0 ;
 	  switch (ti->col)
 	    {
-	    case 41: tag = "Known_starts" ; break ;
+	    case 41: tag = "Confirmed_starts" ; break ;
 	    case 42: tag = "Candidate_starts" ; break ;
-	    case 43: tag = "Known_ends" ; break ;
+	    case 43: tag = "Confirmed_ends" ; break ;
 	    case 44: tag = "Candidate_ends" ; break ;
 	    }
 	  k = ac_tag_int (rc->ali, tag, 0) ;
@@ -6314,6 +6314,7 @@ static int qcGetEtargets (QC *qc)
   memset (qc->Etargets, 0, sizeof (qc->Etargets)) ;
   ccp = getenv ("NO_INTRON") ;
   if (ccp && *ccp == '1') qc->noIntron = TRUE ;
+  qc->noIntron = FALSE ;
   ccp = getenv ("Etargets") ;
   fprintf (stderr, "etargets = %s", ccp ? ccp : "NA") ; 
   if (! ccp || ! *ccp) ccp = "av" ;

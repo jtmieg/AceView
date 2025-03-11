@@ -1136,30 +1136,32 @@ static int assSequence (Array words,
    */
  cutAgain: /* CF y2L761b8.3 vecteur start=543, pure N after 585, length = 980 */
   j = 0 ; vendold = vend ;
-  for (pos = pos1 = ii = (vtop+vend)/2 , cp = arrp (dna, ii, char) ; ii < vend ; ii++, cp++)
-    {
-      switch ((int)*cp)
-        {
-        case A_: case T_: case G_: case C_: j-- ; break ;
-        default: j += 2 ; break ;
-        }
-      if (j < 0) { j = 0 ; pos = ii ; }
-      if (j > 20) /* about 10 N in a stretch */
-        { vend = pos + 5 ; break ; }
-    }
+  if (2 * arrayMax (dna) > vtop + vend)
+    for (pos = pos1 = ii = (vtop+vend)/2 , cp = arrp (dna, ii, char) ; ii < vend ; ii++, cp++)
+      {
+	switch ((int)*cp)
+	  {
+	  case A_: case T_: case G_: case C_: j-- ; break ;
+	  default: j += 2 ; break ;
+	  }
+	if (j < 0) { j = 0 ; pos = ii ; }
+	if (j > 20) /* about 10 N in a stretch */
+	  { vend = pos + 5 ; break ; }
+      }
   if (vend < vendold - 20 && pos < pos1 + 20 && vend > vtop + 60) goto cutAgain ;
   j = 0 ;
-  for (pos = ii = (vtop+vend)/2 , cp = arrp (dna, ii, char) ; ii > vtop ; ii--, cp--)
-    {
-      switch ((int)*cp)
-        {
-        case A_: case T_: case G_: case C_: j-- ; break ;
-        default: j += 2 ; break ;
-        }
-      if (j < 0) { j = 0 ;pos = ii ; }
-      if (j > 20) /* about 10 N in a stretch */
-        { vtop = pos - 5 ; break ; }
-    }
+  if (2 * arrayMax (dna) > vtop + vend)
+    for (pos = ii = (vtop+vend)/2 , cp = arrp (dna, ii, char) ; ii > vtop ; ii--, cp--)
+      {
+	switch ((int)*cp)
+	  {
+	  case A_: case T_: case G_: case C_: j-- ; break ;
+	  default: j += 2 ; break ;
+	  }
+	if (j < 0) { j = 0 ;pos = ii ; }
+	if (j > 20) /* about 10 N in a stretch */
+	  { vtop = pos - 5 ; break ; }
+      }
   
   if (minPos < vtop) minPos = vtop ;
   if (! eMap && minPos + nn + 10 > vend)

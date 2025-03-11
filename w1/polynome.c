@@ -223,8 +223,8 @@ static int polOrder (const void *va, const void *vb)
 {
   const POLYNOME p1 = *(POLYNOME *)va ;
   const POLYNOME p2 = *(POLYNOME *)vb ;
-  float complex z1 = p1->tt.z ;
-  float complex z2 = p2->tt.z ;
+  double complex z1 = p1->tt.z ;
+  double complex z2 = p2->tt.z ;
   int id1 = p1->tt.Id2 ;
   int id2 = p2->tt.Id2 ;
   int s ;
@@ -496,7 +496,7 @@ static int indexTtSort (short *cp, int dx, int sign)
 static POLYNOME contractTtIndices (POLYNOME pp)
 {
   AC_HANDLE h = pp->h ;
-  complex float zz = 1 ;
+  double complex zz = 1 ;
   TT tt = pp->tt ;
   int kkkk = 0 ;
   /* sort and search repeated pair of indices inside the metric itself */
@@ -1445,8 +1445,8 @@ POLYNOME contractProducts (POLYNOME pp)
   
   if (pp->isSum && p1 && p2 && p1->tt.type && p2->tt.type)
     {
-      float complex z1 = p1->tt.z ;
-      float complex z2 = p2->tt.z ;
+      double complex z1 = p1->tt.z ;
+      double complex z2 = p2->tt.z ;
       int s ;
 
       cleanTtSqrt (&(p1->tt)) ;
@@ -1475,8 +1475,8 @@ POLYNOME contractProducts (POLYNOME pp)
       cleanTtSqrt (&(p1->tt)) ;
       cleanTtSqrt (&(p2->p1->tt)) ;
 
-      float complex z1 = p1->tt.z ;
-      float complex z2 = p2->p1->tt.z ;
+      double complex z1 = p1->tt.z ;
+      double complex z2 = p2->p1->tt.z ;
       int s ;
 
       p1->tt.z = 0 ;       
@@ -1695,8 +1695,8 @@ static POLYNOME expandDo (POLYNOME pp, int force)
   if (pp->isSum && p1 && p1->tt.type && p2 && p2->isSum && p2->p1 && p2->p1->tt.type)
     {
       POLYNOME p3 = pp->p2->p1 ;
-      float complex z1 = p1->tt.z ;
-      float complex z3 = p3->tt.z ;
+      double complex z1 = p1->tt.z ;
+      double complex z3 = p3->tt.z ;
       int s ;
       p1->tt.z = 0 ;       
       p3->tt.z = 0 ;       
@@ -1938,7 +1938,7 @@ POLYNOME polCopy (POLYNOME p1, AC_HANDLE h)
 
 /*************************************************************************************************/
 
-POLYNOME newScalar (complex float z, AC_HANDLE h)
+POLYNOME newScalar (double complex z, AC_HANDLE h)
 {
   POLYNOME p = newPolynome (h) ;
   p->tt.type = 1 ;
@@ -3800,7 +3800,7 @@ PMX pmxScalar (int N, char *title, POLYNOME p,  AC_HANDLE h)
 /* fill a pmx with a copy of a given polynome scaled according to the complex matrix zz 
  * the size of zz is checked by requesting a magic value at last position
  */
-BOOL pmxSet (PMX pmx, POLYNOME p,  complex *zz)
+BOOL pmxSet (PMX pmx, POLYNOME p,  double complex *zz)
 {
   pmxCheck (pmx) ;
   int N = pmx->N ;
@@ -3812,7 +3812,7 @@ BOOL pmxSet (PMX pmx, POLYNOME p,  complex *zz)
   for (int i = 0 ; i < N ; i++)
     for (int j = 0 ; j < N ; j++)
       {
-	complex z = zz[N*i + j] ;
+	double complex z = zz[N*i + j] ;
 	if (z != 0) 
 	  {
 	    POLYNOME q = polCopy (p, pmx->h) ;

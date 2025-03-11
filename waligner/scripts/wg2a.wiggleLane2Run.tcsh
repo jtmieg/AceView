@@ -66,8 +66,8 @@ set WG=WIGGLERUN
         set wf=tmp/$WG/$run/$chrom/R.chrom.u.f.BF.gz
         set wr=tmp/$WG/$run/$chrom/R.chrom.u.r.BF.gz
 	if (! -e $wf || ! -e $wr) continue
-        bin/wiggle -i $wf -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tf\tii\t%d\t0\n",$1,$2);}' > $tt.a
-        bin/wiggle -i $wr -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tr\tii\t0\t%d\n",$1,$2);}' > $tt.b
+        bin/wiggle -i $wf  -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tf\tii\t%d\t0\n",$1,$2);}' > $tt.a
+        bin/wiggle -i $wr  -I BF -O BV | gawk '{n=$1+0;if(n>0)printf("%d\tr\tii\t0\t%d\n",$1,$2);}' > $tt.b
         cat $tt.a $tt.b | bin/tsf -I tsf -O tsf -s ns >$tt.c
 
         if (0) then   # do this once using run==the stranded group
@@ -80,40 +80,47 @@ set WG=WIGGLERUN
 	\rm $tt.a $tt.b $tt.c
       end
     if ($ok == 1) then
-      bin/tsf -I tsf -O tsf  -i $tt.1 -s any | gawk -F '\t' '/^#/{next;}{sp=$4;sm=$5;printf("%s\tP_genome\tiif\t%d\t%d\t%.3f\n",run,sp,sm,100*sp/(sp+sm+.001));}' run=$run >> $tt
+      if (-e tmp/WIGGLELANE/$run/wg1.antistranded) then
+        bin/tsf -I tsf -O tsf  -i $tt.1 -s any | gawk -F '\t' '/^#/{next;}{sp=$5;sm=$4;printf("%s\tP_genome\tiif\t%d\t%d\t%.3f\n",run,sp,sm,100*sp/(sp+sm+.001));}' run=$run >> $tt
+      else
+        bin/tsf -I tsf -O tsf  -i $tt.1 -s any | gawk -F '\t' '/^#/{next;}{sp=$4;sm=$5;printf("%s\tP_genome\tiif\t%d\t%d\t%.3f\n",run,sp,sm,100*sp/(sp+sm+.001));}' run=$run >> $tt
+      endif
       \rm $tt.1
     endif
  
 # if the stranding is below 40, we flip the stand of all the files
-if ($Strategy == RNA_seq) then
+if ($Strategy == RNA_seq && ! -e tmp/$WG/$run/wg2a.restrand.done) then
     set ss=`cat $tt | gawk '/^#/{s=50}{s=$6}END{print int(s);}'`
     echo "restrand ss=$ss"
-    if ($ss < 40) then
-      echo "restanding needed"
-#      mv $tt $tt.2
-#      bin/tsf -I tsf -O tsf  -i $tt.2 -s any | gawk -F '\t' '/^#/{next;}{sp=$5;sm=$4;printf("%s\tP_genome\tiif\t%d\t%d\t%.3f\n",run,sp,sm,100*sp/(sp+sm+.001));}' run=$run > $tt
+    if ($ss < 40 && ! -e tmp/WIGGLELANE/$run/wg1.antistranded) then
+       echo $ss >  tmp/$WG/$run/wg2a.restrand.yes
+      echo "restanding needed ss=$ss"
 
       foreach chrom ($chromSetAll)
-        foreach uu (u nu pp)
-          set wf=tmp/$WG/$run/$chrom/R.chrom.$uu.f.BF.gz
-          set wr=tmp/$WG/$run/$chrom/R.chrom.$uu.r.BF.gz
-	  mv $wf $wf.z
-	  mv $wr $wf
-	  mv $wf.z $wr
-	end
-          set wf=tmp/$WG/$run/$chrom/R.chrom.u.ELF.BF.gz
-          set wr=tmp/$WG/$run/$chrom/R.chrom.u.ELR.BF.gz
-	  mv $wf $wf.z
-	  mv $wr $wf
-	  mv $wf.z $wr
-          set wf=tmp/$WG/$run/$chrom/R.chrom.u.ERF.BF.gz
-          set wr=tmp/$WG/$run/$chrom/R.chrom.u.ERR.BF.gz
-	  mv $wf $wf.z
-	  mv $wr $wf
-	  mv $wf.z $wr
+         foreach uu (u nu pp)
+           set wf=tmp/$WG/$run/$chrom/R.chrom.$uu.f.BF.gz
+           set wr=tmp/$WG/$run/$chrom/R.chrom.$uu.r.BF.gz
+	   echo "exchanging $wf $wr"
+	   cp $wf $wf.ok
+	   cp $wr $wr.ok
+	   mv $wf $wf.z
+	   mv $wr $wf
+	   mv $wf.z $wr
+        end
+        set wf=tmp/$WG/$run/$chrom/R.chrom.u.ELF.BF.gz
+        set wr=tmp/$WG/$run/$chrom/R.chrom.u.ELR.BF.gz
+        mv $wf $wf.z
+        mv $wr $wf
+        mv $wf.z $r
+        set wf=tmp/$WG/$run/$chrom/R.chrom.u.ERF.BF.gz
+        set wr=tmp/$WG/$run/$chrom/R.chrom.u.ERR.BF.gz
+        mv $wf $wf.z
+        mv $wr $wf
+        mv $wf.z $wr
       end
+   else
+       echo $ss >  tmp/$WG/$run/wg2a.restrand.no
     endif
-
 endif
 touch tmp/$WG/$run/wg2a.restrand.done
 

@@ -659,7 +659,8 @@ int ac_table_display (vTXT blkp
   char bufK[2] = {'K', 0} ;
   char buftag[1] = {'g'} ;
   char beginline[1] ={'>'};
-
+  static int tableId = 0 ;
+  
   if (beauty == 'J') beauty = 'j' ;
   if (!cols)
     {
@@ -684,7 +685,7 @@ int ac_table_display (vTXT blkp
     }
   
   if (markUp)
-    vtxtPrint (blkp, "\n<table width=\"98%%\" border=2>\n") ;
+    vtxtPrintf (blkp, "\n<table id=\"table%d\" width=\"98%%\" border=2>\n", ++tableId) ;
   
   if (maxLine <= 0)
     maxLine = t->rows ;
@@ -705,8 +706,9 @@ int ac_table_display (vTXT blkp
   /* export the titles */
   if (titles)
     {
+      int jCol = 0 ;
       if (markUp)
-	vtxtPrint (blkp, "<tr VALIGN=TOP bgcolor=\"#d5d5ff\">\n") ;
+	vtxtPrint (blkp, "<tr VALIGN=TOP bgcolor=\"#d5d5ff\">\n<thead>\n") ;
       else
 	vtxtPrint (blkp, "#") ;
       for (jjj = 0 ; mycols[jjj] >= 0 ; jjj++)
@@ -718,7 +720,7 @@ int ac_table_display (vTXT blkp
 	  if (!ccp) 
 	    ccp = markUp ? "&nbsp;" : "" ;
 	  if (markUp)
-	    vtxtPrintf (blkp, "  <td>%s</td>\n", ccp) ;
+	    vtxtPrintf (blkp, "  <th onclick=\"sortTable(\'table%d\',%d)\" type=\"text\" order=\"asc\">%s</th>\n", tableId, ++jCol, ccp) ;
 	  else
 	    vtxtPrintf (blkp, "%s%s", jjj ? "\t" : "", ccp) ;
 	}
@@ -726,7 +728,9 @@ int ac_table_display (vTXT blkp
 	vtxtPrint (blkp, "</tr>") ;
       vtxtPrint (blkp, "\n") ; nLine++ ;
     }
-  
+  if (markUp)
+    vtxtPrint (blkp, "</thead>\n\n<tbody>\n") ;
+
   /* export the table */
   if (!colorControlColumn)
     colorControlColumn = mycols[0] ;
@@ -970,7 +974,7 @@ int ac_table_display (vTXT blkp
   else
     {
       if (markUp)   
-	vtxtPrint (blkp, "</table>\n") ;
+	vtxtPrint (blkp, "</tbody>\n</table>\n") ;
       vtxtBreak (blkp) ;
     }
   return nLine ;

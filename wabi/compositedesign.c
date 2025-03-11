@@ -2,8 +2,8 @@
 #include "cdna.h"
 #include "makemrna.h"
 
-#define ARRAY_CHECK
-#define MALLOC_CHECK
+/* #define ARRAY_CHECK */
+/* #define MALLOC_CHECK */
 
 /**********************************************************************************/
 /**********************************************************************************/
@@ -387,7 +387,7 @@ static void mrnaDesignCleanExons (SC *sc, Array ss)
 /* get the X Composite and their counts */
 static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
 {
-  BOOL debug = FALSE ; /* tyty TRUE ; */
+  BOOL debug = TRUE ; /* tyty TRUE ; */
   HIT *up, *up1 ;
   DSX *ssp ;
   int i1, ii, jj, iMax = 0, ir, iss = 0 ;
@@ -742,6 +742,9 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
        fprintf (stderr, "gmrna->hits\n") ;
        showHits (gmrna->hits) ;
        fprintf (stderr, "gmrna->hits  done\n") ;
+       fprintf (stderr, "ss\n") ;
+       showDs (sc, ss) ;
+       fprintf (stderr, "ss  done\n") ;
      }
 
   iMax = ssHappyFew (ss) ;
@@ -774,7 +777,13 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
   if (! iMax)
     goto done ;
 
-  /* clip end elements overapping an intron */
+if (debug)
+    {
+      fprintf (stderr, "mrnaDesignGetGraphElements kill overlapping introns\n") ;
+      showDs (sc, ss) ;
+      fprintf (stderr, "mrnaDesignGetGraphElements kill overlapping introns done\n") ;
+    }
+    /* clip end elements overapping an intron */
   for (int ii = 0 ; ii < iMax ; ii++)
     {
       ssp = arrp (ss, ii, DSX) ;
@@ -2133,7 +2142,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 
   if (1)
     {
-      int minCover = 0, maxCover = 0 ;
+      int minCover = 0, maxCover = 0, maxC = 0 ;
       int nI = 0 ;
       int nEnds = 0 ;
       
@@ -2143,6 +2152,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 	  DSX *ssp = arrp (ss, jj, DSX) ;
 	  if (ssp->type & (gS | gReal3p | gReal5p))
 	    nEnds++ ;
+	  if (ssp->cover > maxC) maxC = ssp->cover ;
 	  if (ssp->type & gI)
 	    {
 	      nI++ ;
@@ -2153,7 +2163,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 	}
       if (N200 && 200 * minCover < 1 * maxCover)
 	ok = FALSE ;
-      if (nI + nEnds == 0)
+      if (nI + nEnds == 0 && maxC < 1000)
 	ok = FALSE ;
     }
   
@@ -2279,7 +2289,7 @@ static void mrnaDesignSetEndShades (KEYSET light, KEYSET dark)
 
 static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array starts, Array stops)
 {
-  BOOL debug = FALSE ;
+  BOOL debug = TRUE ;
   AC_HANDLE h = ac_new_handle () ;
   DSX *up, *up2, *vp = 0, *wp = 0, *sFlag = 0 ;
   int i, iMax = arrayMax (ss), iStart = 0, iStop = 0, startCover = 0, stopCover = 0 ;
@@ -2616,16 +2626,17 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 	}
     }
   if (0) arraySort (sFlags, sFlagsOrder) ;
-  if (nFlags) /* check if we captured all introns */
+  for (int pass = 0 ; nFlags && pass < 2 ; pass++) /* check if we captured all introns and all cds */
     {
       DSX *up, *up2 ;
       int ii ;
+      int myFlag = (pass == 0 ? gI : gCompleteCDS) ;
       long unsigned int un = 1 ;
       long unsigned int mask = (un << 32) - 1 ;
       for (ii = 0, up2 = arrp (ss2, 0, DSX) ; ii < iMax ; ii++, up2++)
 	{
 	  up = arrp (ss, up2->nn, DSX) ;
-	  if (up->type & gI) 
+	  if (up->type & myFlag) 
 	    { /* is this intron is part of a flag pair */
 	      BOOL ok = FALSE ;
 	      for (int i = 0 ; ! ok && i < nFlags ; i++)
@@ -2647,6 +2658,8 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 			else
 			  flag1 <<= 1 ;
 		    }
+		  else
+		    flag1 = 0 ;
 		  if (up->flag >> 32) /* take the best stop */
 		    {
 		      long unsigned int un = 1 ;
@@ -2657,6 +2670,8 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 			else
 			  flag2 <<= 1 ;
 		    }
+		  else
+		    flag2 = 0 ;
 		  if (debug)
 		    fprintf (stderr, "New pair flag %d : %lu/%lu inherited from the intron %d/%d\n"
 			     , nFlags, flag1, flag2 >> 32, up->a1, up->a2
@@ -2678,7 +2693,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 
 static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
-  BOOL debug = FALSE ;
+  BOOL debug = TRUE ;
   int iFlag, path, path0, tested, nIntron, nStart, nStop, useCDS ;
   int eeMax = ssHappyFew (ds->exons) ;
   Array segs, segs2 ;
@@ -2763,7 +2778,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	      if (vp->cover > bigScore)
 		bigScore = vp->cover ;
 	    }
-	  if (0 && sFlag->nn)
+	  if ((! flag1 || ! flag2)&& sFlag->nn)
 	    {
 	      vp2 = arrp (segs2, sFlag->nn, DSX) ;
 	      vp = arrp (segs, vp2->nn, DSX) ;

@@ -34,7 +34,7 @@ echo "$mytmp"
 if (! $?targets) then
   setenv targets "$DNAtargets $RNAtargets"
 endif
-if ($NO_INTRON == 1) then
+if ($NO_INTRON == 2) then
   setenv targets "$DNAtargets"
 endif
 

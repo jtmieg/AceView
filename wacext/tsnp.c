@@ -74,10 +74,8 @@
 
 #define VERSION "1.1"
 
-/* 
-   #define MALLOC_CHECK   
-   #define ARRAY_CHECK   
-*/
+/* #define MALLOC_CHECK    */
+/* #define ARRAY_CHECK  */
 #include "ac.h"
 #include "channel.h"
 #include "query.h"
@@ -2511,8 +2509,7 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   
   while (ac_free (Snp), ac_free (h1), Snp = ac_iter_obj (iter))
     {
-      AC_HANDLE h1 = ac_new_handle () ;
-      AC_TABLE tbl = ac_tag_table (Snp, "BRS_counts", h1) ;
+      AC_TABLE tbl = 0 ;
       int irmc = 0, ir, irMax = tbl ? tbl->rows : 0 ;
       RMC *rmc ;  
       char typ2[256] ;
@@ -2522,10 +2519,13 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 
       if (! gName || ! dictAdd (gNameDict, gName, 0))
 	continue ;
-      nSites++ ;
       if (! typ)
 	continue ;
       
+      nSites++ ;
+      h1 = ac_new_handle () ;
+      tbl = ac_tag_table (Snp, "BRS_counts", h1) ;
+
       if (typ[1]== '>')
 	{ 
 	  char *cp = strstr (allSubs, typ) ;
@@ -4145,6 +4145,7 @@ static void tsnpDbTranslate (TSNP *tsnp)
 static void tsnpDbGroupCount (TSNP *tsnp)
 {
   AC_HANDLE h = ac_new_handle () ;
+  AC_HANDLE h1 = 0 ;
   AC_DB db = tsnp->db ;
   AC_ITER iter ;
   ACEOUT ao = tsnp->outFileName ? aceOutCreate (tsnp->outFileName, ".group_count.ace", tsnp->gzo, h) : 0 ;
@@ -4181,10 +4182,10 @@ static void tsnpDbGroupCount (TSNP *tsnp)
     iter = ac_query_iter (db, TRUE, "Find Variant BRS_counts", 0, h) ;
 
   /* NOT DONE: split the 729 multi sub and force create the individual pieces */
-  while (ac_free (Snp), Snp = ac_iter_obj (iter))
+  while (ac_free (Snp), ac_free (h1),  Snp = ac_iter_obj (iter))
     {
       AC_TABLE tbl = 0 ;
-      AC_HANDLE h1 = ac_new_handle () ;
+      h1 = ac_new_handle () ;
       nn++ ;
       vtxtPrintf (txt, "\nVariant \"%s\"\n", ac_name (Snp)) ;
 

@@ -67,7 +67,7 @@ void polFree (POLYNOME pp) ;
 /**** New Polynomes of all types ***/
 POLYNOME newPolynome (AC_HANDLE h) ;
 POLYNOME polCopy (POLYNOME p1, AC_HANDLE h) ;
-POLYNOME newScalar (complex float z, AC_HANDLE h) ;
+POLYNOME newScalar (complex double z, AC_HANDLE h) ;
 POLYNOME newG (short mu, short nu, AC_HANDLE h) ;
 POLYNOME newEpsilon (short a, short b, short c, short d, AC_HANDLE h) ;
 /* newAG (... ,  0) antisymmetric link 1/2(ac bd - ad bc). Optionally adding the i epsilon 
@@ -113,7 +113,7 @@ PMX pmxExponential (PMX pmx, char *title, int level, AC_HANDLE h) ;
 BOOL pmxExpand (PMX pmx) ;   /* en place */
 
 POLYNOME pmxDeterminant (PMX pmx, AC_HANDLE h) ;
-BOOL pmxSet (PMX pmx, POLYNOME p,  complex *zz) ;
+BOOL pmxSet (PMX pmx, POLYNOME p,  double complex *zz) ;
 /* fill a pmx with a copy of a given polynome scaled according to the complex matrix zz 
  * to weakly check that the size of pmx and zz are equal,  zz[pmx->N^2]=-1 is required
  */

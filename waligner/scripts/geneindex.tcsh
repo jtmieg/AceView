@@ -534,7 +534,7 @@ foreach target ($Etargets )
     if ($GM == GENE && -e tmp/GENERUNS/$runs/$runs.$target.$uu.geneSupport.ace.gz) continue
 #echo "BB $run tmp/GENERUNS/$runs/$runs.$target.$GM.$uu.$gm.Support.ace.gz"
     if (-e tmp/GENERUNS/$runs/$runs.$target.$GM.$uu."$gm"Support.ace.gz) then
-      ls -ls tmp/GENERUNS/$runs/$runs.$target.$GM.$uu."$gm"Support.ace.gz
+      # ls -ls tmp/GENERUNS/$runs/$runs.$target.$GM.$uu."$gm"Support.ace.gz
       continue
     endif
 #echo "CC $run"
@@ -1254,7 +1254,7 @@ if ($ok == 0) continue
      foreach run (`cat MetaDB/$MAGIC/RunsList `)
          set long=`cat MetaDB/$MAGIC/RunNanoporeList  MetaDB/$MAGIC/RunPacBioList |gawk '{if($1==run)ok=1;}END{print ok+0;}' run=$run`
          if ($long == 1) then
-           ls -ls tmp/SPONGE/$run/$target.mrna.v4.3.$uu.ns.1
+           # ls -ls tmp/SPONGE/$run/$target.mrna.v4.3.$uu.ns.1
            set myGM=gene
            if ($GM == GENESPX) set myGM=mrna
            set n=`ls  tmp/SPONGE/$run/$target.$myGM.v4.*.$uu.[fr].1 | gawk '{n++;}END{print n+0;}'`
@@ -1340,7 +1340,7 @@ if ($phase == g4 || $phase == g4sp || $phase == gsnp4 ||  $phase == ma4  || $pha
     if (! -e tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz) then
       echo "missing file tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz, please =run please run phase SNV"
       exit 1
-    endif 
+    endif
     set myace=tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz
     set targetSNP=$target.$SNPCHROM
     if ($SNPCHROM == "" ) set targetSNP=$target
@@ -1365,12 +1365,13 @@ if ($phase == g4 || $phase == g4sp || $phase == gsnp4 ||  $phase == ma4  || $pha
     echo "FATAL ERROR: Phase $phase cannot access the expression data $myace"
     exit 1
   endif
-ls -ls $myace
+# ls -ls $myace
    \rm  tmp/GENEINDEX/Results/$MAGIC$mNam.$targetSNP.$GM.$uu.*
 
      set out=$MAGIC$mNam.$targetSNP.$GM$CAPT.$uu
      set dg=deepGene
      if ($phase == snp4) set dg=deepSNP
+
 echo "geneindex.tcsh8: phase=$phase GM=$GM target=$target out=$out MAGIC=$MAGIC"
 
      set testtest=""
@@ -1395,7 +1396,7 @@ endif
      endif
 
      if (1) then
-         echo "bin/geneindex $params"
+         echo "AAAA bin/geneindex $params"
                bin/geneindex $params
         if (! -e tmp/GENEINDEX/Results/$out.done) then
           echo "FATAL ERROR inside bin/geneindex : failed to create  tmp/GENEINDEX/Results/$out.done"
@@ -1442,7 +1443,7 @@ if ($phase == m4 || $phase == m4H || $phase == klst4) then
   endif
 
 echo "... $phase $target myace=$myace"
-ls -ls tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
+# ls -ls tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
   set myace=JUNK1209983485
   if ($phase != ii4 && -e   tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) set myace=tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
 

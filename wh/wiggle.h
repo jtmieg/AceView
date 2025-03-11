@@ -32,7 +32,7 @@
 #include "dict.h"
 #include "aceio.h"
 
-typedef enum { BF, BV, BG, AF, AM, AG, AW, BHIT, TABIX, COUNT } WFORMAT ;
+typedef enum { BF, BV, BG, AF, AM, AG, AW, BHIT, COUNT } WFORMAT ;
 typedef struct wiggleStruct { 
   AC_HANDLE h ; const char *title ; 
   ACEIN ai ; ACEOUT ao, aoPeaks ;
