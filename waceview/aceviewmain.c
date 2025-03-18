@@ -26,8 +26,10 @@ june 2007: separate the page in 5 subpages: fgene,fmol, fexp, ffunc, genome
     * These fields exist to be displayed to the user.
     */
 
-#define VERSION "v80"
-#define DATA_VERSION "v80a"
+/* synchronize with AceView/CHANGE */
+#define VERSION "v81"  
+#define DATA_VERSION "v81a"
+
 typedef struct dbConfigStruct {
   const char *dbName ; /* public name of the server, i.e. human */
   char dbSpecies ;

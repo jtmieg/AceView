@@ -2084,7 +2084,7 @@ KEY aceCommandDoExecute (AceCommand look, int level,
 	  if (look->outfile)
 	    look->outLevel = freeOutSetFile (look->outfile) ;
 
-	  if (look->beginTable &&ace_lower(spread->style) == 'x')
+	  if (look->beginTable && ace_lower(spread->style) == 'x')
 	    {
 	      freeOut ("<html>\n<body bgcolor=white>\n<h2>") ;
 	      if (*spread->titleBuffer) freeOutf ("<h2>\n%s\n</h2>", spread->titleBuffer) ;

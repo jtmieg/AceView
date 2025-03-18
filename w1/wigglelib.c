@@ -95,6 +95,7 @@ static BOOL sxRemap (WIGGLE *sx, int target_map, int map, int x1, int x2, int *r
 
 /*************************************************************************************/
 
+
 void sxWiggleParse (WIGGLE *sx, int z1, int z2)
 {
   ACEIN ai = sx->ai ;
@@ -747,7 +748,7 @@ void sxWiggleParse (WIGGLE *sx, int z1, int z2)
 	fprintf (stderr, "%d\t%.1f\n", wp->x, wp->y) ;
 
     }
-  fprintf (stderr, "// Parsed %d positions, %ld Mb, rejected %d positions, in file %s\n", nn, nBp*stepOut/1000000, nRejected, sx->inFileName) ;      
+  fprintf (stderr, "// Parsed %d positions, %ld bases, rejected %d positions, in file %s\n", nn, nBp, nRejected, sx->inFileName) ;      
 
   if (sx->aaa)
     for (nn = 0 ; nn < arrayMax (sx->aaa) ; nn++)

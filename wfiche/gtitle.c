@@ -418,12 +418,6 @@ void gmpJumpPointShow (vTXT blkp, GMP *gmp, BOOL showNow, BOOL verbose)
 	}
 
       vtxtPrint (blkp, "</tr>\n") ;
-      if (0) /* second line of this table */
-	{
-	  vtxtPrint (blkp, "</table><table width=\"98%%\" border=1 bordercolor='blue'>") ;
-	  vtxtPrint (blkp, "  <tr VALIGN=TOP HALIGN=CENTER bgcolor=\"#e5e5ff\">\n") ; 
-	  vtxtPrint (blkp, "<td>Danielle</td><td>est</td><td>la</td><td>plus</td><td>belle</td></tr>\n") ;
-	}
      }
     vtxtPrint (blkp, "</table>") ;
   }

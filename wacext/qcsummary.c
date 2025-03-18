@@ -1832,7 +1832,7 @@ static void qcInsertSize (QC *qc, RC *rc)
     { "Fragment_length_1", "1% fragments in library are shorter than (nt)", 0, 0, 0} ,
     { "Fragment_length_5", "5% fragments in library are shorter than (nt)", 0, 0, 0} ,
     { "Fragment_length_mode", "mode of fragment lengths", 0, 0, 0} ,
-    { "Fragment_length_median", "median fragment lengths", 0, 0, 0} ,
+    { "Fragment_length_median", "median fragment length", 0, 0, 0} ,
     { "Fragment_length_average", "average of fragment lengths", 0, 0, 0} ,
     { "Fragment_length_95", "5% fragments in library are longer than (nt)", 0, 0, 0} ,
     { "Fragment_length_99", "1% fragments in library are longer than (nt)", 0, 0, 0} ,
@@ -1840,7 +1840,7 @@ static void qcInsertSize (QC *qc, RC *rc)
   }; 
 
   const char *caption =
-    "Insert size distribution measured from paired alignments"
+    "Insert size distribution measured from paired alignments, or read lengths in single end protocols"
     ;
   if (rc == (void *) 1)
     return  qcChapterCaption (qc, tts, caption) ;
@@ -1970,7 +1970,7 @@ static void qcProject (QC *qc, RC *rc)
     { "Compute", "Reference", 6, 0, 0} ,    
     { "Compute", "Design", 12, 0, 0} ,
     { "Compute", "Sequencing protocol", 13, 0, 0} ,
-    {  "Paired_end", "Single or Paired end", 0, 0, 0} ,
+    { "Paired_end", "Single or Paired end", 0, 0, 0} ,
     { "Compute", "SRA date", 11, 0, 0} ,
     
    {  0, 0, 0, 0, 0}
@@ -2650,8 +2650,8 @@ static void qcMainResults3 (QC *qc, RC *rc)
 
     { "Compute", "% fragments on strand plus of genes", 90, 0, 0} ,  /* copied from qcGeneExpression */
     { "Compute", "Mismatches per kb aligned", 100, 0, 0} , /* copied from qcMismatchTypes */
-    { "Accessible_length_8kb", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
-    { "Accessible_length_5kb", "Well covered transcript length (nt), max 4kb, measured on transcripts longer than 5kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+    { "Accessible_length_8kb", "Homogeneous coverage of transcripts longer than 8kb, max 6kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+    { "Accessible_length_5kb", "Homogeneous coverage of transcripts longer than 5kb, max 4kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
 
     {  0, 0, 0, 0, 0}
   } ; 
@@ -5032,12 +5032,11 @@ static void qcGeneExpression2 (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
- 
+
     { "Compute1", "Zero index in %s\tLow index in %s\tCross over index in %s\tGenes expressed in at least one run of a group",  100, 0, 0 },
 
-    { "Compute", "Genes significantly expressed in %s\t\t", 1, 0, 0 },
-    { "Compute", "Transcripts significantly expressed in %s\t\t", 2, 0, 0} , 
-
+    { "Genes", "Genes significantly expressed in %s\t\t", 1, 0, 0 },
+    { "Genes", "Transcripts significantly expressed in %s\t\t", 2, 0, 0} ,
     {  0, 0, 0, 0, 0}
   }; 
 
@@ -5057,7 +5056,7 @@ static void qcGeneExpression2 (QC *qc, RC *rc)
 
       if (rc == 0)
 	{
-	  if (! strcmp (ti->tag, "Compute"))
+	  if (! strcmp (ti->tag, "Genes"))
 	    {
 	      char *buf = strnew (ti->title, h) ;
 	      
@@ -5100,9 +5099,10 @@ static void qcGeneExpression2 (QC *qc, RC *rc)
 	  tag = "Zero_index" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Low_index" ; qcShowGeneExp (qc, tt, target, tag) ;
 	  tag = "Cross_over_index" ; qcShowGeneExp (qc, tt, target, tag) ;
-	  tag = "Genes_expressed_in_at_least_one_run" ; qcShowGeneExp (qc, tt, target, tag) ;
+	  tag = "Genes_expressed_in_at_least_one_run" ;
+	  qcShowGeneExp (qc, tt, target, tag) ;
 	}
-      else if (! strcmp (ti->tag, "Compute"))
+      else if (! strcmp (ti->tag, "Genes"))
 	{  
 	  switch (ti->col)
 	    {
@@ -5119,24 +5119,16 @@ static void qcGeneExpression2 (QC *qc, RC *rc)
 	      int ii, ir ;
 	      for (ii = 0 ; ii < 3 ; ii++)
 		{
+		  aceOut (qc->ao, "\t") ;
 		  for (ir = 0 ; ir < tt->rows ; ir++)
 		    {
 		      target = qc->Etargets [ii] ;
 		      if (target && ! strcasecmp (target, ac_table_printable (tt, ir, 0, "x")))
-			break ;
-		    }
-		  if (ir < tt->rows)
-		    {
-		      switch (ti->col)	
-		{
-			case 1: 
-			case 2: 
-			  aceOutf (qc->ao, "\t%d", ac_table_int (tt, ir, 1, 0)) ;
+			{
+			  aceOutf (qc->ao, "%d", ac_table_int (tt, ir, 1, 0)) ;
 			  break ;
 			}
 		    }
-		  else
-		    aceOutf (qc->ao, "\t") ;
 		}
 	    }
 	  else
@@ -5277,6 +5269,327 @@ static void qcHighGenes (QC *qc, RC *rc)
    ac_free (h) ;
    return;
 } /* qcHighGenes */
+
+/*************************************************************************************/
+
+static void qcRunSelection (QC *qc, RC *rc)
+{
+  AC_HANDLE h = ac_new_handle () ;
+
+  TT *ti, tts[] = {
+    { "Spacer", "", 0, 0, 0} ,
+    { "SRP", "Project", 10, 0, 0} ,
+    { "Ends", "Supported known starts", 41, 0, 0} , 
+    { "Ends", "Candidate starts", 42, 0, 0} ,
+    { "Ends", "Supported known ends", 43, 0, 0} ,
+    { "Ends", "Candidate ends", 44, 0, 0} ,
+    { "Introns", "Supported known exon-exon junctions", 10, 0, 0} ,
+    { "PlusStrand", "% fragments on strand plus of genes", 90, 0, 0} ,  /* copied from qcGeneExpression */
+    { "Accessible_length_8kb", "Homogeneous coverage of transcripts longer than 8kb, max 6kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+    { "Compute", "% bases mapped in intergenic regions (suspected genomic contamination)\t% bases mapped to intronic regions (incompletely spliced transcripts)\t% bases mapped to UTR or non coding regions\t% bases mapped to protein coding regions (CDS)\t% Coding in mRNA: CDS/(CDS+UTR)\t% mapped raw bases in sponge", 1, 0, 0} ,
+
+    { "AnyTarget", "% Mb aligned on any target", 54, 0, 0} , 
+    { "Genes", "Genes significantly expressed in %s\t\t", 1, 0, 0 },
+    { "Genes", "Genes with index >= 15 in %s", 15, 0, 0 },
+    { "Genes", "Genes with Index >= 18 in %s", 18, 0, 0 },
+    { "Paired_end", "Single or Paired end", 0, 0, 0} ,
+    { "Fragment_length_median", "median insert size or average aligned length", 0, 0, 0} ,
+    { "Pairs", "% compatible pairs", 1, 0, 0} ,
+    { "FragAli", "Average length aligned per fragment (nt)", 61, 0, 0 } , /* copied from qcAvLengthAli */
+    { "SNV", "SNV sites\tPure variant SNV (95-100%)", 2, 0, 0} ,
+    { "MbAli", "Mb uniquely aligned in main protein coding genes minus very highly expressed genes", 80, 0, 0 }, /* copied from qcGeneExpression */
+    { "Ribo", "% Mb aligned in ribosomal RNA", 80, 0, 0 }, /* copied from qcGeneExpression */
+    
+    {  0, 0, 0, 0, 0}
+  }; 
+  
+  const char *caption =
+    "Run selection"
+    ;
+  
+  if (rc == (void *) 1)
+    return  qcChapterCaption (qc, tts, caption) ;
+  
+  const char *target = qc->Etargets[0] ? qc->Etargets[0] : "xx" ;
+  for (ti = tts ; ti->tag ; ti++)
+    {	
+      const char *tag ;
+      AC_TABLE tt = 0 ;
+      
+      if (rc == 0)
+	{
+	  if (! strcmp (ti->tag, "Genes"))
+	    {
+	      char *buf = strnew (ti->title, h) ;
+	      
+	      char *cp = strstr (buf, "\t\t") ;
+	      if (cp) *cp = 0 ;
+	      for (int ii = 0 ; ii < (ti->col == 1 ? 3 : 1) ; ii++)
+		{
+		  target = qc->Etargets [ii] ;
+		  aceOutf (qc->ao, "\t") ;
+		  if (target && ! strcmp (target, "av")) target = "AceView" ;
+		  aceOutf (qc->ao, buf, target ? target : "NA") ;
+		}		
+	    }
+	  else
+	    aceOutf (qc->ao, "\t%s", ti->title) ;
+	  continue ;
+	}
+       else if (! strcmp (ti->tag, "SRP"))
+	{
+	  const char *ccp = ac_tag_printable (rc->run, "SRP", 0) ;
+	  aceOutf (qc->ao, "\t%s", ccp ? ccp : ac_name(rc->run)) ;
+	  continue ;
+	}
+      else if (! strcmp (ti->tag, "Ends"))
+	{
+	  int k = 0 ;
+	  switch (ti->col)
+	    {
+	    case 41: tag = "Confirmed_starts" ; break ;
+	    case 42: tag = "Candidate_starts" ; break ;
+	    case 43: tag = "Confirmed_ends" ; break ;
+	    case 44: tag = "Candidate_ends" ; break ;
+	    }
+	  k = ac_tag_int (rc->ali, tag, 0) ;
+	  aceOutf (qc->ao, "\t%d", k) ;
+	}
+      else if (! strcmp (ti->tag, "Introns"))
+	{
+	  int ic, ir ;
+	  float z = 0 ;
+	  tag = "Candidate_introns" ;  ic = 3 ; 
+	  tt = ac_tag_table (rc->ali, tag, h) ;
+	  z = 0 ;
+	  if (tt)
+	    for (ir = 0 ; ir < tt->rows ; ir++)
+	      {
+		if (!ir || ! strcasecmp (ac_table_printable (tt, ir, 0, "xxx"), target))
+		  z = ac_table_int (tt, ir, ic, 0) + ac_table_float (tt, ir, ic, 0) ;
+	      }
+	  aceOutf (qc->ao, "\t%.0f", z) ;
+	}
+      else if (! strcmp (ti->tag, "PlusStrand"))
+	{  /* Observed strandedness */
+	  float z, z1 ;
+	  tt = ac_tag_table (rc->run, "Observed_strandedness_in_ns_mapping", h) ; 
+	  z = 50 ;
+	  if (tt)
+	    for (int ir = 0 ; ir < tt->rows ; ir++)
+	      {
+		z1 = ac_table_float (tt, 0,1,50) ;
+		if ((z-50)*(z-50) < (z1-50)*(z1-50))
+		  z = z1 ;
+	      }
+	  aceOutf (qc->ao, "\t%.2f", z) ;
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "AnyTarget"))
+	{
+	  const char *ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+	  float zb = 0 ;
+	  for (int ir = 0 ; tt && ir < tt->rows ; ir++)
+	    {
+	      ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+	      if (! strcasecmp (ccp, "any"))
+		{
+		  /* z = ac_table_float (tt, ir, 3, 0) ; */
+		  zb = ac_table_float (tt, ir, 5, 0) ;
+		  /* zc = ac_table_float (tt, ir, 7, 0) ; */
+		}
+	    } 
+	  
+	  aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned on any target after clipping */
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "Ribo"))
+	{
+	  const char *ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+	  float zb = 0 ;
+	  for (int ir = 0 ; tt && ir < tt->rows ; ir++)
+	    {
+	      ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+	      if (! strcasecmp (ccp, "B_rrna"))
+		{
+		  /* z = ac_table_float (tt, ir, 3, 0) ; */
+		  zb = ac_table_float (tt, ir, 5, 0) ;
+		  /* zc = ac_table_float (tt, ir, 7, 0) ; */
+		}
+	    } 
+	  
+	  aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned in rRNA */
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "Genes"))
+	{
+	  switch (ti->col)
+	    {
+	    case 1: 
+	      tag = "Genes_with_index" ;
+	      break ;
+	    case 15: 
+	      tag = "Genes_with_index_over_15" ;
+	      break ;
+	    case 18: 
+	      tag = "Genes_with_index_over_18" ;
+	      break ;
+	    }
+	  tt = ac_tag_table (rc->ali, tag, h) ;
+	  if (1)
+	    {
+	      int ii, ir ;
+	      for (ii = 0 ; ii < (ti->col == 1 ? 3 : 1) ; ii++)
+		{
+		  aceOutf (qc->ao, "\t") ;
+		  if (tt)
+		    {
+		      for (ir = 0 ; ir < tt->rows ; ir++)
+			{
+			  target = qc->Etargets [ii] ;
+			  if (target && ! strcasecmp (target, ac_table_printable (tt, ir, 0, "x")))
+			    break ;
+			}
+		      if (ir < tt->rows)
+			aceOutf (qc->ao, "%d", ac_table_int (tt, ir, 1, 0)) ;
+		    }
+		}
+	    }
+	}
+      else if (! strcmp (ti->tag, "Paired_end"))
+	{ 
+	  aceOutf (qc->ao, "\t") ;
+	  if (ac_has_tag (rc->run, "Is_run"))
+	    aceOutf (qc->ao, rc->Paired_end ? "Paired_end" : "Single-end") ;
+	  else
+	    {
+	      int n1, n2 ;
+	      n1 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ;>Runs ;   Paired_end", h)) ;
+	      n2 = ac_keyset_count (ac_objquery_keyset (rc->run, ">Union_of ; ! Paired_end", h)) ;
+	      if (n1 > 0 && n2 > 0)
+		aceOutf (qc->ao, "Mix") ;
+	      else if (n1 > 0 && n2 == 0)
+		aceOutf (qc->ao, "Paired_end") ;
+	      else if (n1 == 0 && n2 > 0)
+		aceOutf (qc->ao, "Single-end") ;
+	    }
+	}
+      else if (! strcmp (ti->tag, "Pairs"))
+	{ /* percent compatible pairs */
+	  float z1 = ac_tag_float (rc->ali, "Aligned_fragments", 0) ;
+	  float z2 = ac_tag_float (rc->ali, "Compatible_pairs", 0) ;
+	  aceOutf (qc->ao, "\t%.2f", 100.0 * z2/(z1 + .1)) ;
+	}
+      else if (! strcmp (ti->tag, "FragAli"))
+	{
+	  const char *ccp = EMPTY ;
+	  tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+	  float z = 0, zb = 0, zc = 0 ;
+	  if (tt)
+	    for (int ir = 0 ; tt && ir < tt->rows ; ir++)
+	      {
+		ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+		if (! strcasecmp (ccp, "any1") || ! strcasecmp (ccp, "any2"))
+		  {
+		    zb += ac_table_float (tt, ir, 5, 0) ;
+		  }
+	      }
+	  zc = ac_tag_float (rc->ali,  "Aligned_fragments", 0) ;
+	  if (zc > 0) z = 1000.0 * zb / zc ;
+	  aceOutf (qc->ao, "\t%.2f", z) ;  /* average length aligned per fragment */
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "SNV"))
+	{
+	  tt = ac_tag_table (rc->ali, "Genomic", h) ;
+	  if (tt)
+	    {
+	      int n1 = ac_table_int (tt, 0, 0, 0) ;
+	      int n2 = ac_table_int (tt, 0, 10, 0) ;
+	      aceOutf (qc->ao, "\t%d\t%d", n1, n2) ;
+	    }
+	  else
+	    aceOut (qc->ao, "\t\t") ;
+	}
+      else if (! strcmp (ti->tag, "MbAli"))
+	{
+	  tag = "Mb_in_genes_with_GeneId_minus_high_genes" ;
+	  aceOut (qc->ao, "\t") ;
+	  tt = ac_tag_table (rc->ali, tag, h) ;
+	  if (tt)
+	    {
+	      int ir ;
+	      for (ir = 0 ; ir < tt->rows ; ir++)
+		{
+		  if (target && ! strcasecmp (target, ac_table_printable (tt, ir, 0, "x")))
+		    break ;
+		}
+	      if (ir < tt->rows)
+		{
+		  switch (ti->col)	
+		    {
+		    case 80:   
+		      aceOutf (qc->ao, "%.03f", ac_table_float (tt, ir, 1, 0)) ;
+		      break ;
+		    }
+		}
+	    }
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "Compute"))
+	{
+	  float z, zG = 0, zI = 0, zU = 0, zC = 0, zRaw = 0 ;
+	  switch (ti->col)
+	    {
+	    case 1:
+	      zG = ac_tag_float (rc->ali, "S_1_intergenic", 0) ;
+	      zI = ac_tag_float (rc->ali, "S_1_intronic", 0) ;
+	      zU = ac_tag_float (rc->ali, "S_1_UTR", 0) ;
+	      zC = ac_tag_float (rc->ali, "S_1_CDS", 0) ;
+	      z = zG + zI + zU + zC ;
+  	      zRaw = rc->var[T_kb] ? rc->var[T_kb] : z/2 ;
+	      if (z > 0)
+		aceOutf (qc->ao, "\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f"
+			 , 100.0 * zG/z
+			 , 100.0 * zI/z
+			 , 100.0 * zU/z
+			 , 100.0 * zC/z
+			 , 100.0 * (zC/(zC+zU+.01))
+			 , 100000.0 * z/zRaw
+			 ) ;
+	      else
+		aceOutf (qc->ao, "\t\t\t\t\t\t") ;
+	      break ;
+	    }
+	}
+      else if (! strcmp (ti->tag, "Fragment_length_median"))
+	{
+	  if (ac_has_tag (rc->ali, ti->tag))
+	    qcShowTag (qc, rc, ti) ;
+	  else
+	    {
+	      float z = -1 ;
+	      aceOut (qc->ao, "\t") ;
+	      tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+	      for (int ir = 0 ; tt && ir < tt->rows ; ir++)
+		{
+		  if (! strcmp ("any", ac_table_printable (tt, ir, 0, "toto")))
+		    {
+		      z = ac_table_float (tt, ir, 11, 0) ;
+		      if (z >= 0)
+			aceOutf (qc->ao, "%.0f", z) ;
+		      break ;
+		    }
+		}
+	    }
+	}
+      else /* 110: accessible length 8k/5k, median fragment length */
+	qcShowTag (qc, rc, ti) ;
+    }
+
+   ac_free (h) ;
+   return;
+} /* qcRunSelection */
 
 /*************************************************************************************/
 
@@ -5792,7 +6105,8 @@ static void qc3pBias (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
-    { "Accessible_length_8kb", "Well covered transcript length (nt), max 6kb, measured on transcripts longer than 8kb, imited by the 3' bias in poly-A selected experiments", 0, 0, 0},    { "Accessible_length", "Number of well expressed transcripts longer than 8kb", 1, 0, 0} ,
+    { "Accessible_length_8kb", "Homogeneous coverage of transcripts longer than 8kb, max 6kb, limited by the 3' bias in poly-A selected experiments", 0, 0, 0}, /* copied from qc3pBias */
+    { "Accessible_length", "Number of well expressed transcripts longer than 8kb", 1, 0, 0} ,
     { "Accessible_length_8kb", "Average coverage cumulated over these transcripts", 3, 0, 0} ,
     {  0, 0, 0, 0, 0}
   }; 
@@ -5896,8 +6210,8 @@ static void qcIntergenic2 (QC *qc, RC *rc)
 {
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
-    { "TITLE", "Title", 10, 0, 0} ,
-    { "Compute", "% bases mapped in intergenic regions (suspected genomic contamination)\t% bases mapped to intronic regions (incompletely spliced transcripts)\t% bases mapped to UTR or non coding regions\t% bases mapped to protein coding regions (CDS)\t% mapped raw bases", 1, 0, 0} ,
+    /*     { "TITLE", "Title", 10, 0, 0} , */
+    { "Compute", "% bases mapped in intergenic regions (suspected genomic contamination)\t% bases mapped to intronic regions (incompletely spliced transcripts)\t% bases mapped to UTR or non coding regions\t% bases mapped to protein coding regions (CDS)\t% Coding in mRNA: CDS/(CDS+UTR)\t% mapped raw bases in sponge (no rRNA)", 1, 0, 0} ,
     {  0, 0, 0, 0, 0}
   }; 
   const char *caption =
@@ -5931,15 +6245,16 @@ static void qcIntergenic2 (QC *qc, RC *rc)
 	      z = zG + zI + zU + zC ;
   	      zRaw = rc->var[T_kb] ? rc->var[T_kb] : z/2 ;
 	      if (z > 0)
-		aceOutf (qc->ao, "\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f"
+		aceOutf (qc->ao, "\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f\t%.2f"
 			 , 100.0 * zG/z
 			 , 100.0 * zI/z
 			 , 100.0 * zU/z
 			 , 100.0 * zC/z
+			 , 100.0 * (zC/(zC+zU+.01))
 			 , 100000.0 * z/zRaw
 			 ) ;
 	      else
-		aceOutf (qc->ao, "\t\t\t\t\t") ;
+		aceOutf (qc->ao, "\t\t\t\t\t\t") ;
 	      break ;
 	    }
 	}
@@ -6191,10 +6506,11 @@ static void qcDrosoZhenXia (QC *qc, RC *rc)
 
 /*************************************************************************************/
 
-static const char *allMethods = "0S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
+static const char *allMethods = "R0S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
 static MM methods [] = {
-  {'S', &qcSortingTitles} ,
+  {'R', &qcRunSelection} ,
   {'0', &qcProject} ,
+  {'S', &qcSortingTitles} ,
   {'1', &qcMainResults1} ,
   {'2', &qcMainResults2} ,
   {'3', &qcMainResults3} ,
@@ -6461,6 +6777,8 @@ static void usage (char *message)
 	    "//   -TT  : limit the stats to the (run dependent) targeted genes\n"
 	    "//   -export [TPbafpmg...] : only export some groups of columns, in the requested order\n"
 	    "//      default: if -export is not specified, export all columns in default order\n"
+	    "//            R:  Run selection\n"
+	    "//            0:  Project Info\n"
 	    "//            S:  Sorting titles\n"
 	    "//            1:  Alignments read counts\n"
 	    "//            2:  Alignments percentages\n"
@@ -6483,6 +6801,7 @@ static void usage (char *message)
 	    "//            C: CPU and RAM usage\n"
 	    "//            i: Micro-RNA\n"
 	    "//            f:  ReadFate2\n" 
+	    "//            m:  Mapping per target\n"
 	    "//            a:  Ali\n"
 	    "//            p:  Pair\n" 
 	    "//            A:  Average aligned length\n"
@@ -6491,14 +6810,14 @@ static void usage (char *message)
 	    "//            s:  SNP types\n"
 	    "//            r:  Rejected SNP types\n"
 	    "//            7: 3p bias\n"
-	    "//            g: Gene expression 2\n"
 	    "//            D:  Intergenic\n"
+	    "//            g: Gene expression 2\n"
 	    "//            I:  Candidate introns\n"
-	    "//            L:  SL1-12\n"
 	    "//            X:  Sex and tissue signatures\n"
 	    "//            U:  Intergenic2\n"
+	    "//            L:  SL1-12\n"
 	    "//            Z: Zhenxi\n"
-	    "//            V: capture\n"
+	    "//            v: capture\n"
 	    "//            o:  Other\n"
 	    "//   -orderBy <tag> : sort the lines by this tag\n"
 	    "//      default: sorting_title\n"

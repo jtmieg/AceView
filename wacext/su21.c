@@ -2698,14 +2698,13 @@ static POLYNOME Z3_A_PsiL_PsiLB__Aover (void)
   short e = newDummyIndex () ;
   
   /*
-    int ppva[4] = {0,-1,-1,0} ;
-    int ppvc[4] = {-1,0,0,0} ;
-    int ppve[4] = {1,1,1,0} ;
-  */
-
-  int ppva[4] = {0, -1, -1, 0} ;
+    int ppva[4] = {0, -1, -1, 0} ;
   int ppvb[4] = {-1, 0, 0, 0} ;
   int ppve[4] = {1, 1, 1, 0} ;
+  */
+  int ppva[4] = {0, 0, 0, 0} ;
+  int ppvb[4] = {-1, 0, 0, 0} ;
+  int ppve[4] = {1, 0, 0, 0} ;
 
 
   POLYNOME p1 = vertex_A_PsiL_PsiLB (d,h) ;
@@ -2957,6 +2956,144 @@ static POLYNOME Z3_H_PsiR_PsiLB__HBA (void)
   return pp ;
 } /* Z3_H_PsiR_PsiLB__HBA */
 
+/***********************************************************************************************************************************************/
+/***********************************************************************************************************************************************/
+
+static POLYNOME Z3_A_PsiR_PsiLB__Hunder (void)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  short a = newDummyIndex () ;
+  short b = newDummyIndex () ;
+
+  POLYNOME p1 = vertex_A_PsiL_PsiLB (b,h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (2,h) ;   /* (1/(k+p+q)^2 */ 
+  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p4 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k)^2 */  
+  POLYNOME p5 = vertex_A_PsiR_PsiRB (a,h) ;
+  POLYNOME p6 = prop_HB_H (0,h) ;   /* (1/(k)^2 */ 
+  POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
+
+  POLYNOME pp = polMultiProduct (h,ppp) ;
+  printf ("Z3 Classic vertex A psi Hunder: expect 4 \n") ;
+  showPol (pp) ;
+  pp = dimIntegral (pp) ;
+  showPol(pp) ;
+
+  return pp ;
+} /* Z3_H_PsiR_PsiLB__Hunder */
+
+/***********************************************************************************************************************************************/
+
+static POLYNOME Z3_A_PsiR_PsiLB__Aunder (void)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  short a = newDummyIndex () ;
+  short b = newDummyIndex () ;
+
+  POLYNOME p1 = vertex_A_PsiL_PsiLB (b,h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (2,h) ;   /* (1/(k+p+q)^2 */ 
+  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p4 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k)^2 */  
+  POLYNOME p5 = vertex_A_PsiR_PsiRB (a,h) ;
+  POLYNOME p6 = prop_AA (a,b,0,h) ;   /* (1/(k)^2 */ 
+  POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
+
+  POLYNOME pp = polMultiProduct (h,ppp) ;
+  printf ("Z3 Classic vertex H psi Aunder: expect 4 \n") ;
+  showPol (pp) ;
+  pp = dimIntegral (pp) ;
+  showPol(pp) ;
+
+  return pp ;
+} /* Z3_H_PsiR_PsiLB__Aunder */
+
+/***********************************************************************************************************************************************/
+
+static POLYNOME Z3_A_PsiR_PsiLB__Bunder (void)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  short a = newDummyIndex () ;
+  short b = newDummyIndex () ;
+
+  POLYNOME p1 = vertex_A_PsiL_PsiLB (b,h) ;
+  POLYNOME p2 = prop_PsiLB_PsiL (2,h) ;   /* (1/(k+p+q)^2 */ 
+  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p4 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k)^2 */  
+  POLYNOME p5 = vertex_A_PsiR_PsiRB (a,h) ;
+  POLYNOME p6 = prop_AA (a,b,0,h) ;   /* (1/(k)^2 */ 
+  POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
+
+  POLYNOME pp = polMultiProduct (h,ppp) ;
+  printf ("Z3 Classic vertex H psi Aunder: expect 4 \n") ;
+  showPol (pp) ;
+  pp = dimIntegral (pp) ;
+  showPol(pp) ;
+
+  return pp ;
+} /* Z3_H_PsiR_PsiLB__Bunder */
+
+/***********************************************************************************************************************************************/
+
+static POLYNOME Z3_A_PsiR_PsiLB__HAH (void)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  short a = newDummyIndex () ;
+  short b = newDummyIndex () ;
+  short c = newDummyIndex () ;
+  short d = newDummyIndex () ;
+  short e = newDummyIndex () ;
+  short f = newDummyIndex () ;
+  int kk[4] = {-1,0,0,0} ;
+
+  POLYNOME p1 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p2 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k+p)^2 */ 
+  POLYNOME p3 = vertex_A_PsiR_PsiRB (f,h) ;
+  POLYNOME p4 = prop_HB_H (2,h) ;   /* (1/(k+p+q)^2 */ 
+  POLYNOME p5 = prop_AA (e,f,0,h) ;   /* (1/(k)^2 */ 
+  POLYNOME p6 = vertex_A_H_HB (e,kk,h) ;
+  POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
+
+  POLYNOME pp = polMultiProduct (h,ppp) ;
+  printf ("Z3 New vertex H psi HAB: expect -3 \n") ;
+  showPol (pp) ;
+  pp = dimIntegral (pp) ;
+  showPol(pp) ;
+
+  return pp ;
+} /* Z3_H_PsiR_PsiLB__HAH */
+
+/***********************************************************************************************************************************************/
+
+static POLYNOME Z3_H_PsiR_PsiLB__HHdoublon (void)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  short a = newDummyIndex () ;
+  short b = newDummyIndex () ;
+  short c = newDummyIndex () ;
+  short d = newDummyIndex () ;
+  short e = newDummyIndex () ;
+  short f = newDummyIndex () ;
+  int kk[4] = {-1,0,0,0} ;
+
+  
+  POLYNOME p1 = vertex_A_PsiR_PsiRB (f,h) ;
+  POLYNOME p2 = prop_PsiRB_PsiR (1,h) ;   /* (1/(k+p)^2 */ 
+  POLYNOME p3 = vertex_H_PsiR_PsiLB (h) ;
+  POLYNOME p4 = prop_HB_H (0,h) ;    /* (1/(k)^2 */ 
+  POLYNOME p5 = prop_AA (e,f,2,h) ;  /* (1/(k+p+q)^2 */ 
+  POLYNOME p6 = vertex_A_H_HB (e,kk,h) ;
+  POLYNOME ppp[7] = {p1, p2, p3, p4, p5, p6, 0} ;
+
+  POLYNOME pp = polMultiProduct (h,ppp) ;
+  printf ("Z3 New vertex H psi HAB: expect -3 \n") ;
+  showPol (pp) ;
+  pp = dimIntegral (pp) ;
+  showPol(pp) ;
+
+  return pp ;
+} /* Z3_H_PsiR_PsiLB__HAA */
+
+/***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
 
 static POLYNOME Z3_A_c_cB__Aunder (void)
@@ -11056,37 +11193,46 @@ int main (int argc, const char **argv)
 	    exit (0) ;
 	}
       
-      /* pure gauge theory, coupling of the Vector to the Fermion in the presence of scalar/vector/tensor under */
+      /* Fermion propagator */
       
       if (0) 
 	{
-	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi A under\n") ;
+	  printf ("\n\n\n@@@@@@@@@ Fermion propagator scalar under\n") ;
+	  Z2_PsiL__H_Psi ("######### Fermion propagator, Scalar under\n") ;
+		  
 	  firstDummyIndex = 'a' ;
-	  if (1) Z2_PsiL__A_Psi ("######### Fermion propagator, Vector under\n") ;
+	  Z2_PsiL__A_Psi ("######### Fermion propagator, Vector under\n") ;
+	  	  
 	  firstDummyIndex = 'a' ;
-	  printf ("Z2 done\n") ;
-	  if (1) Z3_A_PsiL_PsiLB__Aunder () ;
-	  firstDummyIndex = 'a' ;
-	  if (1) Z3_A_PsiL_PsiLB__Aover () ;
-	  
-	    
-	  
+	  Z2_PsiL__B_Psi ("######### Fermion propagator, Tensor under\n") ;
+	  	  
+	  printf ("\n\n\n@@@@@@@@@ Fermion propagator DONE\n\n") ;
+	  exit (0) ;
+	}
+
+      /* pure gauge theory, coupling of the Vector to the Fermion in the presence of scalar/vector/tensor under */
+      
+      if (1) 
+	{
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi scalar under\n") ;
-	  firstDummyIndex = 'a' ;
-	  if (1) Z2_PsiL__H_Psi ("######### Fermion propagator, Scalar under\n") ;
 	  firstDummyIndex = 'a' ;
 	  if (1) Z3_A_PsiL_PsiLB__Hunder () ; 
 	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi scalar over\n") ;
 	  if (1) Z3_A_PsiL_PsiLB__Hover () ; 
 
-	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi B under\n") ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi Vector under\n") ;
 	  firstDummyIndex = 'a' ;
-	  if (1) Z2_PsiL__B_Psi ("######### Fermion propagator, Tensor under\n") ;
+	  if (1) Z3_A_PsiL_PsiLB__Aunder () ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi Vector over\n") ;
+	  if (1) Z3_A_PsiL_PsiLB__Aover () ;
+	     
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi tensor under\n") ;
 	  firstDummyIndex = 'a' ;
-	  if (1) Z3_A_PsiL_PsiLB__Bunder () ;   
+	  if (0) Z3_A_PsiL_PsiLB__Bunder () ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi tensor over\n") ;
 	  firstDummyIndex = 'a' ;
-
-	  if (1) Z3_A_PsiL_PsiLB__Bover () ;   /* BUG: expand loops forever */
+	  if (0) Z3_A_PsiL_PsiLB__Bover () ;   /* BUG: expand loops forever */
 	  
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi DONE\n") ; 
 
@@ -11228,8 +11374,43 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
 
+      /* coupling of the vector to the Fermions, influenced by the scalar/vector/tensor */
+      if (0)
+	{
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity  A_PsiB_Psi Hunder vertex\n") ;
+	  if (1) Z3_A_PsiR_PsiLB__Hunder () ;  
+	  
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity  A_PsiB_Psi Aunder vertex\n") ;
+	  if (1) Z3_A_PsiR_PsiLB__Aunder () ;  
+	  
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity  A_PsiB_Psi Bunder vertex\n") ;
+	  if (1) Z3_A_PsiR_PsiLB__Bunder () ;  
+	  
+#ifdef JUNK
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ New Ward identity  A_PsiB_Psi HAH vertex\n") ;
+	  if (1) Z3_A_PsiR_PsiLB__HAH () ;  
+	  firstDummyIndex = 'a' ; 
+	  printf ("\n\n\n@@@@@@@@@ New Ward identity  A_PsiB_Psi AAA vertex\n") ; 
+	  if (1) Z3_H_PsiR_PsiLB__AAA () ; 
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ New Ward identity  H_PsiB_Psi HHA vertex\n") ; 
+	  if (1) Z3_H_PsiR_PsiLB__HHA () ; 
+	  firstDummyIndex = 'a' ;
+	  printf ("\n\n\n@@@@@@@@@ New Ward identity  H_PsiB_Psi HAH vertex\n") ; 
+	  if (1) Z3_H_PsiR_PsiLB__HAH () ; 
+
+	  printf ("\n\n\n@@@@@@@@@ New H-PsiB-Psi Ward identity  DONE\n") ; 
+
+#endif
+	  exit (0) ;
+	}
+
       /* coupling of the tensor to the Fermions, influenced by the scalar/vector/tensor */
-      if (1)
+      if (0)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ New Ward identity  B_PsiB_Psi BAH vertex\n") ;

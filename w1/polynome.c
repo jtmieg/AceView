@@ -3295,10 +3295,11 @@ POLYNOME momentaCleanUp (POLYNOME pp, short alpha)
 
 POLYNOME dimIntegral (POLYNOME p0)
 {
-  AC_HANDLE h = p0->h ;
+  AC_HANDLE h ;
   POLYNOME pp ;
   BOOL debug = FALSE ;
-  
+  if (! p0) return 0 ;
+  h = p0->h ;
   polCheck (p0) ;
   pp = polCopy (p0, h) ;
   pp = expand (pp) ;

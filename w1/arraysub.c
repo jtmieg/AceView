@@ -311,7 +311,7 @@ char *uArray (Array a, int i)
         arrayExtend (a,i) ;
       a->max = i+1 ;
     }
-  return a->base + i*a->size ;
+  return a->base + ((long int)i)*a->size ;
 }
 
 /***************/
@@ -333,13 +333,13 @@ char *uArray (Array a, int i)
  char *uArrCheck (Array a, int i, int size)
 {
   if (! a)
-    messcrash ("dereferecning a null Array") ;
+    messcrash ("dereferencing a null Array") ;
   if (size != a->size)
     messcrash ("Array size mismatch accessing array of size %d with pointer if typse-size %d", a->size, size) ;
   if (i >= a->max || i < 0)
     messcrash ("array index %d out of bounds [0,%d]",
 	       i, a->max - 1) ;
-  return a->base + i*a->size ;
+  return a->base + ((long int)i)*a->size ;
 }
 
 /**************/

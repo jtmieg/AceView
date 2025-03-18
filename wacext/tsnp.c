@@ -2498,10 +2498,12 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   int minSnpCount = tsnp->minSnpCount ;
   int minSnpFrequency = tsnp->minSnpFrequency ;
   char *allSubs = "A>G_T>C_G>A_C>T_A>T_T>A_G>C_C>G_A>C_T>G_G>T_C>A" ;
-  int nSites = 0 ;
+  int nSites = 0, nIter = 0 ;
   tsnp->varTypeDict = tsnpMakeVarTypeDict (h) ;
   int nnn = 0 ;
-  
+  char typ2[256] ;
+
+  memset (typ2, 0, sizeof (typ2)) ;
   if (tsnp->select)
     iter = ac_query_iter (db, TRUE, hprintf (h, "find variant IS  \"%s\" ", tsnp->select), 0, h) ;
   else
@@ -2510,13 +2512,13 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
   while (ac_free (Snp), ac_free (h1), Snp = ac_iter_obj (iter))
     {
       AC_TABLE tbl = 0 ;
-      int irmc = 0, ir, irMax = tbl ? tbl->rows : 0 ;
+      int irmc = 0, ir, irMax = dictMax (runDict) ;
       RMC *rmc ;  
-      char typ2[256] ;
       const char *typ = ac_tag_printable (Snp, "Typ", 0) ;
       int i, k, p = 0 ;
       const char *gName = ac_tag_printable (Snp, "gName", 0) ;
 
+      nIter++ ;
       if (! gName || ! dictAdd (gNameDict, gName, 0))
 	continue ;
       if (! typ)
@@ -2582,7 +2584,7 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
       typ2[0] = '0' + p/10 ; 
       typ2[1] = '0' + p%10 ; 
       typ2[2] = '_' ;
-      for (char *cp = typ2 ; *cp ; cp++)
+      for (char *cp = typ2 + 3 ; *cp ; cp++)
 	*cp = ace_lower (*cp) ;
       
       for (ir = 0 ; ir < irMax ; ir++)
@@ -2707,8 +2709,8 @@ static void tsnpDbSnpProfile (TSNP *tsnp)
 	    }
 	}
  
-      fprintf (stderr, "tsnpDbSnpProfile exported %d snps in file %s\n"
-	       , nnn, aceOutFileName (ao)
+      fprintf (stderr, "tsnpDbSnpProfile exported %d/%d snps in file %s\n"
+	       , nnn, nIter, aceOutFileName (ao)
 	       ) ;
     }
   

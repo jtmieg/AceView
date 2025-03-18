@@ -239,124 +239,61 @@ static void markupText (vTXT blkp, GMP *gmp, int type, char *txt)
     }
 }
 
-
+/*******************************************************/
+/* 2025_03 Tranfer the printing of the table to ac_table_display */
 static int fichePrintSquareTable (GMP *gmp, char style, Array Tbb, vTXT blkp, vTXT bfr, int doEmpty, int colColor, int sR, int eR, int colNum, ... )
 {
-  int iR, iC=0, colorTbb=0 ; 
-  char *ptr, *txt, *txt2 ; 
-  va_list marker ; 
-  char *oldType=ficheMarkupContent[2*_TD] ; 
+  AC_HANDLE h = ac_new_handle () ;
+  va_list marker ;
+  vtxtMarkup (blkp) ;
+  AC_TABLE table = 0 ;
+  Array titles = arrayHandleCreate (16, const char *, h) ;
+  int iC, nCol = -1 ;
 
-    
-  /* clean up the table, replace ooo cellends by zero */
-  
-  for  (iR=sR ; iR < eR ; iR++)
+  iC = colNum ; 
+  va_start  (marker, colNum) ; 
+  while (iC != -1)
     {
-      iC=colNum ; 
-      va_start  (marker, colNum) ; 
-      while  (iC!=-1)
+      nCol++ ;
+      /* clean up the table, replace ooo cellends by zero */
+      char *txt = vtxtPtr  (bfr) + TBB  (0, iC) ;
+      char *ptr = strstr  (txt, ooo) ;
+      if (ptr) *ptr=0 ;
+      /* insert in table */
+      if  (*txt)
+	array (titles, nCol, const char *) = txt ;
+      
+      iC= va_arg  (marker, int) ; 
+    }
+  va_end  ( marker ) ; 
+  table = ac_empty_table (1, arrayMax (titles), h) ; 
+  va_start  (marker, colNum) ;
+  nCol = -1 ;
+  iC = colNum ;
+  while (iC != -1)
+    {
+      nCol++ ;
+      for  (int jj = 0, iR = sR == 0 ? 1 : sR ; iR < eR ; iR++, jj++) /* jump title line */
 	{
-	  
 	  if  (TBB (iR, iC))
 	    {
-	      txt = vtxtPtr  (bfr) + TBB  (iR, iC) ;
-	      if  ( (ptr=strstr  (txt, ooo)))*ptr=0 ;  
-	      if  (!  (*txt))
-		{
-		  TBB  (iR, iC)=0 ; 
-		}
+	      /* clean up the table, replace ooo cellends by zero */
+	      char *txt = vtxtPtr  (bfr) + TBB  (iR, iC) ;
+	      char *ptr = strstr  (txt, ooo) ;
+	      if (ptr) *ptr=0 ;
+	      /* insert in table */
+	      if  (*txt)
+		ac_table_insert_text (table, jj, nCol, txt) ;
 	    }
-	  /* count how many non zero on this row and on this col */
-	  if  (TBB  (iR, iC))
-	    {TBB  (-1, iC)=TBB  (-1, iC)+1 ; TBB  (iR, -1)=TBB  (iR, -1)+1 ; }
-	  
-	  iC= va_arg  (marker, int) ; 
 	}
-      va_end  ( marker ) ; 
+      iC= va_arg  (marker, int) ; 
     }
-  /* Printing the table */
-  if (style == 'x')
-    {
-      markupStart  (blkp, gmp, _TB) ; 
-      for  (iR=sR ; iR < eR ; iR++)
-	{
-	  
-	  if  (!doEmpty && TBB  (iR, -1) < 1)continue ; 
-	  
-	  markupStart  (blkp, gmp, _TR) ; 
-	  
-	  iC=colNum ; 
-	  va_start  (marker, colNum) ; 
-	  while  (iC!=-1)
-	    {
-	      
-	      if  (!doEmpty && TBB  (-1, iC) < 2)
-		{iC= va_arg  (marker, int) ; continue ; }
-	      if  (iC==colNum && TBB (iR, colColor))
-		{
-		  if (!colorTbb)
-		    { 
-		      colorTbb=2;
-		      ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=\"#d5d5ff\">\n" ;  
-		    }
-		  else
-		    {
-		      txt = TBB (iR, colColor)+vtxtPtr (bfr) ; 
-		      txt2 =  TBB (iR-1, colColor)+vtxtPtr (bfr) ; 
-		      if (strcmp (txt, txt2))
-			colorTbb++ ; 
-		      if (colorTbb%2)ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=white>\n" ; 
-		      else ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=\"#efefff\">\n" ; 
-		    }
-		}
-	      
-	      markupStart (blkp, gmp, _TD) ; 
-	      
-	      if (TBB (iR, iC))
-		{
-		  txt=TBB (iR, iC)+vtxtPtr (bfr) ; 
-		  vtxtPrint (blkp, txt) ; 
-		}
-	      markupEnd (blkp, gmp, _TD) ; 
-	      iC= va_arg (marker, int) ; 
-	    }
-	  va_end ( marker ) ; 
-	  
-	  markupEnd (blkp, gmp, _TR) ; 
-	}
-      markupEnd (blkp, gmp, _TB) ; 
-      
-      ficheMarkupContent[2*_TD]=oldType ; 
-      vtxtPrintf (blkp, "<br/>\n") ;
-    }
-  else
-    {
-      for  (iR=sR ; iR < eR ; iR++)
-	{
-	  if  (!doEmpty && TBB  (iR, -1) < 1) continue ; 
-	  
-	  iC = colNum ; 
-	  va_start  (marker, colNum) ; 
-	  while  (iC != -1)
-	    {	      
-	      if  (!doEmpty && TBB  (-1, iC) < 2)
-		{ iC = va_arg  (marker, int) ; vtxtPrintf (blkp, "        ") ; continue ; }
-	      
-	      if (TBB (iR, iC))
-		{
-		  txt=TBB (iR, iC) + vtxtPtr (bfr) ; 
-		  vtxtPrint (blkp, txt) ; 
-		  vtxtPrintf (blkp, "        ") ;
-		}
-	      iC= va_arg (marker, int) ; 
-	    }
-	  va_end ( marker ) ; 
-	  vtxtPrintf (blkp, "\n") ;
-	}
-    }
-  vtxtPrintf (blkp, "\n") ;
-  return iC ; 
-}
+  va_end  ( marker ) ; 
+  vtxtPrint (blkp, "\n<br>\n") ;
+  int nnn = ac_table_display (blkp, table, arrayp (titles, 0, const char *), 0, 0, 0, 0, 0, 0) ;
+  ac_free (h) ;
+  return nnn ;
+} /* fichePrintSquareTable2 */
 
 
 /* -===================================- /
@@ -4348,72 +4285,53 @@ void ficheProductBlastPTableContent (vTXT blkp, GMP *gmp, int maxCol, const char
   AC_TABLE gBlastP ;
   AC_OBJ oBl ; 
   int	ir ; 
-  const char *ccp ;
-  char linkBuf[128+vSTRMAXNAME], buf[vSTRMAXNAME], *ptr, *oldtbl ; 
+  char linkBuf[128+vSTRMAXNAME], buf[vSTRMAXNAME], *ptr ;
+  const char *titles[] = {"score", "from aa to aa", "blastP Hit Title [species] eValue links to GenBank", "from aa to aa"} ; 
   AC_HANDLE h = ac_new_handle () ;
-
-  oldtbl=ficheMarkupContent[2*_TD] ; 
+  AC_TABLE  table = 0 ;
+  vTXT txt = vtxtHandleCreate (h) ;
   
   if ((gBlastP = ac_tag_table (gmp->kantor, "BlastP", h)))
     {
-      ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=\"#d5d5ff\">\n" ;  		
-      markupStart (blkp, gmp, _TB) ; 
-      
-      markupStart (blkp, gmp, _TR) ; 
-      markupText (blkp, gmp, _TD, "score") ; 
-      markupText (blkp, gmp, _TD, "from aa to aa") ; 
-      markupText (blkp, gmp, _TD, "blastP Hit Title [species] eValue links to GenBank") ; 
-      markupText (blkp, gmp, _TD, "from aa to aa") ; 
-      markupEnd (blkp, gmp, _TR) ; 
-
-      if (!maxCol) maxCol = gBlastP->rows ;
+      const char *ccp ;
+      maxCol = gBlastP->rows ;
+      table = ac_empty_table (maxCol, 4, h) ;
       for (ir=0 ; ir<gBlastP->rows && ir<maxCol ;  ir++)
 	{
 	  oBl = ac_table_obj (gBlastP, ir, 0, h) ; 
-	  
-	  if (ir%2)ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=\"#efefff\">\n" ; 
-	  else ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=white>\n" ; 
-	  
-	  markupStart (blkp, gmp, _TR) ; 
-	  
-	  markupStart (blkp, gmp, _TD) ; 
-	  vtxtPrintf (blkp, "   %12.0f", ac_table_float (gBlastP, ir, 2, 0)) ;
-	  markupEnd (blkp, gmp, _TD) ; 
-	  markupStart (blkp, gmp, _TD) ; 
-	  vtxtPrintf (blkp, "%4d to %4d", ac_table_int (gBlastP, ir, 3, 0), ac_table_int (gBlastP, ir, 4, 0) ) ;
-	  markupEnd (blkp, gmp, _TD) ; 
-	  markupStart (blkp, gmp, _TD) ; 
+	  ccp = vtxtPtr (txt) ;
+	  vtxtPrintf (txt, "%12.0f", ac_table_float (gBlastP, ir, 2, 0)) ;
+	  ccp = strnew (vtxtPtr (txt), h) ;
+	  ac_table_insert_text (table, ir, 0, ccp) ;
+
+	  vtxtClear (txt) ;
+	  vtxtPrintf (txt, "%4d to %4d", ac_table_int (gBlastP, ir, 3, 0), ac_table_int (gBlastP, ir, 4, 0) ) ;
+	  ccp = strnew (vtxtPtr (txt), h) ;
+	  ac_table_insert_text (table, ir, 1, ccp) ;
+
+	  vtxtClear (txt) ;
 	  strcpy (buf, ac_name (oBl)) ; 
 	  if ((ptr=strchr (buf, ' ')))*ptr=0 ; 
 	  sprintf (linkBuf, "https://www.ncbi.nlm.nih.gov/entrez/viewer.fcgi?val=%s", buf) ; 
 	  if ((ccp = ac_table_printable (gBlastP, ir, 7, 0)))
-	    gmpURL (blkp, gmp, linkBuf, ccp) ; 
+	    gmpURL (txt, gmp, linkBuf, ccp) ; 
 	  else
-	    gmpURL (blkp, gmp, linkBuf, "segment of previous") ; 
+	    gmpURL (txt, gmp, linkBuf, "segment of previous") ; 
+	  ccp = strnew (vtxtPtr (txt), h) ;
+	  ac_table_insert_text (table, ir, 2, ccp) ;
 
-	  markupEnd (blkp, gmp, _TD) ; 
-	  markupStart (blkp, gmp, _TD) ; 
-	  vtxtPrintf (blkp, "%4d to %4d", ac_table_int (gBlastP, ir, 5, 0), ac_table_int (gBlastP, ir, 6, 0)) ;
-	  markupEnd (blkp, gmp, _TD) ; 
-	  
-	  markupEnd (blkp, gmp, _TR) ; 
+	  vtxtClear (txt) ;
+	  vtxtPrintf (txt, "%4d to %4d", ac_table_int (gBlastP, ir, 5, 0), ac_table_int (gBlastP, ir, 6, 0)) ;
+	  ccp = strnew (vtxtPtr (txt), h) ;
+	  ac_table_insert_text (table, ir, 3, ccp) ;
 	}
-      if (ir<gBlastP->rows)
+      if (ir < gBlastP->rows)
 	{ 
-	  int icol ;
-	  ficheMarkupContent[2*_TD]="<td VALIGN=TOP bgcolor=#d0d0ff>\n" ; 
-	  markupStart (blkp, gmp, _TR) ; 
-	  for (icol = 0 ; icol < 4 ; icol++)
-	    {
-	      markupStart (blkp, gmp, _TD) ; 
-	      vtxtPrint (blkp, more) ;
-	      markupEnd (blkp, gmp, _TD) ; 
-	    }
-	  markupEnd (blkp, gmp, _TR) ;
+	  for (int icol = 0 ; icol < 4 ; icol++)
+	    ac_table_insert_text (table, ir + 1, icol, more) ;
 	}
-      markupEnd (blkp, gmp, _TB) ; 
     }
-  ficheMarkupContent[2*_TD]=oldtbl ; 
+  ac_table_display (blkp, table, titles, 0, 0, 0, 0, 0, 0) ;
   ac_free (h) ;
 } /* ficheProductBlastPTableContent */
 
@@ -13512,7 +13430,7 @@ static void ficheNewGeneIntronsParagraph (vTXT blkp, GMP *gmp)
  
 static int ficheTableConfigureColumns (const char **titles, const char **trueTitles, int *cols) 
 {
-  int i, j, j1, colorControl =  1 ;
+  int i, j, j1, colorControl =  0 ;
   const char *cp ;
   
   for (i = 0 ; i < 60 ; i++)
@@ -13522,7 +13440,7 @@ static int ficheTableConfigureColumns (const char **titles, const char **trueTit
       cp = titles[i] ;
       trueTitles [i] = titles[i] ;
       if (*cp == '+')	
-	{cp++; colorControl = i + 1 ;}
+	{cp++; if (! colorControl)  colorControl= i + 1 ;}
       if (*cp == '-')	
 	continue ;
       if (sscanf (cp,"%d:",&j1) == 1 && j1 >= 1 && j1 < 60)

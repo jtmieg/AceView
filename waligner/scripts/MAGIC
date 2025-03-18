@@ -542,7 +542,7 @@ cat <<EOF > _x.awk
   if (ix > 0) ph = ph " wait   "
   if (tsnp > 0) ph = ph "wait tsnp1b wait tsnp2a " ;
   if (tsnpZZ > 0) ph = ph "wait tsnp2b wait tsnp2c " ;  ## make words, count words , collate word counts
-  if (snp + tsnp > 0) ph = ph "wait tsnp3 wait tsnp3 " ;  ## report snp_profile in ali, must be run twice
+  if (snp + tsnp > 0) ph = ph "wait tsnp3 " ;  ## report snp_profile in ali
   if (snp + tsnp > 0) ph = ph "wait tsnp10 " ;  ## report qcsummary in RESULTS/SNV
   if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (snp > 0) ph = ph "wait snp4 " ;
@@ -5127,8 +5127,8 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   scripts/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/$MAGIC.tsnp3 --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC" 
   if (-e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) \rm  tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz  
 end
-if ($ok == 1 && ! -e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) then
-  scripts/submit wait
+if (! -e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) then
+  if ($ok == 0) scripts/submit wait
   gunzip -c tmp/TSNP_DB/zone*/$MAGIC.tsnp3.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | gawk -F '\t' '/^#/{next;}{print;}' | sort > tmp/TSNP_DB/toto.tsf.$$
   cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/TYPE__/{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n-D SNP_Profile\n",old);} i=index($2,"TYPE__");printf("SNP_Profile f1 %s %d\n", substr($2,i+6), $4);next;}END{printf("\n");}' > tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
   cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/Protein_changing__/{if ($1 != old){if (old) printf ("Ali \"%s\"\nProtein_changing %d sites %d Reference %s Low %d Mid %d High %d Pure\n\n",old,nn,n[0],n[1],n[2],n[3],n[4]);nn=0;n[0]=0;n[1]=0;n[2]=0;n[3]=0;n[4]=0;old=$1} i=index($2,"__");k=substr($2,i+2)+0;n[k]=$4+0;nn=nn+$4;next;}END{printf("\n");}' >> tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace

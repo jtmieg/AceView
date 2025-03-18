@@ -224,6 +224,7 @@ static void sxVentilate (WIGGLE *sx)
   BOOL hierarchic = sx->hierarchic ;
   BOOL firstRead ;
   BOOL inTranscript = FALSE ;
+  BOOL isPartial = FALSE ;
   int lastScore = 0, lastAli = 0, lastToAli = 0 ;
   int EndLength = 30 ;
   int chainNumber, chainFrom, chainTo, mateScore, mateAli , mateToAli ;
@@ -491,6 +492,7 @@ static void sxVentilate (WIGGLE *sx)
       lastAli = ali ; lastToAli = toali ; lastScore = score ;
       if (newProbe) firstX1 = x1 ;
       if (x1 < 30) toali -= x1 ;
+      isPartial = FALSE ;
       if (partial && ! noPartial)  /* may happen, the partial option also serves to export the ends */
 	{                        /* the partial are just a supplementary info */
 	  if ( (ali > 25 || ali > sx->minAliLength || 100 * ali > toali * sx->minAliRate) &&  ali < toali - 30)
@@ -500,13 +502,13 @@ static void sxVentilate (WIGGLE *sx)
 		  ! (wall2[0] && wall2[0] == ace_upper(wall2[0])) &&
 		  (ali + firstX1 < toali -30) 
 		  )
-		{ p2 = a2 ; p1 = p2 - (a1 < a2 ? 30 : -30) ; }
+		{ p2 = a2 ; p1 = p2 - (a1 < a2 ? 30 : -30) ; isPartial = TRUE ;}
 	      if (
 		  (! chainFrom || x1 == chainFrom) &&
 		  ! (wall1[0] && wall1[0] == ace_upper(wall1[0])) &&
 		  x1 > 30
 		  )
-		{ p1 = a1 ; p2 = p1 + (a1 < a2 ? 30 : -30) ; }
+		{ p1 = a1 ; p2 = p1 + (a1 < a2 ? 30 : -30) ; isPartial = TRUE ; }
 	    }
 	}
 
@@ -559,7 +561,8 @@ static void sxVentilate (WIGGLE *sx)
 	      aceOutf (eo, "trackName type=bedGraph\n") ;
 	    }
 	}
-      if (partial && p1)
+
+      if (partial && p1 && isPartial)
 	{
 	  po = array (pos, ifr + 4 * tc2 + 8 * pass + 16 * chrom, ACEOUT) ;
 	  if (!po)
@@ -958,6 +961,9 @@ static void usage (const char *error)
 	   "//     [-trackName name] , overruled by target names specifed in the input file"
 	   "//   BF : one column fixed step UCSC Bed format : gives the height at every idx position\n"
 	   "//     -out_step <int> , default 10, distance between successive input values in 'y' format\n"
+	   "//     -BF_compressor <int n>:  n = 1,2,3 or 4\n"
+	   "//     -BF_predictor <int n>:  n = 1,2,3 or 4\n"
+	   "//        degree of the polynomial predictor used to compress the BF format\n"
 	   "//   BV : two columns variable step UCSC Bed format : position 'tab' value\n"
 	   "//     -out_span <int> , default 1, coverage of each data point\n"
 	   "//     variableStep chrom=<name> span=<int>\n"
@@ -967,11 +973,6 @@ static void usage (const char *error)
 	   "//     the wiggle is exported in .ace format as class:mRNA\\nWiggle 'name' coord number-of-tags\n"
 	   "//   AG : -feature name\n"
 	   "//     the wiggle is exported in .ace format as Sequence target\\nFeature 'name' coord coord number-of-tags 'trackName'\n"
-
-	   "//   -BF_compressor <int n>:  n = 1,2,3 or 4\n"
-	   "//   -BF_predictor <int n>:  n = 1,2,3 or 4\n"
-
-	   "//      degree of the polynomial predictor used to compress the BF format\n"
 	   "//   Count : \n"
 	   "//     coverage statistics are exported on stdout\n"
 	   "//   -cumul : \n"

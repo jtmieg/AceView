@@ -876,7 +876,7 @@ static void spreadHtmlDump(void)
   filclose(f) ;
 
   return;
-} /* spreadAsciiDump */
+} /* spreadHtmlDump */
 
 /**********************************************************/
 

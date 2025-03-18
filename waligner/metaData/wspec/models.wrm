@@ -955,6 +955,8 @@
                                   RNA_modification   UNIQUE  ?Text  //for methylation or other analyses  
                                   Unspecified_RNA  UNIQUE ?Text
                               Targeted    RIP_CLIP UNIQUE ?Text
+                                          RIL  UNIQUE ?Text // RNA Interacting Ligation
+                                          Ends  UNIQUE ?Text
                                           Ribosome_profiling  UNIQUE ?Text
                                           Gene_selection ?Text
                               Genome  Whole_genome    ?Text  

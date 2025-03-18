@@ -3641,6 +3641,8 @@
                                   RIP UNIQUE ?Text // obsolete
                                   RNA_modification   ?Text  //for methylation or other analyses  
                               Targeted    RIP_CLIP UNIQUE Text
+                                          RIL  UNIQUE ?Text // RNA Interacting Ligation
+                                          Ends  UNIQUE ?Text
                                           Ribosome_profiling  UNIQUE ?Text
                                           Gene_selection  UNIQUE Text
                                           Capture  UNIQUE ?Capture

@@ -45,8 +45,6 @@ static AC_DB ac_db = 0 ;
 #define slxFormatNint 162
 #define slxFormatNfloat SOLEXAMAX2
 
-static int solexaStep = 10 ; /* agnostic, will be set by first acces to a wiggle */
-
 typedef struct HtileStruct *Htile ;
 
 typedef struct TmapStruct {
@@ -58,7 +56,6 @@ typedef struct TmapStruct {
   float mag, leftMargin, offset, dragTopMargin ;
   int graphWidth, graphHeight ;
   int a1, a2, min, max ;
-
   float lnWidth ;
   COLOUROPT bb [SOLEXAMAX] ;
 
@@ -105,6 +102,7 @@ typedef struct HtileStruct {
   BOOL isSolexaClosed[SOLEXAMAX] ;
   BOOL isSmoothed[NSMAX] ;
   BOOL isSolexaSmoothed[SOLEXAMAX] ;
+  int solexaStep ;  /* agnostic, will be set by first acces to a wiggle */
   int mxShowNs ;
   int tmFilter, exonicFilter, smoothing, ratio, ends ;
   int filter99, doMask, isMasked ;
@@ -1410,7 +1408,7 @@ static BOOL htileSmoothing (Htile look)
   SEG *seg, *seg1 ;
   double w, sigma = width ;
   double sigma2 = 2 * sigma * sigma ;
-  
+  int solexaStep = look->solexaStep  ; 
   switch (look->smoothing)
     {
     case 1:
@@ -1652,6 +1650,7 @@ static BOOL htileSolexaSmoothing (Htile look)
   SLX *slx, *slx1 ;
   double w, sigma = width ;
   double sigma2 = 2 * sigma * sigma ;
+  int solexaStep = look->solexaStep  ; 
 
   mask = 0 ;
   if (look->doMask && ! look->isMasked)
@@ -2701,16 +2700,19 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
   Array slxs2 = 0 ;
   WIGGLEPOINT *wp ;
   SLX *slx ;
+  int solexaStep = look->solexaStep  ; 
   int step = solexaStep ; /* resolution of this experiment */
 
   /* in old method we parse at actual positions, so the tads have random positions
-   * in new method we systematically create a tag every 10bp
+   * in new method we systematically create a tag every solexastep
    */
   if (!look->map->solexa)
     look->map->solexa = arrayHandleCreate (100000, SLX, look->h) ;
   slxs2 = look->map->solexa ;
    
   /* parse the data in a new array */
+  nn =  (look->map->a2 - look->map->a1 )/step + 1 ;
+  slx = arrayp (slxs2, nn - 1, SLX) ; /* expand */
   nn = nn2 = 0 ;
   for (ii = 0, wp = arrp (wpArray, 0, WIGGLEPOINT) ; ii < arrayMax (wpArray); wp++, ii++)
     {
@@ -2720,6 +2722,7 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 	{
   	  nn++ ;
 	  a1 = (wp->x - look->a1 + step/2 + 1) / step ;
+	  if (a1 > nn2) nn2 = a1 ;
 	  if (a1 >= 1)
 	    {
 	      slx = arrayp (slxs2, a1 - 1, SLX) ;
@@ -2727,6 +2730,8 @@ static int htileWiggleConvert (Htile look, PNX *pnx, int ns, Array wpArray)
 	    }
 	}
     }
+  arrayMax (slxs2) = nn2 ;
+  nn2 = 0 ;
   /* add in the missing coordinates */
 
   if (nn)
@@ -2892,7 +2897,7 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 		    }
 		  if (1 && filCheckName(fNam, 0, "r"))
 		    {
-		      Array aa = sxGetWiggleZone (0, fNam, "BF", &solexaStep, name(look->intMap), look->a1, look->a2, h) ;
+		      Array aa = sxGetWiggleZone (0, fNam, "BF", &(look->solexaStep), name(look->intMap), look->a1, look->a2, h) ;
 		      if (aa && arrayMax (aa))
 			htileWiggleConvert (look, pnx, ns, aa) ;
 		    }
@@ -2961,7 +2966,7 @@ static void htileDrawSolexa (Htile look, float offset, float probeOffset, ACEOUT
       olds = 0 ;
       for (iSlx = 1, slx = arrp (look->map->solexa, 1, SLX); iSlx < arrayMax(look->map->solexa) ; iSlx++, slx++)
 	{
-	  x = TMAP2GRAPH (look->map, slx->a1 + solexaStep) ;
+	  x = TMAP2GRAPH (look->map, slx->a1 + look->solexaStep) ;
 	  if (x < 0 || x > look->map-> graphWidth)
 	    continue ;
 	  if (look->doMask && (slx->flag & MASK_FILTER)) continue ;
