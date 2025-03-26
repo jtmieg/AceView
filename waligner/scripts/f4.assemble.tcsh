@@ -7,7 +7,7 @@ echo -n "f4.assemble.tcsh start "
 date
 
 if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
-
+  echo "parse f4.genes2intmap.ace when available"
   pushd tmp/X.$MAGIC/$chrom
     if (-e TABIX) \rm TABIX
     ln -s ../../TABIX
@@ -18,37 +18,46 @@ if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
       query find gene transcribed_gene && IntMap == $chrom
       show -a -f tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace IntMap
 EOF
-    cat  tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace | gawk '/^Gene/{g=$2;next;}/^IntMap/{printf("Sequence %s\nGenes %s %s %s\n\n", $2, g, $3,$4);}' >   tmp/X.$MAGIC/$chrom/f4.geneParents.ace
-    bin/tacembly tmp/X.$MAGIC/$chrom << EOF
-      read-models
-      parse tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace
-      parse tmp/X.$MAGIC/$chrom/f4.geneParents.ace
-      save
+    if (-e tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace) then
+      cat  tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace | gawk '/^Gene/{g=$2;next;}/^IntMap/{printf("Sequence %s\nGenes %s %s %s\n\n", $2, g, $3,$4);}' >   tmp/X.$MAGIC/$chrom/f4.geneParents.ace
+      bin/tacembly tmp/X.$MAGIC/$chrom << EOF
+        read-models
+        parse tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace
+        parse tmp/X.$MAGIC/$chrom/f4.geneParents.ace
+        save
       quit
 EOF
-  
+    endif
   endif
-
 
   bin/tacembly tmp/X.$MAGIC/$chrom << EOF
     read-models
     query find sequence Is_read && ! cdna_clone
+    comment "cdna_80 create cDNA_clone info"
     acembly
       cdna_80
       quit
+    comment "cdna_77 Kill premRNA echoes on other strand"
     acembly
       cdna_77
       quit
     save
+    comment "cdna_1 align all est"
+    find tg
+    kill
+    find mrna
+    kill
     acembly
       cdna_1 $chrom
       quit
     save
+    comment "cdna_71 realign all tg -split_cloud"
     acembly
       cdna_71 -split_cloud
       quit
     save
 
+    comment "export suspect polyA as tables"
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect1.txt  -f tables/10.polyAsuspect1.def
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect2.txt  -f tables/10.polyAsuspect2.def
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect4.txt  -f tables/10.polyAsuspect4.def
@@ -76,14 +85,14 @@ EOF
 
 endif
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
-# kill echo ct_ac introns
+echo "kill echo ct_ac introns"
 scripts/f3.kill_ct_ac_introns.tcsh $chrom 2
 # find all antisens gene, with non classic or ct_ac intron supported 5 times less than an approximately antisense g[tc]_ag intron
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
      table -o tmp/X.$MAGIC/$chrom/f4.killEchoIntron.out -f tables/f4.killEchoIntron.def
      quit
 EOF
-# export list of reads and gene
+echo " export list of reads and gene"
 cat tmp/X.$MAGIC/$chrom/f4.killEchoIntron.out | gawk -F '\t' '/^"/{printf("Sequence %s\n",$3);printf("Transcribed_gene %s\n",$1);}' > tmp/X.$MAGIC/$chrom/f4.killEchoIntron.list
 # kill the bad reads, recompute the genes, they will usually vanish
 echo "kill tmp/X.$MAGIC/$chrom/f4.killEchoIntron.list"
@@ -152,6 +161,7 @@ wc tmp/X.$MAGIC/*/f4.spliced_tg.list
 # suspect 2 finds forward polyA read endding inside the ORF
 # suspect 4 removes polyA of forward read if a reverse read assembles further down
 
+echo "reverse polyA suspect reads "
 pushd tmp/X.$MAGIC/$chrom
   gawk  -F '\t' '/\"/ {printf ("Sequence %s\nColour PALEGREEN\n\ncDNA_clone %s\nInternal_priming\n\n",$8, $9);}'  f4.10.polyAsuspect1.txt >!  f4.10.polyAsuspect1.ace
   gawk  -F '\t' '/\"/ {printf ("Sequence %s\nColour PALEGREEN\n\ncDNA_clone %s\nInternal_priming\n\n",$8, $9);}'  f4.10.polyAsuspect2.txt >!  f4.10.polyAsuspect2.ace

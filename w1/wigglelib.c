@@ -1118,7 +1118,7 @@ static void sxWiggleExportTranscriptsEnds (WIGGLE *sx, Array aa0, Array bb, int 
 	   ) ;
   ac_free (mmm) ;
   return ;
-} /* sxWiggleExportTrnacriptsEnds */
+} /* sxWiggleExportTranscriptsEnds */
 
 /*************************************************************************************/
 /* aa: possibly gaussed wiggle, bb original wiggle */

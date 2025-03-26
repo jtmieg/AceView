@@ -2227,15 +2227,17 @@ ACEIN aceInCreate (const char *inFileName, BOOL gzi, AC_HANDLE h)
 	  )
 	isBam = TRUE ;
 
-      if (isBam)
-	ai = aceInCreateFromPipe (hprintf (h, "samtools view %s", inFileName), rtype, 0, h) ;
-      else if (gzi)
-	ai = aceInCreateFromPipe (hprintf (h, "gzip -dc %s", inFileName), rtype, 0, h) ;
-      else
-	ai = aceInCreateFromFile (inFileName, rtype, 0, h) ;
-      
+      if (filCheckName (inFileName, 0, "r"))
+	{
+	  if (isBam)
+	    ai = aceInCreateFromPipe (hprintf (h, "samtools view %s", inFileName), rtype, 0, h) ;
+	  else if (gzi)
+	    ai = aceInCreateFromPipe (hprintf (h, "gzip -dc %s", inFileName), rtype, 0, h) ;
+	  else
+	    ai = aceInCreateFromFile (inFileName, rtype, 0, h) ;
+	}
       if (! ai)
-	messcrash ("file %s not found", inFileName) ;
+	messerror ("file %s not found", inFileName) ;
     }
   else
     {

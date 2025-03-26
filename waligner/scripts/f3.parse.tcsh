@@ -255,11 +255,11 @@ echo "# grab the exons from the wiggle "
   cat tmp/X.$MAGIC/$chrom/f3.$XGH.r.ace  | gawk '/^Sequence/{split($2,aa,"__");chrom=substr(aa[1],4);split(aa[2],bb,"_");a1=bb[1];a2=bb[2];ln=a2-a1;if(ln<0)ln=-ln;ln++;printf("%s\t1\t%d\t%s\t%d\t%d\n",$2,ln,chrom,a1,a2);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow
   bin/dna2dna  -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow   tmp/X.$MAGIC/$chrom/f3.$XGH.r.shadow | gawk '/^>/{print;next;}{printf("%s\n",$1);}' >  tmp/X.$MAGIC/$chrom/f3.$XGH.r.fasta
 
-# transcriptsEnds :  
+# transcriptsEnds :  do not use -stranding option, this creates end echos rather than damping them
 
     echo "Construct the transcriptsEnds  $WGR/$ggs"
-    echo "  bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5"
-            bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/$chrom/f3.Xends.$ggs -stranding $stranding -minCover $minExonCover -wiggleRatioDamper 5
+    echo "  bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/$chrom/f3.Xends.$ggs -minCover $minExonCover -wiggleRatioDamper 5"
+            bin/wiggle  -transcriptsEnds tmp/$WGR/$ggs/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/X.$MAGIC/$chrom/f3.Xends.$ggs -minCover $minExonCover -wiggleRatioDamper 5
 
 end
 

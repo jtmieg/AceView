@@ -2806,6 +2806,7 @@ static void htileSolexaEndRatios (Htile look, PNX *pnx0, int ns, int NF)
 	      if (ns3 != NA) z += slx1->signal[ns3] ; 
 	      if (ns4 != NA) t += slx1->signal[ns4] ; 
 	    }
+	  /* do not use the other strand values (s,t) this creates ends echos rather than damping them */
 	  x /= 2 * nn + 1 ; y /= 2 * nn + 1 ;
 	  u =  (x + damper) / (x + y + 2 * damper) - seuil ;
 	  if (u < 0) u = 0 ;

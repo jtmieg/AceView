@@ -647,6 +647,8 @@ static void editSelected(void)
   parseBuffer (stackText (localStack,0), ksNew) ;
   stackDestroy (localStack) ;  /* it can be quite big */
   i = keySetMax(ksNew) ;
+  for (cp = buffer ; *cp ; cp++)
+    if (*cp == '%') *cp = '.' ;
   messout (messprintf ("// I updated %d objects with command\n %s\n", i, buffer)) ;
   messdump (messprintf ("// I updated %d objects with command\n %s\n", i, buffer)) ;
   /*  parseKeepGoing = FALSE ; */

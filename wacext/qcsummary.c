@@ -5296,9 +5296,10 @@ static void qcRunSelection (QC *qc, RC *rc)
     { "Fragment_length_median", "median insert size or average aligned length", 0, 0, 0} ,
     { "Pairs", "% compatible pairs", 1, 0, 0} ,
     { "FragAli", "Average length aligned per fragment (nt)", 61, 0, 0 } , /* copied from qcAvLengthAli */
-    { "SNV", "SNV sites\tPure variant SNV (95-100%)", 2, 0, 0} ,
+    { "SNV", "Exonic SNV sites\tPure variant SNV (95-100%)", 2, 0, 0} ,
     { "MbAli", "Mb uniquely aligned in main protein coding genes minus very highly expressed genes", 80, 0, 0 }, /* copied from qcGeneExpression */
-    { "Ribo", "% Mb aligned in ribosomal RNA", 80, 0, 0 }, /* copied from qcGeneExpression */
+    { "Ribo", "% Reads aligned in ribosomal RNA", 80, 0, 0 }, /* copied from qcGeneExpression */
+    { "Any", "% Reads aligned in any target", 80, 0, 0 }, /* copied from qcGeneExpression */
     
     {  0, 0, 0, 0, 0}
   }; 
@@ -5406,19 +5407,39 @@ static void qcRunSelection (QC *qc, RC *rc)
       else if (! strcmp (ti->tag, "Ribo"))
 	{
 	  const char *ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
-	  float zb = 0 ;
+	  float z = 0, zb = 0 ;
 	  for (int ir = 0 ; tt && ir < tt->rows ; ir++)
 	    {
 	      ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
 	      if (! strcasecmp (ccp, "B_rrna"))
 		{
-		  /* z = ac_table_float (tt, ir, 3, 0) ; */
-		  zb = ac_table_float (tt, ir, 5, 0) ;
+		  if (1)  z = ac_table_float (tt, ir, 3, 0) ; 
+		  if (0) zb = ac_table_float (tt, ir, 5, 0) ;
 		  /* zc = ac_table_float (tt, ir, 7, 0) ; */
 		}
 	    } 
 	  
-	  aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned in rRNA */
+	  if (0)  aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned in rRNA */
+	  if (1)  aceOutf (qc->ao, "\t%.2f", rc->var[T_Read] ? 100 *z / rc->var[T_Read] : 0) ; /* % Read aligned in rRNA */
+	  ac_free (tt) ;
+	}
+      else if (! strcmp (ti->tag, "Any"))
+	{
+	  const char *ccp = EMPTY ; tt = ac_tag_table (rc->ali, "nh_Ali", h) ;
+	  float z = 0, zb = 0 ;
+	  for (int ir = 0 ; tt && ir < tt->rows ; ir++)
+	    {
+	      ccp = ac_table_printable (tt, ir, 0, EMPTY) ;
+	      if (! strcasecmp (ccp, "any"))
+		{
+		  if (1)  z = ac_table_float (tt, ir, 3, 0) ; 
+		  if (0) zb = ac_table_float (tt, ir, 5, 0) ;
+		  /* zc = ac_table_float (tt, ir, 7, 0) ; */
+		}
+	    } 
+	  
+	  if (0)  aceOutf (qc->ao, "\t%.2f", rc->var[T_kb] ? 100 *zb / rc->var[T_kb] : 0) ; /* % Mb aligned in any */
+	  if (1)  aceOutf (qc->ao, "\t%.2f", rc->var[T_Read] ? 100 *z / rc->var[T_Read] : 0) ; /* % Read aligned in any */
 	  ac_free (tt) ;
 	}
       else if (! strcmp (ti->tag, "Genes"))

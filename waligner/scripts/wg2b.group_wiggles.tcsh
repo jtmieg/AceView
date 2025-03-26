@@ -130,8 +130,8 @@ if (! -e $out/wg2b.done) then
 
 
     echo "Construct the transcriptsEnds  $WG/$group"
-    echo "  bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5"
-            bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5
+    echo "  bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a  -minCover 300 -wiggleRatioDamper 5"
+            bin/wiggle  -transcriptsEnds tmp/$WG/$group/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$group/$chrom/wg2a -minCover 300 -wiggleRatioDamper 5
 
 endif
 

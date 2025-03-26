@@ -126,8 +126,8 @@ touch tmp/$WG/$run/wg2a.restrand.done
 
   foreach chrom ($chromSetAll)
     echo "Construct the transcriptsEnds  $WG/$run"
-    echo "  bin/wiggle  -transcriptsEnds tmp/$WG/$run/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$run/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5"
-            bin/wiggle  -transcriptsEnds tmp/$WG/$run/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$run/$chrom/wg2a -stranding 3 -minCover 30 -wiggleRatioDamper 5
+    echo "  bin/wiggle  -transcriptsEnds tmp/$WG/$run/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$run/$chrom/wg2a -minCover 30 -wiggleRatioDamper 5"
+            bin/wiggle  -transcriptsEnds tmp/$WG/$run/$chrom/R.chrom.u -gzi -I BF -O COUNT -o tmp/$WG/$run/$chrom/wg2a -minCover 30 -wiggleRatioDamper 5
 
     foreach cover (5 10 20 50)
         gunzip -c  tmp/$WG/$run/$chrom/R.chrom.frns.$uu.BF.gz | bin/wiggle -I BF -O BV  -gauss 20 -minCover $cover -peaks -o tmp/$WG/$run/$chrom/coverome.$cover.$uu
