@@ -910,7 +910,8 @@ static BOOL snpBrsParseCounts (TSNP *tsnp, SNP *snp)
   int minM = tsnp->minSnpCount ;
   int minC = tsnp->minSnpCover > 0 ? tsnp->minSnpCover : 1 ;
   snp->is20_4 = FALSE ;
- 
+
+  if (minM <= 0) minM = 4 ;
   for (int ir = 0 ; ir < keySetMax (tsnp->runs) ; ir++)
     {
       int r = keySet (tsnp->runs, ir) ;
@@ -922,7 +923,7 @@ static BOOL snpBrsParseCounts (TSNP *tsnp, SNP *snp)
 	continue ;
       c = keySet (tsnp->covers, r) ;
       m = keySet (tsnp->mutant, r) ;
-      if (100 * m >= minF * c && c >= minC && m >= 4)
+      if (100 * m >= minF * c && c >= minC && m >= minM)
 	snp->is20_4 = TRUE ;
       if (r2g && keySetMax (r2g))
 	{

@@ -1485,8 +1485,8 @@ static void gxCounts (GX *gx)
       AC_HANDLE h2 = 0 ;
       AC_OBJ obj = 0 ;
       /*      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron IS CHROMOSOME_III__1557_1508 && de_duo && ! Is_echo", h) ;*/
-      AC_ITER iter7 = ac_dbquery_iter (gx->db, "Find Intron de_duo && ! Is_echo", h) ;
-      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron chr3R__20812148_20812093", h) ;
+      AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron de_duo && ! Is_echo", h) ;
+      /* AC_ITER iter = ac_dbquery_iter (gx->db, "Find Intron chr3R__20812148_20812093", h) ; */
       ISS *up = arrayp (aa, runMax, ISS) ; /* make room */
       RSS *rp = arrayp (rr, NN * runMax, RSS) ; /* make room */
       rp->ii = 0 ; /* for compiler happiness */
