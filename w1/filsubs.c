@@ -686,7 +686,6 @@ void filclose (FILE *fil)
 
   if (!fil || fil == stdin || fil == stdout || fil == stderr)
     return ;
-  fclose (fil) ;
   if (mailFile && assFind (mailFile, fil, &filename))
     { if (assFind (mailAddress, fil, &address))
 	callScript ("mail", messprintf ("%s < %s", address, filename)) ;
@@ -697,6 +696,7 @@ void filclose (FILE *fil)
       unlink ((char *) filename) ;
       messfree (filename) ;
     }
+  fclose (fil) ;
 } /* filclose */
 
 /***********************************/

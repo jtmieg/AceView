@@ -91,8 +91,8 @@ char    *uArrayCheck (Array a, int index, int size) ;
 #define arrayp(ar,i,type)	((type*)uArrayCheck(ar,i,sizeof(type)))
 #define array(ar,i,type)	(*(type*)uArrayCheck(ar,i,sizeof(type)))
 #else
-#define arr(ar,i,type)	((*(type*)((ar)->base + ((long int)i)*(ar)->size)))
-#define arrp(ar,i,type)	(((type*)((ar)->base + ((long int)i)*(ar)->size)))
+#define arr(ar,i,type)	((*(type*)((ar)->base + ((long int)(i))*(ar)->size)))
+#define arrp(ar,i,type)	(((type*)((ar)->base + ((long int)(i))*(ar)->size)))
 #define arrayp(ar,i,type)	((type*)uArray(ar,i))
 #define array(ar,i,type)	(*(type*)uArray(ar,i))
 #endif /* ARRAY_CHECK */

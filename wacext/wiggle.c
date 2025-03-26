@@ -1245,7 +1245,6 @@ int main (int argc, const char **argv)
     }
   else
     {
-      char *fNam = 0 ;
       sx.dict = dictHandleCreate (100000, h) ;
       sx.aaa = arrayHandleCreate (100, Array, h) ;
   
