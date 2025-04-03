@@ -546,6 +546,7 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
   /* POLYNOME pp, ppp[] = {p1,p31,p41,p5, 0} ;  */
 
   p4->tt.denom[pqrD] = 2 ;
+  p4->tt.z *= 4 ;
   if (0) p4->tt.z *= u*I ;
   pp = polMultiProduct (h, ppp) ;
 
@@ -11229,10 +11230,10 @@ int main (int argc, const char **argv)
 	     
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi tensor under\n") ;
 	  firstDummyIndex = 'a' ;
-	  if (0) Z3_A_PsiL_PsiLB__Bunder () ;
+	  if (1) Z3_A_PsiL_PsiLB__Bunder () ;
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi tensor over\n") ;
 	  firstDummyIndex = 'a' ;
-	  if (0) Z3_A_PsiL_PsiLB__Bover () ;   /* BUG: expand loops forever */
+	  if (1) Z3_A_PsiL_PsiLB__Bover () ;   /* BUG: expand loops forever */
 	  
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi DONE\n") ; 
 

@@ -756,7 +756,7 @@ float keyGetFloat (KEY key, KEY tag)
 const char *keyGetText (KEY key, KEY tag) /* not paralelisable */
 {
   OBJ obj = 0 ;
-  static char buf[256] ;
+  static char buf[1024] ;
   char *cp ;
 
   buf[0] = 0 ;
@@ -766,8 +766,8 @@ const char *keyGetText (KEY key, KEY tag) /* not paralelisable */
       (obj = bsCreate(key)))
     {
       if (bsGetData (obj, tag, _Text, &cp))
-	strncpy (buf, cp, 255) ;
-      buf[256] = 0 ;
+	strncpy (buf, cp, 1023) ;
+      buf[1023] = 0 ;
       bsDestroy (obj) ;
     }
   return buf ; /* not paralelisable */}
