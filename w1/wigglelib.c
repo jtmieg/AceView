@@ -970,18 +970,64 @@ static void sxWiggleExportMultiPeaks (WIGGLE *sx, Array aa0, Array bb, int remap
     }
   imm = jj ;
   
-
+  /* cut on local mins < 1% of connex  max on both sides */
+  if (1)
+    {
+      int lastMax = 0, lastMin = 0, goodMin = 0, goodMax = 0 ;
+      MPK *mpMin = 0 ;
+      for (ii = 0, mp = arrp (mmm, ii, MPK) ; ii < imm ; mp++, ii++)
+	{
+	  float av ;
+	  
+	  if (! mp->ln) continue ;
+	  av = mp->cover * 1.0/(mp->ln) ;
+	  if (mp->cover < 1 || mp->x1 > mp[-1].x2 + 10)
+	    {
+	      lastMin = lastMax = goodMin = goodMax = 0 ;
+	      mpMin = 0 ;
+	    }
+	  else if (! lastMax)
+	    {
+	      lastMin = lastMax = av ;
+	      goodMin = av / 100 ;
+	      mpMin = 0 ;
+	    }
+	  else if (av <= goodMin)
+	    {
+	      if (av < lastMin)
+		{
+		  lastMin = av ;
+		  goodMax = 100 * av ;
+		  mpMin = mp ;
+		}
+	    }
+	  else if (mpMin && av >= goodMax)
+	    {
+	      mpMin->cover = -999 * mpMin->ln ;
+	      lastMin = lastMax = av ;
+	      goodMin = av / 100 ;
+	      mpMin = 0 ;
+	    }
+	  else if (av > lastMax)
+	    {
+	      lastMax = av ;
+	      goodMin = av/100 ;
+	    }
+	}
+    }
+  
   /* export */
   if (debug)
     aceOutf (ao, "\nAfter dips\n") ;
 
   for (ii = 0, mp = arrp (mmm, ii, MPK) ; ii < imm ; mp++, ii++)
-    aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%.0f\t%ld\t%d\t%d\n"
-	     , dictName (sx->remapDict, remap)
-	     , mp->x1, mp->x2, mp->ln * step
-	     , mp->yMax, mp->cover * 1.0/(mp->ln), mp->cover * step
-	     , mp->level, mp->level * ratio
-	     ) ;
+    if (mp->cover)
+      aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%.0f\t%ld\t%d\t%d\n"
+	       , dictName (sx->remapDict, remap)
+	       , mp->x1, mp->x2, mp->ln * step
+	       , mp->yMax, mp->cover * 1.0/(mp->ln), mp->cover * step
+	       , mp->level, mp->level * ratio
+	       ) ;
 
   /* zero terminate */
       aceOutf (ao, "%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n"

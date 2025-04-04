@@ -5,30 +5,12 @@ setenv ici `pwd`
 
 echo -n "f4.assemble.tcsh start "
 date
-
-if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
-  echo "parse f4.genes2intmap.ace when available"
-  pushd tmp/X.$MAGIC/$chrom
-    if (-e TABIX) \rm TABIX
-    ln -s ../../TABIX
-    if (! -e tables) ln -s ../../metaData/tables
-  popd
-  if ($species == worm && ! -e tmp/X.$MAGIC/$chrom/genes.ace) then
-    tbly ~/yknew <<EOF
-      query find gene transcribed_gene && IntMap == $chrom
-      show -a -f tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace IntMap
-EOF
-    if (-e tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace) then
-      cat  tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace | gawk '/^Gene/{g=$2;next;}/^IntMap/{printf("Sequence %s\nGenes %s %s %s\n\n", $2, g, $3,$4);}' >   tmp/X.$MAGIC/$chrom/f4.geneParents.ace
-      bin/tacembly tmp/X.$MAGIC/$chrom << EOF
-        read-models
-        parse tmp/X.$MAGIC/$chrom/f4.genes2intmap.ace
-        parse tmp/X.$MAGIC/$chrom/f4.geneParents.ace
-        save
-      quit
-EOF
-    endif
-  endif
+goto laba0
+laba0:
+if (! -e tmp/X.$MAGIC/$chrom/f3.parse.done) then
+  echo "missing file tmp/X.$MAGIC/$chrom/f3.parse.done, please run phase f3"
+  exit 1
+endif
 
   bin/tacembly tmp/X.$MAGIC/$chrom << EOF
     read-models
@@ -42,21 +24,28 @@ EOF
       cdna_77
       quit
     save
-    comment "cdna_1 align all est"
+    comment "kill all old tg and old mrnas"
     find tg
     kill
     find mrna
     kill
+    comment "cdna_1 align all est"    
     acembly
       cdna_1 $chrom
       quit
     save
+    comment "test XG"
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
     comment "cdna_71 realign all tg -split_cloud"
     acembly
       cdna_71 -split_cloud
       quit
     save
 
+    comment "test XG"
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
     comment "export suspect polyA as tables"
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect1.txt  -f tables/10.polyAsuspect1.def
     table -o tmp/X.$MAGIC/$chrom/f4.10.polyAsuspect2.txt  -f tables/10.polyAsuspect2.def
@@ -64,7 +53,8 @@ EOF
     quit
 EOF
 
-laba:
+exit 0
+laba1:
 ## remove echo introns
 ## we need the intron coordinates, some are missing
   echo "find intron NOT IntMap"
@@ -83,7 +73,7 @@ EOF
      quit
 EOF
 
-endif
+
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 echo "kill echo ct_ac introns"
 scripts/f3.kill_ct_ac_introns.tcsh $chrom 2
@@ -117,13 +107,20 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      save
      quit
 EOF
+exit 0
+laba2:
+
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 # split this code out of previous one to monitor eventual errors
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
      key  tmp/X.$MAGIC/$chrom/f4.killEchoIntron.tg.list
+    list
      acem
         cdna_73 -split_cloud
         quit
+    comment "test XG after spli73"
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
      query find mrna DNA:2 > 10000 ; > from_gene
      acem
         cdna_73 -split_cloud // 2017_03_11 a hack to rm stupid extra long empty exons
@@ -135,6 +132,8 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      list -a -f f4.spliced_tg.list
      quit
 EOF
+
+exit 0
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 echo -n "f4.killEchoIntron done"
 date
@@ -183,7 +182,11 @@ pushd tmp/X.$MAGIC/$chrom
     query follow read ; NOT ref_mrna && NOT ref_seq
     edit -D Is_read
     sor
-   
+
+    comment "test XG in split_cloud "
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
+    
     comment "restore missing flags gt_ag in est"
     query find est Flipped
     edit -D Flipped
@@ -203,16 +206,25 @@ pushd tmp/X.$MAGIC/$chrom
     acem
       cdna_73 -split_cloud // will kill all the non_best_mrna and resize and fuse a first time
       quit 
+    comment "test XG in after split_cloud1 "
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
     find tg
     comment cDNA_Flag_suspected_internal_deletion
     acem
       cDNA_Flag_suspected_internal_deletion -ignore // ignore non informative clones
       quit
+    comment "test XG in after split_cloud2 "
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
     query find tg to_be_fused_with
     comment "fuse_genes"
     acem
       cdna_73 -split_cloud // -locally incompatible avec to_be_fused_with
       quit
+    comment "test XG in after split_cloud3 "
+    query find sequence XG_chr3__1976795_1970805 ; from_gene
+    list
     query find mrna NOT from_gene
     spush
     follow dna

@@ -2122,19 +2122,19 @@ static int mrnaDesignExport (S2M *s2m, SC *sc, DS *ds, Array segs, KEYSET ks, in
 static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, int tested, int xStart, int xStop, AC_HANDLE h)
 {
   BOOL ok = TRUE ;
-
+  int PM = 0 ;
   KEYSET ks = keySetHandleCopy (ks0, h) ;
   int iMax = keySetMax (ks) ;
   keySetSort (ks) ;
 
-  if (iMax && xStart)
+  if (path > PM && iMax && xStart)
     {
       int ii = keySet (ks, 0) ;
       DSX *ssp = arrp (ss, ii, DSX) ;
       if (xStart != ssp->a1)
 	ok = FALSE ;
     }
-  if (iMax && xStop)
+  if (path > PM && iMax && xStop)
     {
       int ii = keySet (ks, iMax - 1) ;
       DSX *ssp = arrp (ss, ii, DSX) ;
@@ -2163,7 +2163,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 	      if (ssp->cover < minCover) minCover = ssp->cover ;
 	    }
 	}
-      if (1 && 200 * minCover < 1 * maxCover)
+      if (path > PM && 200 * minCover < 1 * maxCover)
 	ok = FALSE ;
       if (nI + nEnds == 0 && maxC < 1000)
 	ok = FALSE ;
@@ -2609,7 +2609,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 		  vp = arrp (starts, besti, DSX) ;
 		  flag3 |= flag2 ;
 		  if (debug)
-		    fprintf (stderr, "New stop flag %d, a1 = %d, a2 = %d, score = %d, flags %lu / %lu\n"
+		    fprintf (stderr, "New stop Flag %d, a1 = %d, a2 = %d, score = %d, flags %lu / %lu\n"
 			     , nFlags, vp->a1, wp->a2, wp->end, flag, flag2 >> 32) ;
 		  sFlag = arrayp (sFlags, nFlags++, DSX) ;
 		  sFlag->flag = flag | flag2 ;
@@ -2618,7 +2618,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 	      else
 		{
 		  if (debug)
-		    fprintf (stderr, "New stop flag %d, a1 = open, a2 = %d, score = %d, flag = %lu >> 32\n"
+		    fprintf (stderr, "New stop Flag %d, a1 = open, a2 = %d, score = %d, flag = %lu >> 32\n"
 			     , nFlags, wp->a2, wp->end, flag2) ; 
 		  sFlag = arrayp (sFlags, nFlags++, DSX) ;
 		  sFlag->flag = flag2 ;
@@ -2675,7 +2675,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 		  else
 		    flag2 = 0 ;
 		  if (debug)
-		    fprintf (stderr, "New pair flag %d : %lu/%lu inherited from the intron %d/%d\n"
+		    fprintf (stderr, "New pair Flag %d : %lu/%lu inherited from the intron %d/%d\n"
 			     , nFlags, flag1, flag2 >> 32, up->a1, up->a2
 			     ) ;
 		  sFlag = arrayp (sFlags, nFlags++, DSX) ;
@@ -2835,7 +2835,7 @@ static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 	  path++ ;
 	  if (0 || debug)
 	    {
-	      fprintf (stderr, "+++New path %d, flag = %lu/%lu, start on %d %d score=%d maxCover=%d\n", path, flag & mask, flag >> 32, vp->a1, vp->a2, vp->score, maxCover) ;
+	      fprintf (stderr, "+++New path %d, Flag %d = %lu/%lu, start on %d %d score=%d maxCover=%d\n", path, iFlag, flag & mask, flag >> 32, vp->a1, vp->a2, vp->score, maxCover) ;
 	    }
 	  ks = keySetReCreate (ks) ;
 	  keySet (ks, 0) = vp->nn ;
@@ -4426,6 +4426,7 @@ void mrnaDesignAbsorbInIntron (void)
 
 BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
 {
+  BOOL debug = FALSE ;
   BOOL new = FALSE ;
   int nn = ks ? keySetMax (ks) : 0 ;
   const char *errors = 0 ;
@@ -4733,7 +4734,7 @@ BOOL mrnaDesignCutOnePreMrna (KEY gene, KEY green, KEYSET ks)
   if (vtxtPtr (txt))
     {
       ac_parse (db, vtxtPtr (txt), &errors, 0, h) ;
-      if (0) fprintf (stderr, "%s\n\n", vtxtPtr (txt)) ;
+      if (debug) fprintf (stderr, "%s\n\n", vtxtPtr (txt)) ;
     }
   if (ks)
     keySet (ks, nn++) = green ;

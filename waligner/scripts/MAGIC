@@ -4260,7 +4260,7 @@ foreach kb (8kb 5kb)
   if (! -d RESULTS/Coverage_of_"$kb"_transcripts__3prime_bias) mkdir RESULTS/Coverage_of_"$kb"_transcripts__3prime_bias
 
 # construct the group crocodiles
-  foreach gr (`cat MetaDB/$MAGIC/g2r | cut -f 1`)
+  foreach gr (`cat MetaDB/$MAGIC/g2r | cut -f 1 | sort -u`)
     if (! -d  tmp/GENEGROUPS/$gr) mkdir tmp/GENEGROUPS/$gr
     set totogr=tmp/GENEGROUPS/$gr/$gr.coverage_of_"$kb"_transcripts.txt
     echo -n "### $totogr : " > $totogr
@@ -9625,6 +9625,33 @@ goto phaseLoop
 goto phaseLoop
 
 ###############################################################
+// eco + RefSeq + magic
+Ali ERR2868184
+S_1_intergenic 0.850680 "Mb aligned, covered area" 0.071680 "Mb, annotated area" 0.079009 Mb
+S_1_intronic 0.000000 "Mb aligned, covered area" 0.000000 "Mb, annotated area" 0.000000 Mb
+S_1_UTR 603.693110 "Mb aligned, covered area" 0.497300 "Mb, annotated area" 0.521502 Mb
+S_1_CDS 1404.394860 "Mb aligned, covered area" 4.006900 "Mb, annotated area" 0.000000 Mb
+
+// eco + refseq
+Ali ERR2868184
+S_1_intergenic 26.975840 "Mb aligned, covered area" 0.317680 "Mb, annotated area" 0.329851 Mb
+S_1_intronic 0.000000 "Mb aligned, covered area" 0.000000 "Mb, annotated area" 0.000000 Mb
+S_1_UTR 594.067840 "Mb aligned, covered area" 0.287280 "Mb, annotated area" 0.307901 Mb
+S_1_CDS 1387.894970 "Mb aligned, covered area" 3.970920 "Mb, annotated area" 0.000000 Mb
+
+// eco only
+Ali ERR2868184
+S_1_intergenic 30.336560 "Mb aligned, covered area" 0.339760 "Mb, annotated area" 0.352367 Mb
+S_1_intronic 0.000000 "Mb aligned, covered area" 0.000000 "Mb, annotated area" 0.000000 Mb
+S_1_UTR 1978.602090 "Mb aligned, covered area" 4.236120 "Mb, annotated area" 4.289285 Mb
+S_1_CDS 0.000000 "Mb aligned, covered area" 0.000000 "Mb, annotated area" 0.000000 Mb
+
+//
+Ali ERR2868184
+S_1_intergenic 111.162610 "Mb aligned, covered area" 0.422330 "Mb, annotated area" 0.444840 Mb
+S_1_intronic 0.024440 "Mb aligned, covered area" 0.001550 "Mb, annotated area" 0.002519 Mb
+S_1_UTR 1027.012590 "Mb aligned, covered area" 1.709520 "Mb, annotated area" 1.739381 Mb
+S_1_CDS 870.739010 "Mb aligned, covered area" 2.442480 "Mb, annotated area" 0.024440 Mb
 
 phasesponge2:
 # grab the forward aceview genes(1 2 5 10 20 50)
@@ -9643,7 +9670,9 @@ foreach target ($Etargets)
   set mainTarget=$target
   break
 end
-
+# set mainTarget="magic"
+set mainTarget="$Etargets"
+# if ($species == Ecoli) set mainTarget="Eco RefSeq"
 # 2025_03_10, Etargets -> mainTarget
 foreach target ($mainTarget)
   set mask=$mask",$target""_CDS:tmp/METADATA/$target.ns.cds.sponge"

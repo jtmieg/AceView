@@ -12928,8 +12928,8 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
   KEYSET genes = 0 ;
   Array linkPos = arrayCreate (24, HIT) ;
   char *searchCosmid = 0 ; /* 5F60 t22_Hs22_11677_31_6  0" ; usually 0, set to "ZK637" to start looping on that cosmid */
-  int ncosmid = 0 ;  /* if searchCosmid != 0, use this counter */
-  int ncosmidMax = 2 ; /* if searchCosmid != 0, start there, stop after ncosmidMax */
+  int ncosmid = 0 ;  /* 1 was 0,  if searchCosmid != 0, use this counter */
+  int ncosmidMax = 2 ; /* 3 was 2, if searchCosmid != 0, start there, stop after ncosmidMax */
   if (!ks || !keySetMax(ks))
     return ;
 
@@ -12947,14 +12947,13 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
       keySetKill (ks) ;
       keySetDestroy (ks) ;
     }
-
   while (kp++, ii--) 
     {
-
       if (0 &&  ng > 200)   /* for debugging */
         break ;
       getSeqDna ( KEYMAKE (_VCalcul, 12345)) ;    /* cleanup */
       cosmid1 = *kp ;
+      cosmid1 = keyGetKey (cosmid1, _Overlap_right) ; /* CHEAT */
       if (type == 21)
         alignChain (cosmid1, linkPos) ;
       while (cosmid1 && ncosmid < ncosmidMax)
@@ -12982,7 +12981,7 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
                       if (type == 2)
                         genes = alignEst2Cosmid (cosmid1, estKs, genes, type/1000, 2222, 0, 0, 0, 3, 0) ;
                       else if (type != 2002)
-                        genes = alignEst2Cosmid (cosmid1, 0, genes, type/1000, 2, 0, 0, 0, 3, 0) ;
+                        genes = alignEst2Cosmid (cosmid1, 0, genes, type/1000, 2, 0, 0, 0, 1, 0) ;
                       else
                         genes = alignEst2Cosmid (cosmid1, estKs, genes, type/1000, 2, 0, 0, 0, 3, 0) ;
                     }
