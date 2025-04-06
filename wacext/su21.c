@@ -307,7 +307,7 @@ static POLYNOME vertex_A_H_BB (short mu, short a, short b, int mm[4], AC_HANDLE 
   pp = polMultiProduct (h,ppp) ;
   
   return pp ;
-} /* vertex_A_B_HB  */
+} /* vertex_A_H_BB  */
 
 /***********************************************************************************************************************************************/
 /***********************************************************************************************************************************************/
@@ -331,7 +331,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
 	}
       if (mm2[i])
 	{
-	  pp = newScalar (4 * mm2[i],h) ;
+	  pp = newScalar (-4 * mm2[i],h) ;
 	  pp->tt.mm[i][0] = c ;
 	  pp->tt.g[0] = mu ;
 	  pp->tt.g[1] = a ;

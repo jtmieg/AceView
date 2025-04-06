@@ -53,7 +53,6 @@ endif
     quit
 EOF
 
-exit 0
 laba1:
 ## remove echo introns
 ## we need the intron coordinates, some are missing
@@ -70,6 +69,7 @@ EOF
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF
      pparse  tmp/X.$MAGIC/$chrom/f4.intron_nomap.ace
      save
+     query find intron ! IntMap
      quit
 EOF
 
@@ -107,7 +107,7 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      save
      quit
 EOF
-exit 0
+
 laba2:
 
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
@@ -118,7 +118,7 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      acem
         cdna_73 -split_cloud
         quit
-    comment "test XG after spli73"
+    comment "test XG after split73"
     query find sequence XG_chr3__1976795_1970805 ; from_gene
     list
      query find mrna DNA:2 > 10000 ; > from_gene
@@ -133,15 +133,16 @@ if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
      quit
 EOF
 
-exit 0
+touch  tmp/X.$MAGIC/$chrom/f4.assemble.done
+exit 0  # Composite case, exit now, no need for the complications below
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
 echo -n "f4.killEchoIntron done"
 date
 scripts/f3.kill_ct_ac_introns.tcsh $chrom 3
 
-touch  tmp/X.$MAGIC/$chrom/f4.assemble.done
+
 if (-e tmp/X.$MAGIC/$chrom/database/lock.wrm) exit 1
-exit 0  # Composite case, exit now, no need for the complications below
+
 
 foreach chrom ($chromSetAll)
   bin/tacembly  tmp/X.$MAGIC/$chrom << EOF

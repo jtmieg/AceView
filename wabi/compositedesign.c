@@ -2201,7 +2201,7 @@ static BOOL mrnaDesignIsNewPath (Array ss, Array ksPaths, KEYSET ks0, int path, 
 
 /**********************************************************************************/
 
-static int mrnaDesignFlagDescendants (Array ss, int ii, long unsigned int flag)
+static int mrnaDesignFlagDescendants (Array ss, int ii, long unsigned int flag, int maxRatio, int maxI)
 {
   int jj, n = 0 ;
   int iMax = arrayMax (ss) ;
@@ -2209,14 +2209,18 @@ static int mrnaDesignFlagDescendants (Array ss, int ii, long unsigned int flag)
   int a1 = up->a2 + 1 ;
   
   up->flag |= flag ;
+  if ((up->type & gI) && up->cover > maxI)
+    maxI = up->cover ;
   for (jj = ii + 1, vp = up + 1 ; jj < iMax ; vp++, jj++)
     {
       if (vp->a1 > a1)
 	break ;
       if (vp->flag & flag)
 	continue ;
+      if ((vp->type & gI) && maxI > maxRatio * vp->cover)
+	continue ;
       if (vp->a1 == a1)
-	mrnaDesignFlagDescendants (ss, jj , flag) ;
+	mrnaDesignFlagDescendants (ss, jj , flag, maxRatio, maxI) ;
       n++ ;
     }
 
@@ -2225,20 +2229,25 @@ static int mrnaDesignFlagDescendants (Array ss, int ii, long unsigned int flag)
 
 /**********************************************************************************/
 
-static int mrnaDesignFlagAscendants (Array ss, int ii, long unsigned int flag)
+static int mrnaDesignFlagAscendants (Array ss, int ii, long unsigned int flag, int maxRatio, int maxI)
 {
   int n = 0 ;
   int jj ;
   DSX *vp, *up = arrp (ss, ii, DSX) ;
   int a2 = up->a1 - 1 ;
   
-  up->flag |= flag ;
+  up->flag |= flag ; 
+  if ((up->type & gI) && up->cover > maxI)
+    maxI = up->cover ;
+
   for (jj = ii - 1, vp = up - 1 ; jj >= 0 ; vp--, jj--)
     {
       if (vp->flag & flag)
 	continue ;
+      if ((vp->type & gI) && maxI > maxRatio * vp->cover)
+	continue ;
       if (vp->a2 == a2)
-	mrnaDesignFlagAscendants (ss, jj , flag) ;
+	mrnaDesignFlagAscendants (ss, jj , flag, maxRatio, maxI) ;
       n++ ;
     }
   return n ;
@@ -2413,13 +2422,13 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
     {
       long unsigned int flag = un << i ;
       vp = arrayp (starts, i, DSX) ;
-      mrnaDesignFlagDescendants (ss, vp->path, flag) ;
+      mrnaDesignFlagDescendants (ss, vp->path, flag, 200, 0) ;
     }
   for (int i = 0 ; i < iStop ; i++)
     {
       long unsigned int flag = un << (i + 32) ;
       vp = arrayp (stops, i, DSX) ;
-      mrnaDesignFlagAscendants (ss, vp->path, flag) ;
+      mrnaDesignFlagAscendants (ss, vp->path, flag, 200, 0) ;
     }
 
   /* label the good starts (strongest or saves a new intron or a new stop) */

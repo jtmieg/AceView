@@ -12953,7 +12953,7 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
         break ;
       getSeqDna ( KEYMAKE (_VCalcul, 12345)) ;    /* cleanup */
       cosmid1 = *kp ;
-      cosmid1 = keyGetKey (cosmid1, _Overlap_right) ; /* CHEAT */
+
       if (type == 21)
         alignChain (cosmid1, linkPos) ;
       while (cosmid1 && ncosmid < ncosmidMax)
@@ -12981,7 +12981,7 @@ static void alignEst2CosmidChain (KEYSET ks, int type, KEYSET estKs, BOOL doCont
                       if (type == 2)
                         genes = alignEst2Cosmid (cosmid1, estKs, genes, type/1000, 2222, 0, 0, 0, 3, 0) ;
                       else if (type != 2002)
-                        genes = alignEst2Cosmid (cosmid1, 0, genes, type/1000, 2, 0, 0, 0, 1, 0) ;
+                        genes = alignEst2Cosmid (cosmid1, 0, genes, type/1000, 2, 0, 0, 0, 3, 0) ;
                       else
                         genes = alignEst2Cosmid (cosmid1, estKs, genes, type/1000, 2, 0, 0, 0, 3, 0) ;
                     }

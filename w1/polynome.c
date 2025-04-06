@@ -1061,12 +1061,10 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		{ zz *= 4 ; for (k = i ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
 	      else if (s[i] == s[i+2])
 		{ zz *= -2 ; s[i] = s[i+1] ;for (k = i + 1 ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+3] && s[i+1] == s[i+4]) 
-		{ zz *= 4 ; s[i] = s[i+2] ; for (k = i + 1 ; k < GMAX - 4 ; k++) s[k] = s[k+4] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+4] && s[i+1] == s[i+5]  && s[i+2] == s[i+6])
-		{ zz *= -32 ; s[i] = s[i+3] ; for (k = i + 1 ; k < GMAX - 6 ; k++) s[k] = s[k+6] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
 	      else if (s[i] == s[i+3])
 		{ zz *= 4 ; k = strlen ((const char *)g) ; g[k] = s[i+1]; g[k+1] = s[i+2] ; g[k+2] = 0 ; for (k = i ; k < GMAX - 4 ; k++) s[k] = s[k+4] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
+	      else if (s[i] == s[i+4] && s[i+1] == s[i+5]  && s[i+2] == s[i+6])
+		{ zz *= -32 ; s[i] = s[i+3] ; for (k = i + 1 ; k < GMAX - 6 ; k++) s[k] = s[k+6] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
 	    }
 	  if (! ok) continue ;
 
@@ -2250,12 +2248,12 @@ POLYNOME polProduct (POLYNOME p1, POLYNOME p2, AC_HANDLE h)
   if (p2 && ! p2->isSum && ! p2->isProduct && ! p2->tt.z) p2 = 0 ;
   polCheck (p1) ;
   polCheck (p2) ;
-  if (p1)
-    p1 = polCopy (p1, h) ;
-  if (p2)
-    p2 = polCopy (p2, h) ;
   if (p1 && p2)
-    return polDoProduct (p1, p2, h) ;
+    {
+      p1 = polCopy (p1, h) ;
+      p2 = polCopy (p2, h) ;
+      return polDoProduct (p1, p2, h) ;
+    }
   return 0 ;
 } /* polProduct */
 
