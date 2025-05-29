@@ -34,9 +34,6 @@ endif
       cdna_1 $chrom
       quit
     save
-    comment "test XG"
-    query find sequence XG_chr3__1976795_1970805 ; from_gene
-    list
     comment "cdna_71 realign all tg -split_cloud"
     acembly
       cdna_71 -split_cloud

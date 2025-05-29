@@ -26,6 +26,7 @@
 
 extern BOOL finalCleanup ;	/* in messubs.c */
 
+
 /************ Array : class to implement variable length arrays ************/
 
 static long int bigTotalAllocatedMemory = 0 ;
@@ -189,8 +190,9 @@ void uBigArrayDestroy (BigArray a)
 
   if (a->magic != BIG_ARRAY_MAGIC)
     messcrash ("uBigArrayDestroy received corrupt array->magic");
-  if (a->lock)
-     messcrash ("bigArrayDstroy called on locked bigArray") ;
+
+      if (a->lock)
+     messcrash ("bigArrayDestroy called on locked bigArray") ;
   a->magic = 0 ;
   messfree(a);
 }
@@ -201,7 +203,20 @@ static void uBigArrayFinalise (void *cp)
   
   if (reportBigArray != (Array)2)
     bigTotalAllocatedMemory -= a->dim * a->size ;
-  if (!finalCleanup) messfree (a->base) ;
+
+  if (a->readOnly)
+    { /* memory mapped read only bigArray */
+      if (a->max != a->readOnly)
+	messcrash ("A read only memory mapped bigArray has been modified : %s", a->fName) ;
+      if (munmap(a->map, a->max * a->size) == -1)
+	messcrash ("Failed to unmap bigArray %s", a->fName) ;
+      if (a->fd != -1)
+	close (a->fd) ;
+      a->base = a->map = 0 ; a->fd = 0 ; a->readOnly = 0 ;
+      messfree (a->fName) ;
+    }
+  else if (!finalCleanup)
+    { messfree (a->base) ; a->base = 0 ; }
   a->magic = 0 ;
   bigTotalNumberActive-- ;
   if (!finalCleanup && reportBigArray != (Array)1 && reportBigArray != (Array)2) 
@@ -270,6 +285,8 @@ void bigArrayExtend (BigArray a, long int n)
   messfree (a->base) ;
   a->base = neuf ;
 }
+
+/***************/
 
 /***************/
 
@@ -1735,6 +1752,179 @@ void assDump (Associator a)
 } /*assDump */
 
 /**********************************************************************/
+/**********************************************************************/
+/* File MEMORY MAPPING
+ *  This functionalilty is covered inside the BigArray interface
+ *  allowing easy array access and automatic handling of deallocation
+ *   Notice that in ReadOnly case the array is ReadOnly
+ *   It can only be freed via ac)free (a) or ac_free(h)
+ *   but it should not be modified
+ *   Since array aree accessed directly via pointers
+ *   It is the responsability of the client to do this properly
+ *   Checks are made if the array is extended, but not generally
+ */
+/* bigArray can be memory mapped to and from file */
+
+/*
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <errno.h>
+*/
+#include <sys/mman.h>
+
+#ifdef JUNK
+/* possibilities to study */
+#include <sys/statvfs.h>
+ struct statvfs stat;
+ statvfs(".", &stat);
+ uint64_t free_space = stat.f_bavail * stat.f_frsize;
+ if (free_space < total_size) {
+    fprintf(stderr, "Insufficient disk space\n");
+    return -1;
+ }
+ write_buffers("temp.bin", buf, sizes, N);
+ rename("temp.bin", "buffers.bin");char *chunk;
+ posix_memalign((void **)&chunk, 4096, chunk_size);
+#endif
+
+/********************************************************/
+/* write a buffer to a memory mapped file */
+static BOOL mmapWrite (const char *fName, char *buf, long int size)
+{
+  /*  Write a buffer using mmap */
+  /* Open the file */
+  int fd = open(fName, O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if (fd == -1)
+    messcrash ("Failed to create a memory map file of size %ld : %s", size, fName) ;
+
+  /* Extend the file to the requested size */
+  if (ftruncate(fd, size) == -1)
+    messcrash ("Failed to extend a memory map file of size %ld : %s", size, fName) ;
+
+  /* map the file into memory */
+  char *map = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (map == MAP_FAILED)
+    messcrash ("Failed to map a memory map file of size %ld : %s", size, fName) ;
+
+  /* copy the buffer to the mapped region */
+  memcpy (map, buf, size);
+
+  /* ensure the data are  written to disk */
+  if (msync (map, size, MS_SYNC) == -1) 
+    messcrash ("Failed to sync a memory map file of size %ld : %s", size, fName) ;
+
+  /* iunmap and close */
+  if (munmap (map, size) == -1)
+    messcrash ("Failed to unmap a memory map file of size %ld : %s", size, fName) ;
+  
+  close(fd);
+  return TRUE ;
+} /* mmapWrite */
+
+/********************************************************/
+
+static unsigned char *mmapCreate (const char *fName, long int *size, int *fdp, unsigned char **mapp, BOOL readOnly)
+{
+  unsigned char  *buf = 0 ;
+  /* Open the file */
+  int fd = open (fName, O_RDONLY);
+  if (fd == -1)
+    {
+      messerror ("Failed to open for reading a memory map file : %s", fName) ;
+      return FALSE ;
+    }
+
+  /*  Get file size */
+  struct stat st;
+  if (fstat(fd, &st) == -1)
+    {
+      messerror ("Failed to stat for reading a memory map file of size %ld : %s", size, fName) ;
+      close(fd);
+      return FALSE ;
+    }
+  *size = st.st_size;
+
+  /* Map the file to memory */
+  /* the last arg, hemre 0, says that mapping should start n pages down whwere pageSize = sysconf(_SC_PAGE_SIZE). */
+  /* PROT cabe PROT_NONE or   'PROT_READ | PROT_WRITE | PROT_EXE == 777' */
+  /* MAP_PRIVATE | MAP_NORESERVE ; do not write do not reserve swap as we do not write */
+  unsigned char *map = mmap (NULL, *size, PROT_READ, MAP_PRIVATE | MAP_NORESERVE | MAP_POPULATE , fd, 0);
+  if (map == MAP_FAILED)
+    {
+      messerror ("Failed to map for reading a memory map file of size %ld : %s", size, fName) ;
+      close(fd);
+      return FALSE ;
+    }
+  /* Real size */
+  if (0) memcpy (size, map, 8) ;
+
+  /*  Allocate output buffer and copy
+   * use map directly if read-only
+   */
+  if (readOnly)
+    buf = map ; /* this is not allocated */
+  else
+    {
+      buf = (unsigned char *) messalloc (*size);
+      memcpy (buf, map, *size);
+    }
+
+#ifdef JUNK
+  /* Verify CRC32, requires linking with -lz  (zlib compression library)  */
+  long unsigned int crc, expected_crc = crc32(0, buf, size);
+  memcpy(&crc, map + *size, 8) ;
+  if (crc != expected_crc)
+    messcrash ("Failed to read the CRC memory map file of size %ld : %s", size, fName) ;
+#endif
+  if (! readOnly)
+    { /*  Unmap and close */
+      if (munmap(map, *size) == -1)
+	messcrash ("Failed to unmap memory map file of size %ld : %s", size, fName) ;
+      close(fd);
+      map = 0 ; fd = -1 ; /* prevent double deallocation and closure */
+    }
+  *mapp = map ;
+  *fdp = fd ;
+  return  buf ;
+} /* mmapCreate */
+
+/********************************************************/
+
+BigArray uBigArrayMapRead (const char *fName, int recordSize, BOOL readOnly, AC_HANDLE h)
+{
+  unsigned char *map = 0 ;
+  BigArray aa = uBigArrayCreate (8, recordSize, h) ;
+  long int size = 0 ;
+  int fd = -1 ;
+  if (! fName)
+    messcrash ("bigArrayMapRead called with NULL file name") ;
+  messfree (aa->base) ;
+  aa->base = (char *) mmapCreate (fName, &size, &fd, &map, readOnly) ;
+  aa->readOnly = readOnly ;
+  aa->size = recordSize ;
+  aa->max = aa->dim = size/recordSize ;
+  if (readOnly)
+    aa->readOnly = aa->max ;
+  aa->map = map ;
+  aa->fd = fd ;
+  aa->fName = strnew (fName, 0) ;
+  return aa ;
+} /* uBigArrayMapRead */
+
+/**********************************************************************/
+
+BOOL bigArrayMapWrite (BigArray aa, const char *fName)
+{
+  if (aa->readOnly)
+    messcrash ("cannot MapWrite a readOnly bigArray") ;
+  return mmapWrite (fName, aa->base, aa->max * aa->size) ;
+} /* bigArrayMapWrite  */
+
 /**********************************************************************/
 /************************  end of file ********************************/
 /**********************************************************************/

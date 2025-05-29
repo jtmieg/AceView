@@ -547,8 +547,8 @@ cat <<EOF > _x.awk
   if (snpZZ > 0) ph = ph " wait s10 wait s12 wait s20 wait s21 wait gsnp4 wait s13  "   
   if (snp > 0) ph = ph "wait snp4 " ;
   if (iv > 0) ph = ph " wait d6 wait d7 wait d8 " ;
-  if (gx > 0)       ph = ph "  g4sp " ;
-  if (gx + mx > 1000) ph = ph "  wait  c7 g4 " ;
+  if (gx > 0)       ph = ph "  g4 " ;
+  if (gx + mx > 1000) ph = ph "  wait  c7 g4sp " ;
   if (mx > 1000)       ph = ph "  wait  c7 m4H " ;
   if (gx + mx > 1  )  ph = ph " g10 g11 g12a wait g12b FDR1 wait FDR2 " ;
   if (a + small + qc +gx + mx + ix + snp + w > 0) ph = ph " wait c7 "
@@ -4269,18 +4269,26 @@ foreach kb (8kb 5kb)
     foreach run (`cat MetaDB/$MAGIC/g2r | gawk -F '\t' '{if($1 == gr) print $2;}' gr=$gr | sort -u | head -1`)
       set totorun=tmp/GENERUNS/$run/$run.coverage_of_"$kb"_transcripts.txt
       if (-e $totorun.gz) then
-        gunzip -c $totorun.gz | tail -n +2 | head -8 | gawk '/^#/{print}' >> $totogr
+        gunzip -c $totorun.gz | tail -n +2 | head -8 | gawk '/^#/{printf("#\t\t");print}' >> $totogr
+      else if (-e $totorun) then
+        cat $totorun | tail -n +2 | head -8 | gawk '/^#/{printf("#\t\t");print}' >> $totogr
       endif
     end
     # cumulate the content
+   
+   
     echo "#" > $totogr.1
     foreach run (`cat MetaDB/$MAGIC/g2r | gawk -F '\t' '{if($1 == gr) print $2;}' gr=$gr | sort -u`)
       set totorun=tmp/GENERUNS/$run/$run.coverage_of_"$kb"_transcripts.txt
       if (-e $totorun.gz) then
         gunzip -c $totorun.gz | gawk '/^#/{next;}{print}' >> $totogr.1
+      else if (-e $totorun) then
+        cat  $totorun | gawk '/^#/{next;}{print}' >> $totogr.1
       endif
     end
-    cat $totogr.1 | gawk -F '\t' '{gene=$2;for(i=3;i<=NF;i++)z[gene,i]+=$i;gg[gene]=1;if(NF>nf)nf=NF}END{for(gene in gg){printf("%s\t%s",gene,gr);for(i=3;i<=nf;i++)printf("\t%d",z[gene,i]+0);printf("\n");}}' gr=$gr | sort -k 3nr >> $totogr
+    set target=RefSeq
+    touch   tmp/METADATA/$target.symbol.title.txt 
+    cat  tmp/METADATA/$target.symbol.title.txt ZZZZZ $totogr.1 | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){s=$1;LL[s]=$2;TT[s]=$3;next;}}{gene=$2;for(i=3;i<=NF;i++)z[gene,i]+=$i;gg[gene]=1;if(NF>nf)nf=NF}END{for(gene in gg){printf("%s\t%s\t%s\t%s",gene,gr,TT[gene],LL[gene]);for(i=3;i<=nf;i++)printf("\t%d",z[gene,i]+0);printf("\n");}}' gr=$gr | tab_sort -k 9nr >> $totogr
     \rm $totogr.1
     \cp $totogr RESULTS/Coverage_of_"$kb"_transcripts__3prime_bias/$gr.coverage_of_"$kb"_transcripts.txt
   end

@@ -8868,6 +8868,7 @@ static void gxExportTableHeader  (GX *gx, ACEOUT ao, int type)
 	{
 	  if (1)
 	    {
+	      gxExportTableHeaderLegend (gx, ao, hprintf (h, "High %s " , GM), type) ;
 	      for (run = 1, rc = arrayp (gx->runs, run, RC); run < runMax ; rc++, run++) 
 		{
 		  if (rc->private || ! rc->aa || (type == 3 && run > 1 && ! rc->runs) || (type == 5 && ! rc->selectedVariance)) continue ;

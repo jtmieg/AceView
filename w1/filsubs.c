@@ -311,7 +311,8 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
     * if you look above, you see that the Stack full was created with
     * MAXPATHLEN bytes in it.
     */
-      filAddDir (".") ; /* getcwd (stackText (full, 0), MAXPATHLEN )) ; */
+      /* filAddDir (".") ; 2025_04_22 now done in freeinit() */
+      /* getcwd (stackText (full, 0), MAXPATHLEN )) ; */
     }
 
   /*
@@ -325,7 +326,8 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
   * append an extension if they asked for one.
   */
   if (ending && *ending)
-    { catText (part, ".") ;
+    {
+      if (*ending != '.' && *ending != '/') catText (part, ".") ;
       catText (part, ending) ;
     }
 	/* NB filName is reentrant in the sense that it can be called 
@@ -341,6 +343,7 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
       stackClear (full) ;
       catText (full, stackText (part, 0)) ;
       result = stackText (full, 0) ;
+
       if (filCheck (result, spec))
 	return result ;
       else
@@ -360,7 +363,7 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
       result = stackText (full, 0) ;
       if (filCheck (result, spec))
 	return result ;
-      if (strict)
+      if (strict && strcmp (dir, "./"))
 	break ;
     }
   return 0 ;

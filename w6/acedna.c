@@ -61,8 +61,11 @@ void reverseComplement (Array dna)
      but if it is allocated at size max, it implies a new array reallocation
      reverseComplement(dnaR) ;
   */
-  array(dna, arrayMax(dna), char) = 0 ;
-  --arrayMax(dna) ;
+  if (! dna->lock)
+    {
+      array(dna, arrayMax(dna), char) = 0 ;
+      --arrayMax(dna) ;
+    }
 }
 
 /**************************************************************/
@@ -1344,6 +1347,7 @@ static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
  * else the code to extend backwards is not written  
  */
 
+
 Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 			       Array dna2, Array dna2R, int *a1p, int *a2p, 
 			       int *NNp, Array err, int maxJump, int maxError, 
@@ -1851,10 +1855,7 @@ static int oligoEntropy4 (unsigned const char *dna, int ln, int minEntropy)
 #endif
 
 /*********************************************************************/
-/* bp equivalent of the oligo complexity seen in dimers
- *
- * input is dna, x1/x2 in bio-coords
- */
+/* bp equivalent of the oligo complexity seen in dimers */
 
 static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy) 
 {

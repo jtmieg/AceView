@@ -261,6 +261,8 @@ static void mrnaDesignCleanExons (SC *sc, Array ss)
   if (iiMax)
     for (ii = 0, up = arrp (ss, 0, DSX) ; ii < iiMax ; ii++, up++)
       {
+	if (up->a2 < up->a1)
+	  invokeDebugger () ;
 	if (up->type & gI)
 	  {
 	    DSX *vp ;
@@ -370,9 +372,18 @@ static void mrnaDesignCleanExons (SC *sc, Array ss)
   iiMax = ssHappyFew (ss) ;
   /* number the segments */
   if (iiMax)
-    for (ii = 0, up = arrp (ss, 0, DSX) ; ii < iiMax ; ii++, up++)
-      up->nn = ii ;
+    {
+      int a1, a2 ;
 
+      a1 = a2 = arr (ss, 0, DSX).a1 ;
+      for (ii = 0, up = arrp (ss, 0, DSX) ; ii < iiMax ; ii++, up++)
+	{
+	  up->nn = ii ;
+	  a2 = up->a2 ;
+	}
+      if (a2 < a1 + 20)
+	arrayMax (ss) = 0 ;
+    }
   if (debug)
     {
       fprintf (stderr, "mrnaDesignCleanExons\n") ;
@@ -387,7 +398,7 @@ static void mrnaDesignCleanExons (SC *sc, Array ss)
 /* get the X Composite and their counts */
 static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, Array smrnas)
 {
-  BOOL debug = FALSE ; /* tyty TRUE ; */
+  BOOL debug = TRUE ; /* tyty TRUE ; */
   HIT *up, *up1 ;
   DSX *ssp ;
   int i1, ii, jj, iMax = 0, ir, iss = 0 ;
@@ -396,6 +407,8 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
   Array units ;
   BSunit *uu ;
   OBJ Est = 0 ;
+  static int nnnn = 0 ;
+  nnnn++ ;
   AC_HANDLE h = ac_new_handle () ;
   Array ss = arrayHandleCreate (256, DSX, ds->h) ;
   KEYSET ks1 = keySetHandleCreate (h) ;
@@ -405,7 +418,8 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
   int iiMax = arrayMax ( s2m->plainHits) ;
   int ii1Max = arrayMax ( gmrna->hits) ;
   BOOL hasGoody = FALSE ;
-  
+  int aMax = sc->a2 - sc->a1 ;
+  if (aMax < 0) aMax = - aMax ;
   /* grab the introns in the plainHits EST alignments */
   isDown = (sc->a1 < sc->a2) ? TRUE : FALSE ;
   units = arrayHandleCreate (12, BSunit, h) ;
@@ -414,17 +428,21 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
     for (i1 = 0, up1 = arrp (gmrna->hits, 0, HIT) ; i1 < ii1Max ; i1++, up1++)
       {
 	int b1, b2 ;
-	
+
+	if (up->a1 > up->a2 - 10) continue ;
 	if (sc->a1 < sc->a2)
 	  {
 	    b1 = up1->a1 + sc->a1 - 1 ;
 	    b2 = up1->a2 + sc->a1 - 1 ;
+	    if (b2 < 0 || b1 > sc->a2) continue ;
 	  }
 	else
 	  {
 	    b2 = - up1->a1 + sc->a1 + 1 ;
 	    b1 = - up1->a2 + sc->a1 + 1 ;
+	    if (b2 < 0 || b1 > sc->a1) continue ;
 	  }
+
 	
 	if (
 	    ((up1->type & gI) && (up->type & gI) && up->a1 == b1 && up->a2 == b2) ||
@@ -513,7 +531,7 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 			      s *= 3 ; /* il y a plus de bruit car on n'a pas selectionne */
 			  }
 		      
-		      if (s > 0)
+		      if (s > 0 && a1 >= 1 && a2 < aMax)
 			{
 			  DSX *ssp = arrayp (ss, iss++, DSX) ;
 			  ssp->a1 = a1 ;
@@ -552,7 +570,10 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 				uu = arrp (units, ir, BSunit) ;
 				b1 = a1 + uu[0].i - 1 ; 	
 				b2 = a1 + uu[1].i - 1 ;
-				
+
+				if (b1 < 1) b1 = 1 ;
+				if (b2 >= aMax) b2 = aMax - 1 ;
+				if (b1 > b2 - 10) continue ;
 				ssp = arrayp (ss, iss++, DSX) ;
 				ssp->type = gX ;
 				ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
@@ -570,6 +591,9 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 				b1 = a2 - uu[1].i + 1 ; 	
 				b2 = a2 - uu[0].i + 1 ;
 				
+				if (b1 < 1) b1 = 1 ;
+				if (b2 >= aMax) b2 = aMax - 1 ;
+				if (b1 > b2 - 10) continue ;
 				ssp = arrayp (ss, iss++, DSX) ;
 				ssp->a1 = b1 ; ssp->a2 = b2 ; ssp->cover = uu[2].i ;
 				if (ssp->cover > 100)
@@ -633,17 +657,21 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 		  if (! keyFindTag (up->est, _Composite))
 		    continue ;
 		  if (10 * xdx < 9 * cdx) continue ;
-		  if ((Est = bsCreate (up->est)))
+		  if (a1 < 1) a1 = 1 ;
+		  if (a2 >= aMax) a2 = aMax - 1 ;
+		  if (a1 < a2 - 10)
 		    {
-		      int s = 12 ;
-		      nXE++ ;
-		      ssp = arrayp (ss, iss++, DSX) ;
-		      ssp->a1 = a1 ;
-		      ssp->a2 = a2 ; 
-		      ssp->cover = s ;
-		      ssp->type = gX | gCompleteCDS  | gFF ; /* was | gFF */
-		      ssp->clipable = 1 ;
-		      
+		      if ((Est = bsCreate (up->est)))
+			{
+			  int s = 12 ;
+			  nXE++ ;
+			  ssp = arrayp (ss, iss++, DSX) ;
+			  ssp->a1 = a1 ;
+			  ssp->a2 = a2 ; 
+			  ssp->cover = s ;
+			  ssp->type = gX | gCompleteCDS  | gFF ; /* was | gFF */
+			  ssp->clipable = 1 ;
+			}
 		      bsDestroy (Est) ;
 		    }
 		  continue ;
@@ -679,41 +707,54 @@ static BOOL mrnaDesignGetGraphElements (DS *ds, S2M *s2m, SC* sc, SMRNA *gmrna, 
 			    continue ;
 			  
 			  hasGoody = TRUE ;
-			  ssp = arrayp (ss, iss++, DSX) ;
-			  ssp->a1 = a1 ;
-			  ssp->a2 = a2 ;
-			  ssp->cover = s ;
-			  ssp->end = s ;
-			  ssp->endKey = up->est ;
-			  ssp->cDNA_clone = up->cDNA_clone ;
+			  BOOL clipable = FALSE ;
+			  int type = 0 ;
+			  KEY slKey = 0 ;
+			  
 			  if (! strncmp (name(up->est), "XA_", 3))
 			    {
 			      nXA++ ;
-			      ssp->a1 = ssp->a2 ;
-			      ssp->type = gX | gA | g3 ;
-			      ssp->clipable = FALSE ;
+			      a1 = a2 ;
+			      type = gX | gA | g3 ;
 			    }
 			  else if (! strncmp (name(up->est), "XSL", 3))
 			    {
 			      nXSL++ ;
-			      ssp->slKey = up->est ;
-			      ssp->a2 = ssp->a1 ;
-			      ssp->type = gX | gS | g5 | gReal5p ;
-			      ssp->clipable = FALSE ;
+			      slKey = up->est ;
+			      a2 = a1 ;
+			      type = gX | gS | g5 | gReal5p ;
 			    }
 			  else
 			    {
-			      ssp->cover = 1 ; 
-			      ssp->clipable = TRUE ;
+			      clipable = TRUE ;
 			      
 			      if (! strncmp (name(up->est), "Xends_ELF.", 10) && isDown) 
-				{ nXends++ ; ssp->type = (gReal5p | gDF | gX) ; if (ssp->a2 > ssp->a1 + 30) { ssp->a1 += 0 ; ssp->a2 -= 0*30 ; }}
+				{ nXends++ ; type = (gReal5p | gDF | gX) ; if (a2 > a1 + 30) { a1 += 0 ; a2 -= 0*30 ; }}
 			      else if (! strncmp (name(up->est), "Xends_ERF.", 10) && isDown) 
-				{ nXends++ ; ssp->type = (gReal3p | gFF | gX) ; if (ssp->a2 < ssp->a1 - 30) { ssp->a2 -= 0 ; ssp->a2 += 0*30 ; }} 
+				{ nXends++ ; type = (gReal3p | gFF | gX) ; if (a2 < a1 - 30) { a2 -= 0 ; a2 += 0*30 ; }} 
 			      else if (! strncmp (name(up->est), "Xends_ERR.", 10) && ! isDown) 
-				{ nXends++ ; ssp->type = (gReal5p | gDF | gX) ; if (ssp->a2 < ssp->a1 - 30) { ssp->a1 += 0 ; ssp->a2 += 0*30 ; }} 
+				{ nXends++ ; type = (gReal5p | gDF | gX) ; if (a2 < a1 - 30) { a1 += 0 ; a2 += 0*30 ; }} 
 			      else if (! strncmp (name(up->est), "Xends_ELR.", 10) && ! isDown) 
-				{ nXends++ ; ssp->type = (gReal3p | gFF | gX) ; if (ssp->a2 > ssp->a2 + 30) { ssp->a1 -= 0 ; ssp->a2 -= 0*30 ; }}
+				{ nXends++ ; type = (gReal3p | gFF | gX) ; if (a2 > a1 + 30) { a1 -= 0 ; a2 -= 0*30 ; }}
+			    }
+
+			  if (a1 < a2)
+			    {
+			      if (a1 < 1) a1 = 1 ;
+			      if (a2 >= aMax) a2 = aMax - 1 ;
+			    }
+			  if (a1 < a2)
+			    {
+			      ssp = arrayp (ss, iss++, DSX) ;
+			      ssp->a1 = a1 ;
+			      ssp->a2 = a2 ;
+			      ssp->cover = s ;
+			      ssp->end = s ;
+			      ssp->clipable = clipable ;
+			      ssp->type = type ;
+			      ssp->slKey = slKey ;
+			      ssp->endKey = up->est ;
+			      ssp->cDNA_clone = up->cDNA_clone ;
 			    }
 			}
 		      bsDestroy (Est) ;
@@ -2704,7 +2745,7 @@ static int mrnaDesignFindStartEndPairs (Array ss, Array ss2, Array sFlags, Array
 
 static int mrnaDesignFindPaths (S2M *s2m, SC *sc, DS *ds, Array smrnas)
 {
-  BOOL debug = FALSE ;
+  BOOL debug = TRUE ;
   int iFlag, path, path0, tested, nIntron, nStart, nStop, useCDS ;
   int eeMax = ssHappyFew (ds->exons) ;
   Array segs, segs2 ;

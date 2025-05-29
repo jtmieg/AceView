@@ -4527,14 +4527,17 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
     return 1 ;
 
   if (1) globallyStranded = 0 ; /* at this stage we ignore the strand of the read, because we have not counted yet */
-  if (1)
+  if (0)
     {	
       if (pp->nIntronPlus  > 1000 && pp->nIntronPlus  > 20 * pp->nIntronMinus)
 	globallyStranded = 1 ;
       else if (pp->nIntronMinus > 1000 && pp->nIntronMinus > 20 * pp->nIntronPlus)
 	globallyStranded = -1 ;
     }
- 
+  /* 20250418: set k2=0 below so that minority antisens introns are reported  */
+  if (pp->stranded > 0)   globallyStranded = 1 ;
+  if (pp->stranded < 0)   globallyStranded = -1 ; 
+  
   aa = exportIntrons ;
   ii = jj = 0 ; nIntrons = arrayMax (aa) ;
   up = bigArrp (exportDonors, 0, PEXPORT) ;
@@ -4555,8 +4558,6 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
       else
 	stranded = pp->stranded ;
       if (mm->pair < 0) stranded = -stranded ;
-      if (0 && up->a1 > 25170000 && up->a1 < 25171000)
-	  invokeDebugger () ;
       if (debug)
 	fprintf (stderr, "ii=%d f=%d s=%d a1=%d a2=%d x1=%d x2=%d\n", ii, mm->fragment, up->score, up->a1, up->a2, up->x1, up->x2) ;
 
@@ -4754,7 +4755,7 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		reverse = FALSE ;
 		foot[0] = '-' ; foot[1] = 0 ;
 		f1[2] = '_' ; f1[5] = 0 ;
-		f2[2] = '_' ; f2[5] = 0 ;
+		f2[2] = '_' ; f2[5] = 0 ; 
 		if (pp->strategy == STRATEGY_RNA_SEQ &&
 		    (
 		     (isDown == 1 && a2 - dx1 < b1 - pp->intronMinLength) || 
@@ -4788,7 +4789,7 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		    char c1, c2 ;
 		    k1 = k2 = 0 ; 
 		    ccp = exon1 + i  ; ccq = ccp+1 ;
-		    f2[3] = *ccp ; f2[4] = *ccq ;
+		    f2[3] = *ccp ; f2[4] = *ccq ; 
 		    c2 = f1[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
 		    c1 = f1[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
 
@@ -4803,9 +4804,10 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 
 		    ccp = exon2 + dx1 - i - 2 ; ccq = ccp+1 ;
 		    c1 = f1[3] = *ccp ; c2 = f1[4] = *ccq ;
-		    f2[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
-		    f2[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
-		    
+
+		      f2[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
+		      f2[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
+
 		    if (c1 == 'a' && c2 == 'g')        /*    d1 == "ag"  */
 		      { k1 += 4 ; k2 += 3 ; } 
 		    else if (c1 == 'a' && c2 == 'c')   /*    d1 == "ac"  */
@@ -4815,18 +4817,20 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		    else if (c1 == 'a' && c2 == 't')   /*    d1 == "ac"  */
 		      { k1 += 0 ; k2 += 3 ; } 
 
+		    if (stranded < 0) { int kx = k1 ; k1 = k2 ; k2 = kx ; } /* test 2025 */
+		    if (globallyStranded) k2 = 0 ;
 
-		    if (stranded > 0) k2 = 0 ;
-		    if (stranded < 0) k1 = 0 ;
 		    if (k1 > bestk)
-		      { bestk = k1 ; bestdx = i ; reverse = FALSE ; strcpy (foot, f1) ; }
+		      { bestk = k1 ; bestdx = i ; strcpy (foot, f1) ; reverse = FALSE ; }
 		    if ( k2 > bestk)
-		      { bestk = k2 ; bestdx = i ; reverse = TRUE ; strcpy (foot, f2) ; }
-		    if (a2==1289 && b1==1218) 
-		      fprintf (stderr, "XXXXXXXXXX\ta2=%d b1=%d i=%d dxMin=%d dxMax=%d %s stranded=%d %s plus=%d, minus=%d\n"
+		      { bestk = k2 ; bestdx = i ; strcpy (foot, f2) ; reverse = TRUE ; }
+		    
+		    if (0)
+		      fprintf (stderr, "XXXXXXXXXX\ta2=%d b1=%d i=%d dxMin=%d dxMax=%d %s stranded=%d %s plus=%d, minus=%d k1=%d  k2=%d\n"
 			       ,a2,b1,i,dxMin, dxMax, reverse ? "reverse": "forward", stranded			      
 			       , stackText (pp->probeStack, mm->probeName)
 			       , pp->nIntronPlus, pp->nIntronMinus
+			       , k1, k2
 			    ) ;
 		  }
 		if (bestk < 8 && overlap < 2)
@@ -4865,7 +4869,6 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		px->intron = nIntrons ;
 		px->target = up->target ;
 		if (0) {up->donor = 0 ; vp->acceptor = 0 ; }
-		px->fragment = up->fragment ;
 		px->s1 = up->target ;
 		px->s2 = vp->target ;
 		px->x1 = up->a1 ;   
@@ -4898,12 +4901,12 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		px->ali = px->a1 < px->a2 ? px->a2 - px->a1 - 1 : px->a1 - px->a2 - 1 ;
 		strcpy (px->foot, foot) ;
 		px->nN = (px->a1 < px->a2 ? 0x0 : 0x1) ;   /* forward reverse */
-		if (!stranded && bestk < 8) px->nN |= 0x2 ;             /* non gt-ag */
+		if (!stranded && bestk < 8) px->nN |= 0x2 ;             /* non gt-ag ct-ac */
 		if (pp->strategy == STRATEGY_RNA_SEQ &&
 		    bestda >=  pp->intronMinLength
 		    )
 		  {
-                    if (bestk >= 8)
+                    if (bestk >= 9)
 		      {
 			if (px->a1 < px->a2)
 			  mm->gt_ag++ ;
@@ -5034,20 +5037,25 @@ static int clipAlignMergeIntrons (CLIPALIGN *pp)
 	{
 	  if (
 	      ( orientation && /* reverse a NS intron according to dominant stranding of the experiment */
-		(up->nN & 0x2) && /* non gt-ag, orientation unknown */
+		(up->nN & 0x2) &&  /* non gt-ag, orientation unknown */
 		orientation * (up->errLeftVal - up->errRightVal) < 0
 		)
 	      ||
 	      ( ! orientation &&
 		!strcmp (up->foot, "ct_ac")
 	       ))
-	    {  
+	    {
+	      char foot[6] ;
 	      int i = up->x1 ; up->x1 = up->x2 ; up->x2 = i ;
 	      i = up->a1 ; up->a1 = up->a2 ; up->a2 = i ;
 	      i = up->prefix ; up->prefix = up->suffix ; up->suffix = i ;
 	      i = up->errLeftVal ; up->errLeftVal = up->errRightVal ; up->errRightVal = i ;
 	      up->nN ^= 0x1 ; /* flip the orientation flag */
-	      strcpy (up->foot, "gt_ag") ;
+	      strncpy (foot, up->foot, 6) ;
+	      up->foot[0] = complementLetter (foot[4]) ;
+	      up->foot[1] = complementLetter (foot[3]) ;
+	      up->foot[3] = complementLetter (foot[1]) ;
+	      up->foot[4] = complementLetter (foot[0]) ;
 	      pass = -1 ; /* iterate */
 	    }
 	}
@@ -6123,12 +6131,16 @@ static void  clipAlignOptimizeIntronCleanUp (CLIPALIGN *pp, BigArray aa, int ii1
 				if (pt->errLeftVal > pt->errRightVal)
 				  pp->nIntronPlus += mult ;
 				else
-				  pp->nIntronMinus  += mult ;
+				  {
+				    pp->nIntronMinus  += mult ;
+				  }
 			      }
 			    else if (! strcmp (pt->foot, "ct_ac"))
 			      {
 				if (pt->errLeftVal > pt->errRightVal)
-				  pp->nIntronMinus += mult ;
+				  {
+				    pp->nIntronMinus += mult ;
+				  }
 				else
 				  pp->nIntronPlus  += mult ;
 			      }
@@ -7955,12 +7967,20 @@ static int clipAlignOptimizeMergeIntrons (CLIPALIGN *pp)
 			if (py->errLeftVal > py->errRightVal)
 			  pp->nIntronPlus += px->mm->mult ;
 			else
-			  pp->nIntronMinus  += px->mm->mult ;
+			  {
+			    pp->nIntronMinus  += px->mm->mult ;
+			    if (pp->nIntronMinus == 1 || pp->nIntronMinus == 11)
+			      invokeDebugger () ;
+			  }
 		      }
 		    if (! strcmp (py->foot, "ct_ac"))
 		      {
 			if (py->errLeftVal > py->errRightVal)
-			  pp->nIntronMinus += px->mm->mult ;
+			  {
+			    pp->nIntronMinus += px->mm->mult ;
+			    if (pp->nIntronMinus == 1 || pp->nIntronMinus == 11)
+			      invokeDebugger () ;
+			  }
 			else
 			  pp->nIntronPlus  += px->mm->mult ;
 		      }
@@ -8052,7 +8072,7 @@ static int clipAlignOptimizeMergeIntrons (CLIPALIGN *pp)
       }
 
   return jj ;
-} /* clipAlignOptimizeMergeIntrons */
+} /* clipAlignOptimizeMergeIntrons fragment */
 
 /*************************************************************************************/
 /* merge the geneHits into the hits, while resetting the donors */
@@ -8264,6 +8284,7 @@ static int clipAlignOptimizeGeneHits (CLIPALIGN *pp)
 	  if (jj) 
 	    nn += clipAlignOptimizeFragmentHits (pp) ;
 	  jj = 0 ;
+		    
 	  bigArrayDestroy (pp->exportGeneHits) ;
 	  pp->exportGeneHits = bigArrayCreate (100, PEXPORT) ;
 	}
@@ -10727,7 +10748,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "// Example:  clipalign -i tags.fasta -t chromX.fasta -errMax 2\n"
 	   "// -t fileName : the name of a target fasta file on which we align the tags\n"
 	   "//      this file is read as needed, so there is no limit to its size\n"
-	   "//      all named files will be gzip decompressed if they are called *.gz\n"
+	   "//      all files named *.gz are automatically decompressed\n"
 	   "// -targets : multi targets\n"
 	   "//     example A_mito:1:f.mito.fasta.gz,B_rrna:2:f.rrna.fasta.gz\n"
 	   "//     each file is processed, the number is the bonus for that class\n"
@@ -10753,7 +10774,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   
 	   "// -o fileName : output file name, equivalent to redirecting stdout\n"
   
-	   "// -gzo : the output file is gziped\n"
+	   "// -gzo : the output files will be gziped\n"
   
 	   "// -strand : if this option is specified, the tags are only aligned on the forward strand of the target.\n"
 	   "//            This option may be useful if the target is mRNA and the tags are stranded\n"

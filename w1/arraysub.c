@@ -228,8 +228,8 @@ static void uArrayFinalise (void *cp)
   
   if (reportArray != (Array)2)
     totalAllocatedMemory -= a->dim * a->size ;
-  if (!finalCleanup) messfree (a->base) ;
-  a->magic = 0 ;
+  if (!a->lock && !finalCleanup) messfree (a->base) ;
+  a->magic = 0 ; a->base = 0 ;
   totalNumberActive-- ;
   if (!finalCleanup && reportArray != (Array)1 && reportArray != (Array)2) 
     arr(reportArray, a->id, Array) = 0 ;

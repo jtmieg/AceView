@@ -466,27 +466,29 @@ static void cleanTtSqrt (TT *ttp)
 
 static int indexTtSort (short *cp, int dx, int sign)
 {
-  int i, j, k, ss = 1, blockS = 1 ;
+  int i, j, k, ss = 1 ;
   BOOL modif = TRUE ;
 
-  for (i = 0 ; i < dx ; i++)  /* a security, will always end up aas blockS=+1 in our framework */
-    blockS *= sign ;
+  if (! *cp)
+    return 1 ;
+  
   while (modif)
     {   /* sort inside the goups of length dx (i.e. g_ba -> g_ab  eps_acbd -> - eps_abcd */
       modif = FALSE ;
-      for (i = 0 ; i < GMAX + dx - 1 && cp[i + dx - 1] ; i += dx)
+      for (i = 0 ; i + dx - 1 < GMAX && cp[i + dx - 1] ; i += dx)
 	for (j = 0 ; j < dx -1 ; j++)
 	  if (cp[i+j+1]  && cp[i+j] > cp[i+j+1])
 	    { k = cp[i+j] ; cp[i+j] = cp[i+j+1] ; cp[i+j+1] = k ; ss *= sign ; modif = TRUE ; }
     }
+  
   modif = TRUE ;
   while (modif)
     {   /* sort the blocks (i.e. g_cdab -> g_abcd */
       modif = FALSE ;
-      for (i = 0 ; i < GMAX - dx && cp[i+dx] ; i += dx)
-	if (cp[i+dx]  && cp[i] > cp[i+dx])
-	for (j = 0 ; j < dx ; j++)
-	    { k = cp[i+j] ; cp[i+j] = cp[i+j+dx] ; cp[i+j+dx] = k ; ss *= blockS ; modif = TRUE ; }
+      for (i = 0 ; i + 2 * dx - 1 < GMAX && cp[i] && cp[i+dx] ; i += dx)
+	if (cp[i] > cp[i+dx])
+	  for (j = 0 ; j < dx ; j++)
+	    { k = cp[i+j] ; cp[i+j] = cp[i+j+dx] ; cp[i+j+dx] = k ; modif = TRUE ; }
     }
   return ss ;
 } /* indextTtSort */
@@ -537,7 +539,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 	  for (i = 0, g = tt.g ; g[i] && i < GMAX ; i+=2)
 	    { 
 	      if (g[i] == g[i+1])
-		{ zz *= 4 ; ok = FALSE ; for (k = i ; k < GMAX - 2 ; k++) g[k] = g[k+2] ; ok = FALSE ; }
+		{ zz *= 4 ; ok = FALSE ; for (k = i ; k < GMAX - 2 ; k++) g[k] = g[k+2] ; g[k++] = 0; g[k++] = 0 ; ok = FALSE ; }
 	      if (g[i] > g[i+1]) /* switch : the Lorentz metric is Abelian */
 		{ short cc = g[i] ; g[i] = g[i+1] ; g[i+1] = cc ; ok = FALSE ; }
 	    }
@@ -589,7 +591,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 	  if (! ok) continue ; /* will sort the modified epsilon symbol */
 		  
 	  /* search repeated indices inside an epsilon */
-	  for (i = 0, s = tt.eps ; ok && s[i] && i < GMAX ; i+= 4)
+	  for (i = 0, s = tt.eps ; ok && i < GMAX && s[i] ; i+= 4)
 	    for (j = 0 ; j <= 2 ; j++)
 	      for (k = j+1 ; k <= 3 ; k++)
 		{
@@ -605,8 +607,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 
 	  /* search repeated indices between pairs of epsilon */
 	  for (int pass = 4 ; pass > 0 ; pass--)  /* only use n=0,2,4 in first pass */
-	    for (i = 0, s = tt.eps ; 1 && ok && s[i] && i < GMAX ; i+= 4)
-	      for (j = i + 4 ; ok && s[j] && j < GMAX ; j+= 4)
+	    for (i = 0, s = tt.eps ; 1 && ok && i < GMAX && s[i] ; i += 4)
+	      for (j = i + 4 ; ok && j < GMAX && s[j] ; j += 4)
 		{
 		  int kkk[4], lll[4] ;
 		  int n = 0, k, l, kk ;
@@ -656,7 +658,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 			  }
 		      
 		      g = tt.g ; l = 0 ;
-		      while (*g) { l++ ; g++ ;}
+		      while (*g) { g++ ; l++ ;}
 		      *g++ = e1 ;
 		      *g++ = f1 ;
 		      *g++ = e2 ;
@@ -666,13 +668,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      *g++ = 0 ;
 		      
 		      tt.z *= 1 ; /* we contracted 1 index */
-		      /* adjust the sign */
-		      for (k = 0 ; k < 4 ; k++)
-		      if (lll[k] && (k%2))
+		      if (kk % 2) /* adjust the sign */
 			tt.z *= -1 ;
-		      for (k = 0 ; k < 4 ; k++)
-			if (kkk[k] && (k%2))
-			  tt.z *= -1 ;
 		      
 		      /* clean up the epsilons */
 		      for (k = j ; k < GMAX - 4 ; k++)
@@ -783,7 +780,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      *g++ = 0 ;
 		      
 		      tt.z *= 2 ; /* we contracted 2 indices */
-		      if (kk % 2)
+		      if (kk % 2) /* adjust the sign */
 			tt.z *= -1 ;
 		      /* clean up the epsilons */
 		      for (k = j ; k < GMAX - 4 ; k++)
@@ -796,7 +793,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 			s[k] = 0 ;
 		      ok = FALSE ;
 
-		      /* duplicate the polynome and anisymmetrize */
+		      /* duplicate the polynome and antisymmetrize */
 		      p1 = newScalar (1,h) ;
 		      p2 = newScalar (1,h) ;
 		      
@@ -815,7 +812,6 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      
 		      break ;
 		    case 3:
-		      tt.z *= 6 ;
 		      kk = 0 ;
 		      /* identify the non repeated indices */
 		      for (k = 0 ; k < 4 ; k++)
@@ -833,7 +829,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      *g++ = e ;
 		      *g++ = f ;
 		      *g++ = 0 ;
-		      if (kk % 2 == 1)
+		      tt.z *= 6 ; /* we contracted 3 indices */
+		      if (kk % 2 == 1) /* adjust the sign */
 			tt.z *= -1 ;
 		      
 		      /* clean up the epsilons */
@@ -848,7 +845,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		      ok = FALSE ;
 		      break ;
 		    case 4:
-		      tt.z *= 24 ;
+		      tt.z *= 24 ; /* we contracted 4 indices */
 		      for (k = j ; k < GMAX - 4 ; k++)
 			s[k] = s[k+4] ;
 		      for (; k < GMAX - 4 ; k++)
@@ -878,8 +875,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		    POLYNOME p1, p2, p3 ;
 		    int e = 0, f = 0, kk = 0 ;
 		    tt.z *= 1 ;     /* I in Minkovski */
-		    if (g[i] > g[i+1])
-		      tt.z *= -1 ;
+		    if (0 && g[i] > g[i+1])
+		      tt.z *= -1 ;  /* 2025_04)08: wrong was breaking the tensor contribution to the fermion-vector ward identity */
 		    for (k = 0 ; k < 4 ; k++)
 		      if (g[i] != s[j+k] && g[i+1] != s[j+k])
 			{
@@ -899,7 +896,7 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		    for (; k < GMAX - 4 ; k++)
 		      s[k] = 0 ;
 
-		    /* duplicate the polynome and anisymmetrize */
+		    /* duplicate the polynome and antisymmetrize */
 		    p1 = newScalar (1,h) ;
 		    p2 = newScalar (1,h) ;
 
@@ -932,8 +929,8 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		    POLYNOME p1, p2, p3 ;
 		    int e = 0, f = 0, kk = 0 ;
 		    tt.z *= -1 ;    /* -I in Minkovski */
-		    if (g[i] > g[i+1])
-		      tt.z *= -1 ;
+		    if (0 && g[i] > g[i+1])
+		      tt.z *= -1 ; /* 2025_04)08: wrong was breaking the tensor contribution to the fermion-vector ward identity */
 		    for (k = 0 ; k < 4 ; k++)
 		      if (g[i] != s[j+k] && g[i+1] != s[j+k])
 			{
@@ -1022,52 +1019,33 @@ static POLYNOME contractTtIndices (POLYNOME pp)
 		if (s[j] < s[i])
 		  { short cc = s[i] ; s[i] = s[j] ; s[j] = cc ; }
 	  
-	  /* sort internal dummy k-slash indices, rename them */
-	  if (0) 
-	    {
-	      int nd = 0 ; short *u, *v ;
-	      for (ii = 0 ; ii < 3 ; ii++)
-		for (i = 0, u = tt.mm[ii] ; ok && u[i] && i < GMAX ; i++)
-		  {
-		    for (j = 0, v = tt.sigma ; ok && v[j] && j < GMAX ; j++)
-		      if (u[i] < 'w' && u[i] == v[j])
-			{ u[i] = v[j] = 'w' + nd++ ; ok = FALSE ; }
-		    for (j = 0, v = tt.sigB ; ok && v[j] && j < GMAX ; j++)
-		      if (u[i] < 'w' && u[i] == v[j])
-			{ u[i] = v[j] = 'w' + nd++ ; ok = FALSE ; }
-		  }
-	    }
-	  
-	  /* search contiguous sigma_a sigB_a = 4, AND  s_a s_b s_a = -2 s_b AND  abEab = 4 E AND s_a sB_b s_c sB_a = 4 g_bc */
-	  for (i = 0, s = tt.sigma, g = tt.g ; ok && s[i] && i < GMAX - 3 ; i++)
+	  /* search sigma or sigB repeated indices
+	   * sigma_a sigB_a = 4, AND  s_a s_b s_a = -2 s_b AND  abEab = 4 E AND s_a sB_b s_c sB_a = 4 g_bc
+	   */
+	  for (i = 0, s = (tt.sigma[0] ? tt.sigma : tt.sigB) , g = tt.g ; ok && s[i] && i < GMAX - 3 ; i++)
 	    { 
+	      int u = 0, v = 0 ;
 	      if (s[i] == s[i+1])
-		{ zz *= 4 ; for (k = i ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
+		{ zz *= 4 ; u = 0 ; v = 2 ; ok = FALSE ; }
 	      else if (s[i] == s[i+2])
-		{ zz *= -2 ; s[i] = s[i+1] ;for (k = i + 1 ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+3] && s[i+1] == s[i+4]) 
-		{ zz *= 4 ; s[i] = s[i+2] ; for (k = i + 1 ; k < GMAX - 4 ; k++) s[k] = s[k+4] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+4] && s[i+1] == s[i+5]  && s[i+2] == s[i+6])
-		{ zz *= -32 ; s[i] = s[i+3] ; for (k = i + 1 ; k < GMAX - 6 ; k++) s[k] = s[k+6] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
+		{ zz *= -2 ; s[i] = s[i+1] ; u = 1 ; v = 2 ;  ok = FALSE ; }
 	      else if (s[i] == s[i+3])
-		{ zz *= 4 ; k = strlen ((const char *)g) ; g[k] = s[i+1]; g[k+1] = s[i+2] ; g[k+2] = 0 ; for (k = i ; k < GMAX - 4 ; k++) s[k] = s[k+4] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
+		{ zz *= 4 ;
+		  k = strlen ((const char *)g) ; if (k > GMAX-3) messcrash ("k=%d too large", k) ;
+		  g[k] = s[i+1]; g[k+1] = s[i+2] ; g[k+2] = 0 ;
+		  u = 0 ; v = 4 ;  ok = FALSE ;
+		}
+	      else if (s[i] == s[i+4] && s[i+1] == s[i+5]  && s[i+2] == s[i+6])
+		{ zz *= -32 ; s[i] = s[i+3] ; u = 1 ; v = 6 ; ok = FALSE ; }
+	      if (! ok)
+		{
+		  for (k = i + u ; k < GMAX - v ; k++)
+		    s[k] = s[k+v] ;
+		  for (; k < GMAX ; k++)
+		    s[k] = 0 ;
+		}
 	    }
 	  if (! ok) continue ;
-
-	  /* search contiguous sigB_a sigma_a = 4, AND  sb_a s_b sB_a = -2 s_b AND sB_a s_b sB_c s_a = 4 g_bc */
-	  for (i = 0, s = tt.sigB, g = tt.g ; ok && s[i] && i < GMAX - 3 ; i++)
-	    { 
-	      if (s[i] == s[i+1])
-		{ zz *= 4 ; for (k = i ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+2])
-		{ zz *= -2 ; s[i] = s[i+1] ;for (k = i + 1 ; k < GMAX - 2 ; k++) s[k] = s[k+2] ; s[k+1] = s[k+2] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+3])
-		{ zz *= 4 ; k = strlen ((const char *)g) ; g[k] = s[i+1]; g[k+1] = s[i+2] ; g[k+2] = 0 ; for (k = i ; k < GMAX - 4 ; k++) s[k] = s[k+4] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
-	      else if (s[i] == s[i+4] && s[i+1] == s[i+5]  && s[i+2] == s[i+6])
-		{ zz *= -32 ; s[i] = s[i+3] ; for (k = i + 1 ; k < GMAX - 6 ; k++) s[k] = s[k+6] ; for (; k < GMAX ; k++) s[k] = 0 ; ok = FALSE ; }
-	    }
-	  if (! ok) continue ;
-
 	}
     }
   tt.z *= zz ;
@@ -2924,7 +2902,7 @@ static POLYNOME dimIntegralMonome (POLYNOME pp, int state, short *kk, int *np, i
 		"aebcdf","aebdcf","aebfcd",
 		"afbcde","afbdce","afbecd"
 	      } ;
-	      pp->tt.z /= 192 ;
+	      pp->tt.z /= 192 ; 
 	      for (n = 0 ; n < NN ; n++)
 		{                             /* we need N products of type g_ab g_cd g_ef, then we zero terminate the list */
 		  int i ;

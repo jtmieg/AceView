@@ -96,6 +96,7 @@
 ?GeneId    Gene ?Gene XREF GeneId   // MUST be top line to simplify transfer of data
            GeneOld ?Gene XREF GeneIdOld
            Other_gene ?Gene XREF Other_geneId  
+           Gene_group ?Gene_group XREF  GeneId 
            mRNA ?mRNA XREF GeneId  
            TT Title UNIQUE Text   // human extracted from gene_info
               Summary UNIQUE Text   // human extracted from locus id
@@ -2541,7 +2542,8 @@
               HGNC_family_ID UNIQUE Text
               Group_level UNIQUE Int
             Summary  UNIQUE ?Text    
-            Genes ?Gene XREF Gene_group
+            GeneId ?GeneId XREF Gene_group
+            Genes ?Gene XREF Gene_group	    
             Parent ?Gene_group XREF Subgroups
             Subgroups  ?Gene_group XREF Parent
 

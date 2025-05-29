@@ -111,7 +111,7 @@ if ($Strategy == RNA_seq && ! -e tmp/$WG/$run/wg2a.restrand.done) then
         set wr=tmp/$WG/$run/$chrom/R.chrom.u.ELR.BF.gz
         mv $wf $wf.z
         mv $wr $wf
-        mv $wf.z $r
+        mv $wf.z $wr
         set wf=tmp/$WG/$run/$chrom/R.chrom.u.ERF.BF.gz
         set wr=tmp/$WG/$run/$chrom/R.chrom.u.ERR.BF.gz
         mv $wf $wf.z

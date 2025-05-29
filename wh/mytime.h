@@ -75,7 +75,7 @@ char* timeShowNow () ; /* Deprecated
 			* prefer timeHandleShowNow (AC_HANDLE h) ; in regular.h
 			* ir timeBufShowNow
 			*/
-char *timeBufShowNow (char *timeBuf) ; /* expecta buffer of legt 25, or the buffer retruned by a previous  timeHandleShowNow */
+char *timeBufShowNow (char *timeBuf) ; /* expecta buffer of legnth 25, or the buffer retruned by a previous  timeHandleShowNow */
 
 mytime_t timeNow (void) ;
 void     timeDiff (mytime_t t1, mytime_t t2, int *ydiff, int *mdiff,

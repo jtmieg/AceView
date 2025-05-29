@@ -321,7 +321,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
     {
       if (mm1[i])
 	{
-	  pp = newScalar (4 * mm1[i],h) ;
+	  pp = newScalar (1 * mm1[i],h) ;
 	  pp->tt.mm[i][0] = a ;
 	  pp->tt.g[0] = mu ;
 	  pp->tt.g[1] = c ;
@@ -331,7 +331,7 @@ static POLYNOME vertex_A_B_BB (short mu, short a, short b, short c, short d, int
 	}
       if (mm2[i])
 	{
-	  pp = newScalar (-4 * mm2[i],h) ;
+	  pp = newScalar (-1 * mm2[i],h) ;
 	  pp->tt.mm[i][0] = c ;
 	  pp->tt.g[0] = mu ;
 	  pp->tt.g[1] = a ;
@@ -539,14 +539,12 @@ static POLYNOME prop_BB_B (short mu, short nu, short rho, short sig, int pqr, AC
   POLYNOME p3 = newPQR (pqrN, c,h) ;
   POLYNOME p4 = newG  (b, d,h) ;
   POLYNOME p5 = newAG (c,d,rho,sig, -z,h) ; /* -z */
-  POLYNOME p31 = newG  (a, c,h) ;
-  POLYNOME p41 = newG  (b, d,h) ;
   if (0) p5 = newEpsilon (c,d,rho,sig,h) ;
   POLYNOME pp, ppp[] = {p1,p2,p3, p4, p5, 0} ; 
   /* POLYNOME pp, ppp[] = {p1,p31,p41,p5, 0} ;  */
 
   p4->tt.denom[pqrD] = 2 ;
-  p4->tt.z *= 4 ;
+  p4->tt.z *= 16 ;
   if (0) p4->tt.z *= u*I ;
   pp = polMultiProduct (h, ppp) ;
 
@@ -802,7 +800,6 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   POLYNOME p2 = prop_PsiLB_PsiL (1,h) ;   /* (1/(k)^2 */
   POLYNOME p3 = vertex_B_PsiR_PsiLB (c,d,h) ;
   POLYNOME p4 = prop_PsiRB_PsiR (0,h) ;   /* (1/(k)^2 */
-  POLYNOME p5 = prop_BB_B (a, b, c, d, 0,h) ;
   POLYNOME ppp[] = {p10,p1,p2,p3,p4,0} ;
 
   POLYNOME pp = polMultiProduct (h,ppp) ;
@@ -828,7 +825,8 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   pp = bbCleanUp (pp, b,a, d, c) ;
   showPol (pp) ;
 
-  printf ("\n### raw propagator expect 1\n") ;
+  printf ("\n### this is the current definition of the propagator squezed between projectors expect 16\n") ;
+  POLYNOME p5 = prop_BB_B (a, b, c, d, 0,h) ;
   showPol (p5) ;
   p5 = expand (p5) ;
   showPol (p5) ;
@@ -836,65 +834,6 @@ static POLYNOME Z2_BB__loopPsi  (const char *title)
   showPol (p5) ;
   printf ("DONE %s\n", title) ;
 
-  printf("\n### check that skew pairs of pauli are self dual \n") ;
-  POLYNOME r1 = newAG (a,b,c,d, 1, h) ;
-  POLYNOME r2 = newAG (a,b,c,d, -1, h) ;
-  POLYNOME r3 = newAG (c,d,e,f, 1, h) ;
-  POLYNOME r4 = newAG (c,d,e,f, -1, h) ;
-  POLYNOME s1 = newSigma (c, h) ;
-  s1->tt.sigma[1] = d ;
-  POLYNOME s2 = newSigB (c, h) ;
-  s2->tt.sigB[1] = d ;
-
-  printf ("\nP^2\n") ;
-  p5 = polProduct (r1,r3,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-  
-  printf ("\nPM\n") ;
-  p5 = polProduct (r1,r4,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-  
-  printf ("\nM^2\n") ;
-  p5 = polProduct (r2,r4,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-  
-  printf ("\nMP\n") ;
-  p5 = polProduct (r2,r3,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-
-  printf ("\nP.Sig.SigB\n") ;
-  p5 = polProduct (r1,s1,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-
-  printf ("\nM.Sig.SigB\n") ;
-  p5 = polProduct (r2,s1,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-
-  printf ("\nP.SigB.Sig\n") ;
-  p5 = polProduct (r1,s2,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-
-  printf ("\nM.SigB.Sig\n") ;
-  p5 = polProduct (r2,s2,h) ;
-  showPol (p5) ;
-  p5 = expand (p5) ;
-  showPol (p5) ;
-
-  
   
   return pp ;
 } /* Z2_BB__loopPsi */
@@ -2763,7 +2702,7 @@ static POLYNOME Z3_A_PsiL_PsiLB__Bover (void)
   printf ("Z3 Classic vertex A psi with tensor over: expect 1 \n") ;
   showPol (pp) ;
   pp = expand (pp) ;
-  showPol (pp) ;
+  if (0) showPol (pp) ;
   pp = dimIntegral (pp) ;
   showPol(pp) ;
 
@@ -4945,7 +4884,7 @@ static void PolyDeterminant (PMX uvexp)
 		  for (int m = 0 ; m < 4 ; m++)
 		    for (int n = 0 ; n < 4 ; n++)
 		      {
-			/* we can exchange the lines but NOT hyte columns becuase we compute 
+			/* we can exchange the lines but NOT the columns because we compute 
 			 * the determinant by expanding column by column
 			 */
 			zz->pp[N*m + n] = polCopy (uvexp->pp[N*nn[m] + n], h) ;
@@ -10578,6 +10517,7 @@ static void THETA (void)
   PMX uvexp = pmxExponential (uvwx, "exp(u+v+w+x)", 6, h) ;
   pmxShow (uvexp1) ;
   pmxShow (uvexp2) ;
+  pmxShow (uvexp) ;
   pmxShow (u1) ;
   pmxShow (v1) ;
   pmxShow (w1) ;
@@ -10841,6 +10781,122 @@ int main (int argc, const char **argv)
 	  exit (0) ;
 	}
 
+      /* dimIntegral test, expect 1 each time */
+      if (0)
+	{
+	  printf ("============dimIntegralTest: expect 1 each time\n") ;
+	  firstDummyIndex = 'a' ;
+	  char a = newDummyIndex () ;
+	  char b = newDummyIndex () ;
+	  char c = newDummyIndex () ;
+	  char d = newDummyIndex () ;
+	  char e = newDummyIndex () ;
+	  char f = newDummyIndex () ;
+	  char g = newDummyIndex () ;
+	  char h1 = newDummyIndex () ;
+
+	  POLYNOME p1 = newG (a, b, h) ;
+	  POLYNOME p2 = newScalar (1.0, h) ;
+	  p2->tt.denom[0] = 1 ;
+	  p2->tt.denom[1] = 1 ;
+	  p2->tt.denom[2] = 1 ;
+	  p2->tt.mm[0][0] = a ;
+	  p2->tt.mm[0][1] = b ;
+	  printf ("============ k^ab/k^2(k+p)^2(k+p+q)^2\n") ;
+	  showPol (p2) ;
+	  p2 = dimIntegral (p2) ;
+	  showPol (p2) ;
+	  POLYNOME p3 = polProduct (p1, p2, h) ;
+	  showPol (p3) ;
+	  p3 = expand (p3) ;
+	  showPol (p3) ;
+ 
+	  p1 = newG (a, b, h) ;
+	  p1->tt.g[2] = c ;
+	  p1->tt.g[3] = d ;
+	  p2 = newScalar (1.0, h) ;
+	  p2->tt.denom[0] = 1 ;
+	  p2->tt.denom[1] = 1 ;
+	  p2->tt.denom[2] = 2 ;
+	  p2->tt.mm[0][0] = a ;
+	  p2->tt.mm[0][1] = b ;
+	  p2->tt.mm[0][2] = c ;
+	  p2->tt.mm[0][3] = d ;
+	  printf ("============ k^abcd/k^2(k+p)^2(k+p+q)^4\n") ;
+	  showPol (p2) ;
+	  p2 = dimIntegral (p2) ;
+	  showPol (p2) ;
+	  p3 = polProduct (p1, p2, h) ;
+	  showPol (p3) ;
+	  p3 = expand (p3) ;
+	  showPol (p3) ;
+ 
+	  p1 = newG (a, b, h) ;
+	  p1->tt.g[2] = c ;
+	  p1->tt.g[3] = d ;
+	  p1->tt.g[4] = e ;
+	  p1->tt.g[5] = f ;
+	  p2 = newScalar (1.0, h) ;
+	  p2->tt.denom[0] = 1 ;
+	  p2->tt.denom[1] = 2 ;
+	  p2->tt.denom[2] = 2 ;
+	  p2->tt.mm[0][0] = a ;
+	  p2->tt.mm[0][1] = b ;
+	  p2->tt.mm[0][2] = c ;
+	  p2->tt.mm[0][3] = d ;
+	  p2->tt.mm[0][4] = e ;
+	  p2->tt.mm[0][5] = f ;
+	  printf ("============ k^abcdef/k^2(k+p)^4(k+p+q)^4\n") ;
+	  showPol (p2) ;
+	  p2 = dimIntegral (p2) ;
+	  showPol (p2) ;
+	  p3 = polProduct (p1, p2, h) ;
+	  showPol (p3) ;
+	  p3 = expand (p3) ;
+	  showPol (p3) ;
+ 
+	  p1 = newG (a, b, h) ;
+	  p1->tt.g[2] = c ;
+	  p1->tt.g[3] = d ;
+	  if (1)
+	    {
+	      p1->tt.g[4] = e ;
+	      p1->tt.g[5] = f ;
+	      p1->tt.g[6] = g ;
+	      p1->tt.g[7] = h1 ;
+	    }
+	  else
+	    {
+	      p1->tt.eps[0] = e ;
+	      p1->tt.eps[1] = f ;
+	      p1->tt.eps[2] = g ;
+	      p1->tt.eps[3] = h1 ;
+	    }
+	  p2 = newScalar (1.0, h) ;
+	  p2->tt.denom[0] = 2 ;
+	  p2->tt.denom[1] = 2 ;
+	  p2->tt.denom[2] = 2 ;
+	  p2->tt.mm[0][0] = a ;
+	  p2->tt.mm[0][1] = b ;
+	  p2->tt.mm[0][2] = c ;
+	  p2->tt.mm[0][3] = d ;
+	  p2->tt.mm[0][4] = e ;
+	  p2->tt.mm[0][5] = f ;
+	  p2->tt.mm[0][6] = g ;
+	  p2->tt.mm[0][7] = h1 ;
+	  printf ("============ k^abcdefgh/k^4(k+p)^4(k+p+q)^4\n") ;
+	  showPol (p2) ;
+	  p2 = dimIntegral (p2) ;
+	  showPol (p1) ;
+	  showPol (p2) ;
+	  p3 = polProduct (p1, p2, h) ;
+	  showPol (p3) ;
+	  p3 = expand (p3) ;
+	  showPol (p3) ;
+ 
+	  exit (0) ;
+	}
+	  
       /* projector tests */
       if (0)
 	{
@@ -11213,7 +11269,7 @@ int main (int argc, const char **argv)
 
       /* pure gauge theory, coupling of the Vector to the Fermion in the presence of scalar/vector/tensor under */
       
-      if (1) 
+      if (0) 
 	{
 	  printf ("\n\n\n@@@@@@@@@ Classic Ward identity : A_PsiB_Psi scalar under\n") ;
 	  firstDummyIndex = 'a' ;
@@ -11272,13 +11328,13 @@ int main (int argc, const char **argv)
 	}
       
       /* Boson propagators Fermion loops*/
-      if (0)
+      if (1)
 	{
 	  firstDummyIndex = 'a' ;
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators, Fermion loops */\n") ;
 
-	  if (0) Z2_HH__loopPsi ("######### Scalar propagator, Fermion loop\n") ;
-	  if (0) Z2_AA__loopPsi ("######### Vector propagator, Fermion loop\n") ;
+	  if (1) Z2_HH__loopPsi ("######### Scalar propagator, Fermion loop\n") ;
+	  if (1) Z2_AA__loopPsi ("######### Vector propagator, Fermion loop\n") ;
 	  if (1) Z2_BB__loopPsi ("######### Tensor propagator, Fermion loop\n") ; 
 
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators Fermion loops DONE\n") ;
@@ -11539,8 +11595,79 @@ int main (int argc, const char **argv)
 
 	  exit (0) ;	  
 	}
-      
-      
+
+      if (0)
+        {
+	  printf("\n### check that skew pairs of pauli are self dual \n") ;
+
+	  char a = newDummyIndex () ;
+	  char b = newDummyIndex () ;
+	  char c = newDummyIndex () ;
+	  char d = newDummyIndex () ;
+	  char e = newDummyIndex () ;
+	  char f = newDummyIndex () ;
+
+	  POLYNOME r1 = newAG (a,b,c,d, 1, h) ;
+	  POLYNOME r2 = newAG (a,b,c,d, -1, h) ;
+	  POLYNOME r3 = newAG (c,d,e,f, 1, h) ;
+	  POLYNOME r4 = newAG (c,d,e,f, -1, h) ;
+	  POLYNOME s1 = newSigma (c, h) ;
+	  s1->tt.sigma[1] = d ;
+	  POLYNOME s2 = newSigB (c, h) ;
+	  POLYNOME p5 = 0 ;
+
+	  s2->tt.sigB[1] = d ;
+	  
+	  printf ("\nP^2\n") ;
+	  p5 = polProduct (r1,r3,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nPM\n") ;
+	  p5 = polProduct (r1,r4,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nM^2\n") ;
+	  p5 = polProduct (r2,r4,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nMP\n") ;
+	  p5 = polProduct (r2,r3,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nP.Sig.SigB\n") ;
+	  p5 = polProduct (r1,s1,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nM.Sig.SigB\n") ;
+	  p5 = polProduct (r2,s1,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nP.SigB.Sig\n") ;
+	  p5 = polProduct (r1,s2,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  
+	  printf ("\nM.SigB.Sig\n") ;
+	  p5 = polProduct (r2,s2,h) ;
+	  showPol (p5) ;
+	  p5 = expand (p5) ;
+	  showPol (p5) ;
+	  exit (0) ;
+	}
+
       if (0)
 	{
 	  printf ("\n\n\n@@@@@@@@@ Boson propagators, contraction tests */\n") ;

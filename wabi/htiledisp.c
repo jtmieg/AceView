@@ -4395,7 +4395,7 @@ static void htileGenomeAction (void *v)
 	 tt->open = ! tt->open ;
     }
   look->map->mapDraw () ;
-} /*  htileFilterProbes */
+} /*  htileGenomeAction */
 
 static void htileDrawGenomeButtons (Htile look, float *offsetp)
 {
@@ -4651,7 +4651,7 @@ static void htileDrawGenes (Htile look, float offset, BOOL isUp)
       if (a2 < g1 || a1 > g2)
 	continue ;
       	
-      for (pass = 0 ; pass < 4 ; pass++) /* first the genes with a geneid */
+      for (pass = 0 ; pass < 5 ; pass++) /* first the genes with a geneid */
 	{
 	  switch (pass)
 	    {
@@ -4673,6 +4673,13 @@ static void htileDrawGenes (Htile look, float offset, BOOL isUp)
 		tgs = ac_keyset_table (kpg, 0, -1, 1, h) ;
 	      }
 	      y1 = offset + (isUp ? -5 : 5) ; y2 = y1 + .6 ;   /* Defines thickness of the gene. Was set to .6 originally*/
+	      break ;
+	    case 4: 
+	      {
+		AC_KEYSET kpg = ac_objquery_keyset (tile, ">Subsequence ; Is_predicted_gene",h) ;
+		tgs = ac_keyset_table (kpg, 0, -1, 1, h) ;
+	      }
+	      y1 = offset + (isUp ? -2 : 2) ; y2 = y1 + .6 ;   /* Defines thickness of the gene. Was set to .6 originally*/
 	      break ;
 	    }
 	  for (ir = 0 ; tgs && ir < tgs->rows ; ir++)
@@ -4711,6 +4718,7 @@ static void htileDrawGenes (Htile look, float offset, BOOL isUp)
 		    col = GREEN ;
 		  break ;
 		case 3:
+		case 4:
 		  if (! keyFindTag (tg, _Source_exons))
 		    continue ;
 		  col = GRAY ;
@@ -4796,6 +4804,7 @@ static void htileDrawGenes (Htile look, float offset, BOOL isUp)
 		      graphRectangle (v1, y1, v2, y2) ;
 		      break ;
 		    case 3:
+		    case 4:
 		      oldv2 = 0 ;
 		      
 		      spls = ac_tag_table (Tg, "Source_exons", h1) ;
@@ -6375,7 +6384,7 @@ static BOOL solexaAllInit (Htile look)
       const char *suffix[14] = {".LF", ".RF", ".LR", ".RR", "nu+", "nu-", "pp+", "pp-", "+", "-", ".eLF", ".eRF", ".eLR", ".eRR" } ;
       const int colors[14] = { BROWN, GREEN, MAGENTA, CYAN, PALEORANGE, YELLOW, BLACK, GRAY, ORANGE, DARKBLUE, PALEGREEN, PALEVIOLET, PALEMAGENTA, PALECYAN  } ;
       aa = look->solexaAll = arrayHandleCreate (128, PNX, look->h) ;
-      iter = ac_dbquery_iter (look->db, "find run w_colour", h) ;
+      iter = ac_dbquery_iter (look->db, "find run w_colour || wiggle", h) ;
       ir = -1 ;
       while (ac_free (Run), ir++, Run = ac_next_obj (iter))
 	{
@@ -6473,11 +6482,12 @@ BOOL htileDisplay (KEY key, KEY from, BOOL isOldGraph)
       else if (from && class (from) == 0)
 	{ look0->gaussWidth = 10 ;  look0->zoom = 5/32.0  ; }
       else if (class (key) == _VSequence)
-	{ look0->gaussWidth = 1000 ;  look0->zoom = 5 ; }
+	{ look0->gaussWidth = 1000 ;  look0->zoom = 5/32.0 ; }
       else if (class (key) == _VmRNA)
 	{ look0->gaussWidth = 20 ;  look0->zoom = 5 ; }
       else
 	{ look0->gaussWidth = 100000 ; look0->zoom = 40 ; }
+      look0->zoom = 5/256.0 ; 
       if (isGifDisplay)
 	{ 
 	  look0->showRZones = FALSE ; 

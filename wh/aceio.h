@@ -155,7 +155,7 @@ BOOL aceInStep (ACEIN fi, char x) ;
 void aceInNext (ACEIN fi) ;
 char* aceInPos (ACEIN fi) ;
 
-BOOL aceInBinary (ACEIN fi, void *buffer, int size) ;
+BOOL aceInBinary (ACEIN fi, void *buffer, long int size) ;
 
 BOOL aceInEOF (ACEIN fi);	/* TRUE if fi->streamlevel == 0 */
 
@@ -210,7 +210,7 @@ BOOL aceOutStreamPos (ACEOUT fo, long int *posp);
 int aceOut(ACEOUT fo, const char *simple_string) ;	    /* Use for simple text string. */
 int aceOutf(ACEOUT fo, char *format,...) ;		    /* Use for formatted printing. */
 int aceOutxy(ACEOUT fo, const char *text, int x, int y) ; 
-int aceOutBinary(ACEOUT fo, const void *data, int size) ;
+int aceOutBinary(ACEOUT fo, const void *data, long int size) ;
 
 
 int aceOutLine (ACEOUT fo) ;	/* how many lines written */

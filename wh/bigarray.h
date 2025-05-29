@@ -21,7 +21,7 @@
 
 #ifndef DEF_BIG_ARRAY_H
 #define DEF_BIG_ARRAY_H
-#include "regular.h"  /* may set ARRAY_CHECK amd MEM_DEBUG*/ 
+#include "regular.h"  /* may set ARRAY_CHECK and MEM_DEBUG*/ 
 mysize_t stackused (void) ;
  
 /************* Array package ********/
@@ -33,7 +33,11 @@ typedef struct BigArrayStruct
     long int  max ;     /* largest element accessed via array() */
     mysize_t   id ;      /* unique identifier */
     int   magic ;
-    BOOL lock ; /* a locked array cannot be destroyes or reallocated */
+    BOOL lock ; /* a locked array cannot be destroyed or reallocated */
+    long int readOnly ; /* original size, cannot be modified */
+    void *map ;         /* address to be unmapped */
+    const char *fName ;
+    int fd ; /* file descriptor */
   } *BigArray ;
  
     /* NB we need the full definition for arr() for macros to work
@@ -60,6 +64,9 @@ typedef struct BigArrayStruct
 
 #endif
 
+BOOL bigArrayMapWrite (BigArray aa, const char *fName) ;
+BigArray uBigArrayMapRead (const char *fName, int size, BOOL readOnly, AC_HANDLE h) ;
+#define bigArrayMapRead(fName,type,readOnly,h) uBigArrayMapRead(fName,sizeof(type),readOnly,h) 
 BigArray   uBigArrayReCreate (BigArray a,long int n, int size) ;
 void    uBigArrayDestroy (BigArray a);
 char    *uBigArray (BigArray a, long int index) ;

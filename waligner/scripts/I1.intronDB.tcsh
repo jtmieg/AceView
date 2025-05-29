@@ -273,6 +273,7 @@ if (-d tmp/INTRON_DB/$chrom/database &&  -e tmp/INTRON_DB/$chrom/$MAGIC.I4.setSp
    bin/tacembly tmp/INTRON_DB/$chrom  <<EOF
      read-models
      pparse MetaDB/$MAGIC/runs.ace
+     pparse MetaDB/$MAGIC/groups.ace
      save
      quit
 EOF

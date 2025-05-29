@@ -773,6 +773,7 @@ static void wego_do_max_threads (int max)
   memSetIsMultiThreaded () ; /* set memsubs in thread-safe mode */
 
   arrayReport (-2) ;   /* blocks static array counts */
+  bigArrayReport (-2) ;   /* blocks static bigArray counts */
   n = pthread_key_create (&threadrunner_key, NULL );
   if (n < 0)
     perror ("pthread_key_create");

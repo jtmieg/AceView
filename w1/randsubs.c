@@ -56,7 +56,7 @@ int randint (void)
 {
   xrand = 171*xrand % 30269;
   yrand = 172*yrand % 30307;
-  zrand = 170*zrand % 30323;
+  zrand = 170*zrand % 30323; 
   return (zrand) ;
 }
 #endif

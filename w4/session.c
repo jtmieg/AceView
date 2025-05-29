@@ -635,10 +635,11 @@ static void sessionInit2 (const char* ace_path)
 
   /* init these freeXXX first, they belong to the utilities-library,
      do all the acedb specific inits after that */
+  sessionSetPath (ace_path) ;
   freeinit () ;
   freeOutInit () ;  
 
-  sessionSetPath (ace_path) ;
+
   
   /* prompt the system to check whether the file
      exists. If the database directory ace_path (just set above)

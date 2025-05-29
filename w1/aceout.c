@@ -466,12 +466,12 @@ BOOL aceOutStreamPos (ACEOUT fo, long int *posp)
 #define ESUCCESS 0
 #include <errno.h>
 
-int aceOutBinary (ACEOUT fo, const void *data, int size)
+int aceOutBinary (ACEOUT fo, const void *data, long int size)
      /* copy a binary structure onto a text stack
       * RETURNS errno */
 { 
   int errno_result = ESUCCESS;
-  int num_bytes_written = 0;
+  long int num_bytes_written = 0;
 
   if (!aceOutExists(fo))
     messcrash("aceOutBinary() - received invalid fo pointer");
@@ -491,7 +491,7 @@ int aceOutBinary (ACEOUT fo, const void *data, int size)
       fo->line++;
     }
 
-  fo->byte += (long int)num_bytes_written;
+  fo->byte += num_bytes_written;
 
   return errno_result;
 } /* aceOutBinary */

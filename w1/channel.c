@@ -63,6 +63,26 @@ void channelDebug (CHAN *c, int debug, char *title)
 } /* chanDebug */
 
 /*******************************************************************************************************/
+/* number of packets received by channel c, negative is channel is still open */
+int channelCount (CHAN *c)
+{
+  int n = 0 ;
+
+  if (c)
+    {
+      pthread_mutex_lock (&(c->c.mutex)) ;
+      n = c->c.nPut1 ;
+      if (! c->c.isClosed)
+	n = -n ;
+      if (c->c.debug)
+	fprintf (stderr, " - channelCount %s : closed=%d count=%d\n", c->c.title[0] ? c->c.title : "no-name", c->c.isClosed ? 1 : 0, n) ;
+      pthread_mutex_unlock (&(c->c.mutex)) ;
+    }
+
+  return n ;
+} /* channelNget */
+
+/*******************************************************************************************************/
 
 void channelClose (CHAN *c)
 {
@@ -74,6 +94,31 @@ void channelClose (CHAN *c)
 	  c->c.isClosed = TRUE ;
 	  if (c->c.debug)
 	    fprintf (stderr, " - Closing channel %s\n", c->c.title[0] ? c->c.title : "no-name") ;
+	  pthread_cond_signal(&(c->c.notEmpty)) ;
+	}
+      pthread_mutex_unlock (&(c->c.mutex)) ;
+    }
+} /* chanClose */
+
+/*******************************************************************************************************/
+
+void channelCloseAt (CHAN *c, int nGet)
+{
+  if (c && nGet >= 0)
+    {
+      pthread_mutex_lock (&(c->c.mutex)) ;
+      if (c->c.debug)
+	fprintf (stderr, "channel %s received close at %d current nGet=%d p1=%d put2=%d\n"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 , nGet, c->c.nGet, c->c.nPut1, c->c.nPut2
+		 ) ;
+      if (c && ! c->c.isClosed && c->c.nPut1 >= nGet)
+	{
+	  c->c.isClosed = TRUE ;
+	  if (c->c.debug)
+	    fprintf (stderr, " - Closing channel %s\n"
+		     , c->c.title[0] ? c->c.title : "no-name"
+		     ) ;
 	  pthread_cond_signal(&(c->c.notEmpty)) ;
 	}
       pthread_mutex_unlock (&(c->c.mutex)) ;
@@ -332,7 +377,6 @@ int uChannelMultiPut (CHAN *c, void *vp, int size, int max, BOOL wait)
     pthread_mutex_lock (&(c->c.mutex)) ;
 
   /* we always keep one slot empty in the circle otherwise at init time we would not be able to put */ 
-  c->c.nPut1 += max ;
   while (((c->c.in + 1) % c->c.cMax) == c->c.out && rc == 0)  /* the chammel is full */
     {
       if (! wait)  /* return FALSE immediatly */
@@ -350,6 +394,7 @@ int uChannelMultiPut (CHAN *c, void *vp, int size, int max, BOOL wait)
     }
 
   	  /* actual work */
+  c->c.nPut1 += max ;
   while (max-- && ((c->c.in + 1) % c->c.cMax) != c->c.out)
      {
        memcpy (c->vp + c->c.size * c->c.in, vp + nn * c->c.size, size) ;

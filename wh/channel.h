@@ -138,6 +138,25 @@
              {
              }
           print "channel c is closed, all records have been analyzed" ;
+ *
+ *  Parallel agents: In case several agents perform the same task in parallel.
+ *  If two or more agents a1, a2, ... consume in parallel the records exported by channel inChannel
+ *  At some point one of them, say a2, receive a inChannel isClosed message, while a1 is still running
+ *  If a2 closes its outChannel, a1 will not be able to export to outChannel and data are lost
+ *  The solution is to use conditional closing, to insure that outChannel will accept all packets
+ *  emitted by inChannel before closing
+       Example 6:
+         In each agent a1, a2, ...
+           while (channelGet (inChannel, ...)
+             {
+             }
+     // number of records processed by inChannel before closure 
+	   int n = channelCount (inChannel) ;
+     // close outChannel, but only if it has received n records 
+           channelCloseAt (outChannel, n) ;
+     // This way, only the last running agent will actually close the  outChannel
+
+
  * DESTRUCTION
  * To destroy a channel and recover the associated memory, call ac_free on c or h
  *     Example 7 :
@@ -245,6 +264,10 @@ BOOL channelSelect (CHAN **ccc) ; /* ccc is a zero terminated list of channels
 				  */
 void channelClose (CHAN *c) ;
 void channelDebug (CHAN *c, int debug, char *title) ; 
+
+int  channelCount (CHAN *c) ;  /* number of records received by channel c, negative is channel is still open */
+void channelCloseAt (CHAN *c, int nGet) ;  /* close but only if the channel has already received nGet packets */
+
 
 void channelTest (int nn) ; /* This function should print on stdout the numbers 0, 1,2, 3... up to min(9,nn) */
 

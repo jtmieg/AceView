@@ -247,10 +247,12 @@ if ($gtf_active == 1 || ! -e tmp/METADATA/mrnaRemap.gz) then
   echo "---- processing mrnaRemap coordinates informations"
 
   foreach target ($allRNAtargets)
+    echo ' ' > tmp/METADATA/$target.MRNA.info.ace
     if (-e tmp/METADATA/gtf.$target.gene2intMap.txt) then 
        # derived from the gtf file
        if (-e tmp/METADATA/gtf.$target.transcripts.ace.gz) then
-	 zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{s=$2;next;}/^Title/{printf("Sequence %s\nTitle %s\n\n",s, substr($0,7));}' >>  tmp/METADATA/$target.MRNA.info.ace
+	 zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^Sequence/{s=$2;next;}/^Title/{printf("Sequence %s\nTitle %s\n\n",s, substr($0,7));}/^LocusLink/{printf("Sequence %s\n",s);print;printf("\n");}' >>  tmp/METADATA/$target.MRNA.info.ace
+         echo ' ' | gzip >! tmp/METADATA/toto.gz 
 	 zcat tmp/METADATA/gtf.$target.transcripts.ace.gz | gawk '/^$/{out=1;intron=0;next;}/^Intron/{if(out==1){out=0;intron=$2;}next;}/^Gene/{if(intron!=0){printf("Intron %s\nGene %s\n\n",intron, substr($0,5));}}' | gzip >   tmp/METADATA/toto.gz 
          zcat tmp/METADATA/gtf.$target.gene_title.ace.gz ZZZZZ.gz  tmp/METADATA/toto.gz | gawk '/^ZZZZZ/{zz=1;next;}/^$/{intron=0;gene=0;title=0;next;}/^Gene /{gene=$2;gsub(/\"/,"",gene);if(intron==1){print;if(length(g2t[gene])>0)printf("Title %s\n",g2t[gene]);}}/^Title/{title=substr($0,6);if(zz<1 && gene!=0){g2t[gene]=title;next;}}/^Intron/{printf("\n");print;intron=1;gsub(/\"/,"",$2);n1=split($2,aa,"__");n2=split(aa[2],bb,"_");if(n1+n2==4)printf("IntMap %s %s %s\n",aa[1],bb[1],bb[2]);}'  > tmp/METADATA/$target.introns.info.ace
          \rm   tmp/METADATA/toto.gz 
@@ -262,6 +264,7 @@ if ($gtf_active == 1 || ! -e tmp/METADATA/mrnaRemap.gz) then
        echo ' ' >> tmp/METADATA/$target.GENE.info.ace
        cat tmp/METADATA/gtf.$target.gene2intMap.txt | gawk -F '\t' '/^#/{next;}{if(length($1)>0)printf("Gene \"%s\"\nIntMap \"%s\" %d %d\n\n",$1,$2,$3,$4);}' >>  tmp/METADATA/$target.GENE.info.ace
        cat tmp/METADATA/gtf.$target.mrna2intMap.txt | gawk -F '\t' '/^#/{next;}{if(length($1)>0)printf("mRNA \"%s\"\nIntMap \"%s\" %d %d\n\n",$1,$2,$3,$4);}' >>  tmp/METADATA/$target.MRNA.info.ace
+        cat tmp/METADATA/$target.MRNA.info.ace | gawk '/^Sequence /{s=$2;ss[s]=1;next;}/^LocusLink/{LL[s]=$2;next;}/^Title/{tt[s]=substr($0,8);next;}END{for(s in ss){printf("%s\t%s\t%s\n",s,LL[s],tt[s])}}' | sed -e 's/\"//g' > tmp/METADATA/$target.symbol.title.txt
     else
        # backwards compatibility with hand prepared files
        if (-e  TARGET/GENES/$target.gene2intmap.ace) then

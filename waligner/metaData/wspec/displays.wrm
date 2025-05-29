@@ -82,7 +82,7 @@ _DDtQueryBuilder   -g TEXT_SCROLL -t "Query, by Gary Aochi" -w .73  -height 0.35
 
 _DDtQueryByExample   -g TEXT_SCROLL -t "Query by Example" -w .55  -height 0.35 -help Query_By_Example
 
-_DDtSpreadSheet   -g TEXT_FULL_SCROLL -t "Table_Maker" -w .90  -height 0.75 -help Table_Maker
+_DDtSpreadSheet   -g TEXT_FULL_SCROLL -t "Table_Maker" -w 1.05  -height 0.85 -help Table_Maker
 
 _DDtBql   -g TEXT_FULL_SCROLL -t "BQL table queries" -w .90  -height 0.75 -help Bql
 
