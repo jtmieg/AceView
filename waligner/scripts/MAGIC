@@ -11,6 +11,12 @@
 # qstat -u '*' | gawk '{n[$4]++}END{for(k in n) printf ("%d\t%s\n",n[k],k);}' | $tab_sort -k 1n
 
 # cat scripts/MAGIC | gawk -f scripts/csh.beautifier.awk >! scripts/MAGIC.beau
+
+#set ff=`ls Fastc/RNA_AGLR1_B_1.*/*.fastc.gz | head -32 | gawk '{printf("%s,",$1);}'`
+#numactl --cpunodebind=0 --membind=0 bin/sortalign -x HSA.16.step5 -i $ff --align --nB 50 --nA 25 -o tatouN.16.step5 --max_threads 256
+
+
+
 ############################################################################################
 # Master script for short sequence alignments
 #  Author: mieg@ncbi.nlm.nih.gov
@@ -1059,6 +1065,8 @@ if ($phase == a0Bur) goto phasea0Bur
 if ($phase == a0S) goto phasea0S
 if ($phase == a123) goto phasea123
 
+if ($phase == sali) goto phasesali
+
 if ($phase == ali_clean_up) goto phaseali_clean_up
 
 # NTM 25/03/2013: phasea4 is obsolete, goto stays as a place holder
@@ -1136,6 +1144,7 @@ if ($phase == I3) goto phaseI3
 if ($phase == I4) goto phaseI4
 if ($phase == I5) goto phaseI5
 if ($phase == I6) goto phaseI6
+if ($phase == I7) goto phaseI7
 
 if ($phase == d0) goto phased0
 if ($phase == d1) goto phased1
@@ -1408,6 +1417,8 @@ echo '    ali_clean_up: remove all alignment files if an error is reported in tm
 echo '    a5: evaluate the bar code statistics'
 echo '    a6: evaluate the fastq quality coefficients'
 # echo "CleanBowtie: rm the HITS_../bowtie hits that have been transferred to PHITS_off0"
+
+echo '    sali: sortalign 2025'
 
 echo "c1:    export job CPU and statistics"
 echo "c2:    export the alignment statistics to the acedb deep MetaDB database"
@@ -1690,7 +1701,7 @@ if ($species == hs_37) then
   set refG=hs_ref_GRCh37.p13
   set refS=H_sapiens
 endif
-# human T2T mars then oct 2023
+# human T2T mars then oct 2023/june 2025 (in 2025 we replace chr3|NC... by chr3
 if ($species == hs) then
   set t2t=/am/ftp-genomes/all/annotation_releases/9606/GCF_009914755.1-RS_2023_03/
   set ref=T2T-CHM13v2
@@ -1790,12 +1801,13 @@ endif
 
 ### in human 2023 T2T the genome contains 1-22,X,Y named as
 # NC_060926.1 to 960948.1 in that order
-# we add chr..| in from of the NC/NT names: e.g: chr22|NC_000946.1
+# we add chr.._ in from of the NC/NT names: e.g: chr22_NC_000946.1
 
 if ($species == hs) then
   # grab the title lines 
   zcat $refGfna | gawk '/^>/{print}' > _t
-  cat _t | gawk '{split($1,aa,">");split($7,bb,",");printf("%s\tchr%s|%s\n",aa[2],bb[1],aa[2]);}'  > NC2chr.rename.txt
+#  cat _t | gawk '{split($1,aa,">");split($7,bb,",");printf("%s\tchr%s_%s\n",aa[2],bb[1],aa[2]);}'  > NC2chr.rename.txt
+  cat _t | gawk '{split($1,aa,">");split($7,bb,",");printf("%s\tchr%s.T2T.%s\n",aa[2],bb[1],aa[2]);}'  > NC2chr.rename.txt
 endif
 
 ###  in tardigrade RvYokozuna
@@ -1836,28 +1848,38 @@ if ($species == dog) then
 endif
 
 ## rename all the elements of the genome fasta file as chr*  
-# simplified for T2T and  ghs37.105 where we keep  chr7|NC007.7  
+# BAD simplified for T2T and  ghs37.105 where we keep  chr7|NC007.7  because chrm names containing a | cannot be used as directory names
 echo ZZZZZ > ZZZZZ
 echo ZZZZZ | gzip > ZZZZZ.gz
 #cat  NC2chr.rename.txt ZZZZZ $refG.fa | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,"|");x=nam[aa[4]];ok=0;if(length(x)>1)ok=1;if(ok==1)printf(">%s %s\n",x,substr($0,2));next;}{if(ok==1)print}' > $species.genome.$ref.fasta
 #cat  NC2chr.rename.txt ZZZZZ $refG.fa | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,"|");x=nam[aa[4]];ok=1;if(length(x)>1)ok=0;x=aa[4];if(ok==1)printf(">%s %s\n",x,substr($0,2));next;}{if(ok==1)print}' > $species.genome.$ref.unc.fasta
-# cat  NC2chr.rename.txt ZZZZZ $refG.fa | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,">");x=nam[aa[2]];ok=0;if(length(x)>1)ok=1;if(ok==1){$1=">"x; print;}next;}{if(ok==1)print}' > $species.genome.$ref.fasta
+#cat  NC2chr.rename.txt ZZZZZ $refG.fa | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,">");x=nam[aa[2]];ok=0;if(length(x)>1)ok=1;if(ok==1){$1=">"x; print;}next;}{if(ok==1)print}' > $species.genome.$ref.fasta
 # T2T
 gzip  NC2chr.rename.txt
 zcat  NC2chr.rename.txt.gz ZZZZZ.gz $refGfna | gawk '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}/^>/{split($1,aa,">");x=nam[aa[2]];ok=0;if(length(x)>1)ok=1;if(ok==1){$1=">"x; print;}next;}{if(ok==1)print}' > $species.genome.$refG.fasta
 ## rename the source sequences in the gff files as chr*
 #gunzip -c  /am/ftp-genomes/$refS/GFF/$ref'_'top_level.gff3.gz > _t.gff3
-zcat $t2t/*.gff.gz | grep -v RefSeqFE > _t.gff3
+#zcat $t2t/*.gff.gz | grep -v RefSeqFE > _t.gff3
+zcat $t2t/*.gtf.gz  > _t.gtf
 gunzip NC2chr.rename.txt.gz
-cat  NC2chr.rename.txt ZZZZZ _t.gff3  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}{if(length(nam[$1]) < 1)next;printf("%s",nam[$1]);for(i=2;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > $species.RefSeq.$ref.gff3
+#cat  NC2chr.rename.txt ZZZZZ _t.gff3  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}{if(length(nam[$1]) < 1)next;printf("%s",nam[$1]);for(i=2;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > $species.RefSeq.$ref.gff3
+cat  NC2chr.rename.txt ZZZZZ _t.gtf  | gawk -F '\t' '/^ZZZZZ/{zz=1;next;}{if(zz<1){nam[$1]=$2;next;}}{if(length(nam[$1]) < 1)next;printf("%s",nam[$1]);for(i=2;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > $species.RefSeq.$ref.gtf
 
 \rm _t
+\rm _t.gtf
 \rm _t.gff3
-# gtf
-# use the gff3 file to export the .ace annotation, done again in metadata.tcsh and the fasta of the transcripts
+# gtf use the gtf file to export the .ace annotation, done again in metadata.tcsh and the fasta of the transcripts
+# use the gff3 file leads to multiple errors
 # Run on lmem12 (large RAM)
-dna2dna -gff3  $species.RefSeq.$ref.gff3 -o $species.RefSeq.$ref -O fasta -gzo -gtfGenome  $species.genome.$ref.fasta  -gtfRemap KT_RefSeq
-dna2dna -gff3  $species.RefSeq.$ref.unc.gff3 -o $species.RefSeq.$ref.unc  -O fasta -gzo -gtfGenome  $species.genome.$ref.unc.fasta  -gtfRemap KT_RefSeq
+# The direct construction of the fasta file from the gff3 (-O fasta) is bugged, from gtf is ok, we also reconstruct it from the acedb database below
+dna2dna -gtf  $species.RefSeq.$ref.gtf -o $species.RefSeq.$ref  -gzo -gtfGenome  $species.genome.$ref.fasta.gz  -gtfRemap KT_RefSeq
+#dna2dna -gff3  $species.RefSeq.$ref.gff3 -o $species.RefSeq.$ref  -gzo -gtfGenome  $species.genome.$ref.fasta.gz  -gtfRemap KT_RefSeq
+
+zcat $species.RefSeq.$ref.fasta.gz | gawk '/gene-/{next;}/id-/{next;}/^>/{split(substr($1,2),aa,"|");s=aa[1];gene=aa[3];gid=aa[5];printf("Gene %s\nGenefinder %s\n", gene, s);if(length(gid)>0)printf("GeneId %s\n", gid);printf("\n");}' > $species.RefSeq.$ref.g2gid2nm.ace
+zcat $species.RefSeq.$ref.fasta.gz | gawk '/gene-/{next;}/id-/{next;}/^>/{split(substr($1,2),aa,"|");s=aa[1];gene=aa[3];gid=aa[5];printf("-R Sequence %s %s\n\n", s,substr($1,2)) ; printf("-R DNA %s %s\n\n", s,substr($1,2)) ;}' > $species.RefSeq.$ref.nmAlias.ace
+
+
+
 
 cat $species.genome.$ref.fasta | gawk '/^>/{ok=0;}/^>mito/{ok=1;}{if(ok==1)print}' > $species.mito.$ref.fasta
 cat $species.genome.$ref.fasta | gawk '/^>/{ok=1;}/^>mito/{ok=0;}{if(ok==1)print}' > $species.chroms.$ref.fasta
@@ -1873,16 +1895,7 @@ EOF
   cat  toto.bql.dna | gawk '{printf (">%s|GENE|%s\n%s\n",$3,$1,$4);}' | gzip > worm.av.fasta.gz
 endif
 
-set ff=$species.RefSeq.$ref.fasta
-mv $ff.gz $ff.unsorted.gz
-dna2dna -i $ff.unsorted.gz -O raw -keepName  | grep -v pseudogene | gawk '{split($2,aa,"|") ;split(aa[1],bb,"_");printf("%s\t%s\t%s\t%s\t",aa[3],aa[5],bb[1],bb[2]);print;}' | sort -V  > toto
-echo ZZZZZ > ZZZZZ
-cat toto ZZZZZ toto  | gawk -F '\t' '/^ZZZZZ/{zz++;next;}{if(zz<1){if ($2 != gid[$1])ngid[$1]++;gid[$1]=$2;next;}}{g=$1;if(ngid[$1]>1)g=$1 "." $2; split($6,aa,"|");printf("%s\t%s|Gene|%s|geneId|%s\n",$5,aa[1],g,$2);}' > toto2
-
-cat toto2 | dna2dna -I raw -O fasta -keepName -maxLineLn 60 | gzip > $ff.gz
-\rm  toto2 $ff.unsorted.gz
-
-# create an acedb to verify graphically
+# create an acedb to verify graphically and to recover correctly the fasta file of the transcripts
 if (! -e database) then
   mkdir database
   ln -s ~/ace/waligner/metaData/wspec.aceview_web_site wspec
@@ -1890,37 +1903,78 @@ if (! -e database) then
 endif
 tbly . <<EOF
   parse /home/mieg/ace/waligner/metaData/methods.ace
-  parse $species.genome.$ref.fasta
+  parse $species.genome.$ref.fasta.gz
   parse $species.RefSeq.$ref.transcripts.ace.gz
-  acembly
-    cluster_pg
-    quit
+  parse $species.RefSeq.$ref.g2gid2nm.ace
+  query find gene intron
+  // edit -D intron
+  // parse $species.RefSeq.$ref.nmAlias.ace
+  find sequence id-*
+  spush
+  find sequence gene-*
+  sor
+  spop
+  spush
+  follow dna
+  sor
+  spop
+  kill
+  save
+  query find predicted_gene model_of
+  bql -o pg2g.txt select pg,m from pg in @, m in pg->model_of
   save
   quit
 EOF
+cat pg2g.txt | gawk '{printf("Sequence %s\nLocusLink %s\n\n", $1, substr($2,4));}' > pg2g.ace
+# cat pg2g.txt | gawk '{printf("-R Sequence %s %s|Gene|%s\n\n", $1, $1,  substr($2,4));}' > pg2g.rename.ace
+tace . <<EOF
+  parse pg2g.ace
+  // parse pg2g.rename.ace
+  save
+  date
+  query  find predicted_gene
+  dna -o main.RefSeq.fasta
+  date
+  quit
+EOF
 
-mkdir TARGET.$refG
-mkdir TARGET.$refG/Targets
-mkdir TARGET.$refG/GTF
-mkdir TARGET.$refG/CHROMS
-gzip $species.RefSeq.$ref.gff3  
-gzip $species.genome.$ref.fasta
-mv  $species.RefSeq.$ref.gff3.gz  TARGET.$refG/GTF
-mv  $species.RefSeq.$ref.fasta.gz TARGET.$refG/Targets
-mv  $species.genome.$ref.fasta.gz  TARGET.$refG/Targets
-gzip hs.mito.$ref.fasta
-mv hs.mito.$ref.fasta.gz  TARGET.$refG/Targets
+# cat  mrnas.txt | gawk -F '\t' '{gsub(/^X__/,"",$1);printf(">%s|Gene|%s\n%s\n",$2,$1,$3);}' | gzip  > $species.RefSeq.fasta.gz
+date
 
-pushd  TARGET.$refG/GTF ; 
-  ln -s  $species.RefSeq.$ref.gff3.gz  $species.RefSeq.gff.gz 
-popd
+set ff=$species.RefSeq.fasta
+\rm $ff.gz
+cat main.RefSeq.fasta other.RefSeq.fasta | dna2dna -I fasta -O raw -keepName  | gawk '{split($2,aa,"|") ;printf("%s\t%s\t",aa[3],aa[1]);print;}' | tab_sort | cut -f 3,4 | dna2dna -I raw -O fasta -keepName | gzip > $ff.gz
+
+# form here: to be verified after human T2T june 25 2026
+
+if (0) then
+  mkdir TARGET.$refG
+  mkdir TARGET.$refG/Targets
+  mkdir TARGET.$refG/GTF
+  mkdir TARGET.$refG/CHROMS
+  gzip $species.RefSeq.$ref.gff3  
+  gzip $species.genome.$ref.fasta
+  mv  $species.RefSeq.$ref.gff3.gz  TARGET.$refG/GTF
+  mv  $species.RefSeq.$ref.fasta.gz TARGET.$refG/Targets
+  mv  $species.genome.$ref.fasta.gz  TARGET.$refG/Targets
+  gzip hs.mito.$ref.fasta
+  mv hs.mito.$ref.fasta.gz  TARGET.$refG/Targets
+
+  pushd  TARGET.$refG/GTF ; 
+    ln -s  $species.RefSeq.$ref.gff3.gz  $species.RefSeq.gff.gz 
+  popd
+endif
+  
+cat NC2chr.rename.txt | gawk '{x=x " " $2;}END{printf("setenv chromSetAll \"%s\"\n", x);}' > LIMITS.chromSetAll
+source LIMITS.chromSetAll
+
 pushd TARGET.$refG/Targets 
-  ln -s  $species.RefSeq.$ref.fasta.gz  $species.RefSeq.fasta.gz 
+  ln -s  ../GTF/$species.RefSeq.fasta.gz 
   ln -s  $species.genome.$ref.fasta.gz  $species.genome.fasta.gz 
-  zcat   $species.genome.fasta.gz | gawk '/^>/{x=substr($1,2);split(x,aa,".");x=aa[1];split(x,aa,"_");out= species ".chrom_" aa[1] ".fasta";}{print > out}' species=$species
+  zcat   $species.genome.fasta.gz | gawk '/^>/{chrom=substr($1,2);out= species ".chrom_" chrom ".fasta";}{print > out}' species=$species
   foreach chrom ($chromSetAll)
     echo $chrom
-    mv $species.chrom_$chrom'|NC'.fasta $species.chrom_$chrom.fasta
+   # mv $species.chrom_$chrom.fasta $species.chrom_$chrom.fasta
   end
   if (-e $species.genome.fasta) \rm $species.genome.fasta
   foreach chrom ($chromSetAll)
@@ -3599,6 +3653,65 @@ cat tmp/QUAL/Rhs444.2.coord_with_error_at_72.profile.txt ZZZZZ tmp/QUAL/Rhs444.2
 
 cat tmp/QUAL/Rhs444.1.coord_with_error_at_62.profile.txt ZZZZZ tmp/QUAL/Rhs444.1.coord_no_error_at_62.profile.txt | gawk 'BEGIN{zz=0;}/^ZZZZZ/{zz=1;next;}/^72/{old=0;for(q=2;q<=42;q++){n[q-2,zz]=old - $q ; old = $q ;}}END{printf("Quality\tFalse at %d\tExact at %d\tTotal at %d\t%%false at %d\t-10 log(f/t)",pos,pos,poss,pos);for(q=2;q<=40;q++){printf("\n%d",q);bad=n[q,0];good=n[q,1];tot=bad+good;tot2=tot;if(tot2==0)tot2=1;f=bad/tot2;z=0;if(f>0)z=-10*log(f)/log(10);printf("\t%d\t%d\t%d\t%.2f\t%.2f",bad,good,tot,100*f,z);}printf("\n");}' pos=62
 
+###################################################################################
+###################################################################################
+## phase sali 
+## sortalign 2025
+
+phasesali:
+
+if ($USEMAGICBLAST == 1) then
+  if (! -x bin/sortalign) then
+    echo "missing program bin/sortalign"
+    exit 1
+  endif
+endif
+
+if (! -d tmp/SortAlign)  mkdir tmp/SortAlign
+
+# the RefSeq and other Transcripts models are not included
+# the known introns should be included
+set tConfig tmp/SortAlign/tConfig
+if (! -d tmp/SortAlign/targetIndex) then
+  echo -n '#' > $tConfig
+  date >> $tConfig
+  foreach target ($targets)
+    if ($target == SpikeIn)     echo "S TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == DNASpikeIn)  echo "D TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == rrna)        echo "R TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == mito)        echo "M TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == chloro)      echo "C TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == genome)      echo "G TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == virus)       echo "V TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == bacteria)    echo "B TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+  end
+
+  bin/sortalign -T $tConfig --createIndex  tmp/SortAlign/targetIndex
+endif
+
+
+foreach run (`cat MetaDB/$MAGIC/RunList`)
+  if (! -e Fastc/$run/fastc.count.ace) then
+    echo "Fastc/$run/fastc.count.ace missinng"
+    echo "Please run phase a0C"
+    exit 1
+  endif
+
+ 
+  if (! -d tmp/SortAlign/$run) then
+    $mkDir SortAlign  $run
+  endif
+
+  if (-e tmp/SortAlign/$run/sali.done)  continue
+    set ok=1
+
+
+
+    
+  scripts/sortali.tch $tConfig $run
+ end
+ goto phaseLoop
+
 ###############################################################
 ###############################################################
 
@@ -5138,12 +5251,15 @@ end
 if (! -e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) then
   if ($ok == 0) scripts/submit wait
   gunzip -c tmp/TSNP_DB/zone*/$MAGIC.tsnp3.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | gawk -F '\t' '/^#/{next;}{print;}' | sort > tmp/TSNP_DB/toto.tsf.$$
+  # add markers otherwise we lose the last object
+  echo "TYPE__\nProtein_changing__\nGenomic__" >> tmp/TSNP_DB/toto.tsf.$$
   cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/TYPE__/{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n-D SNP_Profile\n",old);} i=index($2,"TYPE__");printf("SNP_Profile f1 %s %d\n", substr($2,i+6), $4);next;}END{printf("\n");}' > tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
   cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/Protein_changing__/{if ($1 != old){if (old) printf ("Ali \"%s\"\nProtein_changing %d sites %d Reference %s Low %d Mid %d High %d Pure\n\n",old,nn,n[0],n[1],n[2],n[3],n[4]);nn=0;n[0]=0;n[1]=0;n[2]=0;n[3]=0;n[4]=0;old=$1} i=index($2,"__");k=substr($2,i+2)+0;n[k]=$4+0;nn=nn+$4;next;}END{printf("\n");}' >> tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
   cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/Genomic__/{if ($1 != old){if (old) printf ("Ali \"%s\"\nGenomic %d sites %d Reference %s Low %d Mid %d High %d Pure\n\n",old,nn,n[0],n[1],n[2],n[3],n[4]);nn=0;n[0]=0;n[1]=0;n[2]=0;n[3]=0;n[4]=0;old=$1} i=index($2,"__");k=substr($2,i+2)+0;n[k]=$4+0;nn=nn+$4;next;}' >> tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
-  cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/TYPE__/{next;}/Protein_changing__/{next;}/Genomic__/{next;}/Measurable/{next;}{if ($1 != old){old = $1; printf ("\nAli \"%s\"\n",old);}printf("%s %d\n", $2, $4);next;}END{printf("\n");}' >> tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
+  cat  tmp/TSNP_DB/toto.tsf.$$ | gawk -F '\t' '/TYPE__/{next;}/Protein_changing__/{next;}/Genomic__/{next;}/Measurable/{next;}{printf ("\nAli \"%s\"\n",$1);}printf("%s %d\n", $2, $4);next;}END{printf("\n");}' >> tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
   gzip  -f tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace
   \rm  tmp/TSNP_DB/toto.tsf.$$
+  \rm  tmp/TSNP_DB/toto.tsf1.$$
   echo "pparse tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz" | bin/tacembly MetaDB -noprompt
 endif
 
@@ -9345,13 +9461,18 @@ phasewg4b:
  echo -n "Phase wg4b compute the ETargets genebox coverage "
  date
 
-foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupWiggleList`)
+ set capts=noCapture
+ if ($?CAPTURES) then
+   set capts="noCapture $CAPTURES"
+ endif
+
+ foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupWiggleList`)
   foreach WG (WIGGLERUN WIGGLEGROUP)
     if (! -d tmp/$WG/$run) continue
     foreach target ($Etargets)
       set spongeF=tmp/METADATA/gtf.$target.f.sponge.gz
       if (! -e $spongeF) continue
-      foreach capture (noCapture $CAPTURES)
+      foreach capture ($capts)
         set tt=tmp/$WG/$run/$target.$capture.tsf
         if (-e $tt) then
 	  set n=`wc $tt | gawk '{print $1;}'`
@@ -10592,7 +10713,7 @@ goto phaseLoop
 
 phaseI3:
 
- echo -n "Phase I3 donor/accepptor de_uno supports "
+ echo -n "Phase I3 donor/acceptor de_uno supports "
  date
 
 if ($Strategy != RNA_seq) goto phaseLoop

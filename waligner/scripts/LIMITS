@@ -195,7 +195,7 @@ setenv wiggle_step 10
 ## the CAPTURES variable should be edited in TARGET/LIMITS 
 ## or preferably in ./LIMITS
 
-setenv CAPTURES ""
+unsetenv CAPTURES ""
 
 ##############################################################
 ##############################################################

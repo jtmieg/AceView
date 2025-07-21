@@ -5621,18 +5621,11 @@ static void qcCandidateIntrons (QC *qc, RC *rc)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
-    
-    
     { "Candidate__introns", "Supported %s exon-exon junctions\t\t", 3, 0, 0 },
-    
-    { "Candidate__introns", "%% %s exon-exon junctions with support\t\t", 11, 0, 0 },
-
+    { "Candidate__introns", "%% %s exon-exon junctions with support\t\t", 9, 0, 0 },
     { "Candidate__introns", "Number of support for %s exon-exon junctions\t\t", 13, 0, 0 },
-    
-    { "Candidate__introns", "Average support of %s exon-exon junctions\t\t", 113, 0, 0 },
-    
+    { "Candidate__introns", "Average support of %s exon-exon junctions\t\t", 1000, 0, 0 },
     { "Candidate_introns", "Candidate new exon-exon junctions", 5, 0, 0 },
-    
     { "Candidate_introns", "Minimal support for new exon-exon junctions", 17, 0, 0 },
     {  0, 0, 0, 0, 0}
   }; 
@@ -5691,12 +5684,12 @@ static void qcCandidateIntrons (QC *qc, RC *rc)
 		  for (ir = 0 ; ir < ttCI->rows ; ir++)
 		    if (! strcasecmp (target, ac_table_printable (ttCI, ir, 0, "xxx"))) 
 		      {
-			if (ti->col > 100)
+			if (ti->col == 1000)
 			  {
-			    float u17 = ac_table_float (ttCI, ir, ti->col - 100, 0) ;
-			    int u05 = ac_table_int (ttCI, ir,  ti->col - 110, 1) ;
-			    if (u05 == 0) u05 = 1 ;
-			    aceOutf (qc->ao, "%.1f", u17/u05) ;
+			    float u13 = ac_table_float (ttCI, ir, 13, 0) ;
+			    int u3 = ac_table_int (ttCI, ir,  3, 1) ;
+			    if (u3 == 0) u3 = 1 ;
+			    aceOutf (qc->ao, "%.1f", u13/u3) ;
 			  }
 			else
 			  aceOut (qc->ao, ac_table_printable (ttCI, ir, ti->col, EMPTY)) ;
@@ -5718,9 +5711,7 @@ static void qcCandidateIntrons (QC *qc, RC *rc)
 		{
 		  for (ir = 0 ; ir < ttCI->rows ; ir++)
 		    if (! strcmp (target, ac_table_printable (ttCI, ir, 0, "xxx"))) 
-		      {
-			aceOut (qc->ao, ac_table_printable (ttCI, ir, ti->col, EMPTY)) ;
-		      }
+		      aceOut (qc->ao, ac_table_printable (ttCI, ir, ti->col, EMPTY)) ;
 		}
 	    }	
 	}
@@ -6526,7 +6517,7 @@ static void qcDrosoZhenXia (QC *qc, RC *rc)
 #endif /* JUNK */
 
 /*************************************************************************************/
-
+/* i: qcMicroRNA not activated */
 static const char *allMethods = "R0S1234HE5UWV9zKBFTPbCifmpAdMsr7DgIX8Lv" ;
 static MM methods [] = {
   {'R', &qcRunSelection} ,

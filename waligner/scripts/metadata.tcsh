@@ -1,5 +1,4 @@
 #!bin/tcsh -f
-
 # Create in a lazy way all needed metadafiles
 # in order to minimize the number of files needed in TARGET
 
@@ -130,7 +129,7 @@ foreach target ($allRNAtargets)
       (bin/dna2dna -gff3 TARGET/GTF/$species.$target.gff.Bacteria.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target ) >& tmp/METADATA/gtf.$target.err
       \rm tmp/METADATA/gtf.$target.*gz
       gzip  -f tmp/METADATA/gtf.$target.*
-    else if (-e TARGET/GTF/$species.$target.gff.gz) then
+    else if (0 && -e TARGET/GTF/$species.$target.gff.gz) then
       (bin/dna2dna -gff3 TARGET/GTF/$species.$target.gff.gz  -gtfRemap $target_class  -o tmp/METADATA/gtf.$target ) >& tmp/METADATA/gtf.$target.err
       \rm tmp/METADATA/gtf.$target.*gz
       gzip  -f tmp/METADATA/gtf.$target.*
@@ -205,6 +204,7 @@ end
 if (1) then
 foreach target ($Etargets)
   # restrict the genebox sponge to the capture
+  if (! $?CAPTURES) continue
   foreach capture ($CAPTURES)
     if (! -e TARGET/GENES/$capture.capture.$target.gene_list) continue
     wc  TARGET/GENES/$capture.capture.$target.gene_list

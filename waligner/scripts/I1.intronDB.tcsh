@@ -20,6 +20,7 @@ if ($phase == setDAsupport) goto setDAsupport
 if ($phase == setSponge) goto setSponge
 if ($phase == setGroups) goto setGroups
 if ($phase == intronCounts) goto intronCounts
+if ($phase == altIntrons) goto altIntrons
 
 if ($phase == deDuo) goto deDuo
 if ($phase == collate) goto collate
@@ -58,11 +59,12 @@ date
 
 if (! -e tmp/INTRON_DB/$chrom/I1.parse_genome.done) then
   pushd tmp/INTRON_DB/$chrom
+    zcat ../../../TARGET/CHROMS/$species.chrom_$chrom.fasta.gz | gawk '/^>/{split($1,aa,"|");print aa[1] ;next;}{print}' | gzip > chrom_$chrom.fasta.gz
     ../../../bin/tace . <<EOF
-      parse ../../../TARGET/CHROMS/$species.chrom_$chrom.fasta.gz
+      parse chrom_$chrom.fasta.gz
       find sequence $chrom
       edit genomic
-      parse ../../../TARGET/CHROMS/$species.mito.fasta.gz
+      parse ../../../TARGET/Targets/$species.mito.fasta.gz
       save
       quit
 EOF
@@ -83,7 +85,7 @@ date
 # parse in INTRON_DB/$chrom the introns/genes/mRNA/chromosomes
 
 if (! -e tmp/INTRON_DB/$chrom/I1.parse_genes.done) then  
-  zcat tmp/METADATA/gtf.*.introns.gz | gawk -F '\t' '{type=substr($1,4);c=$6;if(c != chrom)next;i1=$7+0;i2=$8+0;ln=i2-i1;;if(ln<0)ln=-ln; ln=ln+1;printf("Intron %s__%d_%d\nIntMap %s %d %d\nLength %d\n%s\nGene \"%s\"\nIn_mRNA \"%s\" %d %d\n\n",c,i1,i2,c,i1,i2,ln,type,$2,$3,$4,$5);}' chrom=$chrom | gzip >  tmp/INTRON_DB/$chrom/I1.TargetIntrons.ace.gz
+  zcat tmp/METADATA/gtf.*.introns.gz | gawk -F '\t' '{type=substr($1,4);c=$6;split (c,cc,"|") ;c=cc[1];if(c != chrom)next;i1=$7+0;i2=$8+0;ln=i2-i1;;if(ln<0)ln=-ln; ln=ln+1;printf("Intron %s__%d_%d\nIntMap %s %d %d\nLength %d\n%s\nGene \"%s\"\nIn_mRNA \"%s\" %d %d\n\n",c,i1,i2,c,i1,i2,ln,type,$2,$3,$4,$5);}' chrom=$chrom | gzip >  tmp/INTRON_DB/$chrom/I1.TargetIntrons.ace.gz
   pushd tmp/INTRON_DB/$chrom
     ../../../bin/tace . <<EOF
       read-models
@@ -120,7 +122,7 @@ foreach run1 (`cat MetaDB/$MAGIC/RunList`)
   if ($USEMAGICBLAST == 1) then
     zcat tmp/MAGICBLAST/$run1/f2.*.introns.tsf.gz | bin/tsf -s $run2 --merge | gawk -F '\t' '{split($1,aa,"__");c=aa[1];if (c != chrom) next;plit(aa[2],bb,"_");a2=bb[1];b1=bb[2];if(a2<b1){strand="Forward";a2--;a1=a2-12;b1++;b2=b1+10;ln=b1-a2-1;}else{strand="Reverse";a2++;a1=a2+10;b1--;b2=b1-10;ln=a2-b1-1;}nr=$4;feet=$7;if(nr>0)printf("INTRON\t%s\t%s\t%09d\t%09d\t%s\t%09d\t%09d\t%s\t%d\t%d\t%d\n",strand,chrom,a1,a2,chrom,b1,b2,feet,ln,nr,nperfect);}' chrom=$chom  | sort | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
   else
-    gunzip -c tmp/PHITS_genome/$run1/*.introns.gz  tmp/PHITS_mito/$run1/*.introns.gz  | gawk -F '\t' '/^INTRON/{c=$3;if (c != chrom) next;if ($6 != chrom) next;i1=$5+0;i2=$7+0;if ($2=="Forward"){i1++;i2--;}else {i1--;i2++;}nn=$11; printf("%s__%d_%d\t%d\t%s\n",c,i1,i2,nn,$9);}' chrom=$chrom | gawk -F '\t' '{i=$1;n[i]+=$2;t[i]=$3;}END{for (i in n)printf("%s\t%s\t%d\t%s\n",i,run,n[i],t[i]);}' run=$run2  | sort | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
+    gunzip -c tmp/PHITS_genome/$run1/*.introns.gz  tmp/PHITS_mito/$run1/*.introns.gz  | gawk -F '\t' '/^INTRON/{split($3,cc,"|");c=cc[1];split($6,cc,"|");c2=cc[1];if (c != chrom) next;if (c2 != chrom) next;i1=$5+0;i2=$7+0;if ($2=="Forward"){i1++;i2--;}else {i1--;i2++;}nn=$11; printf("%s__%d_%d\t%d\t%s\n",c,i1,i2,nn,$9);}' chrom=$chrom | gawk -F '\t' '{i=$1;n[i]+=$2;t[i]=$3;}END{for (i in n)printf("%s\t%s\t%d\t%s\n",i,run,n[i],t[i]);}' run=$run2  | sort | gzip > tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz
   endif
 
   zcat tmp/INTRON_DB/$chrom/I2.$run2.deUno.gz >> $ff
@@ -142,6 +144,42 @@ goto phaseLoop
 ########################################################################
 ### parse the intron counts from mRNA alignments
 
+deMrna:
+echo -n "I2 phase $phase start :"
+date
+
+set ok=0
+set f0=tmp/INTRON_DB/$chrom/I2.deMrna
+if (-e $f0) \rm $f0
+foreach run (`cat MetaDB/$MAGIC/RunsList`) 
+  set f1=tmp/INTRON_DB/$chrom/I2.$run.deMrna
+  if (-e $f1.gz) then
+    set ok=`ls -ls $f1.gz | gawk '{print $6}'`
+    if ($ok > 100) continue
+  endif
+  set ff=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz
+  if (! -e $ff) continue 
+  set ok=1
+  zcat $ff | gawk -F '\t' '{split($1,cc,"__"); c = cc[1] ; if(c != chrom) next; print;}' chrom=$chrom > $f1
+  cat $f1 >> $f0
+  gzip -f $f1
+end
+date
+
+if ($ok == 1) then
+  cat $f0 | sort > $f0.sorted
+  date
+  echo "bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC"
+        bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
+  date
+  if (-e  tmp/INTRON_DB/$chrom/I1.setFeet.done) \rm  tmp/INTRON_DB/$chrom/I1.setFeet.done
+  if (-e  tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done)   \rm  tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
+endif
+
+goto phaseLoop
+
+########################################################################
+### clean up
 cleanUp:
 
 \rm _killIntrons
@@ -162,37 +200,6 @@ foreach run (`cat MetaDB/$MAGIC/RunsList`)
   endif
 end
 wc  _killIntrons
-
-deMrna:
-echo -n "I2 phase $phase start :"
-date
-
-set ok=0
-set f0=tmp/INTRON_DB/$chrom/I2.deMrna
-if (-e $f0) \rm $f0
-foreach run (`cat MetaDB/$MAGIC/RunsList`) 
-  set f1=tmp/INTRON_DB/$chrom/I2.$run.deMrna
-  if (-e $f1.gz) then
-    set ok=`ls -ls $f1.gz | gawk '{print $6}'`
-    if ($ok > 100) continue
-  endif
-  set ff=tmp/INTRONRUNS/$run/$run.u.intronSupport.counts.gz
-  if (! -e $ff) continue 
-  set ok=1
-  zcat $ff | gawk  /$chrom'__/{print;}' >> $f1
-  cat $f1 >> $f0
-  gzip -f $f1
-end
-date
-
-if ($ok == 1) then
-  cat $f0 | sort > $f0.sorted
-  date
-  echo "bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC"
-        bin/altintrons --deMrna $f0.sorted --db tmp/INTRON_DB/$chrom -p $MAGIC
-  date
-  if (-e  tmp/INTRON_DB/$chrom/I1.setFeet.done) \rm  tmp/INTRON_DB/$chrom/I1.setFeet.done
-endif
 
 goto phaseLoop
 

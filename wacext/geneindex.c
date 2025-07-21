@@ -858,7 +858,7 @@ static int gxAceParse (GX *gx, const char* fileName,BOOL metaData)
 		  dc->seqs = count ;
 		  dc->tags = cover ;
 		  dc->kb = count ; /* 2016_02_10 was genotype */
-		  index = 0 + 20.0 * ((float)count)/((float)cover +.0001) ; 
+		  index = 0 + 100.0 * ((float)count)/((float)cover +.0001) ; 
 		  dc->indexMin = dc->indexMax = dc->index = index + 1000 ;
 		  gc->tags++ ; /* to insure the SNP is exported */
 		  gc->isGood = TRUE ;

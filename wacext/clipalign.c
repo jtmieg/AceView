@@ -3946,7 +3946,7 @@ static int clipAlignExportPx (CLIPALIGN *pp, int type)
 
 /*********************************************************************/
 /* hits is  in pExportSamOrder
- * so organized by  read/taget/chain in the orientation of the target 
+ * so organized by  read/target/chain in the orientation of the target 
  * as befits a good Cuban CIGAR
  */
 static char *clipAlignExportOneSamCigar (CLIPALIGN *pp,PEXPORT *px, int di, vTXT cigar, Array cigarettes, Array dnaShort, Array err, int *nErrp, AC_HANDLE h)

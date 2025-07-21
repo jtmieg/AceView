@@ -6657,7 +6657,7 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
 	    }
 	  if ((let = ac_tag_table (Ali, "Partial_3p", h1)))
 	    {
-	      partial3_25 += ac_table_float (let, 0, 0, 0) ;
+	      partial3_15 += ac_table_float (let, 0, 0, 0) ;
 	      partial3_25 += ac_table_float (let, 0, 1, 0) ;
 	    }
 	  if ((let = ac_tag_table (Ali, "Diffuse_mapping", h1)))

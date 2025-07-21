@@ -29,7 +29,7 @@ typedef struct gxStruct {
   BOOL setSponge ;
   BOOL counts ;
   BOOL setGroups ;
-  BOOL hasAltIntron ;
+  BOOL altIntrons ;
   Array runs ;
   Array histos ;
   Array introns ;
@@ -1695,8 +1695,13 @@ static void gxCounts (GX *gx)
 /*************************************************************************************/
 /*************************************************************************************/
 
-static void gxOneAltIntrons (GX *gx)
+static void gxOneAltIntrons (GX *gx, AC_OBJ obj)
 {
+  AC_HANDLE h = ac_new_handle () ;
+  AC_TABLE map = ac_tag_table (obj, "IntMap", h) ;
+  AC_TABLE uno = ac_tag_table (obj, "de_uno", h) ;
+
+  ac_free (h) ;
   return ;
 } /* gxAltIntrons */
 
@@ -1704,7 +1709,18 @@ static void gxOneAltIntrons (GX *gx)
 
 static void gxAltIntrons (GX *gx)
 {
-  gxOneAltIntrons (gx) ;
+  AC_HANDLE h = ac_new_handle () ;
+  AC_ITER iter ;
+  AC_OBJ obj = 0 ;
+  int nn = 0, ir ;
+  ITR itr ;
+  int kMin = 100 ;
+
+  iter = ac_dbquery_iter (gx->db, "Find Intron de_uno", h) ;
+  while (ac_free (obj), (obj = ac_iter_obj (iter)))
+    gxOneAltIntrons (gx, obj) ;
+
+  ac_free (h) ;
   return ;
 } /* gxAltIntrons */
 
@@ -1975,6 +1991,7 @@ int main (int argc, const char **argv)
   gx.setSponge = getCmdLineBool (&argc, argv, "--setSponge") ;
   gx.setGroups = getCmdLineBool (&argc, argv, "--setGroups") ;
   gx.counts = getCmdLineBool (&argc, argv, "--counts") ;
+  gx.altIntrons = getCmdLineBool (&argc, argv, "--altIntrons") ;
   getCmdLineOption (&argc, argv, "--deMrna", &(gx.deMrna)) ;
 
   /* optional arguments */
@@ -2051,6 +2068,13 @@ int main (int argc, const char **argv)
     {
       gxGetRuns (&gx) ;
       gxCounts (&gx) ;
+      ac_db_commit (gx.db) ;
+    }
+  if (gx.altIntrons)
+    {
+      gxGetRuns (&gx) ;
+      if (0)       gxAltIntrons (&gx) ;
+      gxAltIntronsExport (&gx) ;
       ac_db_commit (gx.db) ;
     }
   if (0)

@@ -1018,9 +1018,16 @@ if (1) then
 
 echo LALALA0==================---
   if ($?chrom) then
-    if ($phase == ii4 && ! -e tmp/INTRON_DB/$chrom/d5.$MAGIC.de_uno$CAPT.ace) then
-      echo "Missing file tmp/INTRON_DB/$chrom/d5.$MAGIC.de_uno$CAPT.ace"
-      goto phaseLoop
+    if ($phase == ii4) then
+      bin/tace tmp/INTRON_DB/$chrom <<EOF
+        find run
+	edit -D project
+        pparse MetaDB/$MAGIC/runs.ace
+	save
+        query find intron de_duo
+	bql -o  tmp/INTRON_DB/$chrom/ii4.de_duo.txt select ii,r,n from ii in @, r in ii->de_duo where r->project == "$MAGIC", n in r[1]
+EOF
+      cat tmp/INTRON_DB/$chrom/ii4.de_duo.txt | gawk -F '\t' '{if($1 != ii){printf("\nIntron %s\n", $1);ii=$1;}printf ("Run_U %s 0 %d seqs %d tags %d kb\n", $2,$3,$3,$3);}' >  tmp/INTRON_DB/$chrom/ii4.index.ace
     endif
   endif
 
@@ -1039,7 +1046,7 @@ echo LALALA0==================+++
   if ($phase == ii4 && -e MetaDB/$MAGIC/ali.ace) cat MetaDB/$MAGIC/ali.ace | gawk '/^Ali /{print}/h_Ali/{print}/^Candidate_introns any/{print}/^$/{print}' >>  tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace
 echo LALALA1====================++99
   if ($phase == ii4 && -e tmp/METADATA/$MAGIC.av.captured_genes.ace) cat tmp/METADATA/$MAGIC.av.captured_genes.ace >> tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace
-  if ($phase == ii4) cat tmp/INTRON_DB/$chrom/d5.$MAGIC.info$CAPT.ace >> tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace
+  if ($phase == ii4 && -e tmp/INTRON_DB/$chrom/d5.$MAGIC.info$CAPT.ace) cat tmp/INTRON_DB/$chrom/d5.$MAGIC.info$CAPT.ace >> tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace
 
 echo LALALA1====================
 
@@ -1293,9 +1300,6 @@ if ($ok == 0) continue
      end
    endif
 
-   if ($phase == ii4 && ! -e  tmp/INTRON_DB/$chrom/d5.$MAGIC.de_uno$CAPT.ace) then 
-     goto phaseLoop
-   endif
 
 # -seaLevel $seaLevel $seaWall -removeLimit $removeLimit
 set out=junkyard
@@ -1416,7 +1420,7 @@ endif
 
 ####
 
-if ($phase == m4 || $phase == m4H || $phase == klst4) then
+if ($phase == m4 || $phase == m4H || $phase == klst4 || $phase == ii4) then
 
   set  tgcl="-target_class $target_class"    
   set GM=MRNA
@@ -1442,11 +1446,12 @@ if ($phase == m4 || $phase == m4H || $phase == klst4) then
     endif
   endif
 
-echo "... $phase $target myace=$myace"
+
 # ls -ls tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
   set myace=JUNK1209983485
-  if ($phase != ii4 && -e   tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace) set myace=tmp/GENEINDEX/$MAGIC.$target.$GM.$uu.ace
+  if ($phase == ii4 && -e tmp/INTRON_DB/$chrom/ii4.index.ace) set myace=tmp/INTRON_DB/$chrom/ii4.index.ace
 
+echo "... $phase $target myace=$myace"
 # gene_group
 
 set GeneGroup=""
@@ -1459,6 +1464,7 @@ echo "... $phase $target $myace MAGIC=$MAGIC GeneGroup=$GeneGroup"
      set out=$MAGIC$mNam.$targetBeau.$GM$CAPT.$uu
      \rm tmp/GENEINDEX/Results/$out.*
      \rm RESULTS/Expression/AceFiles/$out.*
+     touch tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace 
      echo "bin/geneindex -deepTranscript $myace -$uu $mask $chromAlias -runList MetaDB/$MAGIC/GroupsRunsListSorted -runAce tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace  -o tmp/GENEINDEX/Results/$out -gzo -pA $method $isMRNAH $tgcl  $shA $sg $capt  $refG $rjm $GeneGroup -htmlSpecies $species   -export aitvz  $correl $compare" 
            bin/geneindex -deepTranscript $myace -$uu $mask $chromAlias -runList MetaDB/$MAGIC/GroupsRunsListSorted -runAce tmp/GENEINDEX/$MAGIC.$target.$GM.info.ace  -o tmp/GENEINDEX/Results/$out -gzo -pA $method $isMRNAH $tgcl  $shA $sg $capt  $refG $rjm  $GeneGroup -htmlSpecies $species   -export aitvz  $correl $compare
      if (! -e tmp/GENEINDEX/Results/$out.done) then
@@ -1626,13 +1632,6 @@ endif
 
 end 
 
-if (0 && $phase == ii4) then
-  echo "Report introns using  scripts/d5.intronDB.tcsh cumul $MAGIC in  GeneIndexDB/$MAGIC.intron_confirmation.ace"
-  if (0 && ! -e GeneIndexDB/SMAGIC.intron_confirmation.ace) then
-    scripts/d5.intronDB.tcsh cumul $MAGIC
-  endif
-  goto phaseLoop
-endif
 
 
 goto phaseLoop
