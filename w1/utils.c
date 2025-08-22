@@ -300,6 +300,23 @@ BOOL getCmdLineInt (int *argcp, const char **argv,
   return FALSE ;
 } /* getCmdLineInt */
 
+BOOL getCmdLineLong (int *argcp, const char **argv,
+		     const char *arg_name, long int *val)
+{
+  const char *ccp ;
+  if (getCmdLineOption (argcp, argv, arg_name, &ccp))
+    {
+      long int x = 0 ;  
+      if (sscanf (ccp, "%ld", &x) == 1)
+	{
+	  *val = x ;
+	  messfree (ccp) ;
+	  return TRUE ;
+	}
+    }
+  return FALSE ;
+} /* getCmdLineLong */
+
 /* same as above but returns a float */
 BOOL getCmdLineFloat (int *argcp, const char **argv,
 		    const char *arg_name, float *val)

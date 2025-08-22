@@ -727,7 +727,7 @@ static BOOL baParseOneSamTranscriptHit (ACEIN ai, BA *ba, HIT *up, int nn)
  
   aceInStep (ai, '\t') ; aceInInt (ai, &(up2->a1)) ; /* quality, discard */
   aceInStep (ai, '\t') ;  cigar = aceInWord (ai) ;
-  samParseCigar (cigar, cigarettes, up2->a1, &(up2->a2), &(up->x1), &(up->x2), 0) ;
+  samParseCigar (cigar, cigarettes, up2->a1, &(up2->a2), &(up->x1), &(up->x2), 0, 0, 0) ;
 
   up2->target_class = ba->target_class ;
   up2->dPair = 0 ;

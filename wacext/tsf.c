@@ -442,7 +442,8 @@ static long int tsfParseTsf (TSF *tsf, ACEIN ai)
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai))
     {
-      ccp = aceInWord (ai) ;
+      char cc ;
+      ccp = aceInWordCut (ai, "\t", &cc) ;
       line++ ;
       if (! ccp)
 	continue ;
@@ -483,7 +484,7 @@ static long int tsfParseTsf (TSF *tsf, ACEIN ai)
 
      /* parse the column/sample */
      aceInStep (ai, '\t') ;
-     ccp = aceInWord (ai) ;
+     ccp = aceInWordCut (ai, "\t", &cc) ;
      if (! ccp || *ccp == '#')
        continue ;
       if (! strncmp (ccp, "_P_", 3)) /* do not parse percensamplees */

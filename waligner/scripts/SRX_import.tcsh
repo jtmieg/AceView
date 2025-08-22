@@ -81,6 +81,7 @@ if ($species == hs) then
   #set ff='/home/mieg/AW/Human_DATA/20230813_840_Human_mole_DNA-seq_SraRunInfo.txt'
   set date=2025_05_13
   set ff='/home/mieg/AW/2025_Chris_Stacy/Chris_HUH7_SRA_RNA_5687_SraRunInfo.txt'
+  set ff='/home/mieg/AW/Human_DATA/SEQC2/PacBio_A_excellenteQuality_SraRunInfo.txt'
 endif
 if ($species == rn) then
   set date=2016_11_04

@@ -3660,33 +3660,34 @@ cat tmp/QUAL/Rhs444.1.coord_with_error_at_62.profile.txt ZZZZZ tmp/QUAL/Rhs444.1
 
 phasesali:
 
-if ($USEMAGICBLAST == 1) then
   if (! -x bin/sortalign) then
     echo "missing program bin/sortalign"
     exit 1
   endif
-endif
 
 if (! -d tmp/SortAlign)  mkdir tmp/SortAlign
 
 # the RefSeq and other Transcripts models are not included
 # the known introns should be included
-set tConfig tmp/SortAlign/tConfig
+set tConfig=tmp/SortAlign/tConfig
 if (! -d tmp/SortAlign/targetIndex) then
+
   echo -n '#' > $tConfig
   date >> $tConfig
   foreach target ($targets)
-    if ($target == SpikeIn)     echo "S TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == DNASpikeIn)  echo "D TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == rrna)        echo "R TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == mito)        echo "M TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == chloro)      echo "C TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == genome)      echo "G TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == virus)       echo "V TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
-    if ($target == bacteria)    echo "B TARGET/Targets/$species.$target.fasta.gz" >> $tConfig"
+    if ($target == SpikeIn)     echo "S TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == DNASpikeIn)  echo "D TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == rrna)        echo "R TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == mito)        echo "M TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == chloro)      echo "C TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == genome)      echo "G TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == virus)       echo "V TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
+    if ($target == bacteria)    echo "B TARGET/Targets/$species.$target.fasta.gz" >> $tConfig
   end
 
-  bin/sortalign -T $tConfig --createIndex  tmp/SortAlign/targetIndex
+  mkdir tmp/SortAlign/targetIndex
+  echo "bin/sortalign -T $tConfig --createIndex  tmp/SortAlign/targetIndex"
+        bin/sortalign -T $tConfig --createIndex  tmp/SortAlign/targetIndex
 endif
 
 
@@ -3703,12 +3704,8 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   endif
 
   if (-e tmp/SortAlign/$run/sali.done)  continue
-    set ok=1
-
-
-
     
-  scripts/sortali.tch $tConfig $run
+  scripts/sortali.tcsh $tConfig $run
  end
  goto phaseLoop
 

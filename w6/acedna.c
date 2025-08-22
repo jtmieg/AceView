@@ -833,6 +833,22 @@ JUMP reAligner [] = {  /* called from abifix.c */
  *     n <= -2 stop on first error
 */
  
+/**************************************************************/
+#define EP128
+#ifdef EP128      /* use 128 bit intructions  */
+#include <emmintrin.h> // SSE2
+/*  aaaa aaaa aaaa aaaa  / aaaa aaaa aaaa aaga   -> 14 (number of exact matches)
+static int first_non_equal_byte(unsigned char *cp, unsigned char *cq) {
+    __m128i v1 = _mm_loadu_si128((__m128i*)cp); // aaaaaaaaaaaaaaaa
+    __m128i v2 = _mm_loadu_si128((__m128i*)cq); // aaaaaaaaaaaaaaga
+    __m128i cmp = _mm_cmpeq_epi8(v1, v2);       // 0xff for equal, 0x00 for non-equal
+    int mask = _mm_movemask_epi8(cmp);          // 0xffff for equal, bit 0 for non-equal
+    return mask == 0xffff ? 16 : __builtin_ctz(~mask); // First 0 bit
+}
+*/
+#endif
+
+
 Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1, 
 			 Array dna2, int pos2, int *pp2, int *NNp, Array errArray, 
 			 int maxJump, int maxError, BOOL doExtend, int *maxExactp, BOOL isErrClean)
@@ -896,14 +912,26 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
   nExact = 0 ;
   while (++cq, ++cp < cpmax && cq < cqmax) /* always increment both */
     {
-      /* idee essayee le 2010_09_06: marche pas, sans doute parceque cp et cq ne sont pas word-aligned ?
-
-	if (cp < cpmax4 && cq < cqmax4 && !(((*(int*)cp) ^ (*(int*)cq) ) & mask4))
+#ifdef EP128      /* use 128 bit intructions  */
+      while (cp < cpmax - 16 && cq < cqmax - 16)
 	{
-	nExact += 4 ;cp+= 3 ; cq+= 3 ;
-	continue ;
+	  __m128i v1 = _mm_loadu_si128((__m128i*)cp);
+	  __m128i v2 = _mm_loadu_si128((__m128i*)cq);
+	  __m128i cmp = _mm_cmpeq_epi8(v1, v2);
+	  int mask = _mm_movemask_epi8(cmp);
+	  if (mask != 0xffff)
+	    {
+	      int pos = __builtin_ctz(~mask);
+	      cp +=  pos ; cq += pos ;
+	      break; /* Mismatch at cp/cq */
+	    }
+	  else
+	    {
+	      cp += 16; cq += 16; 
+	      nExact += 16 ;
+	    }
  	}
-      */
+#endif      
       if (*cp == *cq)
 	{
 	  nExact++ ;
@@ -918,6 +946,8 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
 	  nExact++ ;
 	  continue ;
 	}
+      if (maxError == 0)
+	break ;
       jp = activeJumper ;
       jp-- ;
       while (jp++) /* 1, 1, 0, 0 = last always accepted */
@@ -1071,7 +1101,7 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
 } /* aceDnaTrackErrors */
 
 /**************************************************************************/
-/* dna1 is the EST or tag to ba analysed, dna2 is the reference
+/* dna1 is the EST or tag to be analysed, dna2 is the reference
  * if NNp != 0, report the N in the EST, but not in the reference
  */
 Array aceDnaTrackErrorsBackwards (Array  dna1, int pos1, int *pp1, 
@@ -1107,6 +1137,8 @@ Array aceDnaTrackErrorsBackwards (Array  dna1, int pos1, int *pp1,
 	{ jp = jumpN ; goto foundjp ; }
       if (*cp & *cq) /* other kind of ambiguous letter */
 	continue ;
+      if (maxError == 0)
+	break ;
       jp = jumper ; jp-- ;
       while (jp++) /* 1, 1, 0, 0 = last always accepted */
 	{ 
@@ -1346,7 +1378,6 @@ static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
  * if (isDown) we extend in both directions
  * else the code to extend backwards is not written  
  */
-
 
 Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 			       Array dna2, Array dna2R, int *a1p, int *a2p, 

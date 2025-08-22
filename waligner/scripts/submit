@@ -71,10 +71,16 @@ else if ($farm_requested == "128G") then
   set h_vmem="128G"
 else if ($farm_requested == "32G4T") then
   set farm_requested=""
-  set mem_free="32G"
+  set mem_free="8G"
   set m_mem_free="8G"
   set h_vmem="32G"
   set request_multicore="-pe multicore 4  -R y"
+else if ($farm_requested == "64G8T") then
+  set farm_requested=""
+  set mem_free="8G"
+  set m_mem_free="8G"
+  set h_vmem="64G"
+  set request_multicore="-pe multicore 8  -R y"
 else if ($farm_requested == "1G") then
   set farm_requested=""
   set mem_free="1G"

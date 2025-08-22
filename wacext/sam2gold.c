@@ -29,6 +29,8 @@
  * 2018_04_01
  * strategic idea
 
+ * Count the alignment statistics in a sam file
+ 
  * Compare a set of sam file contructed by different methods to a gold standard
  * The gold standard describes how some artificial reads were extracted from the target
  * Each method is hoping to rediscover this hidden truth
@@ -63,6 +65,7 @@ typedef struct s2g_struct {
   BOOL exportIntronSupport ;
   BOOL anne ;
   BOOL exportAliLn ;
+  BOOL samStats ;
   BOOL unique ;
   ACEIN ai ; 
   ACEOUT ao ;
@@ -81,6 +84,8 @@ typedef struct s2g_struct {
   int goldMethod ;
   const char *run ;
   const char *method ;
+  long int nRawReads, nRawBases ;
+  long int nMultiAli[12] ;
   int nIns[32] ;
   int nInsOk[32] ;
   int nGoldIns[32] ;
@@ -91,7 +96,7 @@ typedef struct s2g_struct {
 } S2G ;
 
 typedef struct hit_struct {
-  int method, flag, seq, target, strand, type, a1, a2, score, gold, nerr  ;
+  int method, flag, seq, target, strand, type, a1, a2, x1, x2, score, ali, gold, nerr  ;
   BOOL isComplete ;
  } HIT ;
 
@@ -322,7 +327,7 @@ static void s2gParseGoldFile (S2G *s2g, const char *fNam, int method)
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
   BigArray hits = s2g->hits ;
   long int nn , nn0 = bigArrayMax (hits) ;
-  int seq, target, x1, x2, a1, a2, score, ali, strand ;
+  int seq, target, x1, x2, a1, a2, score, ali, ins, del, strand ;
   HIT *hit ;
 
   nn = nn0 ;
@@ -349,7 +354,8 @@ static void s2gParseGoldFile (S2G *s2g, const char *fNam, int method)
       aceInStep (ai, '\t') ; cigar = aceInWord (ai) ;
       if (! cigar)
 	continue ;
-      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali) ; 
+      ali = ins = del = 0 ;
+      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del) ; 
       score = 1 ;
       if (! strcmp (cigar, "100M") || ! strcmp (cigar, "100="))
 	score = 100 ;
@@ -392,39 +398,6 @@ static void s2gParseGoldFile (S2G *s2g, const char *fNam, int method)
 
 /*************************************************************************************/
 
-static void s2gParseOneSamFileUnique (ACEIN ai, DICT *readDict, KEYSET ksu)
-{
-  int k = 0, n, nr = 0, nnu = 0 ;
-  char *ccp ;
-
-  aceInSpecial (ai, "\n") ;
-  while (aceInCard (ai)) 
-    { /* parse a sam file
-       * Expected format is tab delimited
-       *  seq.1a	83	chr2	145633	255	98M2S	=	145500	-231	TCTTGTTAACAAATC
-       */
-      ccp = aceInWord (ai) ;
-      if (! ccp || *ccp == '#' || *ccp == '/' || *ccp == '@')
-	continue ;
-      k = 0 ;
-      dictAdd (readDict, ccp, &k) ;
-      n = keySet (ksu, k) ;
-      if (n == 0)
-	nr++ ;
-      if (n == 1)
-	nnu++ ;
-      keySet (ksu, k) = n + 1 ;
-    } 
-  fprintf (stderr, "%d reads %d unique %d non-unique representing %.2f in file %s\n"
-	   , nr, nr - nnu, nnu
-	   , 100.0 * nnu / (nr+.00001)   /* avoid zero-divide if nr == 0, ok since then nnu is always 0 */
-	   , aceInFileName (ai)
-	   ) ;
-  return ;
-} /* s2gParseOneSamFileUnique */
-
-/*************************************************************************************/
-
 static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int goldMethod)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -434,21 +407,11 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   char *cigar, seqBuf[128] ;
   BigArray hits = s2g->hits ;
   long int nn, nn0 = bigArrayMax (hits) ;
-  int seq, flag, target, a1, a2, x1, x2, score, nerr, ali, strand ;
+  long int nAlignedBases = 0, nErrors = 0, nBases = 0 ;
+  int seq, flag, target, a1, a2, x1, x2, score, nerr, ali, ins, del, strand ;
   HIT *hit ;
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
-  DICT *readDict = 0 ;
-  KEYSET ksu = 0 ;
-
-  if (s2g->unique)
-    {
-      readDict = dictHandleCreate (100000, h) ;
-      ksu = keySetHandleCreate (h) ;
-      s2gParseOneSamFileUnique (ai, readDict, ksu) ;
-      ac_free (ai) ;
-      ai = aceInCreate (fNam, 0, h) ;
-  
-    }
+  KEYSET ksu = keySetHandleCreate (h) ;
 
   nn = nn0 ;
 
@@ -459,6 +422,8 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
        *  seq.1a	83	chr2	145633	255	98M2S	=	145500	-231	TCTTGTTAACAAATC
        */
       BOOL isComplete = FALSE ;
+      int isMulti ;
+
       ccp = aceInWord (ai) ;
       if (! ccp || *ccp == '#' || *ccp == '/' || *ccp == '@')
 	continue ;
@@ -469,17 +434,27 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	else if (*cq == '>') *cq = 'a' ; 
 	else if (*cq == '<') *cq = 'b' ; 
       */
+
+
       strncpy (seqBuf, ccp, 127) ;
-      if (readDict)
-	{
-	  int k = 0 ;
-	  dictFind (readDict, seqBuf, &k) ;
-	  if (k && keySet (ksu, k) > 1)
-	    continue ;
-	}
+
       aceInStep (ai, '\t') ; aceInInt (ai, &flag) ;
-      if (flag & 0x4) /* unaligned */
-	continue ;
+      if (1)
+	{ /* count the number of alignments of each read */
+	  isMulti = 0 ;
+	  if (flag & 0x4) /* unaligned */
+	    {
+	      s2g->nMultiAli[0]++ ;
+	      continue ;
+	    }
+	  else
+	    {
+	      isMulti = keySet (ksu, seq) + 1 ;
+	      keySet (ksu, seq) = isMulti  ;
+	    }
+	  s2g->nMultiAli[(isMulti > 10 ? 10 : isMulti)]++ ;
+	}
+      
       if (s2g->addReadPairSuffix)
 	{
 	  char *cr = seqBuf + strlen(seqBuf) - 1 ;
@@ -513,12 +488,14 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	  *cr = 0 ;
 	}
 
+      seq = 0 ;
       dictAdd (s2g->seqDict, seqBuf, &seq) ;
+      /* seqBuf */
 
       strand = flag & 0x10 ? -1 : 1 ;
       aceInStep (ai, '\t') ; ccp = aceInWord (ai) ;
       if (! ccp || *ccp == '*') /* unaligned */
-	continue ;
+	messcrash ("why was this unaligned not flagged ") ;
       dictAdd (s2g->targetDict, ccp, &target) ;
       a1 = a2 = 0 ;
       aceInStep (ai, '\t') ; aceInInt (ai, &a1) ; a2 = a1 ;
@@ -529,16 +506,21 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       if (! cigar)
 	continue ;
       score = 1 ;
-      if (! strcmp (cigar, "100M") || ! strcmp (cigar, "100="))
+      /*
+	if (! strcmp (cigar, "100M") || ! strcmp (cigar, "100="))
 	score = 100 ;
+      */
+      
       arrayMax (cigarettes) = 0 ;
-      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali) ; 
+      ali = ins = del = 0 ;
+      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del) ; 
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate target */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate a1 coordinate */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* distance to mate */
       aceInStep (ai, '\t') ; dna = aceInWord (ai) ; 
       if (! dna)
 	continue ;
+      if (isMulti == 1) nBases += strlen (dna) ;
       if (arrayMax (cigarettes))
 	isComplete = s2gRegisterIntron (s2g, cigarettes, flag, method, goldMethod, target, seq, strand, dna) ;
       nerr = -1 ;
@@ -554,24 +536,95 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	  else if (sscanf (ccp, "nM:i:%d%c", &n_, &c_) == 1)
 	    nerr = n_ ;	      
 	}
-      hit = bigArrayp (hits, nn++, HIT) ;
+      if (nerr >= del) nerr -= del ;
+      nErrors += (nerr > 0 ? nerr : 0) ;
+      
+      hit = bigArrayp (hits, nn++, HIT) ; nn-- ;
       hit->method = method ;
       hit->flag = flag ;
       hit->seq = seq ; 
       hit->target = target ; 
       hit->a1 = a1 ; 
       hit->a2 = a2 ; 
+      hit->x1 = x1 ;
+      hit->x2 = x2 ;
       hit->strand = strand ;
-      hit->score = score ;  
+      hit->score = score ;
+      hit->ali = ali ;
       hit->nerr = nerr ;
       hit->isComplete = isComplete ;
-   
+
+      nAlignedBases += ali ;
    }
-  fprintf (stderr, "//%s : Parsed %ld hits in the sam file %s\n"
+  fprintf (stderr, "//%s : Parsed %ld lines in the sam file %s\n"
 	   , timeShowNow()
 	   , nn - nn0
 	   , fNam
 	   ) ;
+  /* because read appearing 7 times previously occured 6 5 4 3 2 1 , we differentiate */
+  for (int i = 1 ; i < 9 ; i++)
+    s2g->nMultiAli[i] -= s2g->nMultiAli[i+1] ;
+
+  if (1)
+    {
+      int nReads = dictMax (s2g->seqDict) ;
+      long int nUnalignedReads = 0 ;
+      long int nAlignedReads = 0 ;
+      ACEOUT ao = aceOutCreate (s2g->outFileName, ".samStats", 0, h) ;
+
+      for (int i = 1 ; i < 11 ; i++)
+	nAlignedReads += s2g->nMultiAli[i] ;
+      nUnalignedReads = s2g->nRawReads - nAlignedReads ;
+      
+      if (s2g->nRawReads)
+	aceOutf (ao, "%s\t%s\tnRawReads\t%ld\n"
+		 , s2g->run, s2g->method
+		 , s2g->nRawReads
+		 ) ;
+
+      if (s2g->nRawBases)
+	aceOutf (ao, "%s\t%s\tnRawBases\t%ld\n"
+		 , s2g->run, s2g->method
+		 , s2g->nRawBases
+		 ) ;
+      aceOutf (ao, "%s\t%s\tnReads\t%d\n"
+	       , s2g->run, s2g->method
+	       , nReads
+	       ) ;
+      aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n"
+	       , s2g->run, s2g->method
+	       , nAlignedBases
+	       , (100.0 * nAlignedBases) / (s2g->nRawBases + .0000001)
+	       ) ;
+
+      aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.4f%%\n"
+	       , s2g->run, s2g->method
+	       , nErrors
+	       , (100.0 * nErrors) / (nAlignedBases + .0000001)
+	       ) ;
+
+      aceOutf (ao, "%s\t%s\tnAlignedReads\t%d\t%.2f%%\n"
+	       , s2g->run, s2g->method
+	       , nAlignedReads
+	       , (100.0 * nAlignedReads) / (s2g->nRawReads + .0000001)
+	       ) ;
+
+      for (int i = 0 ; i < 1 ; i++)
+	aceOutf (ao, "%s\t%s\tnMultiAligned %ld times\t%ld\t%.2f%%\n"
+		 , s2g->run, s2g->method
+		 , i
+		 ,  nUnalignedReads
+		 , (100.0 * nUnalignedReads) / (s2g->nRawReads + .0000001)
+		 ) ;
+      for (int i = 1 ; i <= 10 ; i++)
+	aceOutf (ao, "%s\t%s\tnMultiAligned %ld times\t%d\t%.2f%%\n"
+		 , s2g->run, s2g->method
+		 , i
+		 ,  s2g->nMultiAli[i]
+		 , (100.0 * s2g->nMultiAli[i]) / (s2g->nRawReads + .0000001)
+		 ) ;
+    }
+      
   ac_free (h) ;
  
   return  ;
@@ -655,6 +708,18 @@ static void s2gParse (S2G *s2g)
       cp = cq = list ;
       while (cp)
 	{
+	  if (s2g->samStats)
+	    { /* just check the existence of the sam files */
+	      if (! (ai = aceInCreate (cp, 0, h)))
+		messcrash ("Bad parameter -i, cannot open file %s\n", cp) ;
+	      ac_free (ai) ;
+
+	      dictAdd (s2g->methodDict, s2g->method, &method) ;
+	      dictAdd (dict, cp, &methodFile) ;
+	      keySet (ks, method) = methodFile ;
+	      
+	      break ;
+	    }
 	  cq = strchr (cp, ':') ;
 	  if (! cq)
 	    messcrash ("Bad parameter -i, expected m1:f1,m2:f2...\nMissing : in the inFileList %s\n at %s"
@@ -700,11 +765,11 @@ static void s2gParse (S2G *s2g)
       s2gParseSnpFile (s2g, s2g->snpFileName, s2g->goldMethod) ;
     }
 
-  if (s2g->inFileList)
-    {
-        for (method = 0 ; method < keySetMax (ks) ; method++)
-	if (keySet (ks, method))
-	  s2gParseOneSamFile (s2g, dictName (dict, keySet(ks, method)), method, s2g->goldMethod) ;
+   if (s2g->inFileList)
+     {
+       for (method = 0 ; method < keySetMax (ks) ; method++)
+	 if (keySet (ks, method))
+	   s2gParseOneSamFile (s2g, dictName (dict, keySet(ks, method)), method, s2g->goldMethod) ;
     }
 
   ac_free (h) ;
@@ -1529,9 +1594,10 @@ static void usage (const char commandBuf [], int argc, const char **argv)
   fprintf (stderr,
 	   "// Usage: sam2gold -g goldFile -i file_list \n"
 	   "//      try: -h --help -v --version\n"
-	   "// Paramters\n"
+	   "// Parameters\n"
 	   "//   --run runName         [short form : -r runName]\n"
 	   "//   --method alignerName  [short form : -m alignerName]\n"
+	   "//   --samStats : count aligned reads and bases and missmatches\n"
 	   "//   -g m..gold:gold.cig\n"
 	   "//     where mi is a method name and fi the corresponding sam file\n"
 	   "//     The gold file  defines the gold standard\n"
@@ -1617,6 +1683,7 @@ int main (int argc, const char **argv)
   s2g.gzo = getCmdLineBool (&argc, argv, "-gzo") ;
   s2g.unique = getCmdLineBool (&argc, argv, "-u") ;
   s2g.debug = getCmdLineBool (&argc, argv, "-debug") ;
+  s2g.samStats = getCmdLineBool (&argc, argv, "--samStats") ;
   s2g.exportIntronSupport = getCmdLineBool (&argc, argv, "-exportIntronSupport") ;
   getCmdLineOption (&argc, argv, "-o", &(s2g.outFileName)) ;
   getCmdLineOption (&argc, argv, "-s", &(s2g.snpFileName)) ;
@@ -1631,6 +1698,8 @@ int main (int argc, const char **argv)
   getCmdLineOption (&argc, argv, "--run", &(s2g.run)) ;
   getCmdLineOption (&argc, argv, "-r", &(s2g.run)) ;
   getCmdLineOption (&argc, argv, "--method", &(s2g.method)) ;
+  getCmdLineLong (&argc, argv, "--nRawReads", &(s2g.nRawReads)) ;
+  getCmdLineLong (&argc, argv, "--nRawBases", &(s2g.nRawBases)) ;
   s2g.anne = getCmdLineBool (&argc, argv, "--anne") ;
 
   if (s2g.anne)
@@ -1650,6 +1719,22 @@ int main (int argc, const char **argv)
 	messcrash ("Missing paramater: --merge needs --run <run_name>, please try --help") ;
       s2gTsvAction (&s2g, 2) ;
     }
+  else if (s2g.samStats)
+    {
+      if (! s2g.run)
+	messcrash ("Missing paramater: --samStats needs --run <run_name>, please try --help") ;
+      if (! s2g.method)
+	messcrash ("Missing paramater: --samStats needs --method <method_name>, please try --help") ;
+      if (! s2g.inFileList)
+	messcrash ("Missing paramater: --i <sam_file of file_list_of_sam_files> , please try --help") ;
+      fprintf (stderr, "//%s : Start \n"
+	       , timeShowNow()
+	       ) ;
+
+      s2gInit (&s2g) ;
+      s2gParse (&s2g) ;
+    }
+
   else if (s2g.goldFileName)
     {
       if (! s2g.inFileList && ! s2g.goldFileName)
