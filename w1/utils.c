@@ -231,7 +231,7 @@ char *getUserHomeDir (const char *user_name, AC_HANDLE h)
 
 /*****************************/
 
-BOOL getCmdLineOption (int *argcp, const char **argv,
+BOOL getCmdLineText (AC_HANDLE h, int *argcp, const char **argv,
 		       const char *arg_name, const char **arg_val)
      /* call with (&argc, argv, "-option", &string)
       *   for options with value (e.g. -display <name>)
@@ -257,7 +257,7 @@ BOOL getCmdLineOption (int *argcp, const char **argv,
 	      if ((*argcp - i) < 2)
 		return  FALSE ;
 
-	      *arg_val = strnew(argv[i+1], 0);
+	      *arg_val = strnew(argv[i+1], h);
 	      num = 2;
 	    }
 	  else
@@ -276,6 +276,11 @@ BOOL getCmdLineOption (int *argcp, const char **argv,
   return isFound;
 } /* getCmdLineOption */
 
+BOOL getCmdLineOption (int *argcp, const char **argv,
+		       const char *arg_name, const char **arg_val)
+{
+  return getCmdLineText (0, argcp, argv, arg_name, arg_val) ;
+}
 /* same as above but returns a BOOL */
 BOOL getCmdLineBool (int *argcp, const char **argv,
 		     const char *arg_name)

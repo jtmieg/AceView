@@ -5240,7 +5240,7 @@ static void clipAlignExportAll (CLIPALIGN *pp, const char *commandBuf)
 	  ac_free (pp->ao) ;
 	}
     }
-  if (1)
+  if (! pp->sam)
     { /* samStats, useful to compare to the output of sam2gold */
       AC_HANDLE h = ac_new_handle () ;
       const char *METHOD = pp->method ? pp->method : "02_ClipAlign" ;
@@ -10798,6 +10798,7 @@ static void usage (const char commandBuf [], int argc, const char **argv)
 	   "// -targets : multi targets\n"
 	   "//     example A_mito:1:f.mito.fasta.gz,B_rrna:2:f.rrna.fasta.gz\n"
 	   "//     each file is processed, the number is the bonus for that class\n"
+	   "// -sam : export in SAM format\n"
 	   "// -i : the name of a fasta/fastc/fastq file, possibly .gz, containing the tags to be aligned \n"
 	   "//      (tested with 10 Million tags, upper limit depends on hardware)\n"
 	   "// -fastq33 : the input is in fastq, the quality of the mismatches start at 33=!(NCBI)\n"

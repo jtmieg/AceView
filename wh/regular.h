@@ -193,6 +193,8 @@ void utUnlimitResources(BOOL allow_user_abort) ;
 int utPrintfSizeOfArgList (const char * formatDescription, va_list marker) ;
 BOOL getCmdLineOption (int *argcp, const char **argv,
 		       const char *arg_name, const char **arg_val) ; /* in utils.c */
+BOOL getCmdLineText (AC_HANDLE h, int *argcp, const char **argv,
+		       const char *arg_name, const char **arg_val) ; /* in utils.c */
 BOOL getCmdLineBool (int *argcp, const char **argv, const char *arg_name) ;
 BOOL getCmdLineInt (int *argcp, const char **argv, const char *arg_name, int *val) ;
 BOOL getCmdLineLong (int *argcp, const char **argv, const char *arg_name, long int *val) ; 

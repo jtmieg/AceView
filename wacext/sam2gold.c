@@ -403,15 +403,22 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   AC_HANDLE h = ac_new_handle () ;
   ACEIN ai = aceInCreate (fNam, 0, h) ;
 
+  DICT *unalignedDict = dictHandleCreate (100000, h) ;
   char *ccp, *dna ;
   char *cigar, seqBuf[128] ;
   BigArray hits = s2g->hits ;
   long int nn, nn0 = bigArrayMax (hits) ;
-  long int nAlignedBases = 0, nErrors = 0, nBases = 0 ;
-  int seq, flag, target, a1, a2, x1, x2, score, nerr, ali, ins, del, strand ;
+  int dnaLn ;
+  int seq, seq2, flag, target, a1, a2, x1, x2, score, nerr, ali, ins, del, strand ;
   HIT *hit ;
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
   KEYSET ksu = keySetHandleCreate (h) ;
+  long int nAlignedBases = 0 ;
+  long int nErrors = 0;
+  long int nBases = 0 ;
+  long int nUnalignedReads = 0 ;
+  long int nAlignedReads = 0 ;
+  long int nPerfectReads = 0 ;
 
   nn = nn0 ;
 
@@ -427,72 +434,81 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       ccp = aceInWord (ai) ;
       if (! ccp || *ccp == '#' || *ccp == '/' || *ccp == '@')
 	continue ;
-      /*
-	// 2019_05_13, moved this under if s2g->addReadPairSuffix 
-	cq = ccp + strlen (ccp) - 1 ;
-	if (!strncmp(ccp, "NM_", 3) && *cq == '>') *cq = 0 ;
-	else if (*cq == '>') *cq = 'a' ; 
-	else if (*cq == '<') *cq = 'b' ; 
-      */
 
-
+      /* seqBuf : adjust the suffix indicating paired ends */
       strncpy (seqBuf, ccp, 127) ;
 
+      /* SAM flag
+       * 0x4  0x8 unaligned 
+       * 0x10 0x20  target strand
+       * 0x80   second read of a pair
+       * 0x100  secondary mappings
+       * 1   	000000000001 	template having multiple templates in sequencing (read is paired)
+       * 2 	000000000010 	each segment properly aligned according to the aligner (read mapped in proper pair)
+       * 4 	000000000100 	this segment is unmapped (read1 unmapped)
+       * 8 	000000001000 	next segment in the template unmapped (read2 unmapped)
+       * 16 	000000010000 	this read is minus strand: SEQ being reverse complemented (read1 reverse complemented)
+       * 32 	000000100000 	minus strand read2 : SEQ of the next segment in the template being reverse complemented (read2 reverse complemented)
+       * 64 	000001000000 	the first segment in the template (is read1)
+       * 128 	000010000000 	the last segment in the template (is read2)
+       * 256 	000100000000 	not primary alignment
+       * 512 	001000000000 	alignment fails quality checks
+       * 1024 	010000000000 	PCR or optical duplicate
+       * 2048 	100000000000 	supplementary alignment (e.g. aligner specific, could be a portion of a split read or a tied region)
+       */
       aceInStep (ai, '\t') ; aceInInt (ai, &flag) ;
-      if (1)
-	{ /* count the number of alignments of each read */
-	  isMulti = 0 ;
-	  if (flag & 0x4) /* unaligned */
+
+      if (flag & 512) /* bad quality */
+	continue ;
+      if (flag & 1) /* read pairs */
+	{
+	  char *cr = seqBuf + strlen(seqBuf) ;
+	  if (flag & 64)
+	    *cr++ = '>' ;
+	  else /* 128 */
+	    *cr++ = '<' ;
+	  *cr = 0 ;
+	}
+
+      seq = seq2 = 0 ;
+      if (flag & 4) /* unaligned */
+	{
+	  if (dictAdd (unalignedDict, seqBuf, &seq))
 	    {
+	      nUnalignedReads++ ;
 	      s2g->nMultiAli[0]++ ;
-	      continue ;
 	    }
 	  else
-	    {
-	      isMulti = keySet (ksu, seq) + 1 ;
-	      keySet (ksu, seq) = isMulti  ;
-	    }
-	  s2g->nMultiAli[(isMulti > 10 ? 10 : isMulti)]++ ;
+	    messcrash ("Read %s unaligned appears twice", seqBuf) ;
+	  if (dictFind (s2g->seqDict, seqBuf, &seq2))
+	    messcrash ("Read %s is both aligned and unaligned", seqBuf) ;
+	  continue ;
 	}
-      
-      if (s2g->addReadPairSuffix)
-	{
-	  char *cr = seqBuf + strlen(seqBuf) - 1 ;
-	  if (*cr == '>') *cr++ = 'a' ; 
-	  else if (*cr == '<') *cr++ = 'b' ; 
-  	  else if (flag & 0x80)	    *cr++ = 'b' ;
-	  else	    *cr++ = 'a' ;
-	  *cr = 0 ;
+      if (dictAdd (s2g->seqDict, seqBuf, &seq))
+	{ /* new read */
+	  nAlignedReads++ ;
+	  if (0) printf ("XXXX\t%s\n", seqBuf) ;
+	}
+      if (dictFind (unalignedDict, seqBuf, &seq2))
+	messcrash ("Read %s is both aligned and unaligned", seqBuf) ;
+
+      /* count the number of alignments of each read */
+      isMulti = keySet (ksu, seq) + 1 ;
+      keySet (ksu, seq) = isMulti  ;
+      s2g->nMultiAli[(isMulti > 10 ? 10 : isMulti)]++ ;
+
+      if (flag & 256)
+	{ /* secondary mapping */
+	  if (0 && isMulti == 1)
+	    messcrash ("Read %s first mapping is called secondary (flag 0x100)", seqBuf) ;
 	}
       else
 	{
-	  char *cr = seqBuf + strlen(seqBuf) - 1 ; 
-	  if (*cr == '>') *cr = 0 ;
-	}
-       if (s2g->addReadPairSuffix2)
-	{
-	  char *cr = seqBuf + strlen(seqBuf) ;
-	  if (flag & 0x80)
-	    *cr++ = 'b' ;
-	  else
-	    *cr++ = 'a' ;
-	  *cr = 0 ;
-	}
-      if (s2g->addReadPairSuffixForce)
-	{
-	  char *cr = seqBuf + strlen(seqBuf) - 1 ;
-	  if (flag & 0x10)  /* target strand. a silly proxy for read fragment */
-	    *cr++ = 'b' ;
-	  else
-	    *cr++ = 'a' ;
-	  *cr = 0 ;
+	  if (0 && isMulti > 1)
+	    messcrash ("Read %s mapping %d is called primary (NOT flag 0x100)", seqBuf, isMulti) ;
 	}
 
-      seq = 0 ;
-      dictAdd (s2g->seqDict, seqBuf, &seq) ;
-      /* seqBuf */
-
-      strand = flag & 0x10 ? -1 : 1 ;
+      strand = flag & 16 ? -1 : 1 ;
       aceInStep (ai, '\t') ; ccp = aceInWord (ai) ;
       if (! ccp || *ccp == '*') /* unaligned */
 	messcrash ("why was this unaligned not flagged ") ;
@@ -517,10 +533,10 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate target */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate a1 coordinate */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* distance to mate */
-      aceInStep (ai, '\t') ; dna = aceInWord (ai) ; 
-      if (! dna)
-	continue ;
-      if (isMulti == 1) nBases += strlen (dna) ;
+      aceInStep (ai, '\t') ; dna = aceInWord (ai) ;
+      dnaLn = dna ? strlen(dna) : 0 ;
+      if (isMulti == 1) 
+	nBases += strlen (dna) ;
       if (arrayMax (cigarettes))
 	isComplete = s2gRegisterIntron (s2g, cigarettes, flag, method, goldMethod, target, seq, strand, dna) ;
       nerr = -1 ;
@@ -537,7 +553,26 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	    nerr = n_ ;	      
 	}
       if (nerr >= del) nerr -= del ;
-      nErrors += (nerr > 0 ? nerr : 0) ;
+      if (0)
+	{
+	  if (isMulti == 1)  /* first  primary alignment */
+	    {
+	      nAlignedBases += x2 - x1 + 1 - ins ;
+	      nErrors += (nerr > 0 ? nerr : 0) ;
+	      if (ali == dnaLn && nerr == 0)
+		nPerfectReads++ ;
+	    }
+	}
+      else
+	{
+	  if (! (flag & (256 + 0*2048)))  /* primary alignment */
+	    {
+	      nAlignedBases += x2 - x1 + 1 - ins ;
+	      nErrors += (nerr > 0 ? nerr : 0) ;
+	      if (ali == dnaLn && nerr == 0)
+		nPerfectReads++ ;
+	    }
+	}
       
       hit = bigArrayp (hits, nn++, HIT) ; nn-- ;
       hit->method = method ;
@@ -553,9 +588,8 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       hit->ali = ali ;
       hit->nerr = nerr ;
       hit->isComplete = isComplete ;
-
-      nAlignedBases += ali ;
    }
+
   fprintf (stderr, "//%s : Parsed %ld lines in the sam file %s\n"
 	   , timeShowNow()
 	   , nn - nn0
@@ -568,12 +602,8 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   if (1)
     {
       int nReads = dictMax (s2g->seqDict) ;
-      long int nUnalignedReads = 0 ;
-      long int nAlignedReads = 0 ;
       ACEOUT ao = aceOutCreate (s2g->outFileName, ".samStats", 0, h) ;
 
-      for (int i = 1 ; i < 11 ; i++)
-	nAlignedReads += s2g->nMultiAli[i] ;
       nUnalignedReads = s2g->nRawReads - nAlignedReads ;
       
       if (s2g->nRawReads)
@@ -607,6 +637,12 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	       , s2g->run, s2g->method
 	       , nAlignedReads
 	       , (100.0 * nAlignedReads) / (s2g->nRawReads + .0000001)
+	       ) ;
+
+      aceOutf (ao, "%s\t%s\tnPerfectReads\t%d\t%.2f%%\n"
+	       , s2g->run, s2g->method
+	       , nPerfectReads
+	       , (100.0 * nPerfectReads) / (s2g->nRawReads + .0000001)
 	       ) ;
 
       for (int i = 0 ; i < 1 ; i++)

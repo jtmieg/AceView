@@ -912,7 +912,7 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
   nExact = 0 ;
   while (++cq, ++cp < cpmax && cq < cqmax) /* always increment both */
     {
-#ifdef EP128      /* use 128 bit intructions  */
+#ifdef EP128       /* use 128 bit intructions  */
       while (cp < cpmax - 16 && cq < cqmax - 16)
 	{
 	  __m128i v1 = _mm_loadu_si128((__m128i*)cp);
@@ -1379,6 +1379,8 @@ static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
  * else the code to extend backwards is not written  
  */
 
+
+
 Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 			       Array dna2, Array dna2R, int *a1p, int *a2p, 
 			       int *NNp, Array err, int maxJump, int maxError, 
@@ -1387,7 +1389,9 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
   int i, j, nn, u1, u2, y1 = *x1p, b1 = *a1p ;
   A_ERR *ep, *ep2, *eptmp ;
   Array err1 = 0, err2 = 0 ;
-
+  int maxErrorOld = maxError ;
+  BOOL doExtendOld = doExtend ;
+  
   if (isDown)      /* Plato */
     {
       if (*x1p < 1) *x1p = 1 ;
@@ -1396,9 +1400,14 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
       if (*a1p < 1) *a1p = 1 ;
       if (*a2p > arrayMax(dna2)) *a2p = arrayMax(dna2) ;
 
+      if (maxErrorOld == -2)
+	{ maxError = -1 ; doExtend = FALSE ; }
       err1 = arrayCreate (5, A_ERR) ; /* smaller value 5 limits the number of memset 0 */
       err1 = spliceTrackAllErrors (dna1, *x1p - 1, x2p, dna2, *a1p - 1, a2p, NNp, err1, maxJump, maxError
 				   , doExtend, maxExactp) ;
+
+      if (maxErrorOld == -2)
+	{ maxError = -2 ; doExtend = doExtendOld ; }
 
       u1 = *x1p - 1 ; u2 = *a1p - 1 ; /* C type coord of first base */
       if (err1 && arrayMax (err1))
@@ -1412,6 +1421,8 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 	      u1 = *x1p ; u2 = *a1p ; /* C type coord of first error */
 	    }
 	}
+      if (maxErrorOld == -3)
+	{ maxError = -1 ; doExtend = FALSE ; }
       if ((u1 > y1 && u2 >= b1) || doExtend)
 	  {
 	    int uz1 = u1 - 1, uz2 = u2 - 1 ;
@@ -1420,6 +1431,8 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 	    err2 = aceDnaTrackErrorsBackwards (dna1, uz1, &u1, dna2, uz2, &u2, NNp, err2, maxJump, maxError, doExtend) ;
 	    *x1p = u1 + 1 ; *a1p = u2 + 1 ;
 	  }
+      if (maxErrorOld == -3)
+	{ maxError = -3 ; doExtend = doExtendOld ; }
       j = 0 ; 
       if (err2 && arrayMax (err2))
 	for (i = arrayMax (err2) - 1 ; i >= 0 ; i--)

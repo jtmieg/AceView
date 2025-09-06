@@ -560,7 +560,12 @@ static BOOL getDna (SX *sx, ACEIN ai)
 	  return ok ; 
 	}
       if (!aceInDnaCheck (sx, ccp, ok))
-	continue ;
+	{
+	  if (sx->in == FASTQ)
+	    return FALSE ;
+	  else
+	    continue ;
+	}
       ok = TRUE ;
       vtxtPrint (sx->dna, ccp) ;
 
@@ -5906,7 +5911,7 @@ int main (int argc, const char **argv)
 	      cumul += i * n ;
 	      if (n > maxN) { maxN  = n ; mode = i ; }
 	    }
-	  average = cumul / nn ; 
+	  average = nn ? cumul / nn : 0 ;
 	  /* find the median */
 	  for (n = 0, i = 0 ; i < iMax ; i++)
 	    { 

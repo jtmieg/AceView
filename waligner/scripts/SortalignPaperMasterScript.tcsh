@@ -1,10 +1,22 @@
 #!/bin/tcsh
 setenv SV v4.aug13
 setenv SV v5.aug17
-setenv SV v6.aug18
-setenv SV v7.aug18
+setenv SV v5.aug17
+setenv SV v6.aug18  # they all crash signal 9, memory leak
 setenv SV v8.aug19
 setenv SV v9.aug21
+setenv SV v10.aug23
+setenv SV v11.aug24
+setenv SV v12.aug27
+setenv SV v13.aug30
+setenv SV v14.sep2
+setenv SV v15.sep4
+setenv SVlast v15.sep4
+
+
+if ($SV == $SVlast) then
+  \cp bin/sortalign bin/sortalign.$SV
+endif
 ##       SortalignPaperMasterScript.tcsh
 ## Author, Greg Boratyn, Danielle Thierry-Mieg, Jean Thierry-Mieg
 ## email for this script:   mieg@ncbi.nlm.nih.gov
@@ -31,32 +43,23 @@ if ($1 == '--help') goto phase_Help
 # one can insert new versions of each program by inserting new numbers
 # but since the numbers are erased in the final tables, the number AND the names 
 # must be unique
-setenv methods "01_SortAlign"
+setenv methods "011_SortAlignG3R5"
+setenv methods "012_SortAlignG5R1"
+setenv methods "013_SortAlignG3R1"
 setenv methods "02_ClipAlign"
 setenv methods "10_MagicBLAST"
 setenv methods "21_HISAT2"
 setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
-setenv methods "01_SortAlignTstep5"
 
-setenv methods "01_SortAlign 10_MagicBLAST 21_HISAT2 31_STARlong 50_Minimap2"
-setenv methods "01_SortAlign 10_MagicBLAST 21_HISAT2 31_STARlong 02_ClipAlign 50_Minimap2"
-setenv methods "01_SortAlign 01_SortAlignTstep5 02_ClipAlign 10_MagicBLAST 21_HISAT2 31_STARlong 50_Minimap2"
-setenv methods "21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads"
 
-setenv methods "11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024"
-setenv methods "21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads"
-setenv methods "01_SortAlign 01_SortAlignTstep5 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2"
-# setenv methods "02_ClipAlign"
-# s
-setenv methods "01_SortAlignTstep5"
+setenv allMethods "011_SortAlignG3R5 012_SortAlignG5R1 013_SortAlignG3R1 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
 
-setenv methods "01_SortAlignG3R5 01_SortAlignG5R3 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2"
+setenv methods "$allMethods"
 
-#setenv methods "01_SortAlign"
-#setenv methods "50_Minimap2"
-setenv methods "02_ClipAlign"
-setenv methods "01_SortAlignG3R5 01_SortAlignG5R3"
+# setenv methods "011_SortAlignG3R5 012_SortAlignG5R1 013_SortAlignG3R1"
+
+
 
 #############################################################################
 ## Datasets
@@ -65,7 +68,7 @@ setenv methods "01_SortAlignG3R5 01_SortAlignG5R3"
 setenv main_runs "iRefSeq PacBio Roche Illumina"
 
 # Baruzzo data
-sets, to be aligned on the Baruzzo human reference genome
+# sets, to be aligned on the Baruzzo human reference genome
 setenv HG19_r1_runs "HG19t1r1 HG19t2r1 HG19t3r1"
 setenv HG19_r2_runs "HG19t1r2 HG19t2r2 HG19t3r2"
 setenv HG19_r3_runs "HG19t1r3 HG19t2r3 HG19t3r3"
@@ -133,16 +136,18 @@ setenv runs "Roche"
 setenv runs "iRefSeq Roche"
 setenv runs "HG19t1r1 iRefSeq"
 setenv runs "HG19t1r1 HG19t2r1 HG19t3r1"
+setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1 PacBio Nanopore ChipSeq1 ChipSeq2"
 
 
-setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1"
-setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1 PacBio Nanopore"
+# setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1"
+setenv runs "$allRuns"
+# setenv runs "Roche"
 # setenv runs Nanopore
 
-# setenv runs "iRefSeq"
-# setenv runs "iRefSeq"
+# setenv runs "iRefSeq38 HG19t1r1"
 # setenv runs "RNA_PolyA_B_1"
-# setenv runs "SRR30569887  SRR32923629"
+# setenv runs "ChipSeq1 ChipSeq2"
+
 
 # This adapter is present in the PacBio SRR runs and gives a peak at 32 aligned bases = polyA + first 8 bp of adaptor
 # AAAAAAAAAAAAAAAAAAAAAAAAAAAAGTACTCT  GCGTTGATACCACTGCTTAGATCGGAAGAG
@@ -185,7 +190,7 @@ setenv PFAL_genome PFAL.Baruzzo.genome.fasta.gz
 set FTP="ftp://ftp.ncbi.nlm.nih.gov/blast/demo/magicblast_article/"
 if (! -d Reference_genome) mkdir Reference_genome
 pushd Reference_genome
-  foreach ff (GRCh38.genome.fasta.gz  HG19.Baruzzo.genome.TM.txt  HG19.Baruzzo.genome.fasta.gz  PFAL.Baruzzo.genome.TM.txt  PFAL.Baruzzo.genome.fasta.gz)
+  foreach ff (HG19.Baruzzo.genome.TM.txt  HG19.Baruzzo.genome.fasta.gz  PFAL.Baruzzo.genome.TM.txt  PFAL.Baruzzo.genome.fasta.gz)
     if (! -e $ff) then
       wget $FTP/Reference_genome/$ff
     endif
@@ -524,11 +529,13 @@ foreach run ($runs)
   echo $run
   if (-e Fasta/$run/$run.fasta.gz && ! -e Fasta/$run/$run.count) then
     echo "counting $run, please wait"
-    bin/dna2dna -i  Fasta/$run/$run.fasta.gz -I fasta -count -o Fasta/$run/$run
+    echo "bin/dna2dna -i  Fasta/$run/$run.fasta.gz -I fasta -count -o Fasta/$run/$run"
+          bin/dna2dna -i  Fasta/$run/$run.fasta.gz -I fasta -count -o Fasta/$run/$run
   endif
   if (-e Fasta/$run/$run.fastq.gz && ! -e Fasta/$run/$run.count) then
     echo "counting $run, please wait"
-    bin/dna2dna -i  Fasta/$run/$run.fastq.gz -I fastq -count -o Fasta/$run/$run
+    echo "bin/dna2dna -i  Fasta/$run/$run.fastq.gz -I fastq -count -o Fasta/$run/$run"
+          bin/dna2dna -i  Fasta/$run/$run.fastq.gz -I fastq -count -o Fasta/$run/$run
   endif
   if (-e Fasta/$run/$run'_1'.fastq.gz && ! -e Fasta/$run/$run'_1'.count) then
     echo "counting $run, please wait"
@@ -564,7 +571,7 @@ end
    cat Fasta/$run/$run.count >> toto
    cat Fasta/$run/$run'_'[12].count >> toto
    cat Fasta/$run/$run.*.count >> toto
-   cat toto | gawk '/Tags_processed/{nr+=$2;}/Bases_tags_processed/{bp+=$2;}/Min_probe_length/{x=$2;if(minx<1 || minx > x)minx=x;}/Max_probe_length/{x=$2;if(maxx+0<x)maxx=x;}END{printf("\t%d\t%d\t%d\t%d\t%d\n",nr,int(bp/nr),minx,maxx,bp) ;}' >> $toto
+   cat toto | gawk '/Tags_processed/{nr+=$2;}/Bases_tags_processed/{bp+=$2;}/Min_probe_length/{x=$2;if(minx<1 || minx > x)minx=x;}/Max_probe_length/{x=$2;if(maxx+0<x)maxx=x;}END{printf("\t%d\t%d\t%d\t%d\t%d\n",nr,int(bp/(nr+.00001)),minx,maxx,bp) ;}' >> $toto
 
  end
 echo $toto
@@ -808,22 +815,20 @@ set out=RESULTS/compare
     echo "### $type" > $out.$type.tsf
   end
 
-foreach rm (`ls -d RESULTS/*/* `)
-  set mm=`echo $rm | gawk -F '/' '{print $2}'`
-  set run=`echo $rm | gawk -F '/' '{print $3}'`
+foreach mm ($allMethods)
+  foreach run ($allRuns)
 
-  echo "#$mm#$run#"
+    if (! -e RESULTS/$mm/$run/align.done) continue
 
-
-  set e=RESULTS/$mm/$run/$run.err
-  if (! -e $e) continue
+    set e=RESULTS/$mm/$run/$run.err
+    if (! -e $e) continue
 
     set wallT=""
     set cpu=""
     set maxMem=""
     set multiP=""
 
-    cat $e | grep TIMING | tail -1 > _t
+    cat $e | grep TIMING | sort -k 5nr | tail -1 > _t
     set n=`cat _t | gawk '/TIMING/{n++}END{print n+0}'`
     if ($n == 1) then
       set wallT=`cat _t | gawk -F '\t' '{print $5}'`
@@ -832,12 +837,13 @@ foreach rm (`ls -d RESULTS/*/* `)
       set multiP=`cat _t | gawk -F '\t' '{print $13}'`
    endif
 
+   
     if (! -e RESULTS/$mm/$run/align.done) continue 
     echo "$run\t$mm\tt\t$wallT" >> $out.wallT.tsf
     echo "$run\t$mm\tt\t$cpu" >> $out.cpu.tsf
     echo "$run\t$mm\tt\t$maxMem" >> $out.maxMem.tsf
     echo "$run\t$mm\tt\t$multiP" >> $out.parallel.tsf
-
+  end
 end
 
   echo -n "### Timings of all methods version : $SV :" > COMPARE/timing.txt
@@ -847,31 +853,31 @@ end
   set title="Overall elapsed time in decimal minutes on the same hardware, as reported by the unix command /usr/bin/time %E"
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{n=split($4,aa,":");if(n==1)z=$4;if(n==2)z=60*aa[1]+aa[2];if(n==3)z=3600*aa[1]+60*aa[2]+aa[3];z=z/60.0;if(z+0>=0.002)printf("%s\t%s\tt\t%.2f\n",$1,$2,z);}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
-  echo "\n\n\n" >> COMPARE/timing.txt
+  echo "" >> COMPARE/timing.txt
 
   set type=wallT
   set title="Overall elapsed time in hours:minutes:seconds on the same hardware, as reported by the unix command /usr/bin/time %E"
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{if (! $4)next;printf("%s\t%s\tt\t",$1,$2);n=split($4,aa,":");if(n==1)printf("%d",int($4));if (n==2)printf("%d:%02d",aa[1],int(aa[2]));if (n==3)printf("%d:%02d:%02d",aa[1],aa[2],int(aa[3]));printf("\n");}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
-  echo "\n\n\n" >> COMPARE/timing.txt
+  echo "" >> COMPARE/timing.txt
 
   set type=maxMem
   set title="Peak RAM in Gigabytes, as reported by the unix command /usr/bin/time %M"
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{z=$4/1000000;if(z+0>=0.001)printf("%s\t%s\tt\t%.2f\n",$1,$2,z);}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
-  echo "\n\n\n" >> COMPARE/timing.txt
+  echo "" >> COMPARE/timing.txt
   
   set type=parallel
   set title="Average number of running threads, as reported by the unix command /usr/bin/time %P"
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{z=$4;gsub("%","",z);z=int((z+50)/100);if(z+0>=1)printf("%s\t%s\tt\t%s\n",$1,$2,z);}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
-  echo "\n\n\n" >> COMPARE/timing.txt
+  echo "" >> COMPARE/timing.txt
   	
   set type=cpu
   set title="CPU time in decimal minutes, sum of the system and user times, as reported by the unix command /usr/bin/time %U + %S"
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{z=$4/60.0;if($4+0>=10)printf("%s\t%s\tt\t%.2f\n",$1,$2,z);}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
-  echo "\n\n\n" >> COMPARE/timing.txt
+  echo "" >> COMPARE/timing.txt
 
   mv COMPARE/timing.txt COMPARE/timing.$SV.txt
     
@@ -887,13 +893,18 @@ phase_aliqc:
 echo -n "phase_aliqc :"
 date
 
-foreach run ($runs)
-  set nRawReads=`cat Fasta/$run/*.count | gawk '/^Sequence_kept/{n+=$2;}END{print n+0}'`
-  set nRawBases=`cat Fasta/$run/*.count | gawk '/^Bases_seq_kept/{n+=$2;}END{print n+0}'`
-  foreach mm ($methods)
-    if (! -e RESULTS/$mm/$run/align.done) continue
+foreach run ($allRuns)
+  set nRawReads=`cat Fasta/$run/$run*.count | gawk '/^Sequence_kept/{n+=$2;}END{print n+0}'`
+  set nRawBases=`cat Fasta/$run/$run*.count | gawk '/^Bases_seq_kept/{n+=$2;}END{print n+0}'`
+  foreach mm ($allMethods)
+    if (! -e RESULTS/$mm/$run/align.done) then
+      if (-e RESULTS/$mm/$run/s2g.samStats) \rm RESULTS/$mm/$run/s2g.samStats
+      continue
+    endif
     if (! -e RESULTS/$mm/$run/s2g.samStats) then
       set sam=RESULTS/$mm/$run/sam
+      if (! -e $sam) set sam=RESULTS/$mm/$run/$run.sam
+      if (! -e $sam) set sam=RESULTS/$mm/$run/$mm.$run.sam
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam.gz
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam_sorted
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam_sorted.gz
@@ -902,12 +913,12 @@ foreach run ($runs)
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" > 	RESULTS/$mm/$run/sam2gold.out					
-            scripts/submit RESULTS/$mm/$run/sam2gold "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" 64G
+            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" 64G
     
     endif
-    wc RESULTS/$mm/$run/s2g.samStats
+    # wc RESULTS/$mm/$run/s2g.samStats
   end
-  foreach mm ($methods)
+  foreach mm ($allMethods)
     if (! -e RESULTS/$mm/$run/align.done) continue
     if (-e RESULTS/$mm/$run/$run.s2g.samStats) then
       \cp RESULTS/$mm/$run/$run.s2g.samStats RESULTS/$mm/$run/s2g.samStats
@@ -920,16 +931,16 @@ date  >> COMPARE/samStats.$SV.txt
 echo "### True error rates in Baruzzo datasets:   t1=0.543,  t2=1.186, t3=6.024" >> COMPARE/samStats.$SV.txt
 cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 's/nMultiAligned 1 times/nAlignedOnce/g' -e 's/nMultiAligned 2 times/nMultiAligned_2_sites/g' > RESULTS/allSamStats
 
-foreach tag (nAlignedReads nAlignedBases nErrors nUnaligned nAlignedOnce nMultiAligned_2_sites)
+foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlignedOnce nMultiAligned_2_sites)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) > 1 && length($5) < 8 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
-  echo "\n\n" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) > 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nAlignedReads nAlignedBases nErrors nRawBases nRawReads nUnaligned nAlignedOnce nMultiAligned_2_sites)
+foreach tag (nAlignedReads nAlignedBases nErrors nPerfectReads nRawBases nRawReads nUnaligned nAlignedOnce nMultiAligned_2_sites)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) > 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$4);}}' tag=$tag | bin/tsf  -I tsf -O table --title $tag >> COMPARE/samStats.$SV.txt
-  echo "\n\n" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
 \cp ~/ace/wacext/sortalign.c COMPARE/sortalign.$SV.c
@@ -1610,7 +1621,7 @@ goto phaseLoop
 
 phase6:
 phaseLoop:
-  echo -n "$1 done : "
+  echo -n "$1 $SV done : "
   date
 
 ##############################################################################

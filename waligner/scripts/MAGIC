@@ -1718,6 +1718,13 @@ if ($species == hs) then
   setenv chromSetAll ' chrY chrX chr22 chr21 chr20 chr19 chr18 chr17 chr16 chr15 chr14 chr13 chr12 chr11 chr10 chr9 chr8 chr7 chr6 chr5 chr4 chr3 chr2 chr1'
 endif
 
+# human GRCh37 auguts 2025
+#  see TARGETS/human/TARGET.human.GRCh38.2025
+#  derived from /am/ftp-genomes/all/annotation_releases/9606/110/GCF_000001405.40_GRCh38.p14
+#  keeping only NC chromosomes
+
+
+
 if ($species == rn) then
   set ref=ref_Rnor_6.0
   set refG=rn_ref_Rnor_6.0
@@ -1994,6 +2001,13 @@ NM_	66971
 NR_	22978
 XM_	62692
 XR_	26168
+rna	521
+
+# human GRCh38 2025
+NM_	63738
+NR_	18993
+XM_	65919
+XR_	18993
 rna	521
 
 #######  rn.6_0 2016_08_02

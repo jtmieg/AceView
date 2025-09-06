@@ -9,7 +9,7 @@
  * Description: header for bigarraysub.c
  *              Allow larger Arrays, indexed by long int
  *              I contemplated modifying Array to use long but would imply
- *              editing the code in a zillion palces and would slow everything
+ *              editing the code in a zillion places and would slow everything
  *              when bigarrays are only useful in particular situations
  *              NOT to be included by the user, included by regular.h and ac.h
  * Exported functions:
