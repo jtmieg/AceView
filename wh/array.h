@@ -108,8 +108,12 @@ void    arrayReport (mysize_t j) ;	/* write stderr about all arrays since j */
             /* JTM's package to hold sorted arrays of ANY TYPE */
 BOOL    arrayInsert(Array a, void * s, int (*order)(const void*, const void*));
 BOOL    arrayRemove(Array a, void * s, int (*order)(const void*, const void*));
+/* sort the whole array */
 void    arraySort(Array a, int (*order)(const void*, const void*)) ;
+/* sort from pos to end */
 void    arraySortPos (Array a, mysize_t pos, int (*order)(const void*, const void*));
+/* sort from pos1 to pos 2, pos2 excluded [pos1, pos2[ */
+void    arraySortSlice (Array a, mysize_t pos1, mysize_t pos2, int (*order)(const void*, const void*));
 void    arrayCompress(Array a) ;
 BOOL    arrayFind(Array a, void *s, int *ip, int (*order)(const void*, const void*));
 BOOL    arrayIsEntry(Array a, int i, void *s);

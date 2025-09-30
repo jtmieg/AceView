@@ -1,6 +1,7 @@
 /*
 ************************************************************************
 *** wego - an easy library for simple SMP/multithreading in C
+*** Author Mark Sienkiewicz, Jean Thierry-Mieg, NCBI
 ************************************************************************
 * $Header: /home/mieg/aa/CVS_ACEVIEW/ace/wego/wego.c,v 1.37 2020/06/29 01:20:13 mieg Exp $
 */
@@ -620,12 +621,13 @@ static void *wego_threadrunner (void *thread_parameter)
 
 /************************************************************************/
 
-static void wego_new_thread (void)
+static int wego_new_thread (void)
 {
   pthread_t thread;
   struct threadrunner *t;
   static int thread_id = 1;
   int error = 0 ;
+  int ok = 0 ;
   
   DEBUG((stderr, "wego_new_thread in %d\n",TID)) ;
   
@@ -638,21 +640,23 @@ static void wego_new_thread (void)
   t->next = all_threads;
   pthread_cond_init(&t->condition,NULL);
   pthread_mutex_init(&t->semaphore,NULL);
-  all_threads = t;
   
   pthread_mutex_lock(&thread_startup_lock);
   error = pthread_create(&thread, NULL, wego_threadrunner, (void *)t) ;
   if (! error)
-    pthread_cond_wait(&thread_startup_condition, &thread_startup_lock);
+    {
+      pthread_cond_wait(&thread_startup_condition, &thread_startup_lock);
+      all_threads = t;
+      ok = 1 ;
+    }
   else /* creation failed */
     {
       fprintf (stderr, "ERROR  wego_new_thread: pthread_create retuned error %dn", error) ;
       t->available = -1 ;  
-	    all_threads = t->next ;	    
+      free (t) ;
     }
   pthread_mutex_unlock(&thread_startup_lock);
-  if (t->available == -1)
-    free (t) ;
+  return ok ;
 } /* wego_new_thread */
 
 /************************************************************************/
@@ -701,8 +705,12 @@ static void wego_schedule (void)
   while (num_available + running <= max_threads)
     {
       DEBUG((stderr, "wego_schedule: starting extra thread, available %d running %d < max %d\n", num_available , running , max_threads) )
-	wego_new_thread();
-      num_available++;
+	if (wego_new_thread())
+	  num_available++;
+	else
+	  {
+	    max_threads = num_available + running - 1 ;
+	  }
     }
   
   DEBUG((stderr, "wego_schedule: has running %d available %d\n",running,num_available)) ;

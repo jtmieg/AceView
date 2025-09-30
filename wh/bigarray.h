@@ -104,8 +104,12 @@ BOOL    arrayRemove(BigArray a, void * s, int (*order)(const void*, const void*)
 */
 void bigArrayLock (BigArray a) ;
 void bigArrayUnlockLock (BigArray a) ;
+/* sort the whole array */
 void    bigArraySort(BigArray a, int (*order)(const void*, const void*)) ;
+/* sort from pos to end */
 void    bigArraySortPos (BigArray a, long int pos, int (*order)(const void*, const void*));
+/* sort from pos1 to pos 2, pos2 excluded [pos1, pos2[ */
+void    bigArraySortSlice (BigArray a, long int pos1, long int pos2, int (*order)(const void*, const void*)); 
 void    bigArrayCompress(BigArray a) ;
 BOOL    bigArrayFind(BigArray a, void *s, long int *ip, int (*order)(const void*, const void*));
 BOOL    bigArrayIsEntry(BigArray a, long int i, void *s);

@@ -426,23 +426,33 @@ void bigArrayCompress(BigArray a)
 
 /****************/
 
-/* 31.7.1995 dok408  added arraySortPos() - restricted sorting to tail of array */
-
-void bigArraySort(BigArray a, int (*order)(const void*, const void*)) { bigArraySortPos(a, 0, order) ; }
-
-void bigArraySortPos (BigArray a, long int  pos, int (*order)(const void*, const void*))
+/* 2025_09_10 , added arraySortSlice */
+void bigArraySortSlice (BigArray a, long int pos1, long int pos2, int (*order)(const void*, const void*))
 {
-  long int n = a->max - pos ;
-  int s = a->size ;
-  void *v = a->base + pos * a->size ;
- 
-  if (pos < 0) messcrash("arraySortPos: pos = %ld", pos);
-
+  long int n = pos2 - pos1 ;
+  
+  if (! bigArrayExists (a))
+    messcrash("bigArraySortSlice called on non existing bigArray, please edit the source code") ;
+  if (pos1 < 0)
+    messcrash("pos1 = %ld < 0 in bigArraySortSlice", pos1) ;
+  if (pos2 > a->max)
+    messcrash("pos2 = %ld > max = %ld in bigArraySortPosSlice", pos2, a->max) ;
+  
   if (n > 1) 
-  {
-    mSort (v, n, s, order) ;
-  }
+    {
+      int s = a->size ;
+      void *v = a->base + s * pos1 ;
+      mSort (v, n, s, order) ;
+    }
 }
+
+/* 31.7.1995 dok408  added arraySortPos() - restricted sorting to tail of array */
+void bigArraySortPos (BigArray a, long int  pos, int (*order)(const void*, const void*))
+{ return bigArraySortSlice(a, pos, a ? a->max : 0, order) ;  }
+
+void bigArraySort (BigArray a, int (*order)(const void*, const void*))
+{ return bigArraySortSlice(a, 0, a ? a->max : 0, order) ;  }
+
 
 /***********************************************************/
 

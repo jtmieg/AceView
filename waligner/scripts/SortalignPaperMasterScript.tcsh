@@ -10,13 +10,35 @@ setenv SV v11.aug24
 setenv SV v12.aug27
 setenv SV v13.aug30
 setenv SV v14.sep2
-setenv SV v15.sep4
-setenv SVlast v15.sep4
-
+setenv SV v15.sep4      # before clustering
+setenv SV v16.sep6      # 16mers, clustering on seed counts 1/4 mult^2, maxTargetRepeats 4
+setenv SV v17.sep6      # 16mers, clustering on seed counts 1/4 mult^2
+setenv SV v18.sep7      # 18mers, maxTargetRepeats 12
+setenv SV v19.sep7      # 18mers, maxTargetRepeats 31
+setenv SV v20.sep8
+setenv SV v21.sep10     # new clustering counting seeds in read coordinates
+setenv SV v22.sep12     # 2.5 min words
+setenv SV v23.sep15     # min hash of all words up to step
+#setenv SVlast v23.sep15
+# setenv SV v24.sep22    # same code as 23, but new methods G5R5  G3R3 G3R1 with min hashing    
+# setenv SVlast v24.sep22  
+setenv SV v25.sep22        # fixed introns boundaries, prefer probe with less repeats, maxTargetRepeats 81, seedLength 18
+setenv SVlast v25.sep22  
+setenv SV v26.sep23        # BAD on all metrics same as V25, but maxTargetRepeats 31, seedLength 18
+setenv SVlast v26.sep23  
+setenv SV v27.sep25        # same as 25 maxTargetRepeats 81, seedLength 16
+setenv SVlast v27.sep25  
+setenv SV v28.sep27        # maxTargetRepeats 31, seedLength 18, * for exon words
+setenv SVlast v28.sep27  
+setenv SV v29.sep29        # maxTargetRepeats 31, seedLength 18, * for exon words
+setenv SVlast v29.sep29    # maxTargetRepeats 81, seedLength 18, fixed topology bug, MAXJUMP 3
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
 endif
+
+setenv seedLength 18
+
 ##       SortalignPaperMasterScript.tcsh
 ## Author, Greg Boratyn, Danielle Thierry-Mieg, Jean Thierry-Mieg
 ## email for this script:   mieg@ncbi.nlm.nih.gov
@@ -33,6 +55,7 @@ if ($1 == '--help') goto phase_Help
 ## This script is a nerwer version of the 2018 MagicBLAST_paper_master_script.tcsh
 
 # git clone https://github.com/ncbi/magicblast.git
+echo "#### SORTALIGN $SV"
 
 #############################################################################
 ## Metadata
@@ -53,11 +76,13 @@ setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
 
 
-setenv allMethods "011_SortAlignG3R5 012_SortAlignG5R1 013_SortAlignG3R1 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
+setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
 
 setenv methods "$allMethods"
 
-# setenv methods "011_SortAlignG3R5 012_SortAlignG5R1 013_SortAlignG3R1"
+set createIndex=0
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3"
+# setenv methods "011_SortAlignG5R5"
 
 
 
@@ -142,11 +167,14 @@ setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1
 # setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1"
 setenv runs "$allRuns"
 # setenv runs "Roche"
+# setenv runs "iRefSeq38"
 # setenv runs Nanopore
 
-# setenv runs "iRefSeq38 HG19t1r1"
+# to create all IDX use these runs
+if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1"
 # setenv runs "RNA_PolyA_B_1"
 # setenv runs "ChipSeq1 ChipSeq2"
+# setenv runs "ChipSeq1"
 
 
 # This adapter is present in the PacBio SRR runs and gives a peak at 32 aligned bases = polyA + first 8 bp of adaptor
@@ -931,15 +959,27 @@ date  >> COMPARE/samStats.$SV.txt
 echo "### True error rates in Baruzzo datasets:   t1=0.543,  t2=1.186, t3=6.024" >> COMPARE/samStats.$SV.txt
 cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 's/nMultiAligned 1 times/nAlignedOnce/g' -e 's/nMultiAligned 2 times/nMultiAligned_2_sites/g' > RESULTS/allSamStats
 
-foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlignedOnce nMultiAligned_2_sites)
+foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlignedOnce nMultiAligned)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) > 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nAlignedReads nAlignedBases nErrors nPerfectReads nRawBases nRawReads nUnaligned nAlignedOnce nMultiAligned_2_sites)
+foreach tag (nAlignedReads nAlignedBases nErrors nPerfectReads nRawBases nRawReads nUnaligned nAlignedOnce nMultiAligned nAlignments)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) > 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$4);}}' tag=$tag | bin/tsf  -I tsf -O table --title $tag >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$4);}}' tag=$tag | bin/tsf  -I tsf -O table --title $tag >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
+foreach tag (nMultiAligned)
+  echo "\nAverage_number_of_alignments\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
+foreach tag (nGoodpairs)
+  echo "\nConsistent pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 

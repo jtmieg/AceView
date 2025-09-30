@@ -419,7 +419,8 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   long int nUnalignedReads = 0 ;
   long int nAlignedReads = 0 ;
   long int nPerfectReads = 0 ;
-
+  BOOL isNewPerfectCandidate = FALSE ;
+  
   nn = nn0 ;
 
   aceInSpecial (ai, "\n") ;
@@ -443,18 +444,18 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
        * 0x10 0x20  target strand
        * 0x80   second read of a pair
        * 0x100  secondary mappings
-       * 1   	000000000001 	template having multiple templates in sequencing (read is paired)
-       * 2 	000000000010 	each segment properly aligned according to the aligner (read mapped in proper pair)
-       * 4 	000000000100 	this segment is unmapped (read1 unmapped)
-       * 8 	000000001000 	next segment in the template unmapped (read2 unmapped)
-       * 16 	000000010000 	this read is minus strand: SEQ being reverse complemented (read1 reverse complemented)
-       * 32 	000000100000 	minus strand read2 : SEQ of the next segment in the template being reverse complemented (read2 reverse complemented)
-       * 64 	000001000000 	the first segment in the template (is read1)
-       * 128 	000010000000 	the last segment in the template (is read2)
-       * 256 	000100000000 	not primary alignment
-       * 512 	001000000000 	alignment fails quality checks
-       * 1024 	010000000000 	PCR or optical duplicate
-       * 2048 	100000000000 	supplementary alignment (e.g. aligner specific, could be a portion of a split read or a tied region)
+       * 1   	000000000001 	0x1   template having multiple templates in sequencing (read is paired)
+       * 2 	000000000010 	0x2   each segment properly aligned according to the aligner (read mapped in proper pair)
+       * 4 	000000000100 	0x4   this segment is unmapped (read1 unmapped)
+       * 8 	000000001000 	0x8   next segment in the template unmapped (read2 unmapped)
+       * 16 	000000010000 	0x10  this read is minus strand: SEQ being reverse complemented (read1 reverse complemented)
+       * 32 	000000100000 	0x20  minus strand read2 : SEQ of the next segment in the template being reverse complemented (read2 reverse complemented)
+       * 64 	000001000000 	0x40  the first segment in the template (is read1)
+       * 128 	000010000000 	0x80  the last segment in the template (is read2)
+       * 256 	000100000000 	0x100 not primary alignment
+       * 512 	001000000000 	0x200 alignment fails quality checks
+       * 1024 	010000000000 	0x400 PCR or optical duplicate
+       * 2048 	100000000000 	0x800 supplementary alignment (e.g. aligner specific, could be a portion of a split read or a tied region)
        */
       aceInStep (ai, '\t') ; aceInInt (ai, &flag) ;
 
@@ -487,6 +488,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       if (dictAdd (s2g->seqDict, seqBuf, &seq))
 	{ /* new read */
 	  nAlignedReads++ ;
+	  isNewPerfectCandidate = TRUE ;
 	  if (0) printf ("XXXX\t%s\n", seqBuf) ;
 	}
       if (dictFind (unalignedDict, seqBuf, &seq2))
@@ -559,21 +561,24 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	    {
 	      nAlignedBases += x2 - x1 + 1 - ins ;
 	      nErrors += (nerr > 0 ? nerr : 0) ;
-	      if (ali == dnaLn && nerr == 0)
-		nPerfectReads++ ;
 	    }
 	}
       else
 	{
-	  if (! (flag & (256 + 0*2048)))  /* primary alignment */
+	  if (! (flag & (256 + 2048)))  /* primary alignment */
 	    {
 	      nAlignedBases += x2 - x1 + 1 - ins ;
 	      nErrors += (nerr > 0 ? nerr : 0) ;
-	      if (ali == dnaLn && nerr == 0)
-		nPerfectReads++ ;
 	    }
 	}
-      
+      if (isNewPerfectCandidate)
+	{
+	  if (ali == dnaLn && nerr == 0)
+	    {
+	      nPerfectReads++ ;
+	      isNewPerfectCandidate = FALSE ;
+	    }
+	}
       hit = bigArrayp (hits, nn++, HIT) ; nn-- ;
       hit->method = method ;
       hit->flag = flag ;

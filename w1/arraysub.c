@@ -45,13 +45,8 @@ extern BOOL finalCleanup ;	/* in messubs.c */
 
 /******** tells how much system stack used *********/
 
-char *stackorigin ;
-
 mysize_t stackused (void)
-{ char x ;
-  if (!stackorigin)          /* ideally should set in main() */
-    stackorigin = &x ;       /* on purpose we are storing the address of a local variable */
-  return stackorigin - &x ;        /* MSDOS stack grows down */
+{ return 0 ;
 }
 
 /************ Array : class to implement variable length arrays ************/
@@ -419,23 +414,35 @@ void arrayCompress(Array a)
 
 /****************/
 
-/* 31.7.1995 dok408  added arraySortPos() - restricted sorting to tail of array */
+/****************/
 
-void arraySort(Array a, int (*order)(const void*, const void*)) { arraySortPos(a, 0, order) ; }
-
-void arraySortPos (Array a, mysize_t pos, int (*order)(const void*, const void*))
+/* 2025_09_10 , added arraySortSlice */
+void arraySortSlice (Array a, mysize_t pos1, mysize_t pos2, int (*order)(const void*, const void*))
 {
-  unsigned int n = a->max - pos ;
-  int s = a->size ;
-  void *v = a->base + pos * a->size ;
- 
-  if (pos < 0) messcrash("arraySortPos: pos = %d", pos);
-
+  mysize_t n = pos2 - pos1 ;
+  
+  if (! arrayExists (a))
+    messcrash("arraySortSlice called on non existing array, please edit the source code") ;
+  if (pos1 < 0)
+    messcrash("pos1 = %ld < 0 in arraySortSlice", pos1) ;
+  if (pos2 > a->max)
+    messcrash("pos2 = %ld > max = %ld in arraySortSlice", pos2, a->max) ;
+  
   if (n > 1) 
-  {
-    mSort (v, n, s, order) ;
-  }
+    {
+      int s = a->size ;
+      void *v = a->base + s * pos1 ;
+      mSort (v, n, s, order) ;
+    }
 }
+
+/* 31.7.1995 dok408  added arraySortPos() - restricted sorting to tail of array */
+void arraySortPos (Array a, mysize_t  pos, int (*order)(const void*, const void*))
+{ return arraySortSlice(a, pos, a ? a->max : 0, order) ;  }
+
+void arraySort (Array a, int (*order)(const void*, const void*))
+{ return arraySortSlice(a, 0, a ? a->max : 0, order) ;  }
+
 
 /***********************************************************/
 
