@@ -179,8 +179,8 @@ typedef struct pStruct {
   CHAN *smChan ; /* Sorter sends words to the Matcher */
   CHAN *moChan ; /* Matcher needs seeds to be Ordered */
   CHAN *oaChan ; /* Ordered matches  sent to the Aligner */
-  CHAN *awChan ; /* Aligner to Wiggler */
-  CHAN *weChan ; /* Aligner results to be Exported */
+  CHAN *aeChan ; /* Aligner results to be Exported */
+  CHAN *wwChan ; /* Wiggler */
   CHAN *doneChan ; /* return to main program */
 
   BB bbG ;  /* genome or genes target */
@@ -190,12 +190,12 @@ typedef struct pStruct {
   Array confirmedIntrons ;
   BOOL fasta, fastq, fastc, raw, solid ;
   BOOL sam, exportSamSequence, exportSamQuality ;
-  BOOL hasBonus ;
   int bonus[256] ;
   DICT *runDict ;
   DICT *targetClassDict ;
   DICT *geneDict ;
   DICT *mrnaDict ;
+  DICT *wiggleFileDict ;
   const char *method ;
   int run ;
   int nFiles ;  /* number of input sequence files */
@@ -210,7 +210,7 @@ typedef struct pStruct {
   int maxIntron ;
   int errCost ;
   int errMax ;       /* (--align case) max number of errors in seed extension */
-  int minAli, minAliPerCent ;
+  int minScore, minAli, minAliPerCent ;
   int errRateMax ;       /* (--align case) max number of errors in seed extension */
   int OVLN ;
   BOOL splice ;
@@ -932,7 +932,7 @@ static void globalDnaCreate (BB *bb)
 	  dna->base = (char *) cp ; 
 	  ln += n ; cp += n ;
 	  /* protect each sequence with a terminal A to allow constructing w1 in codeWords */
-	  memset (cp, 0, 16) ; *cp = A_ ; ln += 16 ; cp += 16 ;
+	  memset (cp, 0, 16) ; /* *cp = A_ */ ; ln += 16 ; cp += 16 ;
 	  n = n % 16 ;
 	  if (n)          /* align the data */
 	    {  memset (cp, 0, 16 - n) ; ln += 16 - n ; cp += 16 - n ; }
@@ -1135,7 +1135,7 @@ static BOOL parseOnePair (DnaFormat format, char *namBuf
     {
       char namBuf2 [NAMMAX] ;
       int ln = strlen (namBuf) ;
-      ok2 = parseOneSequence (format, namBuf2, ai2, dna2, qual2, linep2) ;
+      parseOneSequence (format, namBuf2, ai2, dna2, qual2, linep2) ;
       if (strncmp (namBuf, namBuf2, ln-1))
 	messcrash ("\nNon matching pair of sequence identifiers %s <> %s\n line %d of file %s\nlne %d of file %s\n"
 		   , namBuf, namBuf2, *linep1, aceInFileName (ai1), *linep2, aceInFileName (ai2)) ;
@@ -1159,10 +1159,13 @@ static BOOL parseOnePair (DnaFormat format, char *namBuf
 	  arrayMax (dna1) = n ;
 	}      
     }
-  
+
+  ok1 = FALSE ;
+  ok2 = dna2 ? FALSE : TRUE ;
   n = arrayMax (dna1) ;
   if (n)
     {
+      ok1 = TRUE ;
       dnaEncodeArray (dna1) ;
       if (0 &&  /* - (not sequenced) i encoded as 0, i do not dare to change that in w1/dnacode.c  */
 	  n != strlen (arrp (dna1, 0, char)))  /* will detect an early  zero */
@@ -1173,6 +1176,7 @@ static BOOL parseOnePair (DnaFormat format, char *namBuf
   n = dna2 ? arrayMax (dna2) : 0 ;
   if (n)
     {
+      ok2 = TRUE ;
       dnaEncodeArray (dna2) ;
       if (n != strlen (arrp (dna2, 0, char)))  /* will detect an early  zero */
 	{
@@ -1312,7 +1316,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   int NMAX = isGenome ? 500 : 100000 ;  /* was 100000 for 300s on 6.5 GigaBase human 2025_05_23 */
   int BMAX = 200 * NMAX ;
   int nPuts = 0 ;
-  int nn = 0, nSeqs = 0 ;
+  int nn = 0 ;
   int lane = 1 ;
   CHAN *chan = 0 ;
   ACEIN ai1 = 0 ;
@@ -1326,6 +1330,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   const char *fileName1 = rc ? rc->fileName1 : tc->fileName ;
   const char *fileName2 = rc ? rc->fileName2 : 0 ;
   BOOL pairedEnd = rc ? rc->pairedEnd : FALSE ;
+  long int nSeqs = 0 ;
   char tBuf[25] ;
   clock_t t1, t2 ;
   
@@ -1367,10 +1372,10 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       namBufX = namBuf ;
     }
   
+  format = rc ? rc->format : tc->format ;
+      
   if (! bb->h)
     {  /* isGenome: keep expanding the same bbG if already initialised */
-      DnaFormat format = rc ? rc->format : tc->format ;
-      
       bb->h = ac_new_handle () ;
       bb->txt1 = vtxtHandleCreate (bb->h) ;
       bb->txt2 = vtxtHandleCreate (bb->h) ;
@@ -1390,7 +1395,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   
   line1 = line2 = 0 ; line10 = 1 ;
   dna1 = arrayHandleCreate (isGenome ? 1 << 20 : 256, unsigned char, bb->h) ;
-  dna2 = arrayHandleCreate (256, unsigned char, bb->h) ;
+  dna2 = (fileName2 || format == FASTC) ? arrayHandleCreate (256, unsigned char, bb->h) : 0 ;
   if (pp->exportSamQuality && format == FASTQ)
     {
       qual1 = arrayHandleCreate (isGenome ? 1 << 20 : 256, unsigned char, bb->h) ;
@@ -1416,7 +1421,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	    {
 	      sprintf (cr, ".%d", iMult+1) ; 
 	    }
-	  if (pairedEnd || arrayMax(dna2)) 
+	  if (pairedEnd || (dna2 && arrayMax(dna2)) )
 	    {
 	      int k = strlen (namBuf) ;
 	      int nn1, n1 = arrayMax (dna1) ;
@@ -1452,7 +1457,21 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 		  if (bb->quals)
 		    qual1 = arrayHandleCreate (256, unsigned char, bb->h) ;
 		}
-		  
+	      if (arrayMax (dna1))
+		{
+		  int i, iMax = arrayMax (dna1) ;
+		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
+		  for (i = 0 ; i < iMax ; i++)
+		    bb->runStat.NATGC[natgc[(int)*cp]]++ ;
+		}
+	      if (arrayMax (dna2))
+		{
+		  int i, iMax = arrayMax (dna2) ;
+		  unsigned char *cp = arrp (dna2, 0, unsigned char) ;
+		  for (i = 0 ; i < iMax ; i++)
+		    bb->runStat.NATGC[natgc[(int)*cp]]++ ;
+		}
+
 	      /*
 		namBuf[k] = '<' ;  namBuf[k+1] = 0 ;
 		dictAdd (bb->dict, namBuf, &nn2) ;
@@ -1512,7 +1531,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	      if (arrayMax (dna1))
 		{
 		  int i, iMax = arrayMax (dna1) ;
-		  unsigned char *cp = arrp (dna2, 0, unsigned char) ;
+		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax ; i++)
 		    bb->runStat.NATGC[natgc[(int)*cp]]++ ;
 		}
@@ -1572,11 +1591,11 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	}
     }
 
-  if (! bb->nSeqs)
+  if (! nSeqs)
     messcrash ("\nEmpty sequence file %s\n", fileName1) ;
   
 
-  if (chan)
+  if (chan && bb->nSeqs)
     {
       globalDnaCreate (bb) ;
       t2 = clock () ;
@@ -1586,6 +1605,8 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       channelPut (chan, bb, BB) ;
       channelPut (pp->npChan, &nPuts, int) ; /* global counting of BB blocks accross all sequenceParser agents */
     }
+  else
+    { ac_free (bb->h) ; }
   
   /* create the REVERSE COMPLEMENT of the GENOME */
   if (isGenome == 2)
@@ -1610,7 +1631,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	}
     }
   
-  if (1 || pp->debug) printf ("--- %s: Stop sequence parser %d sequences, %d lines from file %s\n", timeBufShowNow (tBuf), nSeqs, line1, fileName1) ;
+  if (1 || pp->debug) printf ("--- %s: Stop sequence parser %ld sequences, %d lines from file %s\n", timeBufShowNow (tBuf), nSeqs, line1, fileName1) ;
   
   ac_free (h) ;
   return ;
@@ -1897,7 +1918,10 @@ static void parseReadsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
 	  dna1 = arrayHandleCreate (256, unsigned char, bb->h) ;
 	}
       ac_free (h) ;
-      globalDnaCreate (bb) ;
+      if (arrayMax (bb->dnas))
+	  globalDnaCreate (bb) ;
+      else
+	messcrash ("\nNo data found in sequence file  %s\n", bb->rc.fileName1) ;
     }
   
   return ;
@@ -1955,7 +1979,7 @@ static void codeWordsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
       int iMax = arrayMax (dna) ;
       long unsigned int w, wr ;
       const int nShift = 62 ;
-      step = iMax < 60 ? 1 : bb->step ;
+      if (0) step = iMax < 60 ? 1 : bb->step ;
       
       w = wr = 0 ;
       /* each q vector is used round-robin style, so no copying is needed */
@@ -3039,32 +3063,32 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 	}
       while  (i < iMax && j < jMax)
 	{
-	  if (0 && rw->seed == 168430082)
-	    printf("(rw->seed == 168430082)\n") ;
+	  if (0 && rw->seed == 975012768)
+	    printf("(rw->seed == 975012768)\n") ;
 	  if ((i & mask) == 0)
 	    {
-	      if (rw->seed < (unsigned int) cw->seed)
+	      if (0 || rw->seed <= (unsigned int) cw->seed)
 		{
 		  cw++ ;
 		  i++ ;
 		  bb->skips0++;
 		  continue;
 		}
-	      else if (rw->seed < (unsigned int) cw->pos)
+	      else if (rw->seed <= (unsigned int) cw->pos)
 		{
 		  cw += step1 ;
 		  i += step1 ;
 		  bb->skips1++;
 		  continue;
 		}
-	      else if (rw->seed < (unsigned int) cw->nam)
+	      else if (rw->seed <= (unsigned int) cw->nam)
 		{
 		  cw += step2 ;
 		  i += step2 ;
 		  bb->skips2++;
 		  continue;
 		}
-	      else if (rw->seed < (unsigned int) cw->intron)
+	      else if (rw->seed <= (unsigned int) cw->intron)
 		{
 		  cw += step3 ;
 		  i += step3 ;
@@ -3582,7 +3606,7 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
   int x1 = *x1p, x2 = *x2p ;
   int a1 = *a1p, a2 = *a2p ;
   arrayMax (err) = 0 ;
-#define MAXJUMP 3
+#define MAXJUMP 8
 
   errMax = isIntron ? 0 : errMax ;
   
@@ -3927,11 +3951,14 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
     aceDnaShowErr (up->errors) ;
   vtxtClear (txt1) ;
   vtxtClear (txt2) ;
-
+  
   for (ii = 0, sep = "" ; ii < nerr ; ii++, ep++, sep = ",")
     {
       xShort = ep->iShort + 1 ;
       xLong = ep->iLong + 1 ;
+
+      if (xShort <= 0 || xLong <= 0 || xShort >= arrayMax (dna))
+	continue ;
       switch (ep->type)
 	{
 	  case TYPE80:
@@ -3990,31 +4017,25 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	case TROU: 
 	  {
 	    char *ss = "-", cc1a, cc2a, cc1ac, cc2ac ;
-	    int xLongR = arrayMax (dnaG) - xLong + 1 ;
 	    
-	    cc1a = arr(dnaG, (isUp ? xLongR - 1 + 0 : xLong - 1 + 0), unsigned char) ;
+	    cc1a = arr(dnaG, xLong - 1, unsigned char) ;
 	    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
 	    
 	    cc1ac = dnaDecodeChar[(int)cc1a] ;
 	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    
-	    /*
-	      if (chenillette (arrp(dnaG, 0, unsigned char), isUp ? xLongR - 1 - (pp->solid ? 1 : 0) : xLong - 1 + (pp->solid ? 1 : 0), 1, &dxL, &dxR))
-	      ss = "*-" ;
-	    */
-	    
+
 	    vtxtPrintf (txt2,"%s%d:%s%c"
 			, sep
 			, xLong 
 			, ss 
-			, cc2ac
+			, cc1ac 
 			) ;
 	    
 	    vtxtPrintf (txt1, "%s%d:%s%c"
 			, sep
 			, xShort
 			, ss
-			, cc1ac
+			, cc2ac
 			) ;
 	  }
 	  break ;
@@ -4022,16 +4043,8 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	case TROU_DOUBLE:
 	  {
 	    char *ss = "--", cc1a, cc1b, cc2a, cc2b, cc1ac, cc1bc, cc2ac, cc2bc ;
-	    int xLongR = arrayMax (dnaG) - xLong + 1 ;
-	    /*
-	      if (chenillette (arrp(pp->dna0, 0, unsigned char), isUp ? xLongR - 2 : xLong - 1, 2, &dxL, &dxR))
-	      {
-	      ss = "*--" ; 
-	      xShort += (pp->solid ? 0 : 0) ;
-	      }
-	    */
-	    cc1a = arr(dnaG, (isUp ? xLongR - 2 + 0 : xLong -1 + 0), unsigned char) ;
-	    cc1b = arr(dnaG, (isUp ? xLongR - 2 + 1 : xLong -1 + 1), unsigned char) ;
+	    cc1a = arr(dnaG, xLong - 1 , unsigned char) ;
+	    cc1b = arr(dnaG, xLong - 1 + 1, unsigned char) ;
 	    
 	    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
 	    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
@@ -4045,40 +4058,23 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 			, sep
 			, xLong 
 			, ss 
-			, cc2ac, cc2bc
+			, cc1ac, cc1bc
 			) ;
 	    
 	    vtxtPrintf (txt1, "%s%d:%s%c%c"
 			, sep
-			, xShort + 1
+			, xShort + (isUp ? 1 : 0)
 			, ss
-			, cc1ac, cc1bc
+			, cc2ac, cc2bc
 			) ;
 	  }
 	  break ;
 	case TROU_TRIPLE:
 	  {
 	    char *ss = "---", cc1a, cc1b, cc1c, cc2a, cc2b, cc2c, cc1ac, cc1bc, cc1cc, cc2ac, cc2bc, cc2cc ;
-	    /*
-	      if (ii == 0)
-	      {
-	      lastShort-- ;
-	      lastShort-- ;
-	      lastShort-- ;
-	      }
-	    */
-	    /*
-	      if (chenillette (arrp(pp->dna0, 0, unsigned char), isUp ? xLongR - 3 : xLong - 1, 3, &dxL, &dxR))
-	      {
-	      ss = "*---" ;
-	      xShort += (pp->solid ? 0 : 0 ) ;
-	      }
-	    */
-	    int xLongR = arrayMax (dnaG) - xLong + 1 ;
-	    cc1a = arr(dnaG, (isUp ? xLongR - 3 + 0 : xLong -1 + 0), unsigned char) ;
-	    cc1b = arr(dnaG, (isUp ? xLongR - 3 + 1 : xLong -1 + 1), unsigned char) ;
-	    cc1c = arr(dnaG, (isUp ? xLongR - 3 + 2 : xLong -1 + 2), unsigned char) ;
-	    
+	    cc1a = arr(dnaG, xLong - 1 , unsigned char) ;
+	    cc1b = arr(dnaG, xLong - 1 + 1 , unsigned char) ;
+	    cc1c = arr(dnaG, xLong - 1 + 2 , unsigned char) ;
 	    
 	    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
 	    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
@@ -4095,24 +4091,21 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 			, sep
 			, xLong 
 			, ss 
-			, cc2ac, cc2bc, cc2cc
+			, cc1ac, cc1bc, cc1cc
 			) ;
 	    
 	    vtxtPrintf (txt1, "%s%d:%s%c%c%c"
 			, sep
 			, xShort + (isUp ? 1 : 0)
 			, ss
-			, cc1ac, cc1bc, cc1cc
+			, cc2ac, cc2bc, cc2cc
 			) ;
 	  }
 	  break ;
 	case INSERTION: 
 	  {
 	    char *ss = "+", cc1a, cc2a, cc1ac, cc2ac ;
-	    /*
-	      if ((ii == 0 || ep->iShort > (ep-1)->iShort + 1) && chenillette (probeDna, xShort - 1, 1, &dxL, &dxR))
-	      ss = "*+" ;
-	    */
+
 	    cc1a = arr (dna, xShort - 1, char) ;
 	    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
 	    cc1ac = dnaDecodeChar[(int)cc1a] ;
@@ -4127,7 +4120,7 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	    
 	    vtxtPrintf (txt1,"%s%d:%s%c"
 			, sep
-			, xShort + (isUp ? -1 : 0)
+			, xShort 
 			, ss
 			, cc1ac
 			) ;
@@ -4137,12 +4130,9 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	case INSERTION_DOUBLE:
 	  {
 	    char *ss = "++", cc1a, cc1b, cc2a, cc2b, cc1ac, cc1bc, cc2ac, cc2bc ;
-	    /*	    
-		    if ((ii == 0 || ep->iShort > (ep-1)->iShort + 1) && chenillette (probeDna, xShort - 1, 2, &dxL, &dxR))
-	      ss = "*++" ;
-	    */
-	    cc1a = arr (dna, xShort - 1 + (isUp ? 0 : 0), char) ;
-	    cc1b = arr (dna, xShort - 1 + (isUp ? 1 : 1), char) ;
+
+	    cc1a = arr (dna, xShort - 1 + (isUp ? -1 : 0), char) ;
+	    cc1b = arr (dna, xShort - 1 + (isUp ? 0 : 1), char) ;
 
 	    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
 	    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
@@ -4153,14 +4143,14 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	    
 	    vtxtPrintf (txt2, "%s%d:%s%c%c"
 			, sep
-			, xLong + (isUp ? 1 : 0)
+			, xLong
 			, ss 
 			, cc2ac, cc2bc
 			) ;
 	    
 	    vtxtPrintf (txt1, "%s%d:%s%c%c"
 			, sep
-			, xShort 
+			, xShort + (isUp ? -1 : 0) 
 			, ss
 			, cc1ac, cc1bc
 			) ;
@@ -4171,13 +4161,9 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	  {
 	    char *ss = "+++", cc1a, cc1b, cc1c, cc2a, cc2b, cc2c, cc1ac, cc1bc, cc1cc, cc2ac, cc2bc, cc2cc ;
 
-	    /*
-	    if ((ii == 0 || ep->iShort > (ep-1)->iShort + 1) && chenillette (probeDna, xShort - 1, 3, &dxL, &dxR))
-	      ss = "*+++" ;
-	    */
-	    cc1a = arr (dna, xShort - 1 + (isUp ? 0 : 0), char) ;
-	    cc1b = arr (dna, xShort - 1 + (isUp ? 1 : 1), char) ;
-	    cc1c = arr (dna, xShort - 1 + (isUp ? 2 : 2), char) ;
+	    cc1a = arr (dna, xShort - 1 + (isUp ? -2 : 0), char) ;
+	    cc1b = arr (dna, xShort - 1 + (isUp ? -1 : 1), char) ;
+	    cc1c = arr (dna, xShort - 1 + (isUp ? 0 : 2), char) ;
 	    
 	    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
 	    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
@@ -4191,14 +4177,14 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	    
 	    vtxtPrintf (txt2, "%s%d:%s%c%c%c"
 			, sep
-			, xLong + (isUp ? 2 : 0)
+			, xLong
 			, ss 
 			, cc2ac, cc2bc, cc2cc
 			) ;
 	    
 	    vtxtPrintf (txt1, "%s%d:%s%c%c%c"
 			, sep
-			, xShort 
+			, xShort + (isUp ? -2 : 0)
 			, ss
 			, cc1ac, cc1bc, cc1cc
 			) ;
@@ -4238,29 +4224,33 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
   int i, j, nE ;
   int bestN, bestI, bestJ ;
   int dy = vp->x2 - wp->x1 + 1 ;
+  int da = vp->a2 - wp->a1 ;
 
+  if (da < 5 && da > -5 && dy < 5 && dy > -5 && vp->chrom == wp->chrom)
+    {
+      /* merge the 2 alignments */
+      vp->a2 = wp->a2 ;
+      vp->x2 = wp->x2 ;
+      vp->nErr += wp->nErr ;
+      vp->errors = vp->errors ? vp->errors : wp->errors ;
+      memset (wp, 0, sizeof (ALIGN)) ;
+      wp->chain = -1 ;
+      return ;
+    }
+  if (vp->x1 > wp->x1)
+    {
+      int dx = vp->x1 - wp->x1 ;
+      wp->x1 = vp->x1 ;
+      if (wp->a1 < wp->a2) wp->a1 += dx ;
+      else wp->a1 -= dx ;
+    }
+  dy = vp->x2 - wp->x1 + 1 ;
   if (dy > 0 && nEx + nEy > 0)
     {  
       for (nE = 0 ; nE < nEx ; nE++)
 	{  /* count the vp errors that cannot be clipped */
 	  epX = arrp (vp->errors, nE, A_ERR) ;
 	  int zX = epX->iShort ; /* first bad base */
-#ifdef JUNK
-	  switch (epX->type)
-	    {   /* we need to adjust the coordinates */
-	    case INSERTION:
-	      zX-- ;
-	      break ;
-	    case INSERTION_DOUBLE:
-	      zX -= 2 ;
-	      break ;
-	    case INSERTION_TRIPLE: 
-	      zX -= 3 ;
-		  break ;
-	    default:
-	      break ;
-	    }
-#endif
 	  if (zX + 1 >= y1) /* bio coords */
 	    break ;
 	}
@@ -4278,29 +4268,13 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	    {
 	      epX = arrp (vp->errors, i, A_ERR) ;
 	      zX = epX->iShort ; /* first bad base starting from the left */
-#ifdef JUNK
-	      switch (epX->type)
-		{   /* we need to adjust the coordinates */
-		case INSERTION:
-		  zX-- ;
-		  break ;
-		case INSERTION_DOUBLE:
-		  zX -= 2 ;
-		  break ;
-		case INSERTION_TRIPLE: 
-		  zX -= 3 ;
-		  break ;
-		default:
-		  break ;
-		}
-#endif
-	      zX = zX  < x2 ? zX : x2 ;
+	      zX = zX  < x2 - 1 ? zX : x2 - 1 ;
 	    }
 	  int zY = x2 ;
 	  if (j < nEy)
 	    {
 	      epY = arrp (wp->errors, j, A_ERR) ;
-	      zY = epY->iShort  ; /* last bad base staring from the right */
+	      zY = epY->iShort  ; /* last bad base starting from the right */
 	      switch (epY->type)
  		{   /* we need to adjust the coordinates */
 		case INSERTION:
@@ -4309,7 +4283,7 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 		  zY+= 1 ;
 		  break ;
 		case INSERTION_TRIPLE:
-		  zY += 1 ;
+		  zY += 2 ;
 		  break ;
 		case TROU:
 		case TROU_DOUBLE:
@@ -4319,8 +4293,20 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 		default:
 		  break ;
 		}
-	      zY = zY  < x2 ? zY : x2 ;
+	      zY = zY  < x2  ? zY : x2 ;
 	    }
+	  if (epX && epY && epX->iLong == epY->iLong && epX->iShort == epY->iShort)
+	    {
+	      /* merge the 2 alignments */
+	      vp->a2 = wp->a2 ;
+	      vp->x2 = wp->x2 ;
+	      vp->nErr += wp->nErr ;
+	      vp->errors = vp->errors ? vp->errors : wp->errors ;
+	      memset (wp, 0, sizeof (ALIGN)) ;
+	      wp->chain = -1 ;
+	      return ;
+	    }
+
 	  if (zX < zY)
 	    { nE++ ; i++ ; }
 	  else if (zX >= zY && zY < x2)
@@ -4537,6 +4523,7 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     ok1:
       if (bestI >= 0)
 	{
+	  bestI = (bestI ? bestI : (dy+1) / 2) ; /* avod zero to keep vp oriented */
 	  dy -= bestI ;
 	  vp->x2 -= dy ;
 	  vp->a2 -= dy ;
@@ -4615,6 +4602,21 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       wp->a1 += (wp->a1 < wp->a2 ? dy : -dy) ;
     }
 
+  dy = vp->x2 - wp->x1 + 1 ;
+  da = vp->a2 - wp->a1 ;
+
+  if (da < 5 && da > -5 && dy < 5 && dy > -5 && vp->chrom == wp->chrom)
+    {
+      /* merge the 2 alignments */
+      vp->a2 = wp->a2 ;
+      vp->x2 = wp->x2 ;
+      vp->nErr += wp->nErr ;
+      vp->errors = vp->errors ? vp->errors : wp->errors ;
+      memset (wp, 0, sizeof (ALIGN)) ;
+      wp->chain = -1 ;
+      return ;
+    }
+
   /* register exact intron support */
   if (isReadDown && donor == vp->a2 + 1 && acceptor == wp->a1 - 1)
     {  /* this intron is confirmed */
@@ -4637,6 +4639,107 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 } /* alignOptimizeIntron */
 
 /**************************************************************/
+
+static void alignClipErrorLeft (ALIGN *vp, int errCost)
+{
+  A_ERR *ep ;
+  int i, iMax = arrayMax (vp->errors) ;
+  int bestMax = -1 ;
+  int x1 = vp->x1 ;
+  
+  if (iMax)
+    {
+      for (i = 0, ep = arrp (vp->errors, i, A_ERR) ; i < iMax ; i++, ep++)
+	{
+	  int dx = ep->iShort - x1 ;
+	  if (dx < (i+1) * errCost)
+	    { bestMax = i ; x1 = ep->iShort ; }
+	}
+      if (bestMax > -1)
+	{
+	  ep = arrp (vp->errors, bestMax, A_ERR) ;
+	  if (0 && ep->iShort > vp->x2 - 5)
+	    return ;
+	  vp->x1 = ep->iShort + 1 ; /* last exact base */
+	  if (vp->a1 < vp->a2)
+	    vp->a1 = ep->iLong + 1 ;
+	  else
+	    {
+	      vp->a1 = ep->iLong - 1 ;
+	    }
+	  switch (ep->type)
+	    {   
+	    case INSERTION:
+	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      break ;
+	    case INSERTION_DOUBLE:
+	      vp->x1 += 1 ;
+	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      break ;
+	    case INSERTION_TRIPLE:
+	      vp->x1 += 2 ;
+	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      break ;
+	    case TROU:
+	      vp->x1 -- ;
+	      break ;
+	    case TROU_DOUBLE:
+	      vp->x1 -- ;
+	      vp->a1 += ((vp->chrom & 0x1) ? -1: 1) ;
+	      break ;
+	    case TROU_TRIPLE:
+	      vp->x1 -- ;
+	      vp->a1 += ((vp->chrom & 0x1) ? -2 : 2) ;
+	      break ;
+	    default:
+	      break ;
+	    }
+	  int k = bestMax + 1 ;
+	  for (i = 0, ep = arrp (vp->errors, i, A_ERR) ; i < iMax - k ; i++, ep++)
+	    *ep = *(ep + k) ;
+	  arrayMax (vp->errors) -= k ;	    
+	}
+    }
+  
+  
+  return ;
+} /* alignClipErrorLeft */
+
+/**************************************************************/
+
+static void alignClipErrorRight (ALIGN *vp, int errCost)
+{
+  A_ERR *ep ;
+  int i, iMax = arrayMax (vp->errors) ;
+  int bestMax = iMax ;
+  int x2 = vp->x2 ;
+  
+  if (iMax)
+    {
+      for (i = iMax - 1, ep = arrp (vp->errors, i, A_ERR) ; i >= 0 ; i--, ep--)
+	{
+	  int dx = x2 - ep->iShort ;
+	  if (dx < (bestMax - i) * errCost)
+	    { bestMax = i ; x2 = ep->iShort; }
+	}
+      if (bestMax < iMax)
+	{
+	  ep = arrp (vp->errors, bestMax, A_ERR) ;
+	  vp->x2 = ep->iShort ; /* last exact base */
+	  if (vp->a1 < vp->a2)
+	    vp->a2 = ep->iLong ;
+	  else
+	    {
+	      vp->a2 = ep->iLong ;
+	    }
+	  arrayMax (vp->errors) = bestMax ;
+	}
+    }
+      
+  return ;
+} /* alignClipErrorRight */
+
+/**************************************************************/
 /* Dynamic programming of path score */
 
 static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array aa, Array dna, int chromA, Array dnaG, Array dnaGR, Array bestUp) 
@@ -4645,6 +4748,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
   int ii, jj, i1, i2, iMax ;
   ALIGN *up, *vp, *wp ;
   int i02 = 0 ;
+  int chainAli = 0 ;
   int chainScore = 0 ;
   int bestChainScore = 0 ;
   int bestI1 = 0 ;
@@ -4654,8 +4758,8 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
   Array aaNew = 0 ;
   int errCost = pp->errCost ;
   int bigErrCost = 8 ; /* errCost ; */
-
-   
+  int myRead = arrp (aa, 0, ALIGN)->read ;
+  
   iMax = arrayMax (aa) ;
   arraySort (aa, alignOrder) ;
 
@@ -4698,7 +4802,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
   if (! iMax) return ;
   
   /* for each exon moving left to right, construct the chains */
-  i2 = 0, vp = arrp (aa, 0, ALIGN) ; /* preposition */
+  i2 = 0 ; vp = arrp (aa, 0, ALIGN) ; /* preposition */
   
   for (i1 = 0, up = arrp (aa, 0, ALIGN) ; i1 < iMax ; i1++, up++)
     {
@@ -4709,6 +4813,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
       int a2 = up->a2 ;
       int bestPrevious = 0 ;
       int bestPreviousScore = 0 ;
+      int bestPreviousAli = 0 ;
       BOOL isDown = ! (chrom & 0x1) ;
       BOOL foundI2 = FALSE ;
       
@@ -4738,12 +4843,14 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      if (vp->chainScore - dx > bestPreviousScore)
 		{
 		  bestPreviousScore = vp->chainScore - dx ;
+		  bestPreviousAli = vp->chainAli - dx ;
 		  bestPrevious = i2 + 1 ;
 		}
 	      }
 	}
       
       up->chainScore = up->score + bestPreviousScore ;
+      up->chainAli = up->ali + bestPreviousAli ;
       up->previous = bestPrevious ;
       if (up->chainScore > bestChainScore)
 	{
@@ -4763,12 +4870,14 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
       /* find the top of the chain */
       up = arrp (aa, bestI1, ALIGN) ;
       chainScore = up->score ;
+      chainAli = up->chainAli ;
       while (up->previous)
 	{
 	  vp = arrp (aa, up->previous - 1, ALIGN) ;
 	  vp->next = up->id ;
 	  int dx = vp->x2 - up->x1 + 1 ;
 	  chainScore += vp->score + (dx> 0 ? -dx : 0) ;
+	  chainAli += vp->ali + (dx> 0 ? -dx : 0) ;
 
 	  i1 = up->previous ;
 	  up = vp ;
@@ -4781,6 +4890,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
       while (up)
 	{
 	  up->chainScore =  chainScore ;
+	  up->chainAli =  chainAli ;
 	  vp = arrayp (aaNew, jj++, ALIGN) ;
 	  *vp = *up ;
 	  
@@ -4813,10 +4923,10 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	  int dz = z2 - z1 ;
 	  int du = up->chainX2 - up->chainX1 ;
 	  int dw = wp->chainX2 - wp->chainX1 ;
-
+	  int tc = *dictName(pp->bbG.dict,wp->chrom >> 1) ;
 	  if (
 	      (2 * dz > du || 2 * dz > dw) /* significant overlap */
-	      && (up->chainScore > 2 * wp->chainScore   || up->chainScore > wp->chainAli + 10) /* 10: allow for class bonus */
+	      && (up->chainScore > 2 * wp->chainScore   || up->chainScore > wp->chainAli + pp->bonus[tc]) /* 10: allow for class bonus */
 	      )
 	    ok = FALSE ;
 	}
@@ -4858,13 +4968,34 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 
   /* transfer the sorted chains back in aa */
   iMax = arrayMax (aaNew) ;
-  for (i1 = 0, up = arrp (aaNew, 0, ALIGN) ; i1 < iMax ; i1++, up++)
+  for (i1 = i2 = 0, up = arrp (aaNew, 0, ALIGN) ; i1 < iMax ; i1++, up++)
     {
-      vp = arrp (aa, i1, ALIGN) ;
-      *vp = *up ;
+      if (up->chain > 0)
+	{
+	  vp = arrp (aa, i2++, ALIGN) ;
+	  *vp = *up ;
+	}
     }
-  arrayMax (aa) = iMax ;
-
+  arrayMax (aa) = i2 ;
+  arrayMax (bestUp) = 0 ;
+  for (i1 = i2 = jj = 0, up = vp = arrp (aa, 0, ALIGN) ; i1 < iMax ; i1++, up++)
+    {
+      if (1 || up->score > 0)
+	{
+	  if (vp < up) *vp = *up ;
+	  if (vp->chain > jj)
+	    {
+	      jj = vp->chain ;
+	      array (bestUp, jj, int) = i2 ;
+	    }
+	  vp++ ; i2++ ;
+	}
+    }
+  iMax = arrayMax (aa) = i2 ;
+  up = arrayp (aa, iMax, ALIGN) ;
+  memset (up, 0, sizeof (ALIGN)) ; /* force a null record */
+  iMax = arrayMax (aa) = i2 ;      /* readjust */
+	  
   /* adjust introns and scores
    * both operations need to know the genome 
    */
@@ -4872,145 +5003,172 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
     {
       /* adjust introns */
       up = vp = arrp (aa, array (bestUp, ic, int), ALIGN) ; 
-      wp = vp->next ? arrp (aa, vp->next - 1, ALIGN) : 0 ;
-
-      if (up->chrom != chromA)
-	{
-	  chromA = vp->chrom ;
-	  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
-	  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
-	}
+      wp = (vp[1].chain == vp[0].chain ? vp + 1 : 0) ;
 
       while (vp && wp)
 	{
-	  if (1) alignOptimizeIntron (bb, vp, wp, dnaG) ;
-	  vp = wp ;
-	  
-	  wp = wp->next ? arrp (aa, wp->next - 1, ALIGN) : 0 ;
+	  if (vp->chrom != chromA)
+	    {
+	      chromA = vp->chrom ;
+	      dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
+	      dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
+	    }
+
+	  if (vp > up && vp->x1 > wp->x1)
+	    {
+	      memset (vp, 0, sizeof (ALIGN)) ; vp->chain = -1 ;
+	      alignOptimizeIntron (bb, up, wp, dnaG) ;
+	    }
+	  else
+	    alignOptimizeIntron (bb, vp, wp, dnaG) ;
+	  if (wp->chain != -1)   /* happens if the exons were merged */
+	    vp = wp ;
+	  wp = (vp[0].chain && wp[1].chain == vp[0].chain ? wp + 1 : 0) ;
 	}
       
       /* recompute the errors in the orientation of the target
        *  adjust ali and score
        */
       up = vp = arrp (aa, array (bestUp, ic, int), ALIGN) ; 
+      int ln = arrayMax (dnaG) ;
       while (vp)
 	{
-	  wp = vp->next ? arrp (aa, vp->next - 1, ALIGN) : 0 ;
+	  if (vp->chain <= 0)
+	    continue ;
+	  
+	  if (vp->chrom != chromA)
+	    {
+	      chromA = vp->chrom ;
+	      dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
+	      dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
+	      ln = arrayMax (dnaG) ;
+	    }
+
 	  if (vp->nErr)
 	    {
-	      arrayMax (vp->errors) = 0 ;
-	      if (vp->a1 < vp->a2)
+	      BOOL isUp = vp->a1 > vp->a2 ;
+	      wp = vp + 1 ;
+	      ALIGN *xp = vp - 1 ;
+	      while (wp->chain == -1) wp++ ;
+	      while (xp->chain == -1 && xp > up) xp-- ;
+	      
+	      if (isUp)  /* we change strand because aceDnaDoubleTrack errors cannot extend on the negative strand */
 		{
-		  int x2 = vp->x2 ;
-		  int a2 = vp->a2 ;
-		  int x1 = vp->x1 ;
-		  int a1 = vp->a1 ;
-		  if (1 && vp == up)
-		    {
-		      a1 = a2 - 2 ; x1 = x2 - 2 ;
-		      aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE    /* isDown = TRUE */    /* MAXJUMP */
-					       , dnaG, dnaGR, &a1, &a2
-					       , 0, vp->errors, MAXJUMP, -2, TRUE, 0) ; /* bio coordinates, extend left */
-		      vp->a1 = a1 ; vp->x1 = x1 ;
-		    }
-		  else if (1 && ! vp->next)
-		    {
-		      a2 = a1 + 2 ; x2 = x1 + 2 ;
-		      aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE    /* isDown = TRUE */    /* MAXJUMP */
-					       , dnaG, dnaGR, &a1, &a2
-					       , 0, vp->errors, MAXJUMP, -3, TRUE, 0) ; /* bio coordinates, extend right */
-		      vp->a2 = a2 ; vp->x2 = x2 ;
-		    }
-		  else
-		    aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE    /* isDown = TRUE */    /* MAXJUMP */
-					     , dnaG, dnaGR, &a1, &a2
-					     , 0, vp->errors, MAXJUMP, -1, FALSE, 0) ; /* bio coordinates, extend = FALSE */
-
+		  Array dummy = dnaG ; dnaG = dnaGR ; dnaGR = dummy ;
+		  vp->a1 = ln - vp->a1 + 1 ;
+		  vp->a2 = ln - vp->a2 + 1 ;
 		}
-	      else
+
+	      /* treat all rerads as top strand */
+
+	      if (wp->chain != vp->chain)   /* is last exon */
 		{
-		  int x1 = vp->x1, x2 = vp->x2 ;
- 		  int a1 = vp->a1, a2 = vp->a2 ;
+		  int x11 = vp->x1 ;
+		  int a11 = vp->a1 ;
+
+		  arrayMax (vp->errors) = 0 ;
+		  aceDnaDoubleTrackErrors (dna, &(vp->x1), &(vp->x2), TRUE    /* isDown = TRUE */    /* MAXJUMP */
+					   , dnaG, dnaGR, &(vp->a1), &(vp->a2)
+					       , 0, vp->errors, MAXJUMP, -3, TRUE, 0) ; /* bio coordinates, extend right */
+		  alignClipErrorRight (vp, errCost) ;
+		  alignClipErrorLeft (vp, errCost) ;
+		  vp->a1 = a11 ;
+		  vp->x1 = x11 ;
+		}
+	      if (vp == up ||  xp->chain != vp->chain)  /* is first exon */
+		{     
+		  int x12 = vp->x2 ;
+		  int a12 = vp->a2 ;
+
+		  arrayMax (vp->errors) = 0 ; /* vp->a1 = vp->a2 - 2 ; vp->x1 = vp->x2 - 2 ; */
+		  aceDnaDoubleTrackErrors (dna, &(vp->x1), &(vp->x2), TRUE    /* isDown = TRUE */    /* MAXJUMP */
+					   , dnaG, dnaGR, &(vp->a1), &(vp->a2)
+					   , 0, vp->errors, MAXJUMP, -2, TRUE, 0) ; /* bio coordinates, extend left */
+		  alignClipErrorLeft (vp, errCost) ;
+		  vp->a2 = a12 ;
+		  vp->x2 = x12 ;
+		  alignClipErrorRight (vp, errCost) ;
+		}
+
+	      if (isUp)  /* reset is bottom strand */
+		{
+		  Array dummy = dnaG ; dnaG = dnaGR ; dnaGR = dummy ;
+		  vp->a1 = ln - vp->a1 + 1 ;
+		  vp->a2 = ln - vp->a2 + 1 ;
+		}
 		  
-		  if (1 && vp == up)
-		    {
-		      a1 = arrayMax (dnaG) - a1 + 1 ;
-		      a2 = arrayMax (dnaG) - a2 + 1 ;
-		      a1 = a2 - 2 ; x1 = x2 - 2 ;
-		      /* we change strand because aceDnaDoubleTrack errors cannot extend on the negative strand */
-		      aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE    /* isDown = TRUE */    /* MAXJUMP */
-					       , dnaGR, dnaG, &a1, &a2
-					       , 0, vp->errors, MAXJUMP, -2, TRUE, 0) ; /* bio coordinates, extend left */
-		      a1 = arrayMax (dnaG) - a1 + 1 ;
-		      a2 = arrayMax (dnaG) - a2 + 1 ;
-		      vp->a1 = a1 ; vp->x1 = x1 ;
-		      aceDnaDoubleTrackErrors (dna, &x2, &x1, FALSE    /* isDown = FALSE */
-					       , dnaG, dnaGR, &a2, &a1
-					       , 0, vp->errors, MAXJUMP, -1, FALSE, 0) ; /* bio coordinates, extend = FALSE */
-		    }
-		  else if (1 && ! vp->next)
-		    {
-		      a1 = arrayMax (dnaG) - a1 + 1 ;
-		      a2 = arrayMax (dnaG) - a2 + 1 ;
-		      a2 = a1 + 2 ; x2 = x1 + 2 ;
-		      /* we change strand because aceDnaDoubleTrack errors cannot extend on the negative strand */
-		      aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE    /* isDown = TRUE */    /* MAXJUMP */
-					       , dnaGR, dnaG, &a1, &a2
-					       , 0, vp->errors, MAXJUMP, -3, TRUE, 0) ; /* bio coordinates, extend right */
-		      a1 = arrayMax (dnaG) - a1 + 1 ;
-		      a2 = arrayMax (dnaG) - a2 + 1 ;
-		      vp->a1 = a1 ; vp->x1 = x1 ;
-		      aceDnaDoubleTrackErrors (dna, &x2, &x1, FALSE    /* isDown = FALSE */
-					       , dnaG, dnaGR, &a2, &a1
-					       , 0, vp->errors, MAXJUMP, -1, FALSE, 0) ; /* bio coordinates, extend = FALSE */
-
-		    }
-		  else
-		    aceDnaDoubleTrackErrors (dna, &x2, &x1, FALSE    /* isDown = FALSE */
-					     , dnaG, dnaGR, &a2, &a1
-					     , 0, vp->errors, MAXJUMP, -1, FALSE, 0) ; /* bio coordinates, extend = FALSE */
-		}
+	      /* set the clean errors  right shifted on the top strand */
+	      arrayMax (vp->errors) = 0 ;
+ 	      aceDnaDoubleTrackErrors (dna, &(vp->x1), &(vp->x2), ! isUp    /* isDown = TRUE */    /* MAXJUMP */
+					   , dnaG, dnaGR, &(vp->a1), &(vp->a2)
+					   , 0, vp->errors, MAXJUMP, -9, FALSE, 0) ; /* bio coordinates, extend = FALSE */
 	    }
+	  
 	  vp->ali = vp->x2 - vp->x1 + 1 ;
 	  vp->nErr = vp->errors ? arrayMax (vp->errors) : 0 ;
 	  vp->score = vp->ali - vp->nErr * errCost ;
 
-	  vp = vp->next ? arrp (aa, vp->next - 1, ALIGN) : 0 ;
+	  chain = vp->chain ;
+	  while (vp[1].chain == -1) { vp++ ; vp->chain = 0 ; }
+	  vp = (vp[0].chain && vp[1].chain == chain ? vp + 1 : 0) ;
 	}
     }
+
+  arrayMax (bestUp) = 0 ;
+  for (i1 = i2 = jj = 0, up = vp = arrp (aa, 0, ALIGN) ; i1 < iMax ; i1++, up++)
+    {
+      if (up->chain > 0 && up->x2 > up->x1 && up->score > -10)
+	{
+	  if (vp < up) *vp = *up ;
+	  if (vp->chain > jj)
+	    {
+	      jj = vp->chain ;
+	      array (bestUp, jj, int) = i2 ;
+	    }
+	  vp++ ; i2++ ;
+	}
+    }
+  iMax = arrayMax (aa) = i2 ;
 
   /* Compute the clean chain score */
   bestChainScore = 0 ;
   for (int ic = 1 ; ic < arrayMax (bestUp) ; ic++)
     {
+      ii =array (bestUp, ic, int) ;
+      up = arrp (aa, ii, ALIGN) ; 
 
-      up = vp = arrp (aa, array (bestUp, ic, int), ALIGN) ; 
       int tc = *dictName(pp->bbG.dict,up->chrom >> 1) ;
-
       int chain = up->chain ;
       int chainX1 = up->chainX1 ;
       int chainX2 = up->chainX2 ;
 
       int chainAli = up->chainAli = 0 ;
       int chainErr = up->chainErr = 0 ;
-      int chainScore =	(pp->hasBonus ? pp->bonus[tc] : 0) ;
+      int chainScore =	pp->bonus[tc] ;
+      int chainA1 = up->a1 ;
+      int chainA2 = up->a2 ;
 
-      up->targetClass = tc ;
-      vp->score = vp->ali - errCost * vp->nErr ;
-      
-      while (vp)
+      for (vp = up, jj = ii ; jj < iMax && vp->chain == chain ; jj++, vp++)
 	{
+	  vp->targetClass = tc ;
+	  vp->ali = vp->x2 - vp->x1 + 1 ;
+	  vp->score = vp->ali - errCost * vp->nErr ;
 	  chainX2 = vp->x2 ;
 	  chainAli += vp->ali ;
 	  chainErr += vp->nErr ;
 	  chainScore += vp->score ;
 
-	  vp = vp->next ? arrp (aa, vp->next - 1, ALIGN) : 0 ;
+	  if (chainA1 > vp->a1) chainA1 = vp->a1 ;
+	  if (chainA1 > vp->a2) chainA1 = vp->a2 ;
+	  if (chainA2 < vp->a1) chainA2 = vp->a1 ;
+	  if (chainA2 < vp->a2) chainA2 = vp->a2 ;
+
 	}
       if (chainAli > arrayMax (dna))
 	chainAli = arrayMax (dna) ;
       /* filter */
-      if (chainAli < pp->minAli ||
+      if (chainScore < pp->minScore ||
+	  chainAli < pp->minAli ||
 	  100 * chainAli < pp->minAliPerCent * arrayMax (dna) ||
 	  100 * chainErr > pp->errRateMax * chainAli
 	  )
@@ -5020,19 +5178,19 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	bestChainScore = chainScore ;
 
       /* set the chain values in all exons */
-      vp = up ;
-      while (vp)
+      if (up->a1 > up->a2)
+	{ int dummy = chainA1 ; chainA1 = chainA2 ; chainA2 = dummy ; }
+      for (vp = up, jj = ii ; jj < iMax && vp->chain == chain ; jj++, vp++)
 	{
-	  vp->chain = chain ;
-	  vp->targetClass = tc ;
 	  vp->chainScore = chainScore ;
 	  vp->chainAli = chainAli ;
 	  vp->chainErr = chainErr ;
 	  vp->chainX1 = chainX1 ;
 	  vp->chainX2 = chainX2 ;
-
-	  vp = vp->next ? arrp (aa, vp->next - 1, ALIGN) : 0 ;
+	  vp->chainA1 = chainA1 ;
+	  vp->chainA2 = chainA2 ;
 	}
+      up = vp - 1 ; ii = jj - 1 ;
     }
 
   /* clean up the destroyed chains and adjust the chain numbers */
@@ -5061,7 +5219,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 		      if  (2 * dz > du || 2 * dz > dw) /* significant overlap */
 			{
 			  int c = up->chain ;
-			  for (wp = up ; wp->chain == c ; wp++)
+			  for (wp = up ; i1 < iMax && wp->chain == c ; wp++)
 			    { k++ ; wp->chainScore = wp->chain = wp->score = 0 ; }
 			  i1 += k - 1 ; up += k - 1 ;
 			}
@@ -5073,45 +5231,22 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 		  int c = up->chain ;
 		  newChain++ ;
 		  array (bestUp, newChain, int) = i2 ;
-		  for (wp = up ; wp->chain == c ; wp++)
-		    {
-		      wp->chain = newChain ;
-		      if (vp < wp) *vp = *wp ;
-		      i2++ ; vp++ ;
-		      i1++ ; up++ ;
-		    }
+		  for (wp = up ; i1 < iMax && wp->chain == c ; wp++)
+		    if (wp->score)
+		      {
+			wp->chain = newChain ;
+			if (vp < wp) *vp = *wp ;
+
+			i2++ ; vp++ ;
+			i1++ ; up++ ;
+		      }
 		  i1-- ; up-- ;
 		}		
 	    }
 	}
     }
-  arrayMax (bestUp) = newChain + 1 ;
+  arrayMax (bestUp) = newChain ? newChain + 1 : 0 ;
   arrayMax (aa) = i2 ;
-
-  /* compute the chain coordinates and score */
-  for (int ic = 0 ; ic < arrayMax (bestUp) ; ic++)
-    {
-      int i, i0 = arr (bestUp, ic, int) ;
-      ALIGN *up0 = arrp (aa, i0, ALIGN) ;
-      int chainA1 = up0->a1 ;
-      int chainA2 = up0->a2 ;
-
-      for (i = i0, up = up0 ; i < i2 && up->chain == ic ; up++, i++)
-	{
-	  if (chainA1 > up->a1) chainA1 = up->a1 ;
-	  if (chainA1 > up->a2) chainA1 = up->a2 ;
-	  if (chainA2 < up->a1) chainA2 = up->a1 ;
-	  if (chainA2 < up->a2) chainA2 = up->a2 ;
-	}
-      if (up0->a1 > up0->a2)
-	{ int dummy = chainA1 ; chainA1 = chainA2 ; chainA2 = dummy ; }
-      for (i = i0, up = arrp (aa, i0, ALIGN) ; i < i2 && up->chain == ic ; up++, i++)
-	{
-	  up->chainA1 = chainA1 ;
-	  up->chainA2 = chainA2 ;
-	}
-    }
-  
 
   /* register the alignments */
   int kMax = arrayMax (aaa) ;
@@ -5288,6 +5423,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 
 		if (2 * dz > du || 2 * dz > dv) /* significant overlap */
 		  {
+		    bb->runStat.nAlignments++ ;
 		    nChains++ ;
 		  }
 		else
@@ -5734,12 +5870,13 @@ static void alignDo (const PP *pp, BB *bb)
 		    }
 		  if (k + 4 < kk) arrayMax(countChroms) = k + 4 ;
 		  if (0) arrayMax(countChroms) = 1 ;
-		  if (0)
-		    showCountChroms (countChroms) ;
 		  arrayMax (hits2) = mm ;
 		  arrayMax (aa) = arrayMax (err) = 0 ;
 		  /* switch chroms and reorder */
+		  if (0) hits2 = bb->hits ;
 		  newMsort (hits2, hitReadOrder) ;
+		  if (0)  showCountChroms (countChroms) ;
+
 		  alignDoOnePair (pp, bb, aaa, hits2, aa, err) ;
 		}
 	    }
@@ -5796,12 +5933,12 @@ static void align (const void *vp)
 	  cpuStatRegister ("7.Align_r", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
 	  if (pp->debug) printf ("--- %s: Stop align %lu ali, %lu mismatches\n", timeBufShowNow (tBuf), bb.nAli, bb.nerr) ;
 	}
-      channelPut (pp->awChan, &bb, BB) ;
+      channelPut (pp->aeChan, &bb, BB) ;
     }
   if (1)
     {
       int n = channelCount (pp->plChan) ;
-      channelCloseAt (pp->awChan, n) ;
+      channelCloseAt (pp->aeChan, n) ;
     }
   return ;
 } /* align */
@@ -5876,30 +6013,29 @@ static void wiggleExport (const PP *pp)
 
 static void wiggle (const void *vp)
 {
-  BB bb ;
   const PP *pp = vp ;
   char tBuf[25] ;
+  int nn ;
+  BB bb ;
   
   clock_t  t1, t2 ;
 
-  if (pp->agent != 0) /* sequential agent */
-    return ;  /* accumulates in  pp->wiggles */
   memset (&bb, 0, sizeof (BB)) ;
-  while (channelGet (pp->awChan, &bb, BB))
+  while (channelGet (pp->wwChan, &nn, int))
     {
       if (pp->wiggle && bb.aligns)
 	{
 	  if (pp->debug) printf ("--- %s: Start wiggle %lu seeds\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
 	  t1 = clock () ;
 
-	  bigArraySort (bb.aligns, wiggleOrder) ;
-	  wiggleDo (pp, &bb) ;
+	  int k = 0 ;
+	  /* 	  int k = wiggleDo (pp, &nn) ; */
 
 	  t2 = clock () ;
-	  cpuStatRegister ("8.Wiggle", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
-	  if (pp->debug) printf ("--- %s: Stop wiggle %lu ali, %lu mismatches\n", timeBufShowNow (tBuf), bb.nAli, bb.nerr) ;
+	  cpuStatRegister ("8.Wiggle", pp->agent, bb.cpuStats, t1, t2, k) ;
+	  if (pp->debug) printf ("--- %s: Stop wiggle\n", timeBufShowNow (tBuf)) ;
 	}
-      channelPut (pp->weChan, &bb, BB) ;
+      channelPut (pp->doneChan, &bb, BB) ;
     }
 
   if (pp->wiggle)
@@ -5914,7 +6050,7 @@ static void wiggle (const void *vp)
   if (1)
     {
       int n = channelCount (pp->plChan) ;
-      channelCloseAt (pp->weChan, n) ;
+      channelCloseAt (pp->doneChan, n) ;
     }
   return ;
 } /* wiggle */
@@ -6054,11 +6190,24 @@ static void exportOneSamExon (BOOL isDown, vTXT cigar, ALIGN *ap, int *nMp, int 
   Array errors = ap->errors ;
   int dx, ii, iMax = errors ? arrayMax (errors) : 0 ;
   int x1 = ap->x1 ;
-  int x2 = ap->x2 ;
-
+  const int L = 16 ;
+  char segs[2*iMax + 4][L] ;
+  int iSeg = 0 ;
+  
   if (iMax)
-    {
-      for (ii = 0, ep = arrp (errors, 0, A_ERR) ; ii < iMax ; ii++, ep++)
+    for (ii = 0 ; ii < iMax ; ii++)
+      {
+	int j = isDown ? ii : iMax - 1 - ii ;
+	ep = arrp (errors, j, A_ERR)  ;
+	
+	int xShort = ep->iShort + 1 ;
+	int xLong = ep->iLong + 1 ;
+	if (xShort <= 0 || xLong <= 0)
+	  continue ;
+	
+	dx = ep->iShort - x1 + 1 ;
+	if (dx <= 0)
+	  continue ;
 	switch (ep->type)
 	  {
 	  case AMBIGUE:
@@ -6068,63 +6217,60 @@ static void exportOneSamExon (BOOL isDown, vTXT cigar, ALIGN *ap, int *nMp, int 
 	    *nSubp += 1 ;
 	    break ;
 	  case INSERTION:
-	    dx = isDown ? ep->iShort - x1 + 0 : x2 - ep->iShort + 1 ;
 	    *nInsp  += 1 ;
-	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort - 1 ;
-	    vtxtPrintf (cigar, "%dM1I", dx) ;
+	    x1 = ep->iShort + 2 ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "1I") ;
 	    *nMp += dx ;
 	    break ;
 	  case INSERTION_DOUBLE:     
-	    dx = isDown ? ep->iShort - x1 - 1 : x2 - ep->iShort + 1 ;
 	    *nInsp += 2 ;
-	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort - 2 ;
-	    vtxtPrintf (cigar, "%dM2I", dx) ;
+	    x1 = ep->iShort + 3 ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "2I") ;
 	    *nMp += dx ;
 	    break ;
 	  case INSERTION_TRIPLE:     
-	    dx = isDown ? ep->iShort - x1 - 2 : x2 - ep->iShort  + 1 ;
 	    *nInsp += 3 ;
-	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort - 3 ;
-	    vtxtPrintf (cigar, "%dM3I", dx) ;
+	    x1 = ep->iShort + 4 ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "3I") ;
 	    *nMp += dx ;
 	    break ;
 	  case  TROU:
-	    dx = isDown ? ep->iShort - x1 + 1 : x2 - ep->iShort + 1 ;
 	    *nDelp += 1 ;
 	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort + 0 ;
-	    vtxtPrintf (cigar, "%dM1D", dx) ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "1D") ;
 	    *nMp += dx ;
 	    break ;
-	  case TROU_DOUBLE: 
-	    dx = isDown ? ep->iShort - x1 + 1 : x2 - ep->iShort + 1 ;
+	  case TROU_DOUBLE:
 	    *nDelp += 2 ;
 	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort + 0 ;
-	    vtxtPrintf (cigar, "%dM2D", dx) ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "2D") ;
 	    *nMp += dx ;
 	    break ;
-	  case TROU_TRIPLE: 
-	    dx = isDown ? ep->iShort - x1 + 1 : x2 - ep->iShort + 1 ;
+	  case TROU_TRIPLE:
 	    *nDelp += 3 ;
 	    x1 = ep->iShort + 1 ;
-	    x2 = ep->iShort + 0 ;
-	    vtxtPrintf (cigar, "%dM3D", dx) ;
+	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    snprintf(segs[iSeg++], L, "3D") ;
 	    *nMp += dx ;
 	    break ;
 	  }
-    }
-
-  dx = isDown ? ap->x2 - x1 + 1 : x2 - ap->x1 + 1 ;
+      }
+  
+  dx = ap->x2 - x1 + 1 ;
   if (dx)
     {
-      vtxtPrintf (cigar, "%dM", dx) ;
+      snprintf(segs[iSeg++], L, "%dM", dx) ;
       *nMp += dx ;
     }
 
+  for (int i = 0 ; i < iSeg ; i++)
+    vtxtPrintf (cigar, segs[isDown ? i : iSeg - i - 1]) ;
+		
   return ;
 } /*  exportOneSamExon */
 
@@ -6150,8 +6296,10 @@ static char *exportOneSamCigar (vTXT cigar, ALIGN *ap0, int iMax, Array dna, int
 	{
 	  exportOneSamExon (isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
 	  int da = ap[1].a1 - ap[0].a2 - 1 ;
-	  vtxtPrintf (cigar, "%dN", da) ;
+	  if (da > 0) vtxtPrintf (cigar, "%dN", da) ;
 	  *nGapp += da ;
+	  int dx = ap[1].x1 - ap[0].x2 - 1 ;
+	  if (dx > 0) vtxtPrintf (cigar, "%dS", dx) ;
 	}
       exportOneSamExon (isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
       
@@ -6175,6 +6323,8 @@ static char *exportOneSamCigar (vTXT cigar, ALIGN *ap0, int iMax, Array dna, int
 	  int da = ap[-1].a2 - ap[0].a1 - 1 ;
 	  vtxtPrintf (cigar, "%dN", da) ;
 	  *nGapp += da ;
+	  int dx = ap[0].x1 - ap[-1].x2 - 1 ;
+	  if (dx > 0) vtxtPrintf (cigar, "%dS", dx) ;
 	}
       exportOneSamExon (isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
       
@@ -6332,12 +6482,13 @@ if (1)
       if (isDown)
 	{
 	  int i = arrayMax (dna) ;
-	  char *cp = arrp (dna, 0, char) ;
-	  dnaDecodeArray (dna) ;
+	  Array dnaR = dnaCopy (dna) ;
+	  char *cp = arrp (dnaR, 0, char) ;
+	  dnaDecodeArray (dnaR) ;
 	  if (0) while (i--)
 	    { *cp = ace_upper (*cp) ; cp++; }
-	  aceOutf (ao, "\t%s", arrp (dna, 0, char)) ;
-	  dnaEncodeArray (dna) ;
+	  aceOutf (ao, "\t%s", arrp (dnaR, 0, char)) ;
+	  ac_free (dnaR) ;
 	}
       else
 	{
@@ -6411,24 +6562,11 @@ static int exportSamDo (ACEOUT ao, const PP *pp, BB *bb)
 {
   AC_HANDLE h = ac_new_handle () ;
   ALIGN *ap = bigArrp (bb->aligns, 0, ALIGN) ;
-  DICT *dictG = pp->bbG.dict ;
   long int ia, aMax = bigArrayMax (bb->aligns) ;
   vTXT cigar = vtxtHandleCreate (h) ;
   Array cigarettes = arrayHandleCreate (1024, SAMCIGAR, h) ;
   Array errors = arrayHandleCreate (1024, A_ERR, h) ;
-  char *VERSION = "0.1.1" ;
   int read, chain ;
-  
-  aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
-  aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
-
-  for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
-    {
-      Array dna = arr (pp->bbG.dnas, chrom, Array) ;
-      int ln = dna ? arrayMax (dna) : 0 ;
-      aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
-    }
-  /* aceOutf (ao, "\tCL:%s", commandBuf) ; */
 
   for (ia = 0, read = chain = 0 ; ia < aMax ; ia++, ap++)
     {
@@ -6459,18 +6597,12 @@ static void export (const void *vp)
   if (pp->agent != 0) /* sequential agent */
     return ;
   AC_HANDLE h = ac_new_handle () ;
-  ACEOUT ao ;
+  int runMax = dictMax (pp->runDict) ;
+  ACEOUT aos[runMax + 1]  ;
 
-  if (!pp->sam)
-    {
-      if (0) ao = aceOutCreate (pp->outFileName, pp->outFileName ? ".hits" : 0, pp->gzo, h) ;
-    }
-  else
-    {
-      ao = aceOutCreate (pp->outFileName, pp->outFileName ? ".sam" : 0, pp->gzo, h) ;
-    }
+  memset (aos, 0, sizeof (aos)) ;
   memset (&bb, 0, sizeof (BB)) ;
-  while (channelGet (pp->weChan, &bb, BB))
+  while (channelGet (pp->aeChan, &bb, BB))
     {
       t1 = clock () ;
       if (bb.aligns && bigArrayMax (bb.aligns))
@@ -6479,8 +6611,26 @@ static void export (const void *vp)
 	  if (! pp->sam)
 	    exportDo (pp, &bb) ;
 	  else
-	    exportSamDo (ao, pp, &bb) ;
-
+	    {
+	      ACEOUT ao = aos[bb.run] ;
+	      if (! ao)
+		{
+		  char *VERSION = "0.1.1" ;
+		  DICT *dictG = pp->bbG.dict ;
+		  ao = aos[bb.run] = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam", dictName (pp->runDict, bb.run)), pp->gzo, h) ;
+		  aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
+		  aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
+		  
+		  for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
+		    {
+		      Array dna = arr (pp->bbG.dnas, chrom, Array) ;
+		      int ln = dna ? arrayMax (dna) : 0 ;
+		      aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
+		    }
+		  /* aceOutf (ao, "\tCL:%s", commandBuf) ; */
+		}
+	      exportSamDo (ao, pp, &bb) ;
+	    }
 	  t2 = clock () ;
 	  cpuStatRegister ("8.Export_ali", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
 	  n = channelCount (pp->plChan) ;
@@ -6986,11 +7136,39 @@ static Array parseInConfig (PP *pp, Array runStats)
       
       ac_free (h) ;
     }
-  printf ("Found %d sequence files\n", arrayMax (rcs)) ;
+  printf ("Found %d sequence file%s\n", arrayMax (rcs), arrayMax (rcs) > 1 ? "s" : "") ;
   return rcs ;
 } /* parseInConfig */    
 
 /*************************************************************************************/
+
+static int parseWiggleFileList (PP *pp)
+{
+  ACEIN ai ;
+  AC_HANDLE wh = ac_new_handle () ;
+  char *cp, cutter ;
+  
+  pp->wiggleFileDict = dictHandleCreate (1024, pp->h) ;
+  if (pp->inFileName)
+    ai = aceInCreateFromText (pp->inFileName, 0, wh) ;
+  else
+    ai = aceInCreate (pp->inConfigFileName, 0, wh) ;
+  
+  while (aceInCard (ai))
+    {
+      while ((cp = aceInWordCut (ai, ",", &cutter)))
+	{
+	  char *cr = filName (cp, 0, "r") ;
+	  if (! cr)
+	    messcrash ("\nCannot open wiggle file %s\n", cp) ;
+	  dictAdd (pp->wiggleFileDict, cr, 0) ;
+	}
+    }
+  ac_free (wh) ;
+
+  return dictMax (pp->wiggleFileDict) ;
+} /* parseWiggleFileList */
+
 /*************************************************************************************/
 /* check the existence of the target files
  * identify their absolute file names
@@ -7050,7 +7228,9 @@ static Array parseTargetConfig (PP *pp, Array runStats)
 		       ) ;
 	  tc = arrayp (tcs, nn++, TC) ;
 	  tc->targetClass = cc ;
-	  
+	  if (cc == 'M') tc->bonus = 1 ;
+	  if (cc == 'R') tc->bonus = 8 ;
+	  if (cc == 'C') tc->bonus = 8 ;	  
 	  /* file names */
 	  aceInStep (ai, '\t') ;
 	  cp = aceInWord (ai) ;
@@ -7191,7 +7371,7 @@ static void usage (char *message, int argc, const char **argv)
 
 
 	       "//         I: Known Introns and Transcripts,\n"
-	       "//            The file must be of type .gtf, .gff, .gff3 [.gz], or .introns.\n"
+	       "//            The I file must be of type .gtf, .gff, .gff3 [.gz], or .introns.\n"
 	       "//            In each case the the chromosome name (column 1) must match the G fasta file(s).\n"
 	       "//            In gtf/gff format the code expects (at least) 7  columns chrom/method/tag/a1/a2/./[+|-]\n"
 	       "//               tag : [intron|exon] other lines are ignored,\n"
@@ -7206,8 +7386,8 @@ static void usage (char *message, int argc, const char **argv)
 	       "//         V: Frequent virus contaminants fasta file.\n"
 	       "//      Column 2: f1[,f2] : one or several coma separated file names.\n"
 	       "//                For a given class (G, ...) several files can also be specified on several lines.\n"
-	       "//      Column 3: Coma separated options, no blank/spaces/tabs please,\n"
-	       "//           fasta[default],raw,bonus=<int>  (the bonus is added to the alignment score).\n" 
+	       "//      Column 3: optional, the file format if not implied by the file name\n"
+	       "//           fasta[default], fastq, fastc, raw.\n"
 	       "//\n"
 	       "// SEQUENCE FILES  TO BE ANALYZED:\n"
 	       "// -x, --index <directory_name> : a directory of index files created  previously using --createIndex\n" 
@@ -7223,7 +7403,7 @@ static void usage (char *message, int argc, const char **argv)
 	       "//       example 3: zcat fx.*.fastq.gz | sortalign -x XYZ -i --fastq -o results/fx\n"
 	       "// -I <config_fileName>\n"
 	       "//     A more precise definition of a set of sequencing files to be analysed\n"
-	       "//     Eeach line contains 1 to 3 tab separated columns\n"
+	       "//     Eech line contains 1 to 3 tab separated columns\n"
 	       "//          FileName[s]  RunName Descriptors\n"
 	       "//     Example:\n"
 	       "//          f1.fasta run1 RNA,Nanopore\n"
@@ -7244,13 +7424,17 @@ static void usage (char *message, int argc, const char **argv)
 	       "// OUTPUT:\n"
 	       "// -o <outFileNamePrefix> [default stdout]\n"
 	       "//   All output files will share this prefix, large outputs are split\n"
+	       "//   Examples : -o x/y/z  all output files will be named x/y/z.something\n"
+       	       "//              -o x/y/   all output files will be named x/y/something\n"
 	       "// --gzo : the output files will be gziped\n"      
 	       "// --sam : export the alignment in sam format (default is self documented .hits format)\n"
 	       "//\n"
 	       "// REQUEST\n"
 	       "// --align : [default] Extend the seed alignments hopefully to full read length\n"
 	       "// --do_not_align : do not align, just test the validity of the index directory\n"
-	       "//   --minAli <int> : minimal length of the alignment\n"
+	       "//     The score s is computed as s = #aligned bases - errCost * #errors\n"
+	       "//   --minAli <int> : [default 30] minimal length of the alignment\n"
+	       "//   --minScore <int> : [default 30] minimal score  of the alignment\n"
 	       "//   --errCost <int> : [default 8] cost of substitition, or short indel up to 3 bases\n"
 	       "//   --errMax <int> : [default NA] maximal number of mismatches in any (partial) alignment\n"
 	       "//   --errRateMax <int> : [default 10] maximal percentage of mismatches in any (partial) alignment\n"
@@ -7314,6 +7498,7 @@ int main (int argc, const char *argv[])
   Array cpuStats = 0 ;
   Array runStats = 0 ;
   Array runErrors = 0 ;
+  Array inArray = 0 ;
   int maxThreads = 128 ;
   long unsigned int nHits = 0, nSeqs = 0, nBaseAligned = 0 ;
   long unsigned int nerr = 0 ;   /* cumulated number of errors */
@@ -7375,9 +7560,8 @@ int main (int argc, const char *argv[])
         }
     }
 
- p.debug = getCmdLineText (h, &argc, argv, "--debug", 0) ;
+  p.debug  = getCmdLineText (h, &argc, argv, "--debug", 0) ;
   p.debug |= getCmdLineText (h, &argc, argv, "--verbose", 0) ;
-
 
   /**************************  debugging tools, ignore *********************************/
 
@@ -7447,6 +7631,7 @@ int main (int argc, const char *argv[])
   p.align = ! getCmdLineBool (&argc, argv, "--do_not_align") ; /* default is to align */
   
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggle") ;
+  p.wiggle = FALSE ; /* code not ready */
   p.ignoreIntronSeeds = getCmdLineBool (&argc, argv, "--ignoreIntronSeeds") ;
 
 
@@ -7501,7 +7686,7 @@ int main (int argc, const char *argv[])
   p.seedLength = 18 ; /* default */
   getCmdLineInt (&argc, argv, "--seedLength", &(p.seedLength));
   
-  p.maxTargetRepeats = 81 ;  /* was 81 31 12 */
+  p.maxTargetRepeats = 81 ;  /* was 81  31 12 */
   getCmdLineInt (&argc, argv, "--maxTargetRepeats", &p.maxTargetRepeats) ;
 
   if (NN != 1 && NN != 2 && NN != 4 && NN != 8 && NN != 16 && NN != 32 && NN != 64)
@@ -7552,7 +7737,7 @@ int main (int argc, const char *argv[])
   getCmdLineLong (&argc, argv, "--nRawBases", &(p.nRawBases)) ;
   
   /*****************  Aligner filters  ************************/
-  p.minAli = 30 ;
+  p.minAli = p.minScore = -1 ;
   p.errMax = 1000000 ; /* on negative values, extendHits stops on first error */
   p.errRateMax = 10 ;
   p.OVLN = 30 ;
@@ -7562,32 +7747,77 @@ int main (int argc, const char *argv[])
   p.errCost = 8 ;
   getCmdLineInt (&argc, argv, "--errCost", &(p.errCost)) ;
   getCmdLineInt (&argc, argv, "--errMax", &(p.errMax)) ;
+  getCmdLineInt (&argc, argv, "--minScore", &(p.minScore)) ;
   getCmdLineInt (&argc, argv, "--minAli", &(p.minAli)) ;
   getCmdLineInt (&argc, argv, "--minAliPerCent", &(p.minAliPerCent)) ;
   getCmdLineInt (&argc, argv, "--errRatMax", &(p.errRateMax)) ;
   p.maxIntron = 1000000 ;
   getCmdLineInt (&argc, argv, "--maxIntron", &(p.maxIntron)) ;
+
+  if (p.minScore == -1) p.minScore = 30 ;
+  if (p.minAli == -1) p.minAli = 30 ;
+  if (p.minAli < p.minScore) p.minAli = p.minScore ;
   
   /****************** Check the existence of all file names ****************************************/ 
 
-  /* check that the index directory is accessible */
-  if (! p.indexName)
-    usage ("Missing parameter --index", argc, argv) ;
-  else
+  if (p.outFileName)
     {
-      AC_HANDLE h1 = ac_new_handle () ;
-      const char *cp = p.indexName ;
-      char *cq ;
-      if (p.createIndex)
+      BOOL ok = FALSE ;
+      int n = randint (), n2 = 0 ;
+      AC_HANDLE h = ac_new_handle () ;
+      char *cp = strrchr (p.outFileName, '/') ;
+      if (cp)
 	{
-	  cq = hprintf (h1, "mkdir %s ; \\rm %s/* ; echo test > %s/sortalign.testFile", cp, cp, cp) ;
-	  system (cq) ;
+	  *cp = 0 ;
+	  char *cmd = hprintf (h, "mkdir -p %s", p.outFileName) ;
+	  system (cmd) ;
+	  *cp = '/' ;
 	}
-      cq = hprintf (h1, "%s/sortalign.testFile", p.indexName) ;
-      ACEIN ai = aceInCreate (cq, FALSE, h1) ;
-      if (! ai)
-	usage (hprintf (p.h, "Cannot create and access the index directory: %s", p.indexName), argc, argv) ;
-      ac_free (h1) ;
+      ACEOUT ao = aceOutCreate (p.outFileName, ".test", 0, h) ;
+      if (ao)
+	{
+	  char * nam = strnew (aceOutFileName (ao), h) ;
+	  aceOutf (ao, "%d\n", n ) ;
+	  ac_free (ao) ;
+	  
+	  ACEIN ai = aceInCreate (nam, 0, h) ;
+	  if (ai)
+	    {
+	      if (aceInCard (ai))
+		aceInInt (ai, &n2) ;
+	      if (n == n2)
+		ok = TRUE ;
+	      ac_free (ai) ;
+	    }
+	  char *cmd = hprintf (h, "rm %s", nam) ;
+	  system (cmd) ;
+	}
+      ac_free (h) ;
+      if (! ok)
+	messcrash ("\nUnable to open a test file  in %s*, please check the -o parameter\n", p.outFileName) ;
+    }
+  
+  /* check that the index directory is accessible */
+  if (! p.wiggle)
+    {
+      if (! p.indexName)
+	usage ("Missing parameter --index", argc, argv) ;
+      else
+	{
+	  AC_HANDLE h1 = ac_new_handle () ;
+	  const char *cp = p.indexName ;
+	  char *cq ;
+	  if (p.createIndex)
+	    {
+	      cq = hprintf (h1, "mkdir %s ; \\rm %s/* ; echo test > %s/sortalign.testFile", cp, cp, cp) ;
+	      system (cq) ;
+	    }
+	  cq = hprintf (h1, "%s/sortalign.testFile", p.indexName) ;
+	  ACEIN ai = aceInCreate (cq, FALSE, h1) ;
+	  if (! ai)
+	    usage (hprintf (p.h, "Cannot create and access the index directory: %s", p.indexName), argc, argv) ;
+	  ac_free (h1) ;
+	}
     }
   
   /*****************  Check tat all parameters have been parsed *******************/
@@ -7637,14 +7867,17 @@ int main (int argc, const char *argv[])
   /*******************  otherwise verify the existence of the indexes ********************/
   
   /* check that input files were provided */
-  if (! p.indexName)
-    usage ("missing parameter -x or --createIndex", argc, argv) ;
+  if (! p.wiggle)
+    {
+      if (! p.indexName)
+	usage ("missing parameter -x or --createIndex", argc, argv) ;
+    }
   if (! p.inFileName && ! p.inConfigFileName)
-     usage ("missing parameter -i or -I inputFileName(s)", argc, argv) ;
+    usage ("missing parameter -i or -I inputFileName(s)", argc, argv) ;
   if (p.inFileName && p.inConfigFileName)
-     usage ("conflicting parameter -i and -I, both define the input files", argc, argv) ;
+    usage ("conflicting parameter -i and -I, both define the input files", argc, argv) ;
 
-  if (1)
+  if (! p.wiggle)
     {
       BOOL ok = TRUE ;
       int k = 0 ;
@@ -7712,128 +7945,152 @@ int main (int argc, const char *argv[])
 	ok = FALSE ;
       if (!ok)
 	usage ("Some of the target binary index files are missing, please run sortalign --createIndex <indexName> ", argc, argv) ;
-    }
-
-  if (p.iStep > p.tStep)      /* impose phasing */
-    p.iStep -= (p.iStep % p.tStep) ;
   
-  /* check the existence of the input sequence files */
-  Array inArray = parseInConfig (&p, runStats) ;
-
+      if (p.iStep > p.tStep)      /* impose phasing */
+	p.iStep -= (p.iStep % p.tStep) ;
+      
+      /* check the existence of the input sequence files */
+      inArray = parseInConfig (&p, runStats) ;
+    }
+  
   /***************************/
   /* launch the multiprocessing */
 
   wego_max_threads (maxThreads) ;
-  
-  /* Create the communication channels */
-  p.fpChan = channelCreate (4096, RC, p.h) ; /* this chan nust be deep enough to accept all file names at once */
-  channelDebug (p.fpChan, debug, "fpChan") ;
-  p.npChan = channelCreate (16, int, p.h) ; /* count BB per inFile */
-  channelDebug (p.npChan, debug, "npChan") ;
-  p.gmChan = channelCreate (1, BB, p.h) ;
-  channelDebug (p.gmChan, debug, "gmChan") ;
-  p.plChan = channelCreate (1, BB, p.h) ;
-  channelDebug (p.plChan, debug, "plChan") ;
-  p.lcChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.lcChan, debug, "lcChan") ;
-  p.csChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.csChan, debug, "csChan") ;
-  p.smChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.smChan, debug, "smChan") ;
-  p.moChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.moChan, debug, "moChan") ;
-  p.oaChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.oaChan, debug, "oaChan") ;
-  p.awChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.awChan, debug, "awChan") ;
-  p.weChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.weChan, debug, "weChan") ;
-  p.doneChan = channelCreate (channelDepth, BB, p.h) ;
-  channelDebug (p.doneChan, debug, "doneChan") ;
 
-
-  /* create the agents using  "wego_go()"
-   *   Their execution is  triggered by their in-channels
-   *   They export processed BB data-blocks on their out-channel
-   *   They exit when their in-channel closes
-   *
-   * a non-writable COPY of p is passed to each agent
-   * this allows to pass agent specific parameters
-   * like p.agent : the identifier of an instance of the agent
-   */
-
-  /* The genome parsers start immediately */
-  p.agent = nAgents ;
-  wego_go (genomeParser, &p, PP) ;
-  /* The load regulator maintains --nB data-blocks in the pipeline */
-  wego_go (loadRegulator, &p, PP) ;
-  
-  /* Start the processing of the sequence files */
-  p.nFiles = arrayMax (inArray) ; /* number of files to be processed */
-  /* n Files must be processed
-   * The readParsers will emit for each file, in parallel, n BB blocks
-   * The number is passed to the npChan which feeds the npCounter
-   * When n numbers have been received, the npCounter
-   * knows the cumulated number N of BB blocks to be analyzed
-   * and tells the plChan, hence the load regulator,
-   * and recurssibvely all program layers
-   * to close after having processed N BB blocks
-   */
-  wego_go (npCounter, &p, PP) ;
-  channelCloseAt (p.npChan, p.nFiles) ; /* close the counter of BB blocks */
-
-  /* Read preprocessing agents, they do not require the genome */
-  for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
+  if (! p.wiggle)
     {
-      p.agent = i ;
-      wego_go (readParser, &p, PP) ;
-    }
-  for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
-    {
-      p.agent = i ;
-      wego_go (codeWords, &p, PP) ;
-      wego_go (sortWords, &p, PP) ;
-    }
-
-  /* Load the fpChan, triggering the readParsers
-   * and recursively the whole pipeline
-   */
-  for (int k = 0 ; k < p.nFiles ; k++)
-    {
-      RC *rc = arrayp (inArray, k, RC) ;
-      array (runErrors, rc->run, Array) = arrayHandleCreate (32, int, p.h) ;
+      /* Create the communication channels */
+      p.fpChan = channelCreate (4096, RC, p.h) ; /* this chan nust be deep enough to accept all file names at once */
+      channelDebug (p.fpChan, debug, "fpChan") ;
+      p.npChan = channelCreate (16, int, p.h) ; /* count BB per inFile */
+      channelDebug (p.npChan, debug, "npChan") ;
+      p.gmChan = channelCreate (1, BB, p.h) ;
+      channelDebug (p.gmChan, debug, "gmChan") ;
+      p.plChan = channelCreate (1, BB, p.h) ;
+      channelDebug (p.plChan, debug, "plChan") ;
+      p.lcChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.lcChan, debug, "lcChan") ;
+      p.csChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.csChan, debug, "csChan") ;
+      p.smChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.smChan, debug, "smChan") ;
+      p.moChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.moChan, debug, "moChan") ;
+      p.oaChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.oaChan, debug, "oaChan") ;
+      p.aeChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.aeChan, debug, "aeChan") ;
+      p.doneChan = channelCreate (channelDepth, BB, p.h) ;
+      channelDebug (p.doneChan, debug, "doneChan") ;
       
-      channelPut (p.fpChan, rc, RC) ;
-    }
-  channelClose (p.fpChan) ;
-    
-  /* wait untill the genome is ready */
-  channelGet (p.gmChan, &p.bbG, BB) ;
-  if (! p.bbG.cwsN[0])
-    messcrash ("matchHits received no target words") ;
-  
-  /* map the reads to the genome in parallel */
-  for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
-    {
-      p.agent = i ;
-      wego_go (matchHits, &p, PP) ;
-      wego_go (sortHits, &p, PP) ;
-      if (!i || p.align) /* at least 1 agent */
+      
+      /* create the agents using  "wego_go()"
+       *   Their execution is  triggered by their in-channels
+       *   They export processed BB data-blocks on their out-channel
+       *   They exit when their in-channel closes
+       *
+       * a non-writable COPY of p is passed to each agent
+       * this allows to pass agent specific parameters
+       * like p.agent : the identifier of an instance of the agent
+       */
+      
+      /* The genome parsers start immediately */
+      p.agent = nAgents ;
+      wego_go (genomeParser, &p, PP) ;
+      /* The load regulator maintains --nB data-blocks in the pipeline */
+      wego_go (loadRegulator, &p, PP) ;
+      
+      /* Start the processing of the sequence files */
+      p.nFiles = arrayMax (inArray) ; /* number of files to be processed */
+      /* n Files must be processed
+       * The readParsers will emit for each file, in parallel, n BB blocks
+       * The number is passed to the npChan which feeds the npCounter
+       * When n numbers have been received, the npCounter
+       * knows the cumulated number N of BB blocks to be analyzed
+       * and tells the plChan, hence the load regulator,
+       * and recurssibvely all program layers
+       * to close after having processed N BB blocks
+       */
+      wego_go (npCounter, &p, PP) ;
+      channelCloseAt (p.npChan, p.nFiles) ; /* close the counter of BB blocks */
+      
+      /* Read preprocessing agents, they do not require the genome */
+      for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
 	{
-	  p.agent = 3*i ;
-	  wego_go (align, &p, PP) ;
-	  p.agent = 3*i + 1 ;
-	  wego_go (align, &p, PP) ;
-	  p.agent = 3*i + 2 ;
-	  wego_go (align, &p, PP) ;
 	  p.agent = i ;
+	  wego_go (readParser, &p, PP) ;
 	}
-      if (!i) /* only 1 wiggle agent */
-	wego_go (wiggle, &p, PP) ;
-      if (!i) /* only 1 export agent */
-	wego_go (export, &p, PP) ;
+      for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
+	{
+	  p.agent = i ;
+	  wego_go (codeWords, &p, PP) ;
+	  wego_go (sortWords, &p, PP) ;
+	}
+
+      
+      /* Load the fpChan, triggering the readParsers
+       * and recursively the whole pipeline
+       */
+      for (int k = 0 ; k < p.nFiles ; k++)
+	{
+	  RC *rc = arrayp (inArray, k, RC) ;
+	  array (runErrors, rc->run, Array) = arrayHandleCreate (32, int, p.h) ;
+	  
+	  channelPut (p.fpChan, rc, RC) ;
+	}
+      channelClose (p.fpChan) ;
+      
+      /* wait untill the genome is ready */
+      channelGet (p.gmChan, &p.bbG, BB) ;
+      if (! p.bbG.cwsN[0])
+	messcrash ("matchHits received no target words") ;
+      
+      /* map the reads to the genome in parallel */
+      for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
+	{
+	  p.agent = i ;
+	  wego_go (matchHits, &p, PP) ;
+	  wego_go (sortHits, &p, PP) ;
+	  if (!i || p.align) /* at least 1 agent */
+	    {
+	      p.agent = 3*i ;
+	      wego_go (align, &p, PP) ;
+	      p.agent = 3*i + 1 ;
+	      wego_go (align, &p, PP) ;
+	      p.agent = 3*i + 2 ;
+	      wego_go (align, &p, PP) ;
+	      p.agent = i ;
+	}
+	  if (!i) /* only 1 export agent */
+	    wego_go (export, &p, PP) ;
+	}
     }
-  
+
+  if (p.wiggle)
+    {
+      int nn = parseWiggleFileList (&p) ;
+
+      if (nn)
+	{
+	  p.wwChan = channelCreate (nn+1, int, p.h) ;
+	  channelDebug (p.wwChan, debug, "wwChan") ;
+
+	  for (int ii = 0 ; ii < 4 ; ii++)
+	    {
+	      p.agent = ii ;
+	      wego_go (wiggle, &p, PP) ;
+	    }
+	  
+	  for (int ii = 1 ; ii <= nn ; ii++)
+	    channelPut (p.wwChan, &ii, int) ;
+	  channelClose (p.wwChan) ;
+	}
+      else
+	nn = 1 ;
+      channelCloseAt (p.doneChan, nn - 1) ;
+    }
+
   while (channelGet (p.doneChan, &bb, BB))
     {
       long int n = (bb.hits ? bigArrayMax (bb.hits) : 0) ;

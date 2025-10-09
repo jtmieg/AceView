@@ -1083,6 +1083,8 @@ ACEOUT aceOutCreate (const char *outFileName, const char *suffix, BOOL gzo, AC_H
   int ln = outFileName ? strlen(outFileName)  : 0 ;
   int lnS = suffix ? strlen(suffix)  : 0 ;
 
+  if (ln > 0 && lnS > 1 && outFileName[ln-1]== '/' && suffix[0] == '.')
+    { suffix++ ; lnS-- ; }
   if (! suffix || (ln > lnS && ((ccp = strstr (outFileName, suffix)) && ccp == outFileName + ln - lnS)))
     suffix = "" ;
 

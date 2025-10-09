@@ -19,25 +19,24 @@ setenv SV v20.sep8
 setenv SV v21.sep10     # new clustering counting seeds in read coordinates
 setenv SV v22.sep12     # 2.5 min words
 setenv SV v23.sep15     # min hash of all words up to step
-#setenv SVlast v23.sep15
-# setenv SV v24.sep22    # same code as 23, but new methods G5R5  G3R3 G3R1 with min hashing    
-# setenv SVlast v24.sep22  
+setenv SV v24.sep22    # same code as 23, but new methods G5R5  G3R3 G3R1 with min hashing    
 setenv SV v25.sep22        # fixed introns boundaries, prefer probe with less repeats, maxTargetRepeats 81, seedLength 18
-setenv SVlast v25.sep22  
 setenv SV v26.sep23        # BAD on all metrics same as V25, but maxTargetRepeats 31, seedLength 18
-setenv SVlast v26.sep23  
 setenv SV v27.sep25        # same as 25 maxTargetRepeats 81, seedLength 16
-setenv SVlast v27.sep25  
 setenv SV v28.sep27        # maxTargetRepeats 31, seedLength 18, * for exon words
-setenv SVlast v28.sep27  
-setenv SV v29.sep29        # maxTargetRepeats 31, seedLength 18, * for exon words
+setenv SV v29.sep29        # maxTargetRepeats 81, seedLength 18, MAXJUMP 3
 setenv SVlast v29.sep29    # maxTargetRepeats 81, seedLength 18, fixed topology bug, MAXJUMP 3
+setenv SV v30.sep30        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3
+setenv SVlast v30.sep30    # maxTargetRepeats 31, seedLength 18, fixed topology bug, MAXJUMP 3
+setenv SV v31.oct6        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 8, fixed snps and topology,  minScore 20
+setenv SVlast v31.oct6
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
 endif
 
 setenv seedLength 18
+setenv maxTargetRepeats 31
 
 ##       SortalignPaperMasterScript.tcsh
 ## Author, Greg Boratyn, Danielle Thierry-Mieg, Jean Thierry-Mieg
@@ -56,6 +55,7 @@ if ($1 == '--help') goto phase_Help
 
 # git clone https://github.com/ncbi/magicblast.git
 echo "#### SORTALIGN $SV"
+
 
 #############################################################################
 ## Metadata
@@ -175,6 +175,11 @@ if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1"
 # setenv runs "RNA_PolyA_B_1"
 # setenv runs "ChipSeq1 ChipSeq2"
 # setenv runs "ChipSeq1"
+
+echo "### S.tcsh SV=$SV"
+echo "$methods"
+echo "$runs"
+
 
 
 # This adapter is present in the PacBio SRR runs and gives a peak at 32 aligned bases = polyA + first 8 bp of adaptor

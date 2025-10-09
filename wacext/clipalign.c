@@ -2284,7 +2284,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			    ) ;
 		    
 		    sprintf(cr,"%d:%s%c"
-			    , xShort + (isUp ? mm->probeLeftClip - 1 : mm->probeLeftClip )
+			    , xShort + (isUp ? mm->probeLeftClip - 0 : mm->probeLeftClip )
 			    , ss
 			    , cc1ac
 			    ) ;
@@ -2397,7 +2397,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			    ) ;
 		    
 		    sprintf(cr,"%d:%s%c%c%c"
-			    , xShort + (isUp ? mm->probeLeftClip - 1 : mm->probeLeftClip )
+			    , xShort + (isUp ? mm->probeLeftClip - 2 : mm->probeLeftClip )
 			    , ss
 			    , cc1ac, cc1bc, cc1cc
 			    ) ;

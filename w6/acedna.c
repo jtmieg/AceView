@@ -1084,7 +1084,7 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
 	  ep->iShort < (ep - 5)->iShort + 10)
 	break ;
       /* we need a cast because we allow calls with maxError<0 to stop on first error */
-      if (maxError &&  maxError != -1 && (int)arrayMax(errArray) > maxError)
+      if (maxError >= 0 &&  maxError != -1 && (int)arrayMax(errArray) > maxError)
 	break ;
     }
   *pp1 = cp - cp0 ;
@@ -1305,7 +1305,53 @@ static Array spliceTrackAllErrors (Array  dna1, int pos1, int *pp1,
 
 /***************************************************************************************/
 
-static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
+static void spliceTrackSlideErrors (Array errors, Array dnaLong, Array dnaShort)
+{
+  A_ERR *ep = arrp (errors, 0, A_ERR) ;
+  int ii, nerr = arrayMax (errors) ;
+
+  for (ii = 0 ; ii < nerr ; ii++, ep++)
+    {
+      int x1 = ep->iShort ;
+      int a1 = ep->iLong ;
+      int dx = 0 ;
+      int da = 0 ;
+      switch (ep->type)
+	{
+	case TYPE80:
+	case AMBIGUE:
+	case ERREUR:
+	  continue ;
+	  break ;
+	case INSERTION: dx = 1 ; break ;
+	case INSERTION_DOUBLE: dx = 2 ; break ;
+	case INSERTION_TRIPLE: dx = 3 ; break ;
+	case TROU: da = 1 ; break ;
+	case TROU_DOUBLE: da = 2 ; break ;
+	case TROU_TRIPLE: da = 3 ; break ;
+	}
+      /* push left on read and right on target target */
+      if (dx > 0)
+	{
+	  x1 = ep->iShort = x1 + dx - 1 ;
+	  a1 = ep->iLong = a1 + 1 ;
+	}
+      if (da > 0)
+	{
+	  x1 = ep->iShort = x1 - 1 ;
+	  a1 = ep->iLong = a1 + 1 - da ;
+	}
+      char *cS = arrp (dnaShort, x1, char) ;  /* inserted base */
+      char *cL = arrp (dnaLong, a1, char)  ; /* base after the insertion */
+      while (*cS == complementBase[(int)*cL])
+	{ ep->iShort-- ; ep->iLong++ ; cS-- ; cL++ ; }
+      /* ep->iShort += dx ; ep->iLong += da  ; cS++ ; cL-- ;  */
+    }
+
+  return ;
+} /* spliceTrackSlideErrors  */
+
+static void spliceTrackSlideErrorsOld (Array err, Array dnaLong, Array dnaShort)
 {
   int i, n ;
   A_ERR *ep ;
@@ -1354,19 +1400,26 @@ static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
             }
           ep->iLong++ ; /* bonus long sliding */
           break ;
-        case INSERTION_TRIPLE:        
-	  ep->iShort-=2 ;
-	  break ;
         case INSERTION_DOUBLE:        
           cs = arrp(dnaLong, ep->iLong - 1, char) ;
           cc = ep->baseShort ; i = arrayMax(dnaLong) - ep->iLong ;
-          while (i-- && *(++cs) == cc)
+	  if (0)           while (i-- && *(++cs) == cc)
             { 
               ep->iShort-- ;
               ep->iLong++ ;
             }
           ep->iLong++ ; ep->iShort++ ;  /* bonus double sliding */
           break ;
+        case INSERTION_TRIPLE:
+          cs = arrp(dnaLong, ep->iLong - 1, char) ;
+          cc = ep->baseShort ; i = arrayMax(dnaLong) - ep->iLong ;
+          if (0) while (i-- && *(++cs) == cc)
+            { 
+              ep->iShort-- ;
+              ep->iLong++ ;
+            }
+	  ep->iLong++ ; ep->iShort+=2 ;  /* bonus double sliding */
+	  break ;
         }
     }
 }
@@ -1378,6 +1431,7 @@ static void spliceTrackSlideErrors (Array err, Array dnaLong, Array dnaShort)
  * if (isDown) we extend in both directions
  * else the code to extend backwards is not written  
  */
+
 
 
 
@@ -1401,13 +1455,24 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
       if (*a2p > arrayMax(dna2)) *a2p = arrayMax(dna2) ;
 
       if (maxErrorOld == -2)
-	{ maxError = -1 ; doExtend = FALSE ; }
+	{ maxError = -2 ; doExtend = FALSE ; }
+      if (maxErrorOld == -3)
+	{ maxError = -2 ; doExtend = TRUE ; }
+      if (maxError == -9)
+	{
+	  spliceTrackAllErrors (dna1, *x1p - 1, x2p, dna2, *a1p - 1, a2p, NNp, err, maxJump, maxError
+				, FALSE, maxExactp) ;
+	  return err ;
+	}
       err1 = arrayCreate (5, A_ERR) ; /* smaller value 5 limits the number of memset 0 */
       err1 = spliceTrackAllErrors (dna1, *x1p - 1, x2p, dna2, *a1p - 1, a2p, NNp, err1, maxJump, maxError
 				   , doExtend, maxExactp) ;
-
+      
+	
       if (maxErrorOld == -2)
 	{ maxError = -2 ; doExtend = doExtendOld ; }
+      if (maxErrorOld == -3)
+	{ maxError = -3 ; doExtend = doExtendOld ; }
 
       u1 = *x1p - 1 ; u2 = *a1p - 1 ; /* C type coord of first base */
       if (err1 && arrayMax (err1))
@@ -1421,8 +1486,10 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 	      u1 = *x1p ; u2 = *a1p ; /* C type coord of first error */
 	    }
 	}
+      if (maxErrorOld == -2)
+	{ maxError = -2 ; doExtend = TRUE ; }
       if (maxErrorOld == -3)
-	{ maxError = -1 ; doExtend = FALSE ; }
+	{ maxError = -2 ; doExtend = FALSE ; }
       if ((u1 > y1 && u2 >= b1) || doExtend)
 	  {
 	    int uz1 = u1 - 1, uz2 = u2 - 1 ;
@@ -1431,6 +1498,8 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 	    err2 = aceDnaTrackErrorsBackwards (dna1, uz1, &u1, dna2, uz2, &u2, NNp, err2, maxJump, maxError, doExtend) ;
 	    *x1p = u1 + 1 ; *a1p = u2 + 1 ;
 	  }
+      if (maxErrorOld == -2)
+	{ maxError = -2 ; doExtend = doExtendOld ; }
       if (maxErrorOld == -3)
 	{ maxError = -3 ; doExtend = doExtendOld ; }
       j = 0 ; 
@@ -1507,14 +1576,14 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
       if (*x2p < 1) *x2p = 1 ;
       if (*x1p > arrayMax(dna1)) *x1p = arrayMax(dna1) ;
 
-      if (*a1p < 1) *a1p = 1 ;
-      if (*a2p > arrayMax(dna2)) *a2p = arrayMax(dna2) ;
+      if (*a2p < 1) *a2p = 1 ;
+      if (*a1p > arrayMax(dna2)) *a1p = arrayMax(dna2) ;
 
       u1 = nn - *a1p + 1 ; u2 = nn - *a2p + 1 ; /* reversed biologist coordinates */
       
-      err = spliceTrackAllErrors (dna1, *x2p - 1, x1p, dna2R, u2 - 1, &u1, NNp, err, maxJump, maxError, doExtend, maxExactp) ;
+      err = spliceTrackAllErrors (dna1, *x1p - 1, x2p, dna2R, u1 - 1, &u2, NNp, err, maxJump, maxError, doExtend, maxExactp) ;
       
-      *a1p = nn - u1 + 1 ; /* restore */
+      *a2p = nn - u2 + 1 ; /* restore */
       
       /* remove the ambiguous errors */
       if (arrayMax(err) && ! NNp)
