@@ -1731,6 +1731,8 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb)
 	  
 	  int nnX = n < (1<<16) ? n : (1<<16) - 1 ;
 	  nnX += nX ;
+	  if (wp->seed == 286331185)
+	    fprintf (stderr, "seed 286331185 n=%d, nX=%d, nI=%d\n", n, nX, nI) ;
 
 	  if (!maxRepeats || n < maxRepeats)
 	    {
@@ -2052,7 +2054,7 @@ static void codeWordsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
 		    cw->intron = 0x1 << 30 ;		  
 		}
 	      cStep = dx ;
-	      if (1 && cw->seed == 799835389)
+	      if (0 || cw->seed == 799835389)
 		fprintf (stderr, "codeWordsDo p=%d k=%d pos=%d seed=%d\n", p, k, cw->pos,cw->seed) ;
 	    }
 	}
@@ -2595,7 +2597,7 @@ static int intronCodeWords (PP *pp, BB *bbG)
   
   bigArraySort (aa, intronOrder) ;
   
-  up = bigArrp (aa, 0, CW) ;
+  up = iMax ? bigArrp (aa, 0, CW) : 0 ;
   for (ii = 0 ; ii < iMax ; ii++, up++)
     {
       long unsigned int w, wr ;
@@ -3047,8 +3049,8 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 	}
       while  (i < iMax && j < jMax)
 	{
-	  if (0 && rw->seed == 975012768)
-	    printf("(rw->seed == 975012768)\n") ;
+	  if (1 && rw->seed == 286331185)
+	    printf("(rw->seed == 286331153)\n") ;
 	  if ((i & mask) == 0)
 	    {
 	      if (0 || rw->seed <= (unsigned int) cw->seed)
@@ -3280,7 +3282,7 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
     }
   bb->hits = hitsArray ;
 
-  if (debug)
+  if (1||debug)
     fprintf (stderr, "..MatchHitsDo found %ld matches\n", kkk) ;
 
   return nn ;
@@ -5996,7 +5998,7 @@ static void alignDo (const PP *pp, BB *bb)
     bb->isAligned = bitSetHandleCreate (bb->nSeqs, bb->h) ;
   */
 
-  for (ii = 0, hit = bigArrp (bb->hits, 0, HIT) ; ii < iMax ; ii++, hit++)
+  for (ii = 0, hit = iMax ? bigArrp (bb->hits, 0, HIT) : 0 ; ii < iMax ; ii++, hit++)
     {
       int nn = 1, read = hit->read, pair = read >> 1 ;
       for (jj = ii + 1, h1 = hit + 1 ; jj < iMax && (h1->read >> 1) == pair ; jj++, h1++)
