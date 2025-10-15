@@ -30,13 +30,21 @@ setenv SV v30.sep30        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3
 setenv SVlast v30.sep30    # maxTargetRepeats 31, seedLength 18, fixed topology bug, MAXJUMP 3
 setenv SV v31.oct6        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 8, fixed snps and topology,  minScore 20
 setenv SVlast v31.oct6
+setenv SV v32.oct9        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 8, fixed snps and topology,  minScore 20 # sam2bam works on Roche, iRefSeq38, ChipSeq1/2
+setenv SVlast v32.oct9
+setenv SV v33.oct10        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 8,  same code as v32
+setenv SVlast v33.oct10
+setenv SV v34.oct10        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3,  same code as v32
+setenv SVlast v34.oct10
+setenv SV v35.oct13        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3,  align on image of transcript
+setenv SVlast v35.oct13
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
 endif
 
 setenv seedLength 18
-setenv maxTargetRepeats 31
+setenv maxTargetRepeats 81
 
 ##       SortalignPaperMasterScript.tcsh
 ## Author, Greg Boratyn, Danielle Thierry-Mieg, Jean Thierry-Mieg
