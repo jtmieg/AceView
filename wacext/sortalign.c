@@ -1672,7 +1672,7 @@ static void npCounter (const void *vp)
 
 /**************************************************************/
 
-static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb)
+static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 {
   long int iMax ; 
   long int jMax ; 
@@ -1731,8 +1731,8 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb)
 	  
 	  int nnX = n < (1<<16) ? n : (1<<16) - 1 ;
 	  nnX += nX ;
-	  if (wp->seed == 286331185)
-	    fprintf (stderr, "seed 286331185 n=%d, nX=%d, nI=%d\n", n, nX, nI) ;
+	  if (0 && kk == 1 && up->seed == 185667857)
+	    fprintf (stderr, "seed 185667857 kk=%d n=%d, nX=%d, nI=%d\n", kk, n, nX, nI) ;
 
 	  if (!maxRepeats || n < maxRepeats)
 	    {
@@ -1965,7 +1965,7 @@ static void codeWordsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
       int iMax = arrayMax (dna) ;
       long unsigned int w, wr ;
       const int nShift = 62 ;
-      if (0) step = iMax < 60 ? 1 : bb->step ;
+      if (1) step = iMax < 60 ? 1 : bb->step ;
       
       w = wr = 0 ;
       /* each q vector is used round-robin style, so no copying is needed */
@@ -2054,7 +2054,7 @@ static void codeWordsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
 		    cw->intron = 0x1 << 30 ;		  
 		}
 	      cStep = dx ;
-	      if (0 || cw->seed == 799835389)
+	      if (0)
 		fprintf (stderr, "codeWordsDo p=%d k=%d pos=%d seed=%d\n", p, k, cw->pos,cw->seed) ;
 	    }
 	}
@@ -2942,7 +2942,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
   bbG->cwsN = halloc (NN * sizeof(BigArray), bbG->h) ;
   for (int kk = 0 ; kk < NN ; kk++)
     {
-      bbG->cwsN[kk] = GenomeAddSkips (pp, cwsN[kk], bbG) ;
+      bbG->cwsN[kk] = GenomeAddSkips (pp, cwsN[kk], bbG, kk) ;
       bigArrayDestroy (cwsN[kk]) ;
     }
 
@@ -3049,11 +3049,11 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 	}
       while  (i < iMax && j < jMax)
 	{
-	  if (1 && rw->seed == 286331185)
-	    printf("(rw->seed == 286331153)\n") ;
+	  if (0 && kk == 1 && rw->seed == 185667857)
+	    printf("(rw->seed == 185667857)\n") ;
 	  if ((i & mask) == 0)
 	    {
-	      if (0 || rw->seed <= (unsigned int) cw->seed)
+	      if (rw->seed <= (unsigned int) cw->seed)
 		{
 		  cw++ ;
 		  i++ ;
@@ -3118,7 +3118,7 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 		      BOOL chromUp = cw1->nam & 0x1 ;
 		      int nTargetRepeats = cw1->intron ;
 		      
-		      if (nTargetRepeats > maxTargetRepeats)
+		      if (1 && nTargetRepeats > maxTargetRepeats)
 			continue ; 
 		      if (0 && useIntronSeeds) continue ;
 		      nn++ ;
@@ -5864,7 +5864,22 @@ static void alignDoOneRead (const PP *pp, BB *bb
 } /* alignDoOneRead */
 
 /**************************************************************/
+/**************************************************************/
+typedef struct pairStruct { ALIGN *up, *vp ; int score, chrom, a1, a2 ; } PAIR ;
+static int pairOrder (const void *va, const void *vb)
+{
+  const PAIR *up = va ;
+  const PAIR *vp = vb ;
+  int n ;
+  n = up->score - vp->score ; if (n) return -n ;
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  n = up->a2 - vp->a2 ; if (n) return n ;
 
+  return 0 ;
+} /* pairOrder */
+
+/**************************************************************/
 static void alignDoOnePair (const PP *pp, BB *bb
 			    , BigArray aaaa, BigArray hits
 			    , Array aa, Array err)
@@ -5903,65 +5918,103 @@ static void alignDoOnePair (const PP *pp, BB *bb
 
   if (bestUp2) /* we have a pair, good  example polyA_B_1 read 144/145*/
     {
-      ALIGN *up, *up01, *up02 ;
-      int i, i01, i02 ;
-      int iMax = arrayMax (aaa) ;
-      int i1Max = arrayMax (bestUp1) ;
-      int i2Max = arrayMax (bestUp2) ;
-      if (i1Max && i2Max)
+      ALIGN *up, *vp ;
+      int iMax1 = arrayMax (bestUp1) ;
+      int iMax2 = arrayMax (bestUp2) ;
+
+      if (iMax1 && iMax2)
 	{
-	  i01 = arr (bestUp1, 1, int) ;
-	  i02 = arr (bestUp2, 1, int) ;
-	  up01 = arrp (aaa, i01, ALIGN) ;
-	  up02 = arrp (aaa, i02, ALIGN) ;
-	  up01->mateChrom = up02->chrom ;
-	  up02->mateChrom = up01->chrom ;
-	  up01->mateA1 = up02->chainA1 ;
-	  up01->mateA2 = up02->chainA2 ;
-	  up02->mateA1 = up01->chainA1 ;
-	  up02->mateA2 = up01->chainA2 ;
-	  bb->runStat.nAlignedPairs++ ;				  
-	  if ((up01->chrom ^ up02->chrom) == 0x1)
+	  Array pairs = arrayHandleCreate (iMax1 * iMax2 , PAIR, h) ;
+	  PAIR *px ;
+	  int i1, i2 ;
+	  int jj = 0 ;
+	  for (i1 = 1 ; i1 < iMax1 ; i1++)
+	    for (i2 = 1 ; i2 < iMax2 ; i2++)
+	      {
+		int j1 = arr (bestUp1, 1, int) ;
+		int j2 = arr (bestUp2, 1, int) ;
+
+		up = arrp (aaa, j1, ALIGN) ;
+		vp = arrp (aaa, j2, ALIGN) ;
+
+		if ((up->chrom ^ vp->chrom) == 0x1)
+		  {
+		    up = ((up->chrom & 0x1) == 0) ? up : vp ;
+		    vp = ((up->chrom & 0x1) == 0) ? vp : up ;
+		    int da = vp->chainA1 - up->chainA1 ;
+		    int db = vp->chainA2 - up->chainA2 ;
+
+		    if (da > 0 && db < 1000000) /* true pair */
+		      {
+			px = arrayp (pairs, jj++, PAIR) ;
+			px->up = up ;
+			px->vp = vp ;
+			px->chrom = up->chrom ;
+			px->a1 = up->a1 ;
+			px->a2 = vp->a1 ;
+			px->score = up->chainScore + vp->chainScore ;
+		      }
+		  }
+	      }
+	  int jMax = jj ;
+	  if (jMax)
 	    {
-	      int pairA1, pairA2, da, da1, da2 ;
-	      /* The 2 strands of the same chromosome */
-	      /* check the topology */
-	      da1 = up01->chainA2 - up01->chainA1 ;
-	      da2 = up02->chainA2 - up02->chainA1 ;
-	      if ((up01->chrom & 0x1) == 0) /* first read on plus strand */
-		{ pairA1 = up01->chainA1 ; pairA2 = up02->chainA1 ; }
-	      else
-		{ pairA1 = up02->chainA1 ; pairA2 = up01->chainA1 ; }
-	      da = pairA2 - pairA1 ;
-	      BOOL goodTopology = (da > 0 &&
-				   (
-				    (da1 > 0 && da2 < 0) ||
-				    (da2 > 0 && da1 < 0) 
-				    )
-				   ) ;
-	      if (goodTopology)
+	      ALIGN *wp, *zp ;
+	      int m ;
+	      arraySort (pairs, pairOrder) ;
+	      PAIR *px0 = arrayp (pairs, 0, PAIR), *qx = 0, *rx ;
+	      int bestScore = px0->score, kk = 0 ;
+	      Array aaa1 = arrayHandleCreate (arrayMax (aaa), ALIGN, h) ;
+
+	      for (jj = 0, px = px0 ; jj < jMax && px->score == bestScore ; jj++, px++)
 		{
-		  int pairScore = up01->chainScore + up02->chainScore ;
-		  for (up = up01, i = i01 ; i < iMax && up->read == read1 && up->chain == up01->chain ; i++, up++)
-		    {
-		      up->pairScore = pairScore ;
-		      up->pairLength = ( da1 > 0 ? da + 1 : -da - 1) ;
-		    }
-		  for (up = up02, i = i02 ; i < iMax && up->read == read2 && up->chain == up02->chain ; i++, up++)
-		    {
-		      up->pairScore = pairScore ;
-		      up->pairLength = ( da2 > 0 ? da + 1 : -da - 1) ;
-		    }
+		  if (qx && px->up == qx->up && px->a2 > qx->a2)
+		    continue ; /* eliminate vp2 in   ---> <--- <--- config */
+		  BOOL ok = TRUE ;
+		  for (m = jj + 1, rx = px+1 ; /* eliminate up1 in   ---> ---> <--- config */
+		       ok && m < jMax && rx->a1 < px->a2 && rx->chrom == px->chrom && rx->score == bestScore ;
+		       m++, rx++ )
+		    ok = FALSE ;
+		  if (!ok)
+		    continue ;
+		  qx = px ;
+
+		  bb->runStat.nAlignedPairs++ ;
 		  bb->runStat.nCompatiblePairs++ ;
+		  
+		  up = px->up ;
+		  for (vp = up ; vp->chain == up->chain && vp->read == up->read ; vp++)
+		    {
+		      wp = px->vp ;
+		      vp->pairScore = px->score ;
+		      vp->mateChrom = wp->chrom ;
+		      vp->mateA1 = wp->chainA1 ;
+		      vp->mateA2 = wp->chainA2 ;
+
+		      zp = arrayp (aaa1, kk++, ALIGN) ;
+		      *zp = *up ;
+		    }	  
+
+
+		  up = px->vp ;
+		  for (vp = up ; vp->chain == up->chain && vp->read == up->read ; vp++)
+		    {
+		      wp = px->up ;
+		      vp->pairScore = px->score ;
+		      vp->mateChrom = wp->chrom ;
+		      vp->mateA1 = wp->chainA1 ;
+		      vp->mateA2 = wp->chainA2 ;
+
+		      zp = arrayp (aaa1, kk++, ALIGN) ;
+		      *zp = *up ;
+		    }	  
 		}
-	      BOOL circleTopology = (da < 0 &&
-				   (
-				    (da1 > 0 && da2 < 0) ||
-				    (da2 > 0 && da1 < 0) 
-				    )
-				   ) ;
-	      if (circleTopology)
-		bb->runStat.nCirclePairs++ ;
+	      arrayMax (aaa) = 0 ;
+	      if (kk)
+		{
+		  zp = arrayp (aaa, kk, ALIGN) ;
+		  memcpy (arrp (aaa, 0, ALIGN), arrp (aaa1, 0, ALIGN), kk * sizeof (ALIGN)) ;
+		}
 	    }
 	}
     }
@@ -7950,7 +8003,7 @@ int main (int argc, const char *argv[])
   p.seedLength = 18 ; /* default */
   getCmdLineInt (&argc, argv, "--seedLength", &(p.seedLength));
   
-  p.maxTargetRepeats = 81 ;  /* was 81  31 12 */
+  p.maxTargetRepeats = 31 ;  /* was 81  31 12 */
   getCmdLineInt (&argc, argv, "--maxTargetRepeats", &p.maxTargetRepeats) ;
 
   if (NN != 1 && NN != 2 && NN != 4 && NN != 8 && NN != 16 && NN != 32 && NN != 64)
@@ -8001,7 +8054,7 @@ int main (int argc, const char *argv[])
   getCmdLineLong (&argc, argv, "--nRawBases", &(p.nRawBases)) ;
 
   /*****************  Aligner filters  ************************/
-  p.minAli = p.minScore = -1 ;
+  p.minAli = p.minAliPerCent = p.minScore = -1 ;
   p.errMax = 1000000 ; /* on negative values, extendHits stops on first error */
   p.errRateMax = 10 ;
   p.OVLN = 30 ;
@@ -8018,8 +8071,9 @@ int main (int argc, const char *argv[])
   p.maxIntron = 1000000 ;
   getCmdLineInt (&argc, argv, "--maxIntron", &(p.maxIntron)) ;
 
-  if (p.minScore == -1) p.minScore = 30 ;
-  if (p.minAli == -1) p.minAli = 30 ;
+  if (p.minScore < 0) p.minScore = 0 ;
+  if (p.minAli < 0) p.minAli = 30 ;
+  if (p.minAliPerCent < 0) p.minAliPerCent = 0 ;
   if (p.minAli < p.minScore) p.minAli = p.minScore ;
   
   /****************** Check the existence of all file names ****************************************/ 
