@@ -21,6 +21,7 @@
 #include "regular.h"
 #include "bigarray.h"
 #include "bitset.h"
+#include <sys/mman.h>
 
   /* Defines bitField bit array from bitset.h */
 
@@ -1863,7 +1864,12 @@ static unsigned char *mmapCreate (const char *fName, long int *size, int *fdp, u
   /* the last arg, hemre 0, says that mapping should start n pages down whwere pageSize = sysconf(_SC_PAGE_SIZE). */
   /* PROT cabe PROT_NONE or   'PROT_READ | PROT_WRITE | PROT_EXE == 777' */
   /* MAP_PRIVATE | MAP_NORESERVE ; do not write do not reserve swap as we do not write */
+#ifdef DARWIN
+  /* MAP_POPULATE and MAP_NORESERVE are not available on MacOS */
+  unsigned char *map = mmap (NULL, *size, PROT_READ, MAP_PRIVATE, fd, 0);
+#else
   unsigned char *map = mmap (NULL, *size, PROT_READ, MAP_PRIVATE | MAP_NORESERVE | MAP_POPULATE , fd, 0);
+#endif
   if (map == MAP_FAILED)
     {
       messerror ("Failed to map for reading a memory map file of size %ld : %s", size, fName) ;
