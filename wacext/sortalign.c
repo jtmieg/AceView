@@ -23,7 +23,6 @@
   #define ARRAY_CHECK
   #define MALLOC_CHECK
 
-
 /* Example: (for more details try: sortalign -h)
   cd worm_2024_RSMagic1
 
@@ -45,10 +44,14 @@ time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --ali
 #include "ac.h"
 #include "channel.h"
 #include <zlib.h>
+#include <stdatomic.h>
+
 #define VECTORIZED_MEM_CPY
 #ifdef VECTORIZED_MEM_CPY
 #include <emmintrin.h> // SSE2
 #endif
+
+#define YANN 1
 
 #define WIGGLE_STEP 10
 #define MAXJUMP 3
@@ -74,6 +77,7 @@ typedef struct runClassStruct {
   DnaFormat format ;
   const char *fileName1 ;
   const char *fileName2 ;
+  atomic_int lane ;
 } RC ;
 		  
 typedef struct runStatStruct {
@@ -108,6 +112,7 @@ typedef struct bStruct {
   int run, lane, readerAgent ;
   RC rc ;
   DICT *dict, *errDict ;
+  mytime_t start, stop ;
   BigArray dnaCoords ;   /* offSets of the dna in the globalDna array */
   Array dnas ;           /* Array of const char Arrays */
   Array dnasR ;          /* Their reverse complement, only computed for the genome */
@@ -320,7 +325,7 @@ typedef struct cpuStatStruct {
 typedef struct timespec TMS ;
 /* bin/sortalign -t TARGET/Targets/hs.genome.fasta.gz -i titi.fastc --align -o tatou */
 
-
+static atomic_int lane ;
 static int cwOrder (const void *va, const void *vb) ;
 
 /**************************************************************/
@@ -1223,7 +1228,6 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   long int nBytes = 0 ;
   int nPuts = 0 ;
 
-  int lane = 0 ;
   CHAN *chan = pp->plChan ;
   gzFile file = 0 ;
   BOOL debug = FALSE ;
@@ -1282,8 +1286,9 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       bb->h = ac_new_handle () ;
 	  
       bb->readerAgent = pp->agent ;
-      bb->lane = ++lane ;
       bb->run = rc ? rc->run : 0 ;
+      bb->start = timeNow () ;
+      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
       bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
       bb->rc.fileName1 = fileName1 ;
       /* copy the buffer */
@@ -1321,7 +1326,6 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   int BMAX = 200 * NMAX ;
   int nPuts = 0 ;
   int nn = 0, nSeqs = 0 ;
-  int lane = 1 ;
   CHAN *chan = 0 ;
   ACEIN ai1 = 0 ;
   ACEIN ai2 = 0 ;
@@ -1369,7 +1373,8 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
     {
       bb = &b ;
       bb->readerAgent = pp->agent ;
-      bb->lane = lane++ ;
+      bb->start = timeNow () ;
+      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
       memset (bb, 0, sizeof (BB)) ;
       chan = pp->plChan ;
       namBufX = namBuf ;
@@ -1555,7 +1560,8 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	  
 	  nn = 0 ;
 	  bb->readerAgent = pp->agent ;
-	  bb->lane = lane++ ;
+	  bb->start = timeNow () ;
+	  bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
 	  bb->h = ac_new_handle () ;
 	  bb->txt1 = vtxtHandleCreate (bb->h) ;
 	  bb->txt2 = vtxtHandleCreate (bb->h) ;
@@ -2897,7 +2903,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
     }
 
   t1 = clock () ;
-  printf ("%s : extract the target seeds\n" , timeShowNow (tBuf)) ;
+  printf ("%s : extract the target seeds\n" , timeBufShowNow (tBuf)) ;
   codeWordsDo (pp, bbG, pp->tStep, TRUE) ;
   if (pp->intronSeeds)
     intronCodeWords (pp, bbG) ;
@@ -2923,7 +2929,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
   cpuStatRegister ("2.Extract target seeds" , pp->agent, bbG->cpuStats, t1, t2, bbG->nSeqs) ;
   t1 = clock () ;
 
-  printf ("%s : sort the target seeds\n" , timeShowNow (tBuf)) ;
+  printf ("%s : sort the target seeds\n" , timeBufShowNow (tBuf)) ;
   for (int k = 0 ; k < NN ; k++)
     newMsort (cwsN[k], cwOrder) ;
 
@@ -2938,7 +2944,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
     }
   t1 = clock () ;
 
-  printf ("%s : write the index to disk\n" , timeShowNow (tBuf)) ;
+  printf ("%s : write the index to disk\n" , timeBufShowNow (tBuf)) ;
   bbG->cwsN = halloc (NN * sizeof(BigArray), bbG->h) ;
   for (int kk = 0 ; kk < NN ; kk++)
     {
@@ -3032,21 +3038,6 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
       const CW *restrict cwMax = cw + iMax ;
       HIT *restrict hit;
         
-
-      if (debug) /* debug */
-	{
-	  CW *up = bigArrp (bbG->cwsN[kk], 0, CW) ;
-	  CW *vp = up + 1 ;
-	  for (long int i1 = 0 ; i1 < iMax - 1 ; i1++, up++, vp++)
-	    if ((i1 & 0xff) && ((i1+1) & 0xff) && up->seed > vp->seed)
-	      messcrash ("Bad order in cws[NN=%d] line %ld\n", kk, i1) ;
-	}
-
-      if (debug)
-	{
-	  if (1) showCws (pp, bb, bb->cwsN[kk]) ;
-	  if (1) showCws (pp, 0, bbG->cwsN[kk]) ;
-	}
       while  (i < iMax && j < jMax)
 	{
 	  if (0 && kk == 1 && rw->seed == 185667857)
@@ -3282,7 +3273,7 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
     }
   bb->hits = hitsArray ;
 
-  if (1||debug)
+  if (debug)
     fprintf (stderr, "..MatchHitsDo found %ld matches\n", kkk) ;
 
   return nn ;
@@ -3329,6 +3320,7 @@ static void matchHits (const void *vp)
   return ;
 } /* matchHits */
 
+/**************************************************************/
 /**************************************************************/
 /**************************************************************/
 
@@ -5515,7 +5507,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   ALIGN *up, *vp ;
 
   int ii ;
-  int iMax = arrayMax (aa) ;
+  int iMax = alignLocateChains (bestUp, aa, read) ;  
   int nChains = 0 ;
   int step = WIGGLE_STEP ;  /* examples s=10, 5, 1 */
   int demiStep = step/2 ;
@@ -5939,8 +5931,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 
 		if ((up->chrom ^ vp->chrom) == 0x1)
 		  {
-		    up = ((up->chrom & 0x1) == 0) ? up : vp ;
-		    vp = ((up->chrom & 0x1) == 0) ? vp : up ;
+		    if ((up->chrom & 0x1) == 1) { ALIGN *zp = up ; up = vp ; vp = zp ;}
 		    int da = vp->chainA1 - up->chainA1 ;
 		    int db = vp->chainA2 - up->chainA2 ;
 
@@ -6354,7 +6345,8 @@ static void wiggle (const void *vp)
 
 static void sortAlignTableCaption (const PP *pp, ACEOUT ao)
 {
-  aceOutf (ao, "## %s Magic aligner\n", timeShowNow()) ;
+  char tBuf[25] ;
+  aceOutf (ao, "## %s Magic aligner\n", timeBufShowNow(tBuf)) ;
   if (1)
     aceOutf (ao, "## Author: Danielle et Jean Thierry-Mieg, Greg Boratyn, NCBI, mieg@ncbi.nlm.nih.gov\n") ;
   if (0)
@@ -6425,7 +6417,7 @@ static void exportDo (const PP *pp, BB *bb)
   BOOL pairedEnd = bb->rc.pairedEnd ;
   const char *run = dictName (pp->runDict, bb->run) ;
   AC_HANDLE h = ac_new_handle () ;
-  char *runNam = hprintf (h, ".%s.f2.%d.%d.hits", run, bb->readerAgent, bb->lane) ;
+  char *runNam = hprintf (h, ".%s.%d.hits", run, bb->lane) ;
   ACEOUT ao = aceOutCreate (pp->outFileName, runNam, pp->gzo, h) ;
   aceOutDate (ao, "###", "sortaling hits") ;
   
@@ -6956,6 +6948,7 @@ static void export (const void *vp)
 	      t1 = clock () ;
 	    }
 	}
+
       channelPut (pp->doneChan, &bb, BB) ;
     }
 
@@ -6966,6 +6959,137 @@ static void export (const void *vp)
   ac_free (h) ;
   return ;
 } /* export */
+
+/**************************************************************/
+
+static void wholeWork (const void *vp)
+{
+  const PP *pp = vp ;
+  BB bb ;
+  BB bbG = pp->bbG;
+  char tBuf[25] ;
+  long int nnn = 0 ;
+  
+  clock_t  t1, t2 ;
+	    
+  memset (&bb, 0, sizeof (BB)) ;
+  /* grab and match a block of reads */
+  while (channelGet (pp->lcChan, &bb, BB))
+    {
+      /* code words */
+      parseReadsDo (pp, &bb, pp->iStep, FALSE) ;
+      codeWordsDo (pp, &bb, pp->iStep, FALSE) ;
+
+      /* sort words */
+      {
+       for (int k = 0 ; k < NN ; k++)
+	 if (bb.cwsN[k])
+	   newMsort (bb.cwsN[k], cwOrder) ;
+      }
+      
+      /* match hits */
+      {
+	long int nn = 0 ;
+	t1 = clock () ;
+	
+	if (bb.length)
+	  {
+	    if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
+	    nn = matchHitsDo (pp, &bbG, &bb) ;
+	    if (pp->debug) printf ("--- %s: Stop wholeWork constructed %ld arrays\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
+	  }
+	nnn += nn ;
+      }
+      /* sorthits */
+      {
+	BigArray aa = bb.hits ;
+	long int iMax = aa ? bigArrayMax (aa) : 0 ;
+	if (pp->debug) printf ("+++ %s: Start sort hits merging %ld arrays\n", timeBufShowNow (tBuf), iMax) ;
+	t1 = clock () ;
+	
+	if (iMax == 0)
+	  bb.hits = 0 ;
+	else if (iMax == 1)
+	  bb.hits = bigArray (aa, 0, BigArray) ;
+	else
+	  {
+	    BigArray a ;
+	    long int n = 0 ;
+	    HIT *up ;
+	    for (long int i = 0 ; i < iMax ; i++)
+	      {
+		a = bigArray (aa, i, BigArray) ;
+		n += bigArrayMax (a) ;
+	      }
+	    bb.hits = bigArrayHandleCreate (n, HIT, bb.h) ;
+	    up = bigArrayp (bb.hits, n - 1, HIT) ; /* make room */
+	    up = bigArrayp (bb.hits, 0, HIT) ;
+	    for (int i = 0 ; i < iMax ; i++)
+	      {
+		a = bigArray (aa, i, BigArray) ;
+		n = bigArrayMax (a) ;
+		if (n > 0)
+		  {
+		    memcpy (up, bigArrp (a, 0, HIT), n * sizeof (HIT)) ;
+		    up += n ;
+		  }
+		bigArrayDestroy (a) ;
+	      }
+	    bigArrayDestroy (aa) ;
+	  }
+	
+	
+	if (pp->align && bb.hits)
+	  {
+	    newMsort (bb.hits, hitPairOrder) ;
+	    
+	  }
+      }
+
+      /* align */
+      if (1) alignDo (pp, &bb) ;
+
+      /* export */
+      {
+	if (bb.aligns && bigArrayMax (bb.aligns))
+	  {
+	    bigArraySort (bb.aligns, alignOrder) ;
+	    if (! pp->sam)
+	      { if (1) exportDo (pp, &bb) ; }
+	    else
+	      {
+		AC_HANDLE h = ac_new_handle () ;
+		ACEOUT ao = 0 ;
+		char *VERSION = "0.1.1" ;
+		DICT *dictG = pp->bbG.dict ;
+		ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.%d.sam", dictName (pp->runDict, bb.run), bb.lane), pp->gzo, h) ;
+		aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
+		aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
+		
+		for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
+		  {
+		    Array dna = arr (pp->bbG.dnas, chrom, Array) ;
+		    int ln = dna ? arrayMax (dna) : 0 ;
+		    aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
+		  }
+		/* aceOutf (ao, "\tCL:%s", commandBuf) ; */
+		exportSamDo (ao, pp, &bb) ;
+		ac_free (h) ;
+	      }
+	  }
+      }
+      t2 = clock () ;
+      cpuStatRegister ("5.WholeWork", pp->agent, bb.cpuStats, t1, t2, nnn) ;
+      channelPut (pp->doneChan, &bb, BB) ;
+    }
+  if (1)
+    {
+      int n = channelCount (pp->plChan) ;
+      channelCloseAt (pp->doneChan, n) ;
+    }
+
+  return ;
+} /* wholeWork */
 
 /*************************************************************************************/
 
@@ -7139,7 +7263,7 @@ static void reportRunStats (PP *pp, Array runStats)
   printf ("\nPerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->nReads + .000001)) ;
   printf ("\nAlignments\t%ld\t%.2f per aligned read", s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
   printf ("\nCompatiblePairs\t%ld\t%.2f%%", s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(s0->nPairs + .000001)) ;
-    printf ("\nCirclePairs\t%ld\t%.2f%%", s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(s0->nPairs + .000001)) ;
+  printf ("\nCirclePairs\t%ld\t%.2f%%", s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(s0->nPairs + .000001)) ;
   printf ("\nReads supporting introns") ;
   for (ii = 0 ; ii < iMax ; ii++) 
     {	
@@ -7827,7 +7951,7 @@ int main (int argc, const char *argv[])
   char tBuf0[25] ;
   AC_HANDLE h ;
   int nAgents = 10 ;
-  int channelDepth = 1 ;
+  int channelDepth = 10 ;
   mytime_t t0, t1 ;
   
   freeinit () ; 
@@ -7851,15 +7975,14 @@ int main (int argc, const char *argv[])
   /***************** pin the threads to the processors ***/
 
   if (! getCmdLineBool (&argc, argv, "--numactl") &&
-      ! strstr (argv[0], "numactl") &&
-      p.nBlocks > 1	
+      ! strstr (argv[0], "numactl") 
       )
     {
-      if (isExecutableInPath ("numactl"))
+      if (1 && isExecutableInPath ("numactl"))
 	{
 	  char ** new_argv = malloc((argc + 3) * sizeof(char*)); 
 
-	  if (0)
+	  if (1)
 	    new_argv[0] = " --interleave=all " ;
 	  else
 	    new_argv[0] = " --cpunodebind=0 --membind=0 " ;
@@ -8024,16 +8147,16 @@ int main (int argc, const char *argv[])
     messcrash ("The source code assumes that long unsigned ints use 64 bits not %d, sorry", 8 * sizeof (long unsigned int)) ;
 
   /*****************  Optional technical parameters ************************/
-  nAgents = 10 ;
+  nAgents = 40 ;
   if (! getCmdLineInt (&argc, argv, "--nAgents", &(nAgents)))
     getCmdLineInt (&argc, argv, "--nA", &(nAgents)) ;
 
-  p.nBlocks = 20 ;  /* max number of BB blocks processed in parallel */
+  p.nBlocks = 40 ;  /* max number of BB blocks processed in parallel */
   if (!getCmdLineInt (&argc, argv, "--nBlocks", &(p.nBlocks)))
     getCmdLineInt (&argc, argv, "--nB", &(p.nBlocks));
   if (p.nBlocks == 1)
     { nAgents = 1 ; }
-
+  channelDepth = p.nBlocks ;
   maxThreads = 128 ;  /* UNIX  max on lmem12 machine */
   getCmdLineInt (&argc, argv, "--max_threads", &maxThreads) ;
   if (maxThreads < 24)
@@ -8289,6 +8412,7 @@ int main (int argc, const char *argv[])
       channelDebug (p.plChan, debug, "plChan") ;
       p.lcChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.lcChan, debug, "lcChan") ;
+#ifndef YANN
       p.csChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.csChan, debug, "csChan") ;
       p.smChan = channelCreate (channelDepth, BB, p.h) ;
@@ -8299,6 +8423,7 @@ int main (int argc, const char *argv[])
       channelDebug (p.oaChan, debug, "oaChan") ;
       p.aeChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.aeChan, debug, "aeChan") ;
+#endif
       p.doneChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.doneChan, debug, "doneChan") ;
       
@@ -8342,8 +8467,11 @@ int main (int argc, const char *argv[])
       for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
 	{
 	  p.agent = i ;
+
+#ifndef YANN
 	  wego_go (codeWords, &p, PP) ;
 	  wego_go (sortWords, &p, PP) ;
+#endif
 	}
 
       
@@ -8368,6 +8496,10 @@ int main (int argc, const char *argv[])
       for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
 	{
 	  p.agent = i ;
+#ifdef YANN
+	  wego_go (wholeWork, &p, PP) ;
+#else
+
 	  wego_go (matchHits, &p, PP) ;
 	  wego_go (sortHits, &p, PP) ;
 	  if (!i || p.align) /* at least 1 agent */
@@ -8379,9 +8511,10 @@ int main (int argc, const char *argv[])
 	      p.agent = 3*i + 2 ;
 	      wego_go (align, &p, PP) ;
 	      p.agent = i ;
-	}
+	    }
 	  if (!i) /* only 1 export agent */
 	    wego_go (export, &p, PP) ;
+#endif
 	}
     }
 
@@ -8523,6 +8656,14 @@ int main (int argc, const char *argv[])
 		ac_free (qual) ;
 	      arr (bb.quals, i, Array) = 0 ;
 	    }
+	}
+      if (1)
+	{
+	  int ns = 0 ;
+	  char tBuf[25], tBuf2[25] ;
+	  bb.stop = timeNow () ;
+	  timeDiffSecs (bb.start, bb.stop, &ns) ;
+	  printf ("%s: run %d / lane %d done start %s elapsed %d nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
 	}
       ac_free (bb.h) ;
     }

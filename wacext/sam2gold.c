@@ -420,7 +420,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   long int nAlignedReads = 0 ;
   long int nPerfectReads = 0 ;
   BOOL isNewPerfectCandidate = FALSE ;
-  
+  ACEOUT aoPerfect = aceOutCreate (s2g->outFileName, ".perfect.list", 0, h) ;  
   nn = nn0 ;
 
   aceInSpecial (ai, "\n") ;
@@ -576,6 +576,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	  if (ali == dnaLn && nerr == 0)
 	    {
 	      nPerfectReads++ ;
+	      aceOutf (aoPerfect, "%s\n", dictName (s2g->seqDict, seq)) ;
 	      isNewPerfectCandidate = FALSE ;
 	    }
 	}

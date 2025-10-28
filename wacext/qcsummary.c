@@ -2109,12 +2109,14 @@ static void qcProject (QC *qc, RC *rc)
 		}	      
 	      break ;
 	    case 11:  /* Date */
-	      mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
-	      mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
-	      char buf25[25] ;
-	      if (d2 && d2 < d1) d1 = d2 ;
-	      if (d1)
-		aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+	      {{
+		  mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
+		  mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
+		  char buf25[25] ;
+		  if (d2 && d2 < d1) d1 = d2 ;
+		  if (d1)
+		    aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+		}}
 	      break ;
 	    case 3:  /* Species */
 	      ccp = rc->run ? ac_tag_printable (rc->run, "Species", EMPTY) : EMPTY ;
@@ -3257,12 +3259,14 @@ static void qcTitles (QC *qc, RC *rc)
 		}	      
 	      break ;
 	    case 11:  /* Date */
-	      mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
-	      mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
-	      char buf25[25] ;
-	      if (d2 && d2 < d1) d1 = d2 ;
-	      if (d1)
-		aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+	      {{
+		  mytime_t d1 = ac_tag_date (rc->run, "Submission_date", 0 ) ;
+		  mytime_t d2 = ac_tag_date (rc->run, "Release_date", 0) ;
+		  char buf25[25] ;
+		  if (d2 && d2 < d1) d1 = d2 ;
+		  if (d1)
+		    aceOutf (qc->ao, timeShow (d1, buf25, 25)) ;
+		}}
 	      break ;
 	    case 3:  /* Species */
 	      ccp = rc->run ? ac_tag_printable (rc->run, "Species", EMPTY) : EMPTY ;

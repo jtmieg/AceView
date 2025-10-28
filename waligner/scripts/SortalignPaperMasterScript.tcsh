@@ -42,6 +42,12 @@ setenv SV v36.oct16        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, max
 setenv SVlast v36.oct16
 setenv SV v37.oct16        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, maxScore 0, restored step=1 on < 60bp
 setenv SVlast v37.oct16
+setenv SV v39.oct26        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 80  NO numactl
+setenv SVlast v39.oct26
+setenv SV v38.oct26        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40  NO mumactl
+setenv SVlast v38.oct26
+setenv SV v40.oct28        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl interleave all
+setenv SVlast v40.oct28
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
@@ -350,6 +356,7 @@ if ($1 == samDownLoad) goto phase_SamDownLoadFromNCBI
 if ($1 == timing) goto phase_Timing
 if ($1 == accuracy) goto phase_Accuracy
 if ($1 == aliqc) goto phase_aliqc
+if ($1 == perfect) goto phase_perfect
 if ($1 == errors) goto phase_DirectErrorCount
 if ($1 == export) goto phase_Export
 if ($1 == aliLn) goto phase_aliLn
@@ -978,12 +985,13 @@ cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 
 
 foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlignedOnce nMultiAligned)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  if (-e  toto.tag) \rm toto.tag
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
   foreach run ($allRuns)
     foreach mm ($allMethods)
-      echo "$run\t$mm\tf\t0" >> toto.tag
+      echo "$run\t$mm\tt\t0" >> toto.tag
     end
   end
-  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
   cat toto.tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
@@ -1002,17 +1010,33 @@ foreach tag (nAlignedReads nAlignedBases nErrors nPerfectReads nRawBases nRawRea
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
+foreach tag (nAlignments)
+  echo $tag
+  if (-e  toto.tag) \rm toto.tag
+  echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  foreach run ($allRuns)
+    foreach mm ($allMethods)
+      echo "$run\t$mm\tf\t0" >> toto.tag
+    end
+  end
+  echo "\nAverage_number_of_alignments per aligned read\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
+
 foreach tag (nMultiAligned)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
   foreach run ($allRuns)
     foreach mm ($allMethods)
-      echo "$run\t$mm\td\t0" >> toto.tag
+      echo "$run\t$mm\tf\t0" >> toto.tag
     end
   end
-  echo "\nAverage_number_of_alignments\t$SV" >> COMPARE/samStats.$SV.txt
-  cat RESULTS/allSamStats | gawk -F '\t' '/sites/{next;}{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
+  echo "\nPercentaged of aligned read which are multi aligned\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
    cat toto.tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
@@ -1702,6 +1726,22 @@ endif
 
   \rm $toto.*
   \rm RESULTS/*.tsv
+goto phaseLoop
+
+##############################################################################
+
+phase_perfect:
+
+foreach run (Roche)
+  foreach mm ($methods)
+    if (-e RESULTS/$mm/$run/$run.$run.1.hits && ! -e RESULTS/$mm/$run/s2g.perfect.list) then
+      cat RESULTS/$mm/$run/$run.$run.*.hits | gawk -F '\t' '/^#/{next;}{if ($2==$4)print $1;}' | sort -u > RESULTS/$mm/$run/s2g.perfect.list
+    endif
+  end
+end
+
+cat RESULTS/*/Roche/*ect.list | sed -e 's/>//' -e 's/<//' -e "s/$run\///" | sort -u > RESULTS/any.$run.perfect.list
+
 goto phaseLoop
 
 ##############################################################################
