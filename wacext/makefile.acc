@@ -41,6 +41,10 @@ LINK_ACS=libace.a libfree.a libtsfree.a
 # LINK_DRMAA is the Sun Grid Engine API libraru
 LINK_DRMAA= -L$(SGE_ROOT)/lib/lx24-amd64 -Wl,-rpath,$(SGE_ROOT)/lib/lx24-amd64  -ldrmaa 
 
+SRAINC = -I../sra
+SRALIBS = -L$(shell find ../sra -name "ngs-sdk.*" -type d)/lib64 -lncbi-ngs-c++-static -lncbi-ngs-static -lncbi-vdb-static -lngs-c++-static
+
+
 .KEEP_STATE: 
 
 # suppress auto SCCS extraction
@@ -294,8 +298,12 @@ clipalign: clipalign.o
 clipalign_chan: clipalign_chan.o  
 	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)   connect_socket.o libtcpfn.a libchannels.a   libwego.a listen_socket.o libfree.a libtsfree.a -lpthread -lm
 
-sortalign: sortalign.o
-	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz
+libsraread.a:
+	$(MAKE) -C ../sra
+	ln -s ../sra/libsraread.a .
+
+sortalign: sortalign.o libsraread.a
+	$(LINKER) -o $@  $@.o $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz
 
 sortalign391: sortalign391.o
 	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread
