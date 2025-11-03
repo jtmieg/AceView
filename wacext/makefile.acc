@@ -295,7 +295,7 @@ clipalign_chan: clipalign_chan.o
 	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)   connect_socket.o libtcpfn.a libchannels.a   libwego.a listen_socket.o libfree.a libtsfree.a -lpthread -lm
 
 sortalign: sortalign.o
-	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz
+	$(LINKER) -o $@  $@.o $(LINK_ACS) $(LIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz 
 
 UMI: UMI.o
 	$(LINKER)  -o $@  $@.o $(LINK_ACS) $(LIBS)  libchannels.a libwego.a -lpthread

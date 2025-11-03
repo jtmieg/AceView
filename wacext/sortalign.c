@@ -215,6 +215,7 @@ typedef struct pStruct {
   int tMaxTargetRepeats ;
   int seedLength ;
   int maxIntron ;
+  int BMAX ; /* max number of bases in a block, default 200M */
   int errCost ;
   int errMax ;       /* (--align case) max number of errors in seed extension */
   int minScore, minAli, minAliPerCent ;
@@ -330,6 +331,7 @@ static int cwOrder (const void *va, const void *vb) ;
 
 /**************************************************************/
 /************** utilities *************************************/
+/**************************************************************/
 
 static void cpuStatRegister (const char *nam, int agent, Array cpuStats, clock_t t1, clock_t t2, long int n)
 {
@@ -1219,8 +1221,8 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 {
   AC_HANDLE h = ac_new_handle () ;
   BB b ;
-  int NMAX = isGenome ? 500 : 100000 ;  /* was 100000 for 300s on 6.5 GigaBase human 2025_05_23 */
-  int BMAX = 200 * NMAX ;
+  int BMAX = isGenome ? 100000 : (pp->BMAX << 20) ;
+  int NMAX = BMAX / 200 ;
   unsigned char *buffer = halloc (BMAX, h) ;
   unsigned char *buffer2 = halloc (BMAX, h) ;
   int pos = 0 ;
@@ -1322,8 +1324,8 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 {
   AC_HANDLE h = ac_new_handle () ;
   BB b ;
-  int NMAX = isGenome ? 500 : 100000 ;  /* was 100000 for 300s on 6.5 GigaBase human 2025_05_23 */
-  int BMAX = 200 * NMAX ;
+  int BMAX = isGenome ? 100000 : (pp->BMAX << 20 ) ;
+  int NMAX = BMAX / 200 ;
   int nPuts = 0 ;
   int nn = 0, nSeqs = 0 ;
   CHAN *chan = 0 ;
@@ -7896,6 +7898,7 @@ static void usage (char *message, int argc, const char **argv)
 	       "//   There is no limit to the size of the input, as data continuously flow in and out\n"
 	       "// --nA or --nAgents <int> : [default 10] number of agent in each code layer\n"
 	       "// --nB or --nBlocks <int> : [default 20] number of simultaneous data blocks circulating in the pipeline\n"
+	       "// --bMax <int> : [default 20] (range 1--1024) max number of mega-bases in a data block.\n"
 	       "// --NN <int> : [default 16] split the seed files in NN parts, allowed values (1,2,4,8,16,32,64)\n"
 	       "//              seedLength > 16 imply NN >= 4^(sedLength - 16)\n"
 	       "// --max_threads <int>  : [default 128] maximal number of simultaneous UNIX threads\n"
@@ -7974,35 +7977,116 @@ int main (int argc, const char *argv[])
 
   /***************** pin the threads to the processors ***/
 
-  if (! getCmdLineBool (&argc, argv, "--numactl") &&
-      ! strstr (argv[0], "numactl") 
+  if (! getCmdLineBool (&argc, argv, "--numactl")  &&
+      !  (getenv("INVOCATION_NOTIFICATIONS") && strstr(getenv("INVOCATION_NOTIFICATIONS"), "numactl")) &&
+      isExecutableInPath ("numactl")
       )
     {
-      if (1 && isExecutableInPath ("numactl"))
+      char ** new_argv = malloc((argc + 3) * sizeof(char*)); 
+      vTXT txt = vtxtHandleCreate (h) ;
+	  
+      int nodes = -1 ;
+
+      if (1)
+	{       /* largest node */
+	  FILE *f = fopen("/sys/devices/system/node/online","r");
+	  if (f)
+	    { /* it seems better to bind to the largest (less used) node */
+	      unsigned a,b; 
+	      if (fscanf(f,"%u-%u",&a,&b) == 2) nodes = b ; 
+	      fclose(f);
+	    }
+	}
+
+      if (1)
+	{ /* node with least running threads */
+#include <dirent.h>
+	  int best_node = 0;
+	  long long min_load = -1;
+
+	  
+	  DIR *d = opendir("/sys/devices/system/node");
+	  if (d)
+	    {	  
+	      struct dirent *e;
+	      while ((e = readdir(d))) {
+		int node;
+		if (sscanf(e->d_name, "node%d", &node) != 1) continue;
+		
+		char path[64];
+		snprintf(path, sizeof(path),
+			 "/sys/devices/system/node/node%d/cpumap", node);
+		
+		FILE *f = fopen(path, "r");
+		if (!f) continue;
+		
+		// count bits = number of online CPUs on this node
+		unsigned long long map = 0;
+		int n = fscanf(f, "%llx", &map);
+		fclose(f);
+		if (n != 1) continue;
+		
+		long long load = 0;
+		for (unsigned long long m = map; m; m &= m-1) load++;
+		
+		// now count how many tasks are actually scheduled here
+		load = 0;
+		snprintf(path, sizeof(path),
+			 "/proc/schedstat");
+		f = fopen(path, "r");
+		if (f) {
+		  char buf[256];
+		  while (fgets(buf, sizeof(buf), f)) {
+		    char domain[32];
+		    int cpu;
+		    if (sscanf(buf, "cpu%d %*s %*d %*d %*d %*d %*d %*d %*d %lld",
+			       &cpu, &load) == 2) {
+		      // quick check if this cpu belongs to our node
+		      char cpu_path[64];
+		      snprintf(cpu_path, sizeof(cpu_path),
+			       "/sys/devices/system/node/node%d/cpu%d",
+			       node, cpu);
+		      if (!access(cpu_path, F_OK))
+                        load += 1;   // one more running thread
+		    }
+		  }
+		  fclose(f);
+		}
+		
+		if (min_load == -1 || load < min_load)
+		  {
+		    min_load = load;
+		    best_node = node;
+		  }
+	      }
+	      closedir(d);
+	    }
+	  nodes = best_node;
+	}
+
+
+
+      
+      if (0)
 	{
-	  char ** new_argv = malloc((argc + 3) * sizeof(char*)); 
+	  fprintf (stderr, "nodes=%d\n", nodes) ;
+	  exit (0) ;
+	}
 
-	  if (1)
-	    new_argv[0] = " --interleave=all " ;
-	  else
-	    new_argv[0] = " --cpunodebind=0 --membind=0 " ;
-	  new_argv[1] = strdup(argv[0]) ;
-	  for (int i = 1 ; i < argc ; i++)
-	    new_argv[i + 1] = strdup (argv[i]) ;
-	  new_argv[argc + 1] = strdup ("--numactl") ;
-	  new_argv[argc + 2] = NULL ;
-	  fprintf (stderr, "/usr/bin/numactl ") ;
-	  for (int i = 0 ; i < argc+2 ; i++) fprintf (stderr, " %s " , new_argv[i]) ;
-	  fprintf (stderr, "\targv[0] %s\n", argv[0]) ;
-	  execvp("/usr/bin/numactl", new_argv) ;
-	  perror("execvp failed");
-	  free(new_argv);
-        }
+
+
+      vtxtPrintf (txt, "/usr/bin/numactl  --cpunodebind=%d --membind=%d ", nodes, nodes) ;
+      for (int i = 0 ; i < argc ; i++)
+	vtxtPrintf (txt, " %s " , argv[i]) ;
+      vtxtPrintf (txt, " --numactl ") ;
+
+      fprintf (stderr, "%s\n", vtxtPtr (txt)) ;
+      return system (vtxtPtr (txt)) ;
     }
-
+  
   p.debug  = getCmdLineText (h, &argc, argv, "--debug", 0) ;
   p.debug |= getCmdLineText (h, &argc, argv, "--verbose", 0) ;
-
+  
   /**************************  debugging tools, ignore *********************************/
 
   if ( getCmdLineInt (&argc, argv, "-n", &n))
@@ -8198,6 +8282,11 @@ int main (int argc, const char *argv[])
   if (p.minAli < 0) p.minAli = 30 ;
   if (p.minAliPerCent < 0) p.minAliPerCent = 0 ;
   if (p.minAli < p.minScore) p.minAli = p.minScore ;
+
+  p.BMAX = 20 ;
+  getCmdLineInt (&argc, argv, "--bMax", &(p.BMAX)) ;
+  if (p.BMAX < 1) p.BMAX = 1 ;
+  if (p.BMAX > 1024) p.BMAX = 1024 ;
   
   /****************** Check the existence of all file names ****************************************/ 
 
@@ -8663,7 +8752,7 @@ int main (int argc, const char *argv[])
 	  char tBuf[25], tBuf2[25] ;
 	  bb.stop = timeNow () ;
 	  timeDiffSecs (bb.start, bb.stop, &ns) ;
-	  printf ("%s: run %d / lane %d done start %s elapsed %d nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
+	  printf ("%s: run %d / lane %d done start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
 	}
       ac_free (bb.h) ;
     }

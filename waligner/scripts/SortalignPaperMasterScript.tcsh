@@ -42,19 +42,19 @@ setenv SV v36.oct16        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, max
 setenv SVlast v36.oct16
 setenv SV v37.oct16        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, maxScore 0, restored step=1 on < 60bp
 setenv SVlast v37.oct16
-setenv SV v39.oct26        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 80  NO numactl
-setenv SVlast v39.oct26
-setenv SV v38.oct26        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40  NO mumactl
-setenv SVlast v38.oct26
-setenv SV v40.oct28        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl interleave all
-setenv SVlast v40.oct28
+setenv SV v42.nov2        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl pin to best
+setenv SVlast v42.nov2
+setenv SV v43.nov2        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl pin to best
+setenv SVlast v43.nov2
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
 endif
 
 setenv seedLength 18
+setenv maxTargetRepeats 81
 setenv maxTargetRepeats 31
+
 
 ##       SortalignPaperMasterScript.tcsh
 ## Author, Greg Boratyn, Danielle Thierry-Mieg, Jean Thierry-Mieg
