@@ -834,8 +834,9 @@ JUMP reAligner [] = {  /* called from abifix.c */
 */
  
 /**************************************************************/
+
+#ifdef __SSE2__   /* use 128 bit intructions  */
 #define EP128
-#ifdef EP128      /* use 128 bit intructions  */
 #include <emmintrin.h> // SSE2
 /*  aaaa aaaa aaaa aaaa  / aaaa aaaa aaaa aaga   -> 14 (number of exact matches)
 static int first_non_equal_byte(unsigned char *cp, unsigned char *cq) {
@@ -866,6 +867,15 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
   /* on one worm chromo we have 240 M calls to this function, so chrone may be too expansive */
   /* chrono("aceDnaTrackErrors") ; */
 
+#ifdef JUNK
+  /* pedantic runtime check if we cross compile */
+#ifdef EP128       /* use 128 bit intructions  */
+  int hasSSE2 = __builtin_cpu_supports("sse2") ;
+#else
+  int hasSSE2 = 0 ;
+#endif
+#endif
+  
   switch (useJumper)
     {
     case 1: /* illumina */
@@ -913,24 +923,25 @@ Array aceDnaTrackErrors (Array  dna1, int pos1, int *pp1,
   while (++cq, ++cp < cpmax && cq < cqmax) /* always increment both */
     {
 #ifdef EP128       /* use 128 bit intructions  */
-      while (cp < cpmax - 16 && cq < cqmax - 16)
-	{
-	  __m128i v1 = _mm_loadu_si128((__m128i*)cp);
-	  __m128i v2 = _mm_loadu_si128((__m128i*)cq);
-	  __m128i cmp = _mm_cmpeq_epi8(v1, v2);
-	  int mask = _mm_movemask_epi8(cmp);
-	  if (mask != 0xffff)
-	    {
-	      int pos = __builtin_ctz(~mask);
-	      cp +=  pos ; cq += pos ;
-	      break; /* Mismatch at cp/cq */
-	    }
-	  else
-	    {
-	      cp += 16; cq += 16; 
-	      nExact += 16 ;
-	    }
- 	}
+      /* if (hasSSE2) pedantic costly run time check */
+	while (cp < cpmax - 16 && cq < cqmax - 16)
+	  {
+	    __m128i v1 = _mm_loadu_si128((__m128i*)cp);
+	    __m128i v2 = _mm_loadu_si128((__m128i*)cq);
+	    __m128i cmp = _mm_cmpeq_epi8(v1, v2);
+	    int mask = _mm_movemask_epi8(cmp);
+	    if (mask != 0xffff)
+	      {
+		int pos = __builtin_ctz(~mask);
+		cp +=  pos ; cq += pos ;
+		break; /* Mismatch at cp/cq */
+	      }
+	    else
+	      {
+		cp += 16; cq += 16; 
+		nExact += 16 ;
+	      }
+	  }
 #endif      
       if (*cp == *cq)
 	{

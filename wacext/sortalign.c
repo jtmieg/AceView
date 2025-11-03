@@ -46,8 +46,8 @@ time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --ali
 #include <zlib.h>
 #include <stdatomic.h>
 
+#ifdef __SSE2__
 #define VECTORIZED_MEM_CPY
-#ifdef VECTORIZED_MEM_CPY
 #include <emmintrin.h> // SSE2
 #endif
 
@@ -1222,7 +1222,6 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   AC_HANDLE h = ac_new_handle () ;
   BB b ;
   int BMAX = isGenome ? 100000 : (pp->BMAX << 20) ;
-  int NMAX = BMAX / 200 ;
   unsigned char *buffer = halloc (BMAX, h) ;
   unsigned char *buffer2 = halloc (BMAX, h) ;
   int pos = 0 ;
@@ -2119,22 +2118,24 @@ static void codeWords (const void *vp)
   BB bb ;
   const PP *pp = vp ;
   char tBuf[25] ;
+  long int nnn = 0 ;
   clock_t  t1, t2 ;
   
 
   memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->lcChan, &bb, BB))
-    { long int nn= 0 ;
-      
-      t1 = clock () ;
+    {
+      long int nn= 0 ;
       if (pp->debug) printf ("+++ %s: Start code words\n", timeBufShowNow (tBuf)) ;
 
+      t1 = clock () ;
       parseReadsDo (pp, &bb, pp->iStep, FALSE) ;
       codeWordsDo (pp, &bb, pp->iStep, FALSE) ;
-
       t2 = clock () ;
+
       for (int i = 0 ; i < NN ; i++)
 	nn += bigArrayMax (bb.cwsN[i]) ;
+      nnn += nn ;
       cpuStatRegister ("3.CodeWords", pp->agent, bb.cpuStats, t1, t2, nn) ;
       if (pp->debug) printf ("--- %s: Stop code words %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.cwsN[0])) ;
 
@@ -2143,6 +2144,7 @@ static void codeWords (const void *vp)
   if (1)
     {
       int n = channelCount (pp->plChan) ;
+      if (pp->debug) printf ("..... close csChan at %d,  coded %ld words\n", n, nnn) ;
       channelCloseAt (pp->csChan, n) ;
     }
 
@@ -2978,28 +2980,36 @@ static void sortWords (const void *vp)
   BB bb ;
   const PP *pp = vp ;
   char tBuf[25] ;
-  
+  long int nnn = 0 ;
   clock_t  t1, t2 ;
 	    
   memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->csChan, &bb, BB))
     {
-      long int nn = 0 ;
-      t1 = clock () ;
-      if (pp->debug) printf ("+++ %s: Start sort words\n", timeBufShowNow (tBuf)) ;
-       for (int k = 0 ; k < NN ; k++)
-	 if (bb.cwsN[k])
-	   newMsort (bb.cwsN[k], cwOrder) ;
-      t2 = clock () ;
-      for (int k = 0 ; k < NN ; k++)
-	nn += bigArrayMax (bb.cwsN[k]) ;
-      cpuStatRegister ("4.SortWords", pp->agent, bb.cpuStats, t1, t2, nn) ;
+      if (1)
+	{
+	  long int nn = 0 ;
+	  if (pp->debug) printf ("+++ %s: Start sort words\n", timeBufShowNow (tBuf)) ;
+	  
+	  t1 = clock () ;
+	  for (int k = 0 ; k < NN ; k++)
+	    if (bb.cwsN[k])
+	      {
+		newMsort (bb.cwsN[k], cwOrder) ;
+		nn += bigArrayMax (bb.cwsN[k]) ;
+	      }
+	  t2 = clock () ;
+	
+	  cpuStatRegister ("4.SortWords", pp->agent, bb.cpuStats, t1, t2, nn) ;
+	  if (pp->debug) printf ("--- %s: Stop sort words %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.cwsN[0])) ;
+	}
       channelPut (pp->smChan, &bb, BB) ;
-      if (pp->debug) printf ("--- %s: Stop sort words %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.cwsN[0])) ;
+
     }
   if (1)
     {
       int n = channelCount (pp->plChan) ;
+      if (pp->debug) printf ("..... close smChan at %d,  sorted %ld words\n", n, nnn) ;
       channelCloseAt (pp->smChan, n) ;
     }
 
@@ -3298,18 +3308,19 @@ static void matchHits (const void *vp)
   /* grab and match a block of reads */
   while (channelGet (pp->smChan, &bb, BB))
     {
-      long int nn = 0 ;
-      t1 = clock () ;
-
       if (bb.length)
 	{
 	  if (pp->debug) printf ("+++ %s: Start match %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
-	  nn = matchHitsDo (pp, &bbG, &bb) ;
+
+
+	  t1 = clock () ;
+	  long int nn = matchHitsDo (pp, &bbG, &bb) ;
 	  if (pp->debug) printf ("--- %s: Stop match hits constructed %ld arrays\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
+	  t2 = clock () ;
+
+	  nnn += nn ;
+	  cpuStatRegister ("5.MatchHits", pp->agent, bb.cpuStats, t1, t2, nn) ;
 	}
-      nnn += nn ;
-      t2 = clock () ;
-      cpuStatRegister ("5.MatchHits", pp->agent, bb.cpuStats, t1, t2, nn) ;
       channelPut (pp->moChan, &bb, BB) ;
     }
   if (1)
@@ -3431,78 +3442,96 @@ static int countChromOrder (const void *va, const void *vb)
 } /* countChromOrder */
 
 /**************************************************************/
+
+static void sortHitsFuse (const PP *pp, BB *bb)
+{
+  BigArray aa = bb->hits ;
+  long int iMax = aa ? bigArrayMax (aa) : 0 ;
+  char tBuf[25] ;
+  
+  if (pp->debug) printf ("+++ %s: Start sort hits merging %ld arrays\n", timeBufShowNow (tBuf), iMax) ;
+
+
+  if (iMax == 0)
+    bb->hits = 0 ;
+  else if (iMax == 1)
+    bb->hits = bigArray (aa, 0, BigArray) ;
+  else
+    {
+      BigArray a ;
+      long int n = 0 ;
+      HIT *up ;
+      for (long int i = 0 ; i < iMax ; i++)
+	{
+	  a = bigArray (aa, i, BigArray) ;
+	  n += bigArrayMax (a) ;
+	}
+      bb->hits = bigArrayHandleCreate (n, HIT, bb->h) ;
+      up = bigArrayp (bb->hits, n - 1, HIT) ; /* make room */
+      up = bigArrayp (bb->hits, 0, HIT) ;
+      for (int i = 0 ; i < iMax ; i++)
+	{
+	  a = bigArray (aa, i, BigArray) ;
+	  n = bigArrayMax (a) ;
+	  if (n > 0)
+	    {
+	      memcpy (up, bigArrp (a, 0, HIT), n * sizeof (HIT)) ;
+	      up += n ;
+	    }
+	  bigArrayDestroy (a) ;
+	}
+      bigArrayDestroy (aa) ;
+    }
+  return ;
+} /* sortHitsFuse */
+
+/**************************************************************/
 /* sort the hits */
 static void sortHits (const void *vp)
 {
   BB bb ;
   const PP *pp = vp ;
-  memset (&bb, 0, sizeof (BB)) ;
   char tBuf[25] ;
-  
+  long int nnn = 0 ;
   clock_t  t1, t2 ;
 
+  memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->moChan, &bb, BB))
     {
-      BigArray aa = bb.hits ;
-      long int iMax = aa ? bigArrayMax (aa) : 0 ;
-      if (pp->debug) printf ("+++ %s: Start sort hits merging %ld arrays\n", timeBufShowNow (tBuf), iMax) ;
-      t1 = clock () ;
-
-      if (iMax == 0)
-	bb.hits = 0 ;
-      else if (iMax == 1)
-	bb.hits = bigArray (aa, 0, BigArray) ;
-      else
-	{
-	  BigArray a ;
-	  long int n = 0 ;
-	  HIT *up ;
-	  for (long int i = 0 ; i < iMax ; i++)
-	    {
-	      a = bigArray (aa, i, BigArray) ;
-	      n += bigArrayMax (a) ;
-	    }
-	  bb.hits = bigArrayHandleCreate (n, HIT, bb.h) ;
-	  up = bigArrayp (bb.hits, n - 1, HIT) ; /* make room */
-	  up = bigArrayp (bb.hits, 0, HIT) ;
-	  for (int i = 0 ; i < iMax ; i++)
-	    {
-	      a = bigArray (aa, i, BigArray) ;
-	      n = bigArrayMax (a) ;
-	      if (n > 0)
-		{
-		  memcpy (up, bigArrp (a, 0, HIT), n * sizeof (HIT)) ;
-		  up += n ;
-		}
-	      bigArrayDestroy (a) ;
-	    }
-	  bigArrayDestroy (aa) ;
-	}
-      t2 = clock () ;
-      if (pp->debug) printf ("....... %s: merge done, arraySort start %ld\n", timeBufShowNow (tBuf), bb.hits ? bigArrayMax (bb.hits) : 0) ;
-
       if (pp->align && bb.hits)
 	{
-	  newMsort (bb.hits, hitPairOrder) ;
-	  
-	  t2 = clock () ;
-	  cpuStatRegister ("6.SortHits", pp->agent, bb.cpuStats, t1, t2, bigArrayMax (bb.hits)) ;
-	  
-	  if (pp->debug) printf ("--- %s: Stop sort hits %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
+	  t1 = clock () ;
+	  sortHitsFuse (pp, &bb) ;
+	  if (bb.hits)
+	    {
+	      newMsort (bb.hits, hitPairOrder) ;
+	      t2 = clock () ;
+
+	      long int nn = bigArrayMax (bb.hits) ;
+	      nnn += nn ;
+	      cpuStatRegister ("6.SortHits", pp->agent, bb.cpuStats, t1, t2, nn) ;
+	      if (pp->debug) printf ("--- %s: Stop sort hits %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
+	    }
 	}
       channelPut (pp->oaChan, &bb, BB) ;
     }
 
-  int n = channelCount (pp->plChan) ;
-  memset (&bb, 0, sizeof (BB)) ;
-  bb.isGenome = TRUE ;
-  channelPut (pp->doneChan, &bb, BB) ; /* destroy bbG.cws, all Matches are already computed */ 
-  channelCloseAt (pp->oaChan, n) ;
-  
+  if (1)
+    {
+      memset (&bb, 0, sizeof (BB)) ;
+      bb.isGenome = TRUE ;
+      channelPut (pp->doneChan, &bb, BB) ; /* destroy bbG.cws, all Matches are already computed */ 
+
+      int n = channelCount (pp->plChan) ;
+      if (pp->debug) printf ("..... close oaChan at %d,  sorted %ld hits\n", n, nnn) ;
+      channelCloseAt (pp->oaChan, n) ;
+    }
   return ;
 } /* sortHits */
 
 /**************************************************************/
+#ifdef __SSE2__
+#define EP128
 #include <emmintrin.h> // SSE2
 /*  aaaa aaaa aaaa aaaa  / aaaa aaaa aaaa aaga   -> 14 (number of exact matches)
 static int first_non_equal_byte(unsigned char *cp, unsigned char *cq) {
@@ -3513,6 +3542,7 @@ static int first_non_equal_byte(unsigned char *cp, unsigned char *cq) {
     return mask == 0xffff ? 16 : __builtin_ctz(~mask); // First 0 bit
 }
 */
+#endif
 /**************************************************************/
 #include <stdint.h>
 
@@ -3528,6 +3558,7 @@ void extendExact(Array dna, int *x1p, int *x2p, Array dnaG, int *a1p, int *a2p)
   cq = arrp (dnaG, a2, unsigned char) ;
 
   /* Forward extension 16 bases steps */
+#ifdef VECTORIZED_MEM_CPY
   while (x2 < dnaMax - 16 && a2 < dnaGMax - 16)
     {
       __m128i v1 = _mm_loadu_si128((__m128i*)cp);
@@ -3546,7 +3577,8 @@ void extendExact(Array dna, int *x1p, int *x2p, Array dnaG, int *a1p, int *a2p)
 	  cp += 16; cq += 16; x2 += 16; a2 += 16;
 	}
     }
-   // Byte-wise to end
+#endif
+  // Byte-wise to end
   if (ok)
     while (x2 < dnaMax && a2 < dnaGMax && *cp == *cq)
       { cp++; cq++; x2++ ; a2++ ;}
@@ -3555,6 +3587,7 @@ void extendExact(Array dna, int *x1p, int *x2p, Array dnaG, int *a1p, int *a2p)
   cp = arrp (dna , x1 - 1, unsigned char) ; /* first matching base */
   cq = arrp (dnaG, a1 - 1, unsigned char) ;
   ok = TRUE ;
+#ifdef VECTORIZED_MEM_CPY
   while (x1 > 16 && a1 > 16)
     {
       __m128i v1 = _mm_loadu_si128((__m128i*)(cp - 16));
@@ -3566,6 +3599,7 @@ void extendExact(Array dna, int *x1p, int *x2p, Array dnaG, int *a1p, int *a2p)
       else
         { cp -= 16; cq -= 16; x1 -= 16; a1 -= 16; }
     }
+#endif
   // Byte-wise to end
   while (x1 > 1 && a1 > 1 && *cp == *cq)
     { cp--; cq--; x1-- ; a1-- ; }
@@ -4614,6 +4648,7 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 } /* alignOptimizeIntron */
 
 /**************************************************************/
+#ifdef JUNK
 
 static void alignClipErrorLeft (ALIGN *vp, int errCost)
 {
@@ -4679,6 +4714,7 @@ static void alignClipErrorLeft (ALIGN *vp, int errCost)
   
   return ;
 } /* alignClipErrorLeft */
+#endif
 
 /**************************************************************/
 
@@ -6204,7 +6240,7 @@ static void align (const void *vp)
   BB bb ;
   const PP *pp = vp ;
   char tBuf[25] ;
-  
+  long int nnn = 0 ;
   clock_t  t1, t2 ;
 
   memset (&bb, 0, sizeof (BB)) ;
@@ -6213,19 +6249,22 @@ static void align (const void *vp)
       if (pp->align && bb.hits)
 	{
 	  if (pp->debug) printf ("--- %s: Start align %lu seeds\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
+
 	  t1 = clock () ;
-
 	  alignDo (pp, &bb) ;
-
+	  nnn += bb.nAli ;
 	  t2 = clock () ;
+	  
 	  cpuStatRegister ("7.Align_r", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
 	  if (pp->debug) printf ("--- %s: Stop align %lu ali, %lu mismatches\n", timeBufShowNow (tBuf), bb.nAli, bb.nerr) ;
 	}
       channelPut (pp->aeChan, &bb, BB) ;
     }
+  
   if (1)
     {
       int n = channelCount (pp->plChan) ;
+      if (pp->debug) printf ("..... close aeChan at %d,  found %ld ali\n", n, nnn) ;
       channelCloseAt (pp->aeChan, n) ;
     }
   return ;
@@ -7982,12 +8021,11 @@ int main (int argc, const char *argv[])
       isExecutableInPath ("numactl")
       )
     {
-      char ** new_argv = malloc((argc + 3) * sizeof(char*)); 
       vTXT txt = vtxtHandleCreate (h) ;
-	  
+      
       int nodes = -1 ;
 
-      if (1)
+      if (0)
 	{       /* largest node */
 	  FILE *f = fopen("/sys/devices/system/node/online","r");
 	  if (f)
@@ -7997,7 +8035,7 @@ int main (int argc, const char *argv[])
 	      fclose(f);
 	    }
 	}
-
+      
       if (1)
 	{ /* node with least running threads */
 #include <dirent.h>
@@ -8009,62 +8047,61 @@ int main (int argc, const char *argv[])
 	  if (d)
 	    {	  
 	      struct dirent *e;
-	      while ((e = readdir(d))) {
-		int node;
-		if (sscanf(e->d_name, "node%d", &node) != 1) continue;
-		
-		char path[64];
-		snprintf(path, sizeof(path),
-			 "/sys/devices/system/node/node%d/cpumap", node);
-		
-		FILE *f = fopen(path, "r");
-		if (!f) continue;
-		
-		// count bits = number of online CPUs on this node
-		unsigned long long map = 0;
-		int n = fscanf(f, "%llx", &map);
-		fclose(f);
-		if (n != 1) continue;
-		
-		long long load = 0;
-		for (unsigned long long m = map; m; m &= m-1) load++;
-		
-		// now count how many tasks are actually scheduled here
-		load = 0;
-		snprintf(path, sizeof(path),
-			 "/proc/schedstat");
-		f = fopen(path, "r");
-		if (f) {
-		  char buf[256];
-		  while (fgets(buf, sizeof(buf), f)) {
-		    char domain[32];
-		    int cpu;
-		    if (sscanf(buf, "cpu%d %*s %*d %*d %*d %*d %*d %*d %*d %lld",
-			       &cpu, &load) == 2) {
-		      // quick check if this cpu belongs to our node
-		      char cpu_path[64];
-		      snprintf(cpu_path, sizeof(cpu_path),
-			       "/sys/devices/system/node/node%d/cpu%d",
-			       node, cpu);
-		      if (!access(cpu_path, F_OK))
-                        load += 1;   // one more running thread
-		    }
-		  }
+	      while ((e = readdir(d)))
+		{
+		  int node;
+		  if (sscanf(e->d_name, "node%d", &node) != 1) continue;
+		  
+		  char path[64];
+		  snprintf(path, sizeof(path),
+			   "/sys/devices/system/node/node%d/cpumap", node);
+		  
+		  FILE *f = fopen(path, "r");
+		  if (!f) continue;
+		  
+		  /* count bits = number of online CPUs on this node */
+		  unsigned long long map = 0;
+		  int n = fscanf(f, "%llx", &map);
 		  fclose(f);
+		  if (n != 1) continue;
+		  
+		  long long load = 0;
+		  for (unsigned long long m = map; m; m &= m-1) load++;
+		  
+		  /* count how many tasks are actually scheduled here */
+		  load = 0;
+		  snprintf (path, sizeof(path), "/proc/schedstat");
+		  f = fopen(path, "r");
+		  if (f)
+		    {
+		      char buf[256];
+		      while (fgets(buf, sizeof(buf), f))
+			{
+			  int cpu;
+			  if (sscanf(buf, "cpu%d %*s %*d %*d %*d %*d %*d %*d %*d %lld", &cpu, &load) == 2)
+			    {
+			      /* check if this cpu belongs to our node */
+			      char cpu_path[64];
+			      snprintf(cpu_path, sizeof(cpu_path),
+				       "/sys/devices/system/node/node%d/cpu%d",
+				       node, cpu);
+			      if (! access(cpu_path, F_OK))
+				load += 1;   // one more running thread
+			    }
+			}
+		      fclose(f);
+		    }
+		  
+		  if (min_load == -1 || load < min_load)
+		    {
+		      min_load = load;
+		      best_node = node;
+		    }
 		}
-		
-		if (min_load == -1 || load < min_load)
-		  {
-		    min_load = load;
-		    best_node = node;
-		  }
-	      }
 	      closedir(d);
 	    }
 	  nodes = best_node;
 	}
-
-
 
       
       if (0)
