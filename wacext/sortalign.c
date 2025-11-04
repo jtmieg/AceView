@@ -45,6 +45,7 @@ time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --ali
 #include "channel.h"
 #include <zlib.h>
 #include <stdatomic.h>
+#include "../wsra/sra_read.h"
 
 #ifdef __SSE2__
 #define VECTORIZED_MEM_CPY
@@ -78,6 +79,7 @@ typedef struct runClassStruct {
   const char *fileName1 ;
   const char *fileName2 ;
   atomic_int lane ;
+  ACEOUT aoSam ;
 } RC ;
 		  
 typedef struct runStatStruct {
@@ -7005,128 +7007,81 @@ static void export (const void *vp)
 
 static void wholeWork (const void *vp)
 {
-  const PP *pp = vp ;
   BB bb ;
+  const PP *pp = vp ;
   BB bbG = pp->bbG;
   char tBuf[25] ;
   long int nnn = 0 ;
-  
   clock_t  t1, t2 ;
 	    
   memset (&bb, 0, sizeof (BB)) ;
-  /* grab and match a block of reads */
   while (channelGet (pp->lcChan, &bb, BB))
     {
+      long int nn = 0 ;
+
+      t1 = clock () ;
       /* code words */
       parseReadsDo (pp, &bb, pp->iStep, FALSE) ;
       codeWordsDo (pp, &bb, pp->iStep, FALSE) ;
 
+      if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
+
       /* sort words */
-      {
-       for (int k = 0 ; k < NN ; k++)
-	 if (bb.cwsN[k])
-	   newMsort (bb.cwsN[k], cwOrder) ;
-      }
+      for (int k = 0 ; k < NN ; k++)
+	if (bb.cwsN[k])
+	  newMsort (bb.cwsN[k], cwOrder) ;
       
       /* match hits */
-      {
-	long int nn = 0 ;
-	t1 = clock () ;
-	
-	if (bb.length)
-	  {
-	    if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
-	    nn = matchHitsDo (pp, &bbG, &bb) ;
-	    if (pp->debug) printf ("--- %s: Stop wholeWork constructed %ld arrays\n", timeBufShowNow (tBuf), bigArrayMax (bb.hits)) ;
-	  }
-	nnn += nn ;
-      }
+      if (bb.length)
+	nn = matchHitsDo (pp, &bbG, &bb) ;
+      nnn += nn ;
+
       /* sorthits */
-      {
-	BigArray aa = bb.hits ;
-	long int iMax = aa ? bigArrayMax (aa) : 0 ;
-	if (pp->debug) printf ("+++ %s: Start sort hits merging %ld arrays\n", timeBufShowNow (tBuf), iMax) ;
-	t1 = clock () ;
-	
-	if (iMax == 0)
-	  bb.hits = 0 ;
-	else if (iMax == 1)
-	  bb.hits = bigArray (aa, 0, BigArray) ;
-	else
-	  {
-	    BigArray a ;
-	    long int n = 0 ;
-	    HIT *up ;
-	    for (long int i = 0 ; i < iMax ; i++)
-	      {
-		a = bigArray (aa, i, BigArray) ;
-		n += bigArrayMax (a) ;
-	      }
-	    bb.hits = bigArrayHandleCreate (n, HIT, bb.h) ;
-	    up = bigArrayp (bb.hits, n - 1, HIT) ; /* make room */
-	    up = bigArrayp (bb.hits, 0, HIT) ;
-	    for (int i = 0 ; i < iMax ; i++)
-	      {
-		a = bigArray (aa, i, BigArray) ;
-		n = bigArrayMax (a) ;
-		if (n > 0)
-		  {
-		    memcpy (up, bigArrp (a, 0, HIT), n * sizeof (HIT)) ;
-		    up += n ;
-		  }
-		bigArrayDestroy (a) ;
-	      }
-	    bigArrayDestroy (aa) ;
-	  }
-	
-	
-	if (pp->align && bb.hits)
-	  {
-	    newMsort (bb.hits, hitPairOrder) ;
-	    
-	  }
-      }
+      if (pp->align && bb.hits)
+	{
+	  sortHitsFuse (pp, &bb) ;
+	  newMsort (bb.hits, hitPairOrder) ;
+	  alignDo (pp, &bb) ;
+	}
 
-      /* align */
-      if (1) alignDo (pp, &bb) ;
-
+#ifdef JUNK      
       /* export */
-      {
-	if (bb.aligns && bigArrayMax (bb.aligns))
-	  {
-	    bigArraySort (bb.aligns, alignOrder) ;
-	    if (! pp->sam)
-	      { if (1) exportDo (pp, &bb) ; }
-	    else
-	      {
-		AC_HANDLE h = ac_new_handle () ;
-		ACEOUT ao = 0 ;
-		char *VERSION = "0.1.1" ;
-		DICT *dictG = pp->bbG.dict ;
-		ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.%d.sam", dictName (pp->runDict, bb.run), bb.lane), pp->gzo, h) ;
-		aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
-		aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
-		
-		for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
-		  {
-		    Array dna = arr (pp->bbG.dnas, chrom, Array) ;
-		    int ln = dna ? arrayMax (dna) : 0 ;
-		    aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
-		  }
-		/* aceOutf (ao, "\tCL:%s", commandBuf) ; */
-		exportSamDo (ao, pp, &bb) ;
-		ac_free (h) ;
-	      }
-	  }
-      }
+      if (bb.aligns && bigArrayMax (bb.aligns))
+	{
+	  bigArraySort (bb.aligns, alignOrder) ;
+	  if (! pp->sam)
+	    { if (1) exportDo (pp, &bb) ; }
+	  else
+	    {
+	      AC_HANDLE h = ac_new_handle () ;
+	      ACEOUT ao = bb.rc.aoSam  ;
+	      char *VERSION = "0.1.1" ;
+	      DICT *dictG = pp->bbG.dict ;
+	      ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.%d.sam", dictName (pp->runDict, bb.run), bb.lane), pp->gzo, h) ;
+	      aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
+	      aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
+	      
+	      for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
+		{
+		  Array dna = arr (pp->bbG.dnas, chrom, Array) ;
+		  int ln = dna ? arrayMax (dna) : 0 ;
+		  aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
+		}
+	      /* aceOutf (ao, "\tCL:%s", commandBuf) ; */
+	      exportSamDo (ao, pp, &bb) ;
+	      ac_free (h) ;
+	    }
+	}
+#endif
+      
       t2 = clock () ;
       cpuStatRegister ("5.WholeWork", pp->agent, bb.cpuStats, t1, t2, nnn) ;
-      channelPut (pp->doneChan, &bb, BB) ;
+      channelPut (pp->aeChan, &bb, BB) ;
     }
   if (1)
     {
       int n = channelCount (pp->plChan) ;
-      channelCloseAt (pp->doneChan, n) ;
+      channelCloseAt (pp->aeChan, n) ;
     }
 
   return ;
@@ -7463,7 +7418,7 @@ static Array parseInConfig (PP *pp, Array runStats)
       int run = 0 ;
       char *filName2 = 0 ;
       if (! pp->runName)
-	pp->runName = "f.1" ;
+	pp->runName = "runX" ;
       dictAdd (pp->runDict, pp->runName, &run) ;
       cp = buf ; *(cp + strlen (cp)) = ',' ;
       while ((cq = strchr (cp, ',')))
@@ -7801,6 +7756,21 @@ static BOOL isExecutableInPath (const char *name)
   return FALSE ;
 }
 
+/*************************************************************************************/
+
+static int sraParse (const char *sraID)
+{
+    SRAObj* sra = SraObjNew(sraID);
+    int num_bases = 500;
+    const char *cpp ;
+    
+    while ((cpp = SraGetReadBatch(sra, num_bases)))
+       printf("%s", cpp);
+    SraObjFree(sra);
+
+    return 1 ;
+}
+
 /***************************** Public interface **************************************/
 /*************************************************************************************/
 
@@ -8005,14 +7975,39 @@ int main (int argc, const char *argv[])
 
   if (argc < 2)
     usage (0, 0, argv) ;
-  if (getCmdLineText (h, &argc, argv, "-help", 0) ||
-      getCmdLineText (h, &argc, argv, "--help", 0)||
-      getCmdLineText (h, &argc, argv, "-h", 0)
+  if (getCmdLineBool (&argc, argv, "-help")  ||
+      getCmdLineBool (&argc, argv, "--help") ||
+      getCmdLineBool (&argc, argv, "-h")
       )
     usage (0, 0, argv) ;
 
   if (getCmdLineBool (&argc, argv, "--version"))
-    { fprintf (stderr, "sortalign version 0.0.12, august 2025") ; exit (0) ; }     
+    {
+      fprintf (stderr, "sortalign version 0.0.12, august 2025") ;
+      exit (0) ;
+    }     
+
+  {{
+      const char *sraID = 0 ;
+      if (getCmdLineText (h, &argc, argv, "--sra", &sraID))
+	{
+	  sraParse (sraID) ;
+	  exit (0) ;
+	}
+    }}
+    {
+      SRAObj* sra = SraObjNew("SRR35876976");
+      int num_bases = 500;
+      const char *ccp ;
+      
+      while ((ccp = SraGetReadBatch (sra, num_bases)))
+	{
+	  printf ("%s\n", ccp);
+	}
+      SraObjFree (sra);
+      exit (0) ;
+    }
+
 
   /***************** pin the threads to the processors ***/
 
@@ -8547,9 +8542,9 @@ int main (int argc, const char *argv[])
       channelDebug (p.moChan, debug, "moChan") ;
       p.oaChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.oaChan, debug, "oaChan") ;
+#endif
       p.aeChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.aeChan, debug, "aeChan") ;
-#endif
       p.doneChan = channelCreate (channelDepth, BB, p.h) ;
       channelDebug (p.doneChan, debug, "doneChan") ;
       
@@ -8638,9 +8633,9 @@ int main (int argc, const char *argv[])
 	      wego_go (align, &p, PP) ;
 	      p.agent = i ;
 	    }
+#endif
 	  if (!i) /* only 1 export agent */
 	    wego_go (export, &p, PP) ;
-#endif
 	}
     }
 
