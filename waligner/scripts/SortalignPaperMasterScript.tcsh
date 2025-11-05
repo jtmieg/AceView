@@ -1732,15 +1732,21 @@ goto phaseLoop
 
 phase_perfect:
 
-foreach run (Roche)
+echo "Searching perfects\n\t$runs\n\t$methods"
+foreach run ($runs)
+
   foreach mm ($methods)
-    if (-e RESULTS/$mm/$run/$run.$run.1.hits && ! -e RESULTS/$mm/$run/s2g.perfect.list) then
-      cat RESULTS/$mm/$run/$run.$run.*.hits | gawk -F '\t' '/^#/{next;}{if ($2==$4)print $1;}' | sort -u > RESULTS/$mm/$run/s2g.perfect.list
+    if (-e RESULTS/$mm/$run/$run.$run.2.hits && ! -e RESULTS/$mm/$run/s2g.perfect.list2) then
+      echo -n "seraching perfect $mm $run "
+      cat RESULTS/$mm/$run/$run.$run.*.hits | gawk -F '\t' '/^#/{next;}{if ($2==$4)print $1;}' | sed -e "s/$run\///" | sort -uV > RESULTS/$mm/$run/s2g.perfect.list
+      wc RESULTS/$mm/$run/s2g.perfect.list
     endif
   end
-end
 
-cat RESULTS/*/Roche/*ect.list | sed -e 's/>//' -e 's/<//' -e "s/$run\///" | sort -u > RESULTS/any.$run.perfect.list
+  cat RESULTS/*/$run/*ect.list | sed  -e "s/$run\///" | sort -u > RESULTS/any.$run.perfect.list
+ #    cat RESULTS/*/$run/*ect.list | sed -e 's/>//' -e 's/<//' -e "s/$run\///" | sort -u > RESULTS/any.$run.perfect.list
+  wc RESULTS/any.$run.perfect.list
+end
 
 goto phaseLoop
 

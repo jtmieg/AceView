@@ -198,7 +198,7 @@ typedef struct pStruct {
   BigArray intronSeeds ;
   BigArray exonSeeds ;
   Array confirmedIntrons ;
-  BOOL fasta, fastq, fastc, raw, solid, sra ;
+  BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   int bonus[256] ;
   DICT *runDict ;
@@ -1226,10 +1226,10 @@ static int sraDownload (const char *sraID)
   SRAObj* sra = SraObjNew(sraID);
   int num_bases = 1 << 27 ; /* 128 M */
   long unsigned int nMax = (0x1L << 31) / num_bases ; /* 2Gb */
-  const char *cpp ;
+  const char *ccp ;
   
-  while (nMax-- > 0 && (cpp = SraGetReadBatch(sra, num_bases)))
-    aceOutf (ao, "%s", cpp) ;
+  while (nMax-- > 0 && (ccp = SraGetReadBatch(sra, num_bases)))
+    aceOutf (ao, "%s", ccp) ;
 
   SraObjFree(sra);
   ac_free (h) ;
@@ -1250,7 +1250,7 @@ static int sraDownload (const char *sraID)
  * so in this way, even facinga single large fastq, the pipeline will no longer be hanged on the parser
  */
 
-static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
+static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   AC_HANDLE h = ac_new_handle () ;
   BB b ;
@@ -1273,29 +1273,8 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   char tBuf[25] ;
   clock_t t1, t2 ;
 
-  if (isGenome || (format != FASTA && format != SRA) || fileName2 || pairedEnd)
-    messcrash ("Bad internal options in newSequenceParser, please edit the code, sorry") ;
-
-  if (format == SRA)  /* check in the cache */
-    {
-      char tBuf[25] ;
-      char *cp = hprintf (pp->h, "SRA/%s.fasta.gz", rc->fileName1) ;
-      char *cr = filName (cp, 0, "r") ;
-      if (!cr)
-	{
-	  fprintf (stderr, "%s: SRA download start %s\n", timeBufShowNow (tBuf), rc->fileName1) ;
-	  sraDownload (rc->fileName1) ;
-	  fprintf (stderr, "%s: SRA download done %s\n", timeBufShowNow (tBuf), cp) ;
-	  cr = filName (cp, 0, "r") ;
-	}
-      if (! cr)
-	messcrash ("Failed to download from run %s from SRA, try sortalign --help\n", rc->fileName1) ;
-      else
-	fprintf (stderr, "Found cached file %s\n", cp) ;
-      fileName1 = rc->fileName1 = strnew (cr, pp->h) ;
-      rc->format = SRACACHE ; 
-    }
-
+  if (isGenome || fileName2 || pairedEnd)
+    messcrash ("Bad internal options in fastaSequenceParser, please edit the code, sorry") ;
   
   t1 = clock () ;
   
@@ -1334,7 +1313,7 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       nBytes += bytes ;
       if (!nBytes)
 	messcrash ("No sequence found in file %s\n", fileName1) ;
-
+      
       if (format == SRACACHE)
 	{   /* check for identifiers signalling a paired end read */
 	  unsigned char *cq = buffer ;
@@ -1346,7 +1325,7 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 	  else
 	    format = SRACACHE1 ;
 	}
-      
+
       /* create a data block */
       bb = &b ;
       memset (bb, 0, sizeof (BB)) ;
@@ -1375,13 +1354,138 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   ac_free (h) ;
   
   t2 = clock () ;
-  cpuStatRegister ("2.NewSequenceParser", pp->agent, bb->cpuStats, t1, t2, nBytes) ;
+  cpuStatRegister ("2.FastaSequenceParser", pp->agent, bb->cpuStats, t1, t2, nBytes) ;
 
   if (debug)
-     printf ("--- %s: Stop newSequenceParser %d blocks %ld bytes file %s\n", timeBufShowNow (tBuf), lane, nBytes, fileName1) ;
+     printf ("--- %s: Stop FastaSequenceParser %d blocks %ld bytes file %s\n", timeBufShowNow (tBuf), lane, nBytes, fileName1) ;
   
   return ;
-}
+} /* fastaSequenceParser */
+
+/**************************************************************/
+/* nov 2 2025
+ * grab data directly from SRA sequence archives
+ * f = gzopen ("gilname.gz", r)
+ *  cp = gzread (f, 100Mega, buffer) ;
+ *  cq = strrchr (cp, '>')
+ *    if (!cq || cq == cp) continue reading intil EOF
+ *    else { *(cq-1)=0; pass the cp buffer to a new agent which will decode the dna ;
+ *    copy cq ... (n bytes)  to a new clean buffer and gzread in buffer+n
+ *  gzclose() 
+ * the general idea is that parsing big buffers is fast, while decoding them is slow
+ * so in this way, even facinga single large fastq, the pipeline will no longer be hanged on the parser
+ */
+
+static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  ACEOUT ao = 0 ;
+  BB b ;
+  int BMAX = isGenome ? 100000 : (pp->BMAX << 20) ;
+  const char *ccp ;
+  int pos = 0 ;
+  BOOL done = FALSE ;
+  long int bytes = 0, nBytes = 0 ;
+  int nPuts = 0 ;
+
+  CHAN *chan = pp->plChan ;
+  BOOL debug = FALSE ;
+  
+  DnaFormat format = rc->format ;
+  const char *sraID = rc ? rc->fileName1 : tc->fileName ;
+  BOOL pairedEnd = FALSE ;
+  char tBuf[25] ;
+  clock_t t1, t2 ;
+
+  if (isGenome || format != SRA)
+    messcrash ("Bad internal options in sraSequenceParser, please edit the code, sorry") ;
+
+  char *fNam = hprintf (pp->h, "SRA/%s.fasta.gz", sraID) ;
+  if (1)  /* check in the cache */
+    {
+      char *cr = filName (fNam, 0, "r") ;
+      if (cr)
+	{
+	  fprintf (stderr, "Found cached file %s\n", fNam) ;
+	  rc->fileName1 = strnew (cr, pp->h) ;
+	  rc->format = SRACACHE ;
+	  ac_free (h) ;
+	  return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
+	}
+    }
+
+  if (pp->sraCaching)
+    {
+      if (mkdir("./SRA", 0755) == -1)
+	{
+	  if (errno != EEXIST)       /* not "already exists" */
+	    messcrash ("\nCannot create or cannot write in the SRA cache directory ./SRA") ;
+	}
+      ao = aceOutCreate (fNam, 0, TRUE, h) ;
+      if (!ao)
+	messcrash ("\nCannot create the SRA cache file %s", fNam) ;
+    }
+
+  t1 = clock () ;
+  SRAObj* sra = SraObjNew(sraID);
+  long unsigned int nMax = (0x1L << 31) / BMAX ; /* 2Gb */
+  if (nMax < 1) nMax = 1 ;
+  rc->format = SRACACHE ;
+
+  while (nMax-- > 0 && (ccp = SraGetReadBatch(sra, BMAX)))
+    {
+      if (ao)
+	aceOutf (ao, "%s", ccp) ;
+
+      bytes = strlen (ccp) ;
+      nBytes += bytes ; 
+      if (!bytes)
+	messcrash ("No sequence found in SRA %s\n", sraID) ;
+
+      if (format == SRACACHE)
+	{   /* check for identifiers signalling a paired end read */
+	  const char *cq = ccp ;
+	  int nDots = 0 ;
+	  while (cq && *cq != '\n')
+	    nDots += (*cq++ == '.' ? 1 : 0) ;
+	  if (nDots == 3)
+	    format = SRACACHE2 ;
+	  else
+	    format = SRACACHE1 ;
+	}
+      
+      /* create a data block */
+      bb = &b ;
+      memset (bb, 0, sizeof (BB)) ;
+      bb->h = ac_new_handle () ;
+	  
+      bb->readerAgent = pp->agent ;
+      bb->run = rc ? rc->run : 0 ;
+      bb->start = timeNow () ;
+      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
+      bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
+      bb->rc.fileName1 = sraID ;
+      /* copy the buffer */
+      bb->gzBuffer = halloc (bytes + 1, bb->h) ;
+      memcpy (bb->gzBuffer, ccp, bytes) ;
+      bb->gzBuffer[bytes] = 0 ;
+      bb->nSeqs = 100 ;  /* a guess */
+      /* export the databalock to the channel */
+      nPuts++ ;
+      channelPut (chan, bb, BB) ;
+    }
+  channelPut (pp->npChan, &nPuts, int) ; /* global counting of BB blocks accross all sequenceParser agents */
+  
+  ac_free (h) ;
+  
+  t2 = clock () ;
+  cpuStatRegister ("2.sraSequenceParser", pp->agent, bb->cpuStats, t1, t2, nBytes) ;
+
+  if (debug)
+     printf ("--- %s: Stop sraSequenceParser %d blocks %ld bytes in %s\n", timeBufShowNow (tBuf), lane, nBytes, sraID) ;
+  
+  return ;
+} /* sraSequenceParser */
 
 /**************************************************************/
 
@@ -1702,9 +1806,10 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 static void sequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   DnaFormat format = rc ? rc->format : tc->format ;
-  if (1 && 
-      ! isGenome && ! rc->pairedEnd &&  (format == FASTA  || format == SRA))
-    return newSequenceParser (pp, rc, tc, bb, isGenome) ;
+  if (! isGenome && ! rc->pairedEnd &&  format == FASTA)
+    return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
+  else if (! isGenome && format == SRA)
+    return sraSequenceParser (pp, rc, tc, bb, isGenome) ;
   else
     return oldSequenceParser (pp, rc, tc, bb, isGenome) ;
 } /* sequenceParser */
@@ -7538,11 +7643,11 @@ static Array parseInConfig (PP *pp, Array runStats)
 	  rc->format = FASTA ; /* default */
 	  rc->format = FASTA ; /* default */
 	  if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	  else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
-	  else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	  else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
 	  else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
 	  else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
+	  else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	  
 	  /* user can override the defaults */
 	  if (pp->raw) rc->format = RAW ;
@@ -7652,11 +7757,11 @@ static Array parseInConfig (PP *pp, Array runStats)
 	    {
 	      rc->format = FASTA ; /* default */
 	      if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	      else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
-	      else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	      else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
 	      else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
 	      else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
+	      else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	    }
 
 	  if (rc->format == SRA)  /* check in the cache */
@@ -7966,12 +8071,16 @@ static void usage (char *message, int argc, const char **argv)
 	       "//        Machine : [default Illumina], one of Illumina, PacBio, Nanopore,..\n"
 	       "//        Adaptors=atagg,cctg   run specific adaptor sequences\n"
 	       "//        Format : [default fasta], one of sra, raw, fasta, fastq, fastc, only needed if not implied by the file name\n"
-	       "// --gzi\n"
+	       "//  --sraCaching\n"
+	       "//    When the requested sequences are is SRA format they are automatically downloaded from NCBI SRA archive\n"
+	       "//    If --sraCaching is set, the (large) downloaded fasta.gz files are copied and saved in the ./SRA local directory\n"
+	       "//    This is only useful if you intend to align these sequences several times or reuse them in other programs\n" 
+	       "//  --sraDownload SRR123,SRR456,SRR999\n"
+	       "//    Just download a set of SRR entries into the cache directory ./SRA/SRR123.fasta.gz ... \n"
+	       "//    This command is optional, since sortalign provides direct SRA access\n"
+	       "//  --gzi\n"
 	       "//    Forces decompression of the input files, useful when piping into sortalign\n"
 	       "//    All files named *.gz are automatically decompressed\n"
-	       "//  --sraDownload SRR123,SRR456,SRR999\n"
-	       "//    Download a set of SRR entries into the cache directory ./SRA/SRR123.fasta.gz ... \n"
-	       "//    This command is optional, since direct SRA access via (-I config) will also cache the sequence files\n"
 	       "// OUTPUT:\n"
 	       "// -o <outFileNamePrefix> [default stdout]\n"
 	       "//   All output files will share this prefix, large outputs are split\n"
@@ -8314,6 +8423,7 @@ int main (int argc, const char *argv[])
   p.fastc = getCmdLineBool (&argc, argv, "--fastc");
   p.raw = getCmdLineBool (&argc, argv, "--raw");
   p.sra = getCmdLineBool (&argc, argv, "--sra");
+  p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");
 
   p.gzi = getCmdLineBool (&argc, argv, "-gzi") ||
     getCmdLineBool (&argc, argv, "--gzi");
@@ -8736,7 +8846,7 @@ int main (int argc, const char *argv[])
 	      p.agent = i ;
 	    }
 #endif
-	  if (!i) /* only 1 export agent */
+	  if (! p.sam || !i) /* only 1 export agent in sam case */
 	    wego_go (export, &p, PP) ;
 	}
     }
