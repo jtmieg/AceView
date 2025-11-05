@@ -33,7 +33,7 @@
 #define UTILS_DEF
 
 /* case-insensitive version of strstr */
-char *strcasestr (const char *str1, const char *str2);
+char *strcasestr (char *str1, char *str2);
 /* Wrapper to allow lexstrcmp to be used with arraySort.y */
 int arrstrcmp (const void *s1, const void *s2);
 /* lextstrcmp does an intuitive sort of strings that include numbers */

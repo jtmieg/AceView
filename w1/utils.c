@@ -1020,19 +1020,27 @@ BOOL utStr2LongInt(char *num_str, long int *num_out)
 #endif
 
 /************************************************************/
-/* case-insensitive version of strstr 
- * problem this impolite function has a disgusting side effect
- * it alters its parameter
-*/
-#if 0
-char *strcasestr(char *str1, char *str2)
-{
-  g_strup(str1);
-  g_strup(str2);
 
-  return strstr(str1, str2);
+char *strcasestr (char *str1, char *str2)
+{
+  char *s1 = strnew (str1, 0) ;
+  char *s2 = strnew (str2, 0) ;
+
+  bufferToUpper (s1) ;
+  bufferToUpper (s2) ;
+
+  char *cp = strstr(s1, s2) ;
+  if (cp)
+    {
+      int n = cp - s1 ;
+      cp = str1 + n ;
+    }
+  ac_free (s1) ;
+  ac_free (s2) ;
+  return cp ; 
 }
-#endif
+
+
 /*************************************************************************/
 /*************************************************************************/
 

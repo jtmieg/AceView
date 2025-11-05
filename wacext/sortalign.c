@@ -43,6 +43,7 @@ time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --ali
 
 #include "ac.h"
 #include "channel.h"
+#include <dirent.h>
 #include <zlib.h>
 #include <stdatomic.h>
 #include "../wsra/sra_read.h"
@@ -60,7 +61,7 @@ time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --ali
 
 typedef struct nodeStruct { double x ; CHAN *cx, *cy, *cu, *cv, *done ; int k ; } NODE ;
 
-typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, INTRONS} DnaFormat ;
+typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, SRACACHE, SRACACHE1, SRACACHE2, INTRONS} DnaFormat ;
 typedef struct targetClassStruct {
   char targetClass ; /* single char a-z, A-Z */
   int bonus ;
@@ -197,7 +198,7 @@ typedef struct pStruct {
   BigArray intronSeeds ;
   BigArray exonSeeds ;
   Array confirmedIntrons ;
-  BOOL fasta, fastq, fastc, raw, solid ;
+  BOOL fasta, fastq, fastc, raw, solid, sra ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   int bonus[256] ;
   DICT *runDict ;
@@ -1205,6 +1206,36 @@ static BOOL parseOnePair (DnaFormat format, char *namBuf
   return ok1 && ok2 ;
 } /* parseOnepair */
 
+/*************************************************************************************/
+
+static int sraDownload (const char *sraID)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  char *fName = hprintf (h, "SRA/%s.fasta", sraID) ;
+  ACEOUT ao = 0 ; 
+
+  if (mkdir("./SRA", 0755) == -1)
+    {
+      if (errno != EEXIST)       /* not "already exists" */
+	messcrash ("\nCannot create or cannot write in the SRA cache directory ./SRA") ;
+    }
+  ao = aceOutCreate (fName, 0, TRUE, h) ;
+  if (!ao)
+    messcrash ("\nCannot create the SRA cache file %s", fName) ;
+  
+  SRAObj* sra = SraObjNew(sraID);
+  int num_bases = 1 << 27 ; /* 128 M */
+  long unsigned int nMax = (0x1L << 31) / num_bases ; /* 2Gb */
+  const char *cpp ;
+  
+  while (nMax-- > 0 && (cpp = SraGetReadBatch(sra, num_bases)))
+    aceOutf (ao, "%s", cpp) ;
+
+  SraObjFree(sra);
+  ac_free (h) ;
+  return 0 ;
+}
+
 /**************************************************************/
 /* aug 2
  * alternative idea
@@ -1242,11 +1273,31 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   char tBuf[25] ;
   clock_t t1, t2 ;
 
-  if (isGenome || format != FASTA || fileName2 || pairedEnd)
+  if (isGenome || (format != FASTA && format != SRA) || fileName2 || pairedEnd)
     messcrash ("Bad internal options in newSequenceParser, please edit the code, sorry") ;
+
+  if (format == SRA)  /* check in the cache */
+    {
+      char tBuf[25] ;
+      char *cp = hprintf (pp->h, "SRA/%s.fasta.gz", rc->fileName1) ;
+      char *cr = filName (cp, 0, "r") ;
+      if (!cr)
+	{
+	  fprintf (stderr, "%s: SRA download start %s\n", timeBufShowNow (tBuf), rc->fileName1) ;
+	  sraDownload (rc->fileName1) ;
+	  fprintf (stderr, "%s: SRA download done %s\n", timeBufShowNow (tBuf), cp) ;
+	  cr = filName (cp, 0, "r") ;
+	}
+      if (! cr)
+	messcrash ("Failed to download from run %s from SRA, try sortalign --help\n", rc->fileName1) ;
+      else
+	fprintf (stderr, "Found cached file %s\n", cp) ;
+      fileName1 = rc->fileName1 = strnew (cr, pp->h) ;
+      rc->format = SRACACHE ; 
+    }
+
   
   t1 = clock () ;
-
   
   file = gzopen (fileName1, "r");
   if (! file)
@@ -1283,6 +1334,19 @@ static void newSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       nBytes += bytes ;
       if (!nBytes)
 	messcrash ("No sequence found in file %s\n", fileName1) ;
+
+      if (format == SRACACHE)
+	{   /* check for identifiers signalling a paired end read */
+	  unsigned char *cq = buffer ;
+	  int nDots = 0 ;
+	  while (cq && *cq != '\n')
+	    nDots += (*cq++ == '.' ? 1 : 0) ;
+	  if (nDots == 3)
+	    format = SRACACHE2 ;
+	  else
+	    format = SRACACHE1 ;
+	}
+      
       /* create a data block */
       bb = &b ;
       memset (bb, 0, sizeof (BB)) ;
@@ -1638,8 +1702,8 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 static void sequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   DnaFormat format = rc ? rc->format : tc->format ;
-  if (1 && /* this code is bugged, it loses the last few reads */
-      ! isGenome && ! rc->pairedEnd &&  format == FASTA )
+  if (1 && 
+      ! isGenome && ! rc->pairedEnd &&  (format == FASTA  || format == SRA))
     return newSequenceParser (pp, rc, tc, bb, isGenome) ;
   else
     return oldSequenceParser (pp, rc, tc, bb, isGenome) ;
@@ -1896,13 +1960,35 @@ static void parseReadsDo (const PP *pp, BB *bb, int step, BOOL isTarget)
       while (parseOnePair (FASTA, namBuf, ai, dna1, qual1, &line1, 0, 0, 0, 0)) 
 	{
 	  int nn1, n1 = arrayMax (dna1) ;
+	  int isRead2 = 0 ;
+	  char *cp ;
 	  
 	  bb->nSeqs++ ;
 	  bb->length += n1 ;
 	  bb->runStat.nReads++ ;
 	  bb->runStat.nBase1 += n1 ;
+
+	  switch (bb->rc.format)
+	    {
+	    case SRACACHE2:
+	      cp = namBuf + strlen (namBuf) - 3 ;
+	      if (! strcmp (cp, ".2"))
+		{
+		  isRead2 = 1 ;
+		  *cp = 0 ;
+		}
+	      if (! strcmp (cp, ".1"))
+		{
+		  isRead2 = 0 ;
+		  *cp = 0 ;
+		}
+	      break ;
+	    default:
+	      break ;
+	    }
+	  
 	  dictAdd (bb->dict, namBuf, &nn1) ;
-	  nn1 <<= 1 ;
+	  nn1 = (nn1 << 1) | isRead2 ;
 	  array (bb->dnas, nn1, Array) = dna1 ;
 	  
 	  if (arrayMax (dna1))
@@ -2861,7 +2947,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
       int step ;
       
       if (tc->targetClass == 'I')
-	continue ; /* we need to parse thge genome before the introns */
+	continue ; /* we need to parse the genome before the introns */
       ntc++ ;
       
       memset (&rc, 0, sizeof (RC)) ;
@@ -7443,28 +7529,39 @@ static Array parseInConfig (PP *pp, Array runStats)
 	      filName2 = strnew (cr, pp->h) ;
 	    }
 	  
-	  cr = filName (cp, 0, "r") ;
-	  if (! cr)
-	    messcrash ("\nCannot open input file %s\n", cp) ;
-	  
+
 	  rc = arrayp (rcs, nn++, RC) ; 
-	  rc->fileName1 = strnew (cr, pp->h) ;
+	  rc->fileName1 = strnew (cp, pp->h) ;
 	  rc->fileName2 = filName2 ;
 	  rc->run = run ;
 
 	  rc->format = FASTA ; /* default */
+	  rc->format = FASTA ; /* default */
 	  if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	  if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
-	  if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
-	  if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
-	  if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
-
+	  else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
+	  else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
+	  else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
+	  
 	  /* user can override the defaults */
 	  if (pp->raw) rc->format = RAW ;
 	  if (pp->fasta) rc->format = FASTA ;
 	  if (pp->fastq) rc->format = FASTQ ;
 	  if (pp->fastc) rc->format = FASTC ;
+	  if (pp->sra) rc->format = SRA ;
 
+	  if (rc->format == SRA)  /* check in the cache */
+	    {
+	    }
+	  else
+	    {
+	      cr = filName (rc->fileName1, 0, "r") ;
+	      if (! cr)
+		messcrash ("\nCannot open input file %s\n", cp) ;
+	      rc->fileName1 = strnew (cr, pp->h) ;
+	    }
+	  
 	  RunSTAT *rs = arrayp (runStats, run, RunSTAT) ;
 	  rs->nFiles++ ;
 	  if (rc->fileName2)
@@ -7485,18 +7582,20 @@ static Array parseInConfig (PP *pp, Array runStats)
       ACEIN ai = aceInCreate (pp->inConfigFileName, 0, h) ;
       int nRuns = 0, run = 0 ;
       int line = 0 ;
-      
+
+      if (! ai)
+	messcrash ("\nCannot find file -I %s specified on the command line", pp->inConfigFileName) ;
       while (aceInCard (ai))
 	{
 	  char *cq, *cr, *cp = aceInWord (ai) ;
-
+	  
 	  line++ ;
 	  if (! cp || ! *cp || *cp == '#')
 	    continue ;
 	  /* file names */
 	  rc = arrayp (rcs, nn++, RC) ; 
 	  nRuns++ ;
-	  /* file pairs */
+	      /* file pairs */
 	  cq = strchr (cp, '+') ;
 	  if (cq) 
 	    {
@@ -7510,12 +7609,9 @@ static Array parseInConfig (PP *pp, Array runStats)
 		  rc->fileName2 = strnew (cr, pp->h) ;
 		}
 	    }
-	  cr = filName (cp, 0, "r") ;
-	  if (! cr)
-	    messcrash ("\nCannot open sequence file %s listed in configuration file -I %s\n\tDid you mean -i %s\n\tPlease try sortalign --help\n", cp, pp->inConfigFileName, pp->inConfigFileName) ;
-	  rc->fileName1 = strnew (cr, pp->h) ;
-	  if (! dictAdd (fDict, cr, 0))
-	    messcrash ("\nDuplicate target file name %s\n at line %d of file -T %s\n try sortalign --help\n"
+	  rc->fileName1 = strnew (cp, pp->h) ;
+	  if (! dictAdd (fDict, cp, 0))
+	    messcrash ("\nDuplicate file name %s\n at line %d of file -T %s\n try sortalign --help\n"
 		       , cr
 		       , line
 		       , pp->inConfigFileName
@@ -7544,6 +7640,7 @@ static Array parseInConfig (PP *pp, Array runStats)
 	      if (! strcasecmp (cp, "fastq")) rc->format = FASTQ ;
 	      if (! strcasecmp (cp, "fastc")) rc->format = FASTC ;
 	      if (! strcasecmp (cp, "raw")) rc->format = RAW ;
+	      if (! strcasecmp (cp, "SRA")) rc->format = SRA ;
 
 	      if (! strcasecmp (cp, "rna")) rc->RNA = TRUE ;
 	      if (! strcasecmp (cp, "dna")) rc->RNA = FALSE ;
@@ -7553,13 +7650,26 @@ static Array parseInConfig (PP *pp, Array runStats)
 
 	  if (! rc->format)
 	    {
-	      rc->format = RAW ; /* default */
+	      rc->format = FASTA ; /* default */
 	      if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	      if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
-	      if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
-	      if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
+	      else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
+	      else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
+	      else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
 	    }
-	 
+
+	  if (rc->format == SRA)  /* check in the cache */
+	    {
+	    }
+	  else
+	    {
+	      cr = filName (rc->fileName1, 0, "r") ;
+	      if (! cr)
+		messcrash ("\nCannot open sequence file %s listed in configuration file -I %s\n\tDid you mean -i %s\n\tPlease try sortalign --help\n", cp, pp->inConfigFileName, pp->inConfigFileName) ;
+	      rc->fileName1 = strnew (cr, pp->h) ;
+	    }
+	  
 	  RunSTAT *rs = arrayp (runStats, run, RunSTAT) ;
 	  rs->nFiles++ ;
 	  if (rc->fileName2)
@@ -7570,6 +7680,7 @@ static Array parseInConfig (PP *pp, Array runStats)
       
       ac_free (h) ;
     }
+  pp->nFiles = arrayMax (rcs) ;
   printf ("Found %d sequence file%s\n", arrayMax (rcs), arrayMax (rcs) > 1 ? "s" : "") ;
   return rcs ;
 } /* parseInConfig */    
@@ -7756,21 +7867,6 @@ static BOOL isExecutableInPath (const char *name)
   return FALSE ;
 }
 
-/*************************************************************************************/
-
-static int sraParse (const char *sraID)
-{
-    SRAObj* sra = SraObjNew(sraID);
-    int num_bases = 500;
-    const char *cpp ;
-    
-    while ((cpp = SraGetReadBatch(sra, num_bases)))
-       printf("%s", cpp);
-    SraObjFree(sra);
-
-    return 1 ;
-}
-
 /***************************** Public interface **************************************/
 /*************************************************************************************/
 
@@ -7792,6 +7888,7 @@ static void usage (char *message, int argc, const char **argv)
 	       "// EXAMPLES:\n"
 	       "//      sortalign --createIndex XYZ -t target.fasta (needed once)\n"
 	       "//      sortalign --index XYZ -i f_1.fastq.gz+f_2.fastq.gz --wiggle -o results/xxx \n"
+	       "//      sortalign --index XYZ -i SRR35876976  -o results/xxx \n"
 	       "//\n"
 	       "// OBJECTIVE:\n"
 	       "//    Sort align maps deep-sequencing files and can export at once alignments, coverage plots, introns.\n"
@@ -7801,6 +7898,7 @@ static void usage (char *message, int argc, const char **argv)
 	       "//    The amount of data to be analysed can be large (say 100 Gbases), as it is processed in batches.\n"
 	       "//      Depending on the  hardware, using 10 to 20 CPUs, it may process up to 1 Gigabases of human RNA-seq per minute\n"
 	       "//      On human or mouse, the program requires around (30 + nB) gigabytes of RAM (see --nB --nA options).\n"
+	       "//    Sequence files can be provided locall, or automatically downloaded from SRA as in the EXAMPLES above.\n"
 	       "//\n"
 	       "// TARGET CREATION:\n"
 	       "// --createIndex <directory_name>\n"
@@ -7847,7 +7945,7 @@ static void usage (char *message, int argc, const char **argv)
 	       "//       example 2:   -i f1_1.fastq+f1_2.fastq,f2_1.fastq.gz+f2_2.fastq.gz\n"
 	       "//        Align read pairs, again possibly using different formats.\n"
 	       "//     The file format is implied by the file name, or may be provided explicitly using\n"
-	       "//       --raw   | --fasta  | --fastq | --fastc\n"
+	       "//       --raw   | --fasta  | --fastq | --fastc | -sra\n"
 	       "//     for example when using  '-i - ' to pipe sequence files into the pipeline\n"
 	       "//       example 3: zcat fx.*.fastq.gz | sortalign -x XYZ -i --fastq -o results/fx\n"
 	       "// -I <config_fileName>\n"
@@ -7861,15 +7959,19 @@ static void usage (char *message, int argc, const char **argv)
 	       "//     1: file name, mandatory\n"
 	       "//        For paired end sequencing, provide, as in the second example (f1.F+f1.R), two file names separated by a plus\n"
 	       "//        A file named (.fa, .fasta, .fastq, .fastc) implies that format, the file may be gzipped (.gz)\n"
+	       "//        A file named (SRR[0-9]*) implies direct SRA download, with optional caching in the ./SRA directory\n"
 	       "//     2: Run name, optional,the name must not contain spaces or special characters, as it will be used to name subdirectories\n"
 	       "//     3: Descriptors, optional, the options are coma separated, possibilities are\n"
 	       "//        DNA/RNA : [default RNA], if DNA sortalign will not clip polyA or jump introns\n"
 	       "//        Machine : [default Illumina], one of Illumina, PacBio, Nanopore,..\n"
 	       "//        Adaptors=atagg,cctg   run specific adaptor sequences\n"
-	       "//        Format : [default fasta], one of raw, fasta, fastq, fastc, only needed if not implied by the file name\n"
+	       "//        Format : [default fasta], one of sra, raw, fasta, fastq, fastc, only needed if not implied by the file name\n"
 	       "// --gzi\n"
 	       "//    Forces decompression of the input files, useful when piping into sortalign\n"
 	       "//    All files named *.gz are automatically decompressed\n"
+	       "//  --sraDownload SRR123,SRR456,SRR999\n"
+	       "//    Download a set of SRR entries into the cache directory ./SRA/SRR123.fasta.gz ... \n"
+	       "//    This command is optional, since direct SRA access via (-I config) will also cache the sequence files\n"
 	       "// OUTPUT:\n"
 	       "// -o <outFileNamePrefix> [default stdout]\n"
 	       "//   All output files will share this prefix, large outputs are split\n"
@@ -7989,26 +8091,24 @@ int main (int argc, const char *argv[])
 
   {{
       const char *sraID = 0 ;
-      if (getCmdLineText (h, &argc, argv, "--sra", &sraID))
+      if (getCmdLineText (h, &argc, argv, "--sraDownload", &sraID))
 	{
-	  sraParse (sraID) ;
+	  char *buf = strnew (sraID, h) ;
+	  char *cp = buf ;
+
+	  while (cp)
+	    {
+	      char *cq = strchr (cp, ',') ;
+	      if (cq) *cq = 0 ;
+	      sraDownload (cp) ;
+	      cp = cq ? cq + 1 : 0 ;
+	    }
 	  exit (0) ;
 	}
     }}
-    {
-      SRAObj* sra = SraObjNew("SRR35876976");
-      int num_bases = 500;
-      const char *ccp ;
-      
-      while ((ccp = SraGetReadBatch (sra, num_bases)))
-	{
-	  printf ("%s\n", ccp);
-	}
-      SraObjFree (sra);
-      exit (0) ;
-    }
 
-
+  /*
+  */
   /***************** pin the threads to the processors ***/
 
   if (! getCmdLineBool (&argc, argv, "--numactl")  &&
@@ -8033,12 +8133,12 @@ int main (int argc, const char *argv[])
       
       if (1)
 	{ /* node with least running threads */
-#include <dirent.h>
+
 	  int best_node = 0;
 	  long long min_load = -1;
 
 	  
-	  DIR *d = opendir("/sys/devices/system/node");
+	  DIR *d = opendir("/sys/devices/system/node"); 
 	  if (d)
 	    {	  
 	      struct dirent *e;
@@ -8213,6 +8313,7 @@ int main (int argc, const char *argv[])
   p.fastq = getCmdLineBool (&argc, argv, "--fastq");
   p.fastc = getCmdLineBool (&argc, argv, "--fastc");
   p.raw = getCmdLineBool (&argc, argv, "--raw");
+  p.sra = getCmdLineBool (&argc, argv, "--sra");
 
   p.gzi = getCmdLineBool (&argc, argv, "-gzi") ||
     getCmdLineBool (&argc, argv, "--gzi");
@@ -8582,6 +8683,7 @@ int main (int argc, const char *argv[])
       /* Read preprocessing agents, they do not require the genome */
       for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
 	{
+	  fprintf (stderr, "Launch readParser %d\n", i) ;
 	  p.agent = i ;
 	  wego_go (readParser, &p, PP) ;
 	}
