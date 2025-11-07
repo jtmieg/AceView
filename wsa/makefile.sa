@@ -73,7 +73,7 @@ include deffile
 ## CC, LIBS, NAME are defined in $(ACEDB_MACHINE)_DEF
 ##
  
-IDIR = -I. -I.. -I../wh -I/netopt/sge/include 
+IDIR = -I. -I.. -I../wh -I../wsa -I/netopt/sge/include 
 
 # Do not use -I/usr/include
 # it prevents gcc from picking up its own includes
@@ -96,11 +96,11 @@ COMPILE.c = $(COMPILER) $(USEROPTS) $(IDIR) -DAC_TEST -D$(NAME) -D_FILE_OFFSET_B
 #################################################################
 #################################################################
 
-ALL_SA_OBJS = sortalign.o sa_sort.o
+SA_OBJS = sa.main.o sa.sort.o
 	
-ALL_SA_SOURCES =  $(ALL_SA_OBJS:.o=.c) 
+SA_SOURCES =  $(SA_OBJS:.o=.c) 
 
-$(ALL_SA_SOURCES)  :
+$(SA_SOURCES)  :
 	$(TEST) -L $@ || ln -s ../wsa/$@ . 
 
 # "all" should always be the first target so that it is the default make action.
@@ -109,8 +109,8 @@ all: sortalign
 libsraread.a:
 	$(MAKE) -C ../wsra
 	ln -s ../wsra/libsraread.a .
-sortalign: sortalign.o libsraread.a sa_sort.o
-	$(LINKER) -o $@  $@.o sa_sort.o $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
+sortalign: $(SA_OBJS)  libsraread.a 
+	$(LINKER) -o $@  $(SA_OBJS)  $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
 
 ###########################################################
 ########### end of     acedb makefile.sa  ################
