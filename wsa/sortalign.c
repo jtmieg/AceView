@@ -197,7 +197,6 @@ typedef struct pStruct {
   Array runStats ;
   BigArray intronSeeds ;
   BigArray exonSeeds ;
-  Array confirmedIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   int bonus[256] ;
@@ -288,9 +287,10 @@ typedef struct mrnaStruct {
 		  
 
 typedef struct intronStruct {
+  int run ;
   int mrna ;
   int chrom ;
-  int a1, a2 ; 
+  int n, a1, a2 ; 
 } INTRON ;
 		  
 typedef struct exonStruct {
@@ -734,6 +734,24 @@ static int intronOrder (const void *va, const void *vb)
   n = (up->pos > up->intron) - (vp->pos > vp->intron) ; if (n) return n ;
   /* pos order */
   n = (up->pos > vp->pos) - (up->pos < vp->pos) ; if (n) return n ;
+  return 0 ;
+} /* intronOrder */
+
+/**************************************************************/
+
+static int confirmedIntronsOrder (const void *va, const void *vb)
+{
+  const INTRON *up = va ;
+  const INTRON *vp = vb ;
+  int n ;
+
+  /* chrom order */
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  /* pos order */
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  n = up->a2 - vp->a2 ; if (n) return n ;
+  /* run order */
+    n = up->run - vp->run ; if (n) return n ;
   return 0 ;
 } /* intronOrder */
 
@@ -1383,8 +1401,6 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   BB b ;
   int BMAX = isGenome ? 100000 : (pp->BMAX << 20) ;
   const char *ccp ;
-  int pos = 0 ;
-  BOOL done = FALSE ;
   long int bytes = 0, nBytes = 0 ;
   int nPuts = 0 ;
 
@@ -1393,7 +1409,6 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   
   DnaFormat format = rc->format ;
   const char *sraID = rc ? rc->fileName1 : tc->fileName ;
-  BOOL pairedEnd = FALSE ;
   char tBuf[25] ;
   clock_t t1, t2 ;
 
@@ -1489,7 +1504,7 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 
 /**************************************************************/
 
-static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
+static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   AC_HANDLE h = ac_new_handle () ;
   BB b ;
@@ -1799,7 +1814,7 @@ static void oldSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   
   ac_free (h) ;
   return ;
-} /* oldSequenceParser */
+} /* otherSequenceParser */
 
 /**************************************************************/
 
@@ -1811,7 +1826,7 @@ static void sequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
   else if (! isGenome && format == SRA)
     return sraSequenceParser (pp, rc, tc, bb, isGenome) ;
   else
-    return oldSequenceParser (pp, rc, tc, bb, isGenome) ;
+    return otherSequenceParser (pp, rc, tc, bb, isGenome) ;
 } /* sequenceParser */
 
 /**************************************************************/
@@ -2306,6 +2321,7 @@ void* f(void* arg) {
 
 /**************************************************************/
 
+#ifndef YANN
 static void codeWords (const void *vp)
 {
   BB bb ;
@@ -2343,6 +2359,7 @@ static void codeWords (const void *vp)
 
   return ;
 } /* codeWords */
+#endif
 
 /**************************************************************/
 /**************************************************************/
@@ -3168,6 +3185,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
 /**************************************************************/
 /**************************************************************/
 
+#ifndef YANN
 static void sortWords (const void *vp)
 {
   BB bb ;
@@ -3208,6 +3226,7 @@ static void sortWords (const void *vp)
 
   return ;
 } /* sortWords */
+#endif
 
 /**************************************************************/
 
@@ -3487,6 +3506,7 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 /**************************************************************/
 /**************************************************************/
 
+#ifndef YANN
 static void matchHits (const void *vp)
 {
   const PP *pp = vp ;
@@ -3525,6 +3545,7 @@ static void matchHits (const void *vp)
 
   return ;
 } /* matchHits */
+#endif
 
 /**************************************************************/
 /**************************************************************/
@@ -3550,6 +3571,7 @@ static int alignOrder (const void *va, const void *vb)
 
 /**************************************************************/
 
+#ifndef YANN
 static int wiggleOrder (const void *va, const void *vb)
 {
   const ALIGN *up = va ;
@@ -3560,6 +3582,7 @@ static int wiggleOrder (const void *va, const void *vb)
 
   return 0 ;
 } /* wiggleOrder */
+#endif
 
 /**************************************************************/
 /* a0 = a1 - x1 is the putative position of base 1 of the read 
@@ -3680,6 +3703,7 @@ static void sortHitsFuse (const PP *pp, BB *bb)
 
 /**************************************************************/
 /* sort the hits */
+#ifndef YANN
 static void sortHits (const void *vp)
 {
   BB bb ;
@@ -3721,6 +3745,7 @@ static void sortHits (const void *vp)
     }
   return ;
 } /* sortHits */
+#endif
 
 /**************************************************************/
 #ifdef __SSE2__
@@ -4090,6 +4115,76 @@ static void reportRunErrors (const PP *pp, Array runStats, Array runErrors)
   ac_free (h) ;
 } /* runErrorsCumulate */
 
+/**************************************************************/
+/**************************************************************/
+
+static long int confirmedIntronsCompress (BigArray aaa) 
+{
+  long int ii, jj, iMax = bigArrayMax (aaa) ;
+  bigArraySort (aaa, confirmedIntronsOrder) ;
+  INTRON *up, *vp, *wp ;
+
+  for (ii = 0, jj = 0, up = bigArrp (aaa, 0, INTRON), vp = up, wp = up ; ii < iMax ; ii++, up++)
+    {
+      if (vp && up->a1 == vp->a1 && up->a2 == vp->a2 && up->chrom == vp->chrom && up->run == vp->run)
+	vp->n += up->n ;
+      else
+	{
+	  vp = wp ;
+	  if (wp < up) *wp = *up ;
+	  wp++ ; jj++ ;
+	}
+    }
+  bigArrayMax (aaa) = jj ;
+  return jj ;
+} /* confirmedIntronsCompress */
+
+/**************************************************************/
+
+static void confirmedIntronsCumulate (BigArray aaa, Array aa) 
+{
+  int iMax = arrayMax (aa) ;
+  
+  if (iMax)
+    {
+      long int jj = bigArrayMax (aaa) ;
+      bigArrayp (aaa, jj + iMax - 1, INTRON)->n = 0 ; /*  make room */
+      memcpy (bigArrp (aaa, jj, INTRON), arrp (aa, 0, INTRON), iMax * sizeof (INTRON)) ;
+      confirmedIntronsCompress (aaa) ;
+    }
+} /* confirmedIntronsCumulate */
+
+/**************************************************************/
+
+static void confirmedIntronsExport (const PP *pp, BigArray aaa)
+{
+  long int iMax = aaa ? confirmedIntronsCompress (aaa) : 0 ;
+  
+  if (iMax)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (pp->outFileName, ".introns.tsf", 0, h) ;
+      INTRON *up ;
+      long int ii ;
+      
+      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, i (format for one integer), nb of supporting reads\n") ;
+      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
+	       aceOutFileName (ao)
+	       ) ;
+      for (ii = 0, up = bigArrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
+	{
+	  aceOutf (ao, "%s__%d_%d\t%s\ti\t%d\n"
+		   , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2
+		   , dictName (pp->runDict, up->run)
+		   , up->n
+		   ) ;
+	}
+      
+      ac_free (h) ;
+    }
+} /* confirmedIntronsExport */
+
+/**************************************************************/
 /**************************************************************/
 
 static void alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
@@ -4822,6 +4917,8 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     {  /* this intron is confirmed */
       INTRON *zp = arrayp (bb->confirmedIntrons, arrayMax (bb->confirmedIntrons), INTRON) ;
       zp->chrom = vp->chrom ;
+      zp->run = bb->run ;
+      zp->n = 1 ;
       zp->a1 = isIntronDown ? donor : acceptor ;
       zp->a2 = isIntronDown ? acceptor : donor ;
       bb->nIntronSupportPlus += (isIntronDown ? 1 : 0) ;
@@ -4831,6 +4928,8 @@ static void alignOptimizeIntron (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     {  /* this intron is confirmed */
       INTRON *zp = arrayp (bb->confirmedIntrons, arrayMax (bb->confirmedIntrons), INTRON) ;
       zp->chrom = vp->chrom ;
+      zp->run = bb->run ;
+      zp->n = 1 ;
       zp->a1 = isIntronDown ? acceptor : donor ;
       zp->a1 = isIntronDown ? donor : acceptor ;
       bb->nIntronSupportPlus += (isIntronDown ? 0 : 1) ;
@@ -6407,27 +6506,9 @@ static void alignDo (const PP *pp, BB *bb)
   return ;
 } /* alignDo */
 
-#ifdef JUNK
-
-dna2dna -i Fasta/iRefSeq38/iRefSeq38.fasta.gz -get 'NM_001385438.1|Gene|NBPF15|GeneId|284565' -o AMELY/NM_001385438.1 -rightClipAt 462
-run -x ../Aligners/013_SortAlignG3R1/IDX.GRCh38.18 -i NM_001385438.1.fasta --numactl --nB 1 --step 3
-zcat Fasta/iRefSeq38/TARGET.human.GRCh38.2025/hs.RefSeq.GRCh38.mrnaRemap.gz | grep NM_001385438.1
-
-(gdb) p showCountChroms (countChroms)
-.. 0:  weight=1356.00	seeds=1356	1:120/2:96/4:344/8:540/16:206/32:50	index 13401 15214	chrom=31	pos=82349478 82348881	da=4294966699	x= 1 4435
-.. 1:  weight=1203.00	seeds=1203	1:62/2:192/4:404/8:352/16:146/32:47	index 3171 6239	chrom=30	pos=82429982 82529588	da=99606	x= 1 4433
-.. 2:  weight=1187.00	seeds=1187	1:78/2:99/4:337/8:479/16:173/32:21	index 15215 18354	chrom=31	pos=84437849 84516001	da=78152	x= 1 4435
-.. 3:  weight=1182.00	seeds=1182	1:120/2:234/4:344/8:288/16:140/32:56	index 6240 9456	chrom=30	pos=84235736 84166271	da=4294897831	x= 1 4271
-.. 4:  weight=983.00	seeds=983	1:163/2:225/4:240/8:200/16:91/32:64	index 9841 11435	chrom=30	pos=85244038 85249952	da=5914	x= 532 4434
-.. 5:  weight=633.00	seeds=633	1:4/2:62/4:185/8:208/16:119/32:55	index 19797 20510	chrom=49	pos=25502067 25694944	da=192877	x= 7 4435
-.. 6:  weight=609.00	seeds=609	1:0/2:61/4:189/8:201/16:101/32:57	index 18740 19406	chrom=48	pos=24168143 24177212	da=9069	x= 56 4433
-.. 7:  weight=256.00	seeds=256	1:0/2:10/4:27/8:103/16:115/32:1	index 2559 3148	chrom=30	pos=75258593 75790118	da=531525	x= 94 4402
-.. 8:  weight=215.00	seeds=215	1:4/2:0/4:15/8:76/16:101/32:19	index 12072 12513	chrom=31	pos=28358224 30409394	da=2051170	x= 44 4404
-.. 9:  weight=210.00	seeds=210	1:0/2:0/4:24/8:90/16:90/32:6	index 13000 13209	chrom=31	pos=74082705 74076496	da=4294961087	x= 94 4404
-.. 10:  weight=209.00	seeds=209	1:0/2:0/4:22/8:108/16:75/32:4	index 2338 2552	chrom=30	pos=72605180 72669569	da=64389	x= 96 4402
-#endif
 /**************************************************************/
 
+#ifndef YANN
 static void align (const void *vp)
 {
   BB bb ;
@@ -6462,13 +6543,15 @@ static void align (const void *vp)
     }
   return ;
 } /* align */
+#endif
 
 /**************************************************************/
 /**************************************************************/
-
-static void wiggleDo (const PP *pp, BB *bb)
-{
-  ALIGN *ap ;
+  
+#ifndef YANN
+  static void wiggleDo (const PP *pp, BB *bb)
+  {
+    ALIGN *ap ;
   long int ii, iMax = bigArrayMax (bb->aligns) ;
   int chrom = 0 ;
   Array wig = 0 ;
@@ -6497,6 +6580,7 @@ static void wiggleDo (const PP *pp, BB *bb)
     }
   return ;
 } /* wiggle do */
+#endif
 
 /**************************************************************/
 
@@ -6715,6 +6799,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
   char segs[2*iMax + 4][L] ;
   int iSeg = 0 ;
   KEYSET ks = keySetCreate () ;
+  static int nn = 0 ;
   
   if (iMax)
     for (ii = 0 ; ii < iMax ; ii++)
@@ -6807,7 +6892,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
   for (int i = 0 ; i < iSeg ; i++)    
     vtxtPrintf (cigar, segs[isDown ? i : iSeg - i - 1]) ;
 
-  if (1 && lSam != dx)
+  if (lSam != dx && nn++ < 100)
     fprintf (stderr,  "Bad length in sam cigar lSam=%d dx=%d ap->x1=%d ap->x2=%d\t%s\t%s\n", lSam, dx, ap->x1, ap->x2, vtxtPtr (cigar), dictName (bb->dict, ap->read >> 1)) ;
 
   keySetDestroy (ks) ;
@@ -7071,17 +7156,6 @@ if (1)
     aceOut (ao, "\t*") ;
 
 
-#ifdef JUNK
-  if (! isPrimary)
-    aceOutf (ao, "\t*1") ;
-  else
-    {
-      if (isDown)
-	aceOutf (ao, "\t*2") ;  /* QUAL ascii de phread scale quaity + 33 ou * */
-      else
-	aceOutf (ao, "\t*3") ; /* we must reverse the order of the QUAL */
-    }
-#endif
   /* end of the 11 mandatory columns */
 
     
@@ -7196,6 +7270,7 @@ static void export (const void *vp)
 
 /**************************************************************/
 
+#ifdef YANN
 static void wholeWork (const void *vp)
 {
   BB bb ;
@@ -7277,6 +7352,7 @@ static void wholeWork (const void *vp)
 
   return ;
 } /* wholeWork */
+#endif
 
 /*************************************************************************************/
 
@@ -7641,13 +7717,18 @@ static Array parseInConfig (PP *pp, Array runStats)
 	  rc->run = run ;
 
 	  rc->format = FASTA ; /* default */
-	  rc->format = FASTA ; /* default */
-	  if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	  else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
-	  else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
+	  int ln = strlen (rc->fileName1) ;
+	  if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fastq.gz") == rc->fileName1 + ln - 9) rc->format = FASTQ ;
+	  else if (strstr (rc->fileName1, ".fasta") == rc->fileName1 + ln - 6) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fastq") == rc->fileName1 + ln - 6) rc->format = FASTQ ;
+	  else if (strstr (rc->fileName1, ".fna.gz") == rc->fileName1 + ln - 7) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fa.gz") == rc->fileName1 + ln - 6) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fastc.gz") == rc->fileName1 + ln - 9) rc->format = FASTC ;
+	  else if (strstr (rc->fileName1, ".fastc") == rc->fileName1 + ln - 6) rc->format = FASTC ;
+	  else if (strstr (rc->fileName1, ".fna") == rc->fileName1 + ln - 4) rc->format = FASTA ;
+	  else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	  else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
-	  else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
-	  else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	  
 	  /* user can override the defaults */
 	  if (pp->raw) rc->format = RAW ;
@@ -7755,13 +7836,19 @@ static Array parseInConfig (PP *pp, Array runStats)
 
 	  if (! rc->format)
 	    {
+	      int ln = strlen (rc->fileName1) ;
 	      rc->format = FASTA ; /* default */
-	      if (strstr (rc->fileName1, ".fasta")) rc->format = FASTA ;
-	      else if (strstr (rc->fileName1, ".fastq")) rc->format = FASTQ ;
-	      else if (strstr (rc->fileName1, ".fastc")) rc->format = FASTC ;
+	      if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fastq.gz") == rc->fileName1 + ln - 9) rc->format = FASTQ ;
+	      else if (strstr (rc->fileName1, ".fasta") == rc->fileName1 + ln - 6) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fastq") == rc->fileName1 + ln - 6) rc->format = FASTQ ;
+	      else if (strstr (rc->fileName1, ".fna.gz") == rc->fileName1 + ln - 7) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fa.gz") == rc->fileName1 + ln - 6) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fastc.gz") == rc->fileName1 + ln - 9) rc->format = FASTC ;
+	      else if (strstr (rc->fileName1, ".fastc") == rc->fileName1 + ln - 6) rc->format = FASTC ;
+	      else if (strstr (rc->fileName1, ".fna") == rc->fileName1 + ln - 4) rc->format = FASTA ;
+	      else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	      else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
-	      else if (strstr (rc->fileName1, ".fna")) rc->format = FASTA ;
-	      else if (strstr (rc->fileName1, ".fa")) rc->format = FASTA ;
 	    }
 
 	  if (rc->format == SRA)  /* check in the cache */
@@ -8875,6 +8962,8 @@ int main (int argc, const char *argv[])
       channelCloseAt (p.doneChan, nn - 1) ;
     }
 
+  BigArray confirmedIntrons  = bigArrayHandleCreate (1000, INTRON, h) ;
+
   while (channelGet (p.doneChan, &bb, BB))
     {
       long int n = (bb.hits ? bigArrayMax (bb.hits) : 0) ;
@@ -8921,6 +9010,8 @@ int main (int argc, const char *argv[])
 
 	  runErrorsCumulate (0, runErrors, bb.errors) ;
 	  runErrorsCumulate (bb.run, runErrors, bb.errors) ;
+
+	  confirmedIntronsCumulate (confirmedIntrons, bb.confirmedIntrons) ;
 	}
       
       /* recycle the unaligned reads */
@@ -8996,13 +9087,14 @@ int main (int argc, const char *argv[])
 	  char tBuf[25], tBuf2[25] ;
 	  bb.stop = timeNow () ;
 	  timeDiffSecs (bb.start, bb.stop, &ns) ;
-	  printf ("%s: run %d / lane %d done start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
+	  printf ("%s: run %d / slice %d done start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
 	}
       ac_free (bb.h) ;
     }
   cpuStatExport (&p, cpuStats) ;
   runStatExport (&p, runStats) ;
-
+  confirmedIntronsExport (&p, confirmedIntrons) ;
+  
   wego_log ("Done") ;
   wego_flush () ; /* flush the wego logs to stderr */
 
@@ -9029,6 +9121,7 @@ int main (int argc, const char *argv[])
     reportRunStats (&p, runStats) ;
   if (p.align)
     reportRunErrors (&p, runStats, runErrors) ;
+  
   /* release memory */
   if (p.bbG.dnas)
     {
@@ -9056,3 +9149,4 @@ int main (int argc, const char *argv[])
 /**************************************************************/
 /**************************************************************/
  
+
