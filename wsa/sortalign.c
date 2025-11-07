@@ -1,5 +1,5 @@
 /*
- * RNA aligner
+ * sortalign : RNA aligner
 
  * Created April 18, 2025
  * In collaboration with Greg Boratyn, NCBI
@@ -23,314 +23,16 @@
   #define ARRAY_CHECK
   #define MALLOC_CHECK
 
-/* Example: (for more details try: sortalign -h)
-  cd worm_2024_RSMagic1
-
-\rm -rf IDX.WG IDX.WGR
-sortalign -t _a1.GR.fasta --createIndex IDX.WGR
-sortalign -t _a1.G.fasta --createIndex IDX.WG
-
-run -i _a1.fasta -x IDX.WGR --minAli 30 -o _a3.R.hits --align --max_threads 1
-
-\rm -rf IDX.WX.1
-bin/sortalign -T tConfig --createIndex IDX.WX.1 --NN 1
-
-time sortalign -i _unc32.1.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --align
-time sortalign -i _unc32.fastc -x IDX.WX.1 --minAli 30 -o _unc32.sort.hits --align
-
- */
+/* Examples: try   sortalign -h */
 
 
-#include "ac.h"
-#include "channel.h"
-#include <dirent.h>
-#include <zlib.h>
-#include <stdatomic.h>
-#include "../wsra/sra_read.h"
+#include "../wsa/sortalign.h"
 
-#ifdef __SSE2__
-#define VECTORIZED_MEM_CPY
-#include <emmintrin.h> // SSE2
-#endif
-
-#define YANN 1
-
-#define WIGGLE_STEP 10
-#define MAXJUMP 3
-#define MAXJUMP2 8
-
-typedef struct nodeStruct { double x ; CHAN *cx, *cy, *cu, *cv, *done ; int k ; } NODE ;
-
-typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, SRACACHE, SRACACHE1, SRACACHE2, INTRONS} DnaFormat ;
-typedef struct targetClassStruct {
-  char targetClass ; /* single char a-z, A-Z */
-  int bonus ;
-  int priority ;
-  DnaFormat format ;
-  const char *fileName ;
-  Array cws ;
-} TC ;
-		  
-typedef struct runClassStruct {
-  int run ;   /* index in pp->runDict */
-  BOOL pairedEnd ;
-  BOOL RNA ; /* 1: is RNA, 0 : is DNA (no introns) */
-  int bonus ;
-  DnaFormat format ;
-  const char *fileName1 ;
-  const char *fileName2 ;
-  atomic_int lane ;
-  ACEOUT aoSam ;
-} RC ;
-		  
-typedef struct runStatStruct {
-  int run ;   /* index in p.runDict */
-  int nFiles ;
-  long int nPairs, nReads ;
-  long int nAlignedPairs, nCompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
-  long int nBase1, nBase2 ;
-  long int nMultiAligned[11] ;
-  long int nAlignedPerTargetClass[256] ;
-  long int nPerfectReads ;
-  long int nAlignments ;
-  long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
-  long int nClippedPolyA ;
-  long int nClippedVectors ;
-  long int nSupportedIntrons ;
-  long int nIntronSupports ;
-  long int nIntronSupportPlus ;
-  long int nIntronSupportMinus ;    
-  int minReadLength, maxReadLength ;
-  char *adaptor1, *adaptor2 ;
-  long int nN, nErr ;
-  long int NATGC[5] ;
-  int GF[256], GR[256] ; /* number of reads aligned per target_class on Forward/Reverse strand */
-  Array errors ;  /* substitutions, insertions, deletions counts */
-  /* coverage of long transcripts ? */
-} RunSTAT ;
-		  
 static int NN = 1 ;
-typedef struct bStruct {
-  AC_HANDLE h ;
-  int run, lane, readerAgent ;
-  RC rc ;
-  DICT *dict, *errDict ;
-  mytime_t start, stop ;
-  BigArray dnaCoords ;   /* offSets of the dna in the globalDna array */
-  Array dnas ;           /* Array of const char Arrays */
-  Array dnasR ;          /* Their reverse complement, only computed for the genome */
-  Array quals ;
-  BigArray globalDna ;   /* concatenation of all sequence DNAs separated by blocks of nnn */
-  BigArray globalDnaR ;  /* concatenation of all reverse sequences, in the same order */
-  BigArray hits ;        /* BigArray of read<->genome hits */
-  BigArray *cwsN ;         /* BigArray of codeWords */
-  Array confirmedIntrons ;
-  long unsigned int nSeqs ;  /* number of sequences in bloc */
-  long unsigned int length ; /* cumulated number of bases */
-  long unsigned int nerr ;   /* cumulated number of errors */
-  long unsigned int nAli ;   /* cumulated number of alignments */
-  long unsigned int aliDx ;  /* cumulated aligned read length */
-  long unsigned int aliDa ;  /* cumulated genome coverage */
-
-  char *gzBuffer ;
-  
-  /*   BitSet isAligned ; */
-  BigArray aligns ; /* final alignments */  
-  RunSTAT runStat ;
-  Array cpuStats ;
-  Array errors ;
-  Array wiggles ;
-  BOOL isGenome ;
-  int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
-  long int nIntronSupportPlus ;
-  long int nIntronSupportMinus ;    
-  vTXT txt1, txt2 ; /* a pair of reusable txt buffer */ 
-} BB ;  
-
-typedef struct pStruct {
-  AC_HANDLE h ;
-  BOOL debug, gzi, gzo ;
-  BOOL createIndex ;
-  BOOL align ;
-  BOOL wiggle ;
-  BOOL introns ;
-  BOOL snps ;
-  BOOL ignoreIntronSeeds ;
-  const char *runName ;
-  const char *inFileName ;
-  const char *inConfigFileName ;
-  const char *outFileName ;
-  const char *indexName ;
-  const char *tFileName ;
-  const char *tConfigFileName ;
-  const char *tFileBinaryCwsName ;
-  const char *tFileBinaryDnaName ;
-  const char *tFileBinaryDnaRName ;
-  const char *tFileBinaryIdsName ;
-  const char *tFileBinaryCoordsName ;
-
-  /* Agents:
-     R read parser
-     G genome parser
-     L load regulator,
-     C code words,
-     S sort words,
-     M match words
-     O order hits
-     A align in detail
-     E export ali
-  */
-  CHAN *fpChan ; /* RC, Run Config -> readParser */
-  CHAN *npChan ; /* int, number of BB emitted for each inFile */
-  CHAN *gmChan ; /* Genome is ready, signals the Matcher */
-  CHAN *plChan ; /* Parser sends a BB to the load regulator */
-  CHAN *lcChan ; /* Load regulator sends a BB to the word Coder */
-  CHAN *csChan ; /* Coder sends words to the Sorter */
-  CHAN *smChan ; /* Sorter sends words to the Matcher */
-  CHAN *moChan ; /* Matcher needs seeds to be Ordered */
-  CHAN *oaChan ; /* Ordered matches  sent to the Aligner */
-  CHAN *aeChan ; /* Aligner results to be Exported */
-  CHAN *wwChan ; /* Wiggler */
-  CHAN *doneChan ; /* return to main program */
-
-  BB bbG ;  /* genome or genes target */
-  Array runStats ;
-  BigArray intronSeeds ;
-  BigArray exonSeeds ;
-  BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
-  BOOL sam, exportSamSequence, exportSamQuality ;
-  int bonus[256] ;
-  DICT *runDict ;
-  DICT *targetClassDict ;
-  DICT *geneDict ;
-  DICT *mrnaDict ;
-  DICT *wiggleFileDict ;
-  const char *method ;
-  int run ;
-  int nFiles ;  /* number of input sequence files */
-  int agent ;  /* instance of the agent */
-  int nBlocks ;
-  int blocMaxBases ; /* max number of bases read as one bloc */
-  int iStep ;        /* default 2, take a read seed every iStep */
-  int tStep ;        /* default 3, take a target seed every tStep */
-  int maxTargetRepeats ;
-  int tMaxTargetRepeats ;
-  int seedLength ;
-  int maxIntron ;
-  int BMAX ; /* max number of bases in a block, default 200M */
-  int errCost ;
-  int errMax ;       /* (--align case) max number of errors in seed extension */
-  int minScore, minAli, minAliPerCent ;
-  int errRateMax ;       /* (--align case) max number of errors in seed extension */
-  int OVLN ;
-  BOOL splice ;
-  long int nRawReads, nRawBases ; 
-} PP ;
-
-typedef struct codeWordsStruct {
-  unsigned int seed ; /* 32 bits = 16 bases, 2 bits per base */
-  int nam ; /* index in readDict or chromDict << 1 | (0x1 for minus words) */
-  int pos ;  /* bio coordinate of first letter of seed */
-  unsigned int intron ;
-} __attribute__((aligned(16))) CW ;
-
-typedef struct hitStruct {
-  unsigned int read ;  /* index in readDict */
-  unsigned int chrom ; /* index in chromDict << 1 | (0x1 if minus strand) */
-  unsigned int a1 ;  /* bio coordinates on chrom (base 1) */
-  unsigned int x1 ;  /* bio coordinate on read */
-} __attribute__((aligned(16))) HIT ;
-
-typedef struct countChromStruct {
-  float weight ;
-  int seeds, chrom ;
-  int seed1, seed2, seed4, seed8, seed16, seed32 ;
-  int i1, i2, x1, x2 ;
-  unsigned int a1 ;  /* bio coordinates on chrom (base 1) */
-  unsigned int a2 ;  /* bio coordinate on read */
-}  COUNTCHROM ;
-
-typedef struct alignStruct {
-  int read ;
-  int targetClass ;
-  int chrom ;
-  int a0, x0 ;  /* coordinate of the hit before extension */
-  int a1, a2 ;  /* bio position in chrom, a1 < a2 on minus strand */
-  int x1, x2 ;  /* bio position in read, x1 < x2 always */
-  int w1, w2 ;  /* wiggle coords, rounded, flipped if read2 */
-  int chain, chainX1, chainX2, chainA1, chainA2 ;
-  int id, previous, next ;
-  int ali, chainAli, score, chainScore ;
-  int pairScore, mateChrom, mateA1, mateA2, pairLength ;
-  int nN, nErr, chainErr ;
-  int nTargetRepeats ;
-  int nChains ;
-  int readLength ;
-  int errShort, errLong ; /* bb->dict */
-  int leftOverhang, rightOverhang ; /* bb->dict */
-  int donor, acceptor ;
-  Array errors ;
-} __attribute__((aligned(32))) ALIGN ;
-
-
-typedef struct geneStruct {
-  int gene ; /* index in pp->geneDict */
-  int chrom ;
-  int a1, a2 ; 
-} GENE ;
-		  
-typedef struct mrnaStruct {
-  int mrna ; /* index in pp->mrnaDict */
-  int chrom ;
-  int a1, a2 ; 
-} MRNA ;
-		  
-
-typedef struct intronStruct {
-  int run ;
-  int mrna ;
-  int chrom ;
-  int n, a1, a2 ; 
-} INTRON ;
-		  
-typedef struct exonStruct {
-  int mrna ;
-  int chrom ;
-  int a1, a2 ; 
-} EXON ;
-		  
-
-typedef struct cpuStatStruct {
-  char nam[32] ;
-  int agent ;
-  int nB ; /* blocs treated */
-  long int n ;
-  clock_t tA ; /* time time active */
-} CpuSTAT ;
-		  
-#define step1 256
-#define step2 512
-#define step3 1024
-#define step4 4096
-/* was 256 1024 4096 16384 */
-
-#define NTARGETREPEATBITS 5
-#define NSHIFTEDTARGETREPEATBITS 8
-
-#define mstep1 255
-#define mstep2 510
-#define mstep3 1020
-#define mstep4 4080
-/* was 255 1020 4080 16320 */
-
-#include <pthread.h>
-#include <time.h>
-
-typedef struct timespec TMS ;
-/* bin/sortalign -t TARGET/Targets/hs.genome.fasta.gz -i titi.fastc --align -o tatou */
 
 static atomic_int lane ;
-static int cwOrder (const void *va, const void *vb) ;
+static void showHitsDo (HIT *hit, long int iMax) ;
+
 
 /**************************************************************/
 /************** utilities *************************************/
@@ -414,185 +116,6 @@ static void cpuStatExport (const PP *pp, Array stats)
   return ;
 } /* cpuStatExport */
 
-/**************************************************************/
-/**************************************************************/
-/* newMsort algorithm minimizing memcpy */
-
-/* Taquin insertion algorithm
- * works en place
- */
-static BOOL newInsertionSort (char *b, mysize_t n, int s, int (*cmp)(const void *va, const void *vb))
-{
-  mysize_t i, j ;
-  char buf[s] ;
-  BOOL clean = TRUE ;
-
-  for (i = 1 ; i < n ; i++)
-    {
-      j = i - 1 ;
-      if ((*cmp) (b + i*s, b + j*s) >= 0)
-	continue ;
-      clean = FALSE ;
-      memcpy (buf, b + i*s, s) ;
-      memcpy (b + i*s, b + j*s, s) ;
-      while (j > 0 && (*cmp) (buf, b + (j-1)*s) < 0)
-	{
-	  memcpy (b + j*s, b + (j-1)*s, s) ;
-	  j-- ;
-	}
-      memcpy (b + j*s, buf, s) ;
-    }
-  return clean ;
-} /* insertionSort */
-
-static void showHitsDo (HIT *hit, long int iMax) ;
-
-/* recursivelly split the table
- * the partially sorted data oscillate between b and buf
- * they end up correctly in b because for small n
- * we switch to the insertion taquin algoright
- * on correct parity, as speed is 2 persent higher with
- * insertion n>0,  relative to n==0
- * but n=8,16,32 are equivalent speeds
- */
-
-static BOOL newMsortDo (char *b, long int nn, int s, char *buf, BOOL hitIsTarget, int (*cmp)(const void *va, const void *vb))
-{
- char *up, *vp, *wp ;
-  long int n1 = nn / 2 ;
-  long int n2 = nn - n1 ;
-  char *b1 = b ;
-  char *b2 = b + n1 * s ;
-  char *b01 = buf ;
-  char *b02 = buf + n1 * s ;
-  int n = 0 ;
-  BOOL ok = FALSE ;
-  BOOL clean1, clean2, clean = TRUE ;
-  /* for small n,
-   * sort en place using the insertion algorithm (game of taquin)
-   */
-  if (hitIsTarget && nn < 8)
-    {
-      clean = newInsertionSort (b, nn, s, cmp) ;
-      return clean ;
-    }
-
-  /* otherwise: sort the 2 halves exchanging hit and buf */
-  clean1 = newMsortDo (b01, n1, s, b1, ! hitIsTarget, cmp) ;
-  clean2 = newMsortDo (b02, n2, s, b2, ! hitIsTarget, cmp) ;
-  
-  /* then merge the 2 sorted halves */
-  up = b01 ;
-  vp = b02 ;
-  wp = b1 ;
-
-  if  ((*cmp) (b02 - s, b02) <= 0)
-    {
-      /* sortmerge is not needed, copy whole blocks */
-      /* do we need to copy */
-      if (! clean1)
-	{ /* copy n1 (or nn idf ! clean2)  records back to b */
-	  clean = FALSE ;
-	  memcpy(wp, up, (clean2 ? n1 : nn)  * s) ;	  
-	}
-      else if (! clean2)
-	{ /* just copy n2 to the second part of b */
-	  clean = FALSE ;
-	  memcpy(wp + n1 * s, vp, n2 * s);	  
-	}
-      /* if clean1 && clean2, no copying is needed */
-    return clean  ;
-    }
-  clean = FALSE ;
-  
-#ifdef VECTORIZED_MEM_CPY
-  /* code generated by Grok, loads and stores 16bytes (128 bits) */
-  if (cmp == cwOrder)
-    {
-      while (n1 > 0 && n2 > 0)
-	{
-	  __m128i u = _mm_load_si128((__m128i*)up) ;
-	  __m128i v = _mm_load_si128((__m128i*)vp) ;
-
-	  int n = (*(unsigned int*)up <= *(unsigned int*)vp) ;
-	  
-	  _mm_store_si128((__m128i*)wp, n  ? u : v) ;
-	  wp += s ;
-	  up += n * s ;
-	  vp += (1 - n) * s ;
-	  n1 -= n ;
-	  n2 -= 1 - n ;
-	}
-      ok = TRUE ;
-    }
-  else if (s == 16)
-    {
-      while (n1 > 0 && n2 > 0)
-	{
-	  __m128i u = _mm_load_si128((__m128i*)up) ;
-	  __m128i v = _mm_load_si128((__m128i*)vp) ;
-	  
-	  int n = ((*cmp)(up, vp) <= 0) ? 1 : 0 ;
-	  
-	  _mm_store_si128((__m128i*)wp, n  ? u : v) ;
-	  wp += s ;
-	  up += n * s ;
-	  vp += (1 - n) * s ;
-	  n1 -= n ;
-	  n2 -= 1 - n ;
-	}
-      ok = TRUE ;
-    }
-#endif
-  if (! ok) /* either we do not have _mm_store_si128, or size s is not 16 */
-    { /* classic code */
-      while (n1 > 0 && n2 > 0)
-	{
-	  n = ((*cmp) (up, vp) <= 0) ? 1 : 0 ;
-
-	  memcpy (wp, (n<=0) ? up : vp, s) ;
-	  wp += s ;
-	  up += n * s ;
-	  vp += (1 - n) * s ;
-	  n1 -= n ;
-	  n2 -= 1 - n ;
-	}
-    }
-
-  /* I also tried to count all greater cases and bulk copy
-   * but this code was more complex and not faster
-   */
-
-  /* bulk copy the reminders */
-    if (n1 > 0) memcpy(wp, up, n1 * s);
-    if (n2 > 0) memcpy(wp, vp, n2 * s);
-
-    return clean ;
-} /* newMsortDo */
-
-static void newMsort (BigArray aa, int (*cmp)(const void *va, const void *vb))
-{
-  long int N = bigArrayMax (aa) ;
-  char *cp = N ?  (char *) bigArrp (aa, 0, HIT) : 0 ;
-  int s = aa->size ;
-  
-#ifdef VECTORIZED_MEM_CPYzzzzzz
-  if (s != 16) /* code now always works */
-    messcrash ("only works for aligned 16 bytes structures") ;
-#endif
-  if (N <= 1) return;
-  else if (N < 128)
-    newInsertionSort (cp, N, s, cmp) ;
-  else
-    {
-      char *buf = malloc (N * s) ;
-      memcpy (buf, cp, N * s) ;
-      newMsortDo (cp, N, s, buf, TRUE, cmp) ;
-      free (buf) ;
-    }
-}/* newMsort */
-
-/**************************************************************/
 /**************************************************************/
 /* cumulate int global runStats the content of bb->runStats */
 static void runStatsCumulate (int run, Array aa, RunSTAT *vp)
@@ -709,7 +232,7 @@ static void runStatExport (const PP *pp, Array runStats)
 
 /**************************************************************/
 
-static int cwOrder (const void *va, const void *vb)
+static int exonOrder (const void *va, const void *vb)
 {
   const CW *up = va ;
   const CW *vp = vb ;
@@ -718,7 +241,7 @@ static int cwOrder (const void *va, const void *vb)
   n = up->nam - vp->nam ; if (n) return n ;
   n = (up->pos > vp->pos) - (up->pos < vp->pos) ; if (n) return n ;
   return 0 ;
-} /* cwOrder */
+} /* exonOrder */
 
 /**************************************************************/
 
@@ -2712,7 +2235,7 @@ static long int gffParser (PP *pp, BB *bbG, TC *tc)
     {
       CW *up, *vp ;
       long int ii, jj ;
-      bigArraySort (pp->exonSeeds, cwOrder) ;
+      bigArraySort (pp->exonSeeds, exonOrder) ;
 
       for (up = vp = bigArrp (pp->exonSeeds, 0, CW), ii = jj = 0 ; ii < nnE ; ii++, up++)
 	{
@@ -3145,7 +2668,7 @@ static long int createTargetIndex (PP *pp, BB *bbG, Array tArray)
 
   printf ("%s : sort the target seeds\n" , timeBufShowNow (tBuf)) ;
   for (int k = 0 ; k < NN ; k++)
-    newMsort (cwsN[k], cwOrder) ;
+    saSort (cwsN[k], 1) ; /* cwOrder */
 
   t2 = clock () ;
   cpuStatRegister ("3.Sort seeds" , pp->agent, bbG->cpuStats, t1, t2, nn) ;
@@ -3206,7 +2729,7 @@ static void sortWords (const void *vp)
 	  for (int k = 0 ; k < NN ; k++)
 	    if (bb.cwsN[k])
 	      {
-		newMsort (bb.cwsN[k], cwOrder) ;
+		saSort (bb.cwsN[k], 1) ; /* cwOrder */
 		nn += bigArrayMax (bb.cwsN[k]) ;
 	      }
 	  t2 = clock () ;
@@ -3588,23 +3111,6 @@ static int wiggleOrder (const void *va, const void *vb)
 /* a0 = a1 - x1 is the putative position of base 1 of the read 
  * It also works for the negative strand (a1 < 0, x1 > 0).
  */
-static int hitReadOrder (const void *va, const void *vb)
-{
-  const HIT *up = va ;
-  const HIT *vp = vb ;
-  int n ;
-
-  n = ((up->read > vp->read) - (up->read < vp->read)) ; if (n) return n ;
-  n = ((up->chrom > vp->chrom) - (up->chrom < vp->chrom)) ; if (n) return n ; 
-  n = ((up->a1 > vp->a1) - (up->a1 < vp->a1)) ;  if (n) return n ;
-  n = ((up->x1 > vp->x1) - (up->x1 < vp->x1)) ; 
-  return n ;
-} /* hitReadOrder */
-
-/**************************************************************/
-/* a0 = a1 - x1 is the putative position of base 1 of the read 
- * It also works for the negative strand (a1 < 0, x1 > 0).
- */
 static int hitReadPosOrder (const void *va, const void *vb)
 {
   const HIT *up = va ;
@@ -3619,26 +3125,6 @@ static int hitReadPosOrder (const void *va, const void *vb)
   n = n1 - n2 ;
   return n ;
 } /* hitReadPosOrder */
-
-/**************************************************************/
-/* a0 = a1 - x1 is the putative position of base 1 of the read 
- * It also works for the negative strand (a1 < 0, x1 > 0).
- */
-static int hitPairOrder (const void *va, const void *vb)
-{
-  const HIT *up = va ;
-  const HIT *vp = vb ;
-  int n, n1, n2 ;
-  
-  n = ((up->read >> 1) > (vp->read >> 1)) -  ((up->read >> 1) < (vp->read >> 1)) ; if (n) return n ; 
-  n = ((up->chrom > vp->chrom) - (up->chrom < vp->chrom)) ; if (n) return n ; 
-  n1 = up->a1 + (up->x1 >> NSHIFTEDTARGETREPEATBITS) ;
-  n2 = vp->a1 + (vp->x1 >> NSHIFTEDTARGETREPEATBITS) ;
-  n = n1 - n2 ; if (n) return n ;
-  n = ((up->x1 > vp->x1) - (up->x1 < vp->x1)) ; 
-
-  return n ;
-} /* hitPairOrder */
 
 /**************************************************************/
 /* a0 = a1 - x1 is the putative position of base 1 of the read 
@@ -3721,7 +3207,7 @@ static void sortHits (const void *vp)
 	  sortHitsFuse (pp, &bb) ;
 	  if (bb.hits)
 	    {
-	      newMsort (bb.hits, hitPairOrder) ;
+	      saSort (bb.hits, 3) ; /* hitPairOrder */
 	      t2 = clock () ;
 
 	      long int nn = bigArrayMax (bb.hits) ;
@@ -3748,81 +3234,8 @@ static void sortHits (const void *vp)
 #endif
 
 /**************************************************************/
-#ifdef __SSE2__
-#define EP128
-#include <emmintrin.h> // SSE2
-/*  aaaa aaaa aaaa aaaa  / aaaa aaaa aaaa aaga   -> 14 (number of exact matches)
-static int first_non_equal_byte(unsigned char *cp, unsigned char *cq) {
-    __m128i v1 = _mm_loadu_si128((__m128i*)cp); // aaaaaaaaaaaaaaaa
-    __m128i v2 = _mm_loadu_si128((__m128i*)cq); // aaaaaaaaaaaaaaga
-    __m128i cmp = _mm_cmpeq_epi8(v1, v2);       // 0xff for equal, 0x00 for non-equal
-    int mask = _mm_movemask_epi8(cmp);          // 0xffff for equal, bit 0 for non-equal
-    return mask == 0xffff ? 16 : __builtin_ctz(~mask); // First 0 bit
-}
-*/
-#endif
 /**************************************************************/
 #include <stdint.h>
-
-void extendExact(Array dna, int *x1p, int *x2p, Array dnaG, int *a1p, int *a2p)
-{
-  int dnaMax = arrayMax (dna) ;
-  int dnaGMax = arrayMax (dnaG) ;
-  unsigned char *cp, *cq ;
-  BOOL ok = TRUE ;
-  int a1 = *a1p, a2 = *a2p, x1 = *x1p, x2 = *x2p ;
-  
-  cp = arrp (dna , x2, unsigned char) ; /* first base beyond exact match */
-  cq = arrp (dnaG, a2, unsigned char) ;
-
-  /* Forward extension 16 bases steps */
-#ifdef VECTORIZED_MEM_CPY
-  while (x2 < dnaMax - 16 && a2 < dnaGMax - 16)
-    {
-      __m128i v1 = _mm_loadu_si128((__m128i*)cp);
-      __m128i v2 = _mm_loadu_si128((__m128i*)cq);
-      __m128i cmp = _mm_cmpeq_epi8(v1, v2);
-      int mask = _mm_movemask_epi8(cmp);
-      if (mask != 0xffff)
-	{
-	  int pos = __builtin_ctz(~mask);
-	  x2 += pos; a2 += pos;
-	  ok = FALSE ;
-	  break; // Mismatch
-        }
-      else
-	{
-	  cp += 16; cq += 16; x2 += 16; a2 += 16;
-	}
-    }
-#endif
-  // Byte-wise to end
-  if (ok)
-    while (x2 < dnaMax && a2 < dnaGMax && *cp == *cq)
-      { cp++; cq++; x2++ ; a2++ ;}
-
-  // Backward extension
-  cp = arrp (dna , x1 - 1, unsigned char) ; /* first matching base */
-  cq = arrp (dnaG, a1 - 1, unsigned char) ;
-  ok = TRUE ;
-#ifdef VECTORIZED_MEM_CPY
-  while (x1 > 16 && a1 > 16)
-    {
-      __m128i v1 = _mm_loadu_si128((__m128i*)(cp - 16));
-      __m128i v2 = _mm_loadu_si128((__m128i*)(cq - 16));
-      __m128i cmp = _mm_cmpeq_epi8(v1, v2);
-      int mask = _mm_movemask_epi8(cmp);
-      if (mask != 0xffff)
-	break ;
-      else
-        { cp -= 16; cq -= 16; x1 -= 16; a1 -= 16; }
-    }
-#endif
-  // Byte-wise to end
-  while (x1 > 1 && a1 > 1 && *cp == *cq)
-    { cp--; cq--; x1-- ; a1-- ; }
-  *a1p = a1 ; *a2p = a2 ; *x1p = x1 ; *x2p = x2 ;    
-} /* extendExact */
 
 /**************************************************************/
 
@@ -3841,19 +3254,6 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 
   errMax = isIntron ? 0 : errMax ;
   
-  if (0 && errMax == 0) /* faster code, actually slower oniRefSeq and gives very poor number of bases aligned */
-    {
-      if (isDown)
-	extendExact(dna, x1p, x2p, dnaG, a1p, a2p) ;
-      else
-	{
-	  *a1p = chromLength - *a1p + 1 ; *a2p = chromLength - *a2p + 1 ;
-	  extendExact(dna, x1p, x2p, dnaGR, a1p, a2p) ;
-	  *a1p = chromLength - *a1p + 1 ; *a2p = chromLength - *a2p + 1 ;
-	}
-      dx = *x2p - *x1p + 1 ;
-      goto done ;
-    }
   
 
   if (! isDown)
@@ -3944,8 +3344,6 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
   *x1p = x1 ; *x2p = x2 ;
   *a1p = a1 ; *a2p = a2 ;
   dx = x2 - x1 + 1 ;
-  
- done:
 
   minAli = isIntron ? 8 : 22 ;
   if (dx < minAli)
@@ -6490,7 +5888,7 @@ static void alignDo (const PP *pp, BB *bb)
 		  arrayMax (aa) = arrayMax (err) = 0 ;
 		  /* switch chroms and reorder */
 		  if (0) hits2 = bb->hits ;
-		  newMsort (hits2, hitReadOrder) ;
+		  saSort (hits2, 2) ; /* hitReadOrder */
 		  if (0)  showCountChroms (countChroms) ;
 
 		  alignDoOnePair (pp, bb, aaa, hits2, aa, err) ;
@@ -7295,7 +6693,7 @@ static void wholeWork (const void *vp)
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
 	if (bb.cwsN[k])
-	  newMsort (bb.cwsN[k], cwOrder) ;
+	  saSort (bb.cwsN[k], 1) ; /* cwOrder */
       
       /* match hits */
       if (bb.length)
@@ -7306,7 +6704,7 @@ static void wholeWork (const void *vp)
       if (pp->align && bb.hits)
 	{
 	  sortHitsFuse (pp, &bb) ;
-	  newMsort (bb.hits, hitPairOrder) ;
+	  saSort (bb.hits, 3) ; /* hitPairOrder */
 	  alignDo (pp, &bb) ;
 	}
 
@@ -8426,7 +7824,7 @@ int main (int argc, const char *argv[])
 	bigArray (a, i, HIT).read = ( !(n &0x1) ? (n - i)%7 :  (unsigned int)randint()) ;  
 
       b = bigArrayHandleCopy (a, 0) ;
-      newMsort (b, hitReadOrder) ;
+      saSort (b, 2) ; /* hitReadOrder */
       
       for (int i = 0 ; i < 50 && i < n ; i++)
 	printf("%d %d\n"

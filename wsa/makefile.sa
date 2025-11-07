@@ -96,7 +96,7 @@ COMPILE.c = $(COMPILER) $(USEROPTS) $(IDIR) -DAC_TEST -D$(NAME) -D_FILE_OFFSET_B
 #################################################################
 #################################################################
 
-ALL_SA_OBJS = sortalign.o
+ALL_SA_OBJS = sortalign.o sa_sort.o
 	
 ALL_SA_SOURCES =  $(ALL_SA_OBJS:.o=.c) 
 
@@ -109,8 +109,8 @@ all: sortalign
 libsraread.a:
 	$(MAKE) -C ../wsra
 	ln -s ../wsra/libsraread.a .
-sortalign: sortalign.o libsraread.a
-	$(LINKER) -o $@  $@.o $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
+sortalign: sortalign.o libsraread.a sa_sort.o
+	$(LINKER) -o $@  $@.o sa_sort.o $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
 
 ###########################################################
 ########### end of     acedb makefile.sa  ################
