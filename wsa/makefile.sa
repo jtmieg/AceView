@@ -96,7 +96,9 @@ COMPILE.c = $(COMPILER) $(USEROPTS) $(IDIR) -DAC_TEST -D$(NAME) -D_FILE_OFFSET_B
 #################################################################
 #################################################################
 
-SA_OBJS = sa.main.o sa.sort.o sa.sam.o sa.config.o
+SA_OBJS = sa.main.o sa.sort.o sa.sam.o sa.config.o \
+	sa.introns.o sa.wiggle.c sa.gff.o sa.targetIndex.o \
+	sa.seeds.o sa.sequenceParser.o
 	
 SA_SOURCES =  $(SA_OBJS:.o=.c) 
 

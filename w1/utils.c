@@ -2117,6 +2117,33 @@ int regExpMatch (const char *data, const char *pattern)
   return ok ;
 } /* regExpMatch  */
 
+/*************************************************************************************/
+/*  Check if executable exists in PATH */
+BOOL isExecutableInPath (const char *name)
+{
+  const char *path = getenv("PATH") ;
+  if (!path)
+    return FALSE ;
+  char *path_copy = strdup(path) ;
+  if (path_copy)
+    {
+      char *dir = strtok(path_copy, ":") ;
+      while (dir)
+	{
+	  char full_path[1024] ;
+	  snprintf (full_path, sizeof(full_path), "%s/%s", dir, name) ;
+	  if (access(full_path, X_OK) == 0)
+	    {
+	      free (path_copy) ;
+	      return TRUE ;
+	    }
+	  dir = strtok (NULL, ":") ;
+	}
+      free (path_copy) ;
+    }
+  return FALSE ;
+} /* isExecutableInPath */
+
 /*******************************************************************/
 /************************* end of file ****************************/
 /*******************************************************************/

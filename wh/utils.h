@@ -32,6 +32,8 @@
 #ifndef UTILS_DEF
 #define UTILS_DEF
 
+BOOL isExecutableInPath (const char *name) ;
+
 /* case-insensitive version of strstr */
 char *strcasestr (char *str1, char *str2);
 /* Wrapper to allow lexstrcmp to be used with arraySort.y */
