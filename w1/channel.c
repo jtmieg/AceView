@@ -80,7 +80,7 @@ int channelCount (CHAN *c)
     }
 
   return n ;
-} /* channelNget */
+} /* channelCount */
 
 /*******************************************************************************************************/
 
@@ -123,7 +123,7 @@ void channelCloseAt (CHAN *c, int nGet)
 	}
       pthread_mutex_unlock (&(c->c.mutex)) ;
     }
-} /* chanClose */
+} /* chanCloseAt */
 
 /*******************************************************************************************************/
 
