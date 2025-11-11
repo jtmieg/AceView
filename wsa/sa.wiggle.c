@@ -110,7 +110,7 @@ static void wiggleExportOne (const PP *pp, int nn)
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
   int run = nn / (2 * chromMax) ;
   int chrom = (nn % (2 * chromMax)) >> 1 ;
-  char strand = ( nn & 0x1) ? 'f' : 'r' ;
+  char strand = ( nn & 0x1) ? 'r' : 'f' ;
   
   if (wig && arrayMax (wig))
     {
