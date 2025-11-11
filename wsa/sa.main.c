@@ -4603,45 +4603,6 @@ int main (int argc, const char *argv[])
 	  if (p.wiggle) saWiggleCumulate (&p, &bb) ;
 	}
       
-      /* recycle the unaligned reads */
-#ifdef JUNK
-      if (bb->step > 1)
-	{
-	  BB b, *bbR ;
-	  bbR = &b ;
-	  memset (bbR, 0, sizeof (BB)) ;
-	  bbR->h = ac_new_handle () ;
-	  bbR->readerAgent = bb->agent ;
-	  bbR->lane = 1000 + bb->lane ;
-	  bbR->txt1 = vtxtHandleCreate (bbR->h) ;
-	  bbR->txt2 = vtxtHandleCreate (bbR->h) ;
-	  bbR->errors = arrayHandleCreate (256, int, bbR->h) ;
-	  bbR->cpuStats = arrayHandleCreate (128, CpuSTAT, bbR->h) ;
-	  bbR->run = bb->run ;
-	  bbR->length = 0 ;
-	  bbR->dnas = arrayHandleCreate (64, BigArray, bbR->h) ;
-	  bbR->dict = dictHandleCreate (NMAX, bbR->h) ;
-	  bbR->errDict = dictHandleCreate (NMAX, bbR->h) ;
-
-	  for (int ii = 1 ; ii < bb->nSeqs ; ii++)
-	    if (! bitt(bb->isAligned, ii))
-	      {
-		int k = 0 ;
-		bbR->nSeqs++ ;
-		dictAdd (bbR->dict, dictName (bb->dict, ii >>1), &k) ;
-		k = k << 1 | (ii & 0x1) ;
-		array (bbR->dnas, k, Array) = arrayHandleCopy (array (bb->dnas, ii, Array), bbR->h) ;
-	      }
-	  if (! bbR->nSeqs)
-	    ac_free (bbR->h) ;
-	  else
-	    {
-
-
-	    }
-
-	}
-#endif
       /* release block  memory */
       if (bb.dnas)
 	{

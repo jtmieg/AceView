@@ -18,36 +18,21 @@
  */
 
 #define WIGGLETYPEMAX 2 /* strand */
-  #define ARRAY_CHECK
-  #define MALLOC_CHECK
 #include "sa.h"
-
-/**************************************************************/
-
-static int wiggleOrder (const void *va, const void *vb)
-{
-  const ALIGN *up = va ;
-  const ALIGN *vp = vb ;
-  int n ;
-  n = up->chrom - vp->chrom ; if (n) return n ;
-  n = up->w1 - vp->w1  ; if (n) return n ;
-
-  return 0 ;
-} /* wiggleOrder */
 
 /*************************************************************************************/
 
-void wiggleCumulate (Array aaa, Array aa)
+void wiggleCumulate (BigArray aaa, BigArray aa)
 {
-  int i, iMax = arrayMax (aa) ;
+  long int i, iMax = bigArrayMax (aa) ;
   if (iMax)
     {
-      i = array (aaa, iMax - 1, int) ; /* make room */
+      i = bigArray (aaa, iMax - 1, int) ; /* make room */
       for (i = 0 ; i < iMax ; i++)
-	array (aaa, i, int) += arr (aa, i, int) ;
+	bigArray (aaa, i, int) += bigArr (aa, i, int) ;
     }
   return ;
-}
+} /* wiggleCumulate */
   
 /**************************************************************/
   
@@ -56,10 +41,11 @@ static int wiggleCreate (const PP *pp, BB *bb)
   ALIGN *ap ;
   long int ii, iMax = bigArrayMax (bb->aligns) ;
   int chrom = 0 ;
-  Array wig = 0 ;
+  BigArray wig = 0 ;
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
-  Array wiggles = bb->wiggles = arrayHandleCreate (2 * chromMax, Array, bb->h) ;
-  
+  Array wiggles = bb->wiggles = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
+
+  saSort (bb->aligns, 4) ;
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
     {
       int w1 = ap->w1, w2 = ap->w2 ;
@@ -74,14 +60,14 @@ static int wiggleCreate (const PP *pp, BB *bb)
 	  chrom = ap->chrom ;
 	  if (*dictName (pp->bbG.dict, chrom >> 1) == 'G')
 	    {
-	      wig = array (wiggles, chrom, Array) ;
+	      wig = array (wiggles, chrom, BigArray) ;
 	      if (! wig)
-		wig = array (wiggles,  chrom, Array) = arrayHandleCreate (100000, int, bb->h) ;
+		wig = array (wiggles,  chrom, BigArray) = bigArrayHandleCreate (100000, int, bb->h) ;
 	    }
 	}
       if (wig && w1 < w2)
 	for (int i = w1 ; i <= w2 ; i++)
-	  array (wig, i, int) += weight ;
+	  bigArray (wig, i, int) += weight ;
     }
   return  arrayMax (wiggles) ;
 } /* wiggleCreate */
@@ -93,23 +79,23 @@ void saWiggleCumulate (const PP *pp, BB *bb)
   Array wiggles = pp->wiggles ;
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
   int iwMax = wiggleCreate (pp, bb) ;
-  Array *ap1, *ap0 = arrp (wiggles, 0, Array) ;
+  BigArray *ap1, *ap0 = arrp (wiggles, 0, BigArray) ;
 
   if (iwMax > 2 * chromMax) messcrash ("iwMax too large ?") ;
   for (int iw = 0 ; iw < iwMax ; iw++)
     {
-      Array aa = array (bb->wiggles, iw, Array) ;
+      BigArray aa = array (bb->wiggles, iw, BigArray) ;
 
       if (aa)
 	{
-	  Array aaa = array (wiggles, 2 * bb->run * chromMax + iw, Array) ;
+	  BigArray aaa = array (wiggles, 2 * bb->run * chromMax + iw, BigArray) ;
 	  if (! aaa)
-	    aaa = array (wiggles, 2 * bb->run * chromMax + iw, Array) = arrayHandleCreate (100000, int, pp->h) ;
-	  arraySort (aa, wiggleOrder) ;
+	    aaa = array (wiggles, 2 * bb->run * chromMax + iw, BigArray) = bigArrayHandleCreate (100000, int, pp->h) ;
+	  saSort (aa, 4) ;
 	  wiggleCumulate (aaa, aa) ;
 	}
     }
-  ap1 = arrp (wiggles, 0, Array) ;
+  ap1 = arrp (wiggles, 0, BigArray) ;
   if (ap1 != ap0)
     messcrash ("pp->wiggles was relocalized which is not allowed here because of multiuthreading") ;
   return ;
@@ -120,19 +106,25 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 static void wiggleExportOne (const PP *pp, int nn)
 {
   int step = WIGGLE_STEP ;
-  Array wig = array (pp->wiggles, nn, Array) ;
+  BigArray wig = array (pp->wiggles, nn, BigArray) ;
+  int chromMax = dictMax (pp->bbG.dict) + 1 ;
+  int run = nn / (2 * chromMax) ;
+  int chrom = (nn % (2 * chromMax)) >> 1 ;
+  char strand = ( nn & 0x1) ? 'f' : 'r' ;
+  
   if (wig && arrayMax (wig))
     {
       AC_HANDLE h = ac_new_handle () ;
-      const char *chrom = dictName (pp->bbG.dict, nn >> 1) ;
-      char *fNam = hprintf (h, ".any.%s.u.%s.BF", chrom, (nn & 0x1 ? "r" : "f")) ;
+      const char *chromNam = dictName (pp->bbG.dict, chrom) ;
+      const char *runNam = dictName (pp->runDict, run) ;
+      char *fNam = hprintf (h, ".%s.%s.u.%c.BF", runNam, chromNam, strand) ;
       ACEOUT ao = aceOutCreate (pp->outFileName, fNam, pp->gzo, h) ;
       aceOutDate (ao, "##", "wiggle") ;
       aceOutf (ao, "track type=wiggle_0\n") ;
-      aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chrom, step, step) ;
+      aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, step, step) ;
       
-      for (int jj = 1 ; jj < arrayMax (wig) ; jj++)
-	aceOutf (ao, "%d\n", array (wig, jj, int)) ;
+      for (long int jj = 1 ; jj < bigArrayMax (wig) ; jj++)
+	aceOutf (ao, "%d\n", bigArr (wig, jj, int)) ;
       ac_free (h) ;
     }
 

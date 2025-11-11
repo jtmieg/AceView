@@ -76,6 +76,19 @@ static inline int hitPairOrder (const void *va, const void *vb)
 } /* hitPairOrder */
 
 /**************************************************************/
+
+static inline int shadowOrder (const void *va, const void *vb)
+{
+  const ALIGN *up = va ;
+  const ALIGN *vp = vb ;
+  int n ;
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  n = up->w1 - vp->w1  ; if (n) return n ;
+
+  return 0 ;
+} /* wiggleOrder */
+
+/**************************************************************/
 /**************************************************************/
 /* saSort algorithm minimizing memcpy */
 
@@ -249,6 +262,11 @@ void saSort (BigArray aa, int type)
     case 3:
       cmp = hitPairOrder ;
       break ;
+    case 4:
+      cmp = shadowOrder ;
+      break ;
+    default:
+      messcrash ("Wrong call to saSort typw = %dd>4", type) ;
     }
   if (N <= 1) return;
   else if (N < 128)
