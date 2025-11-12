@@ -554,7 +554,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	  else if (sscanf (ccp, "nM:i:%d%c", &n_, &c_) == 1)
 	    nerr = n_ ;	      
 	}
-      if (nerr >= del) nerr -= del ;
+      /* if (nerr >= del) nerr -= del ; */
       if (0)
 	{
 	  if (isMulti == 1)  /* first  primary alignment */

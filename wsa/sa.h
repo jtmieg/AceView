@@ -63,6 +63,7 @@ typedef struct runClassStruct {
   const char *fileName1 ;
   const char *fileName2 ;
   atomic_int lane ;
+  atomic_int laneDone ;
   ACEOUT aoSam ;
 } RC ;
 		  
@@ -179,6 +180,8 @@ typedef struct pStruct {
 
   BB bbG ;  /* genome or genes target */
   Array runStats ;
+  Array runLanes ;
+  Array runLanesDone ;
   BigArray intronSeeds ;
   BigArray exonSeeds ;
   Array wiggles ;

@@ -67,6 +67,7 @@ struct channelStruct1 {
   int in ;                  /* cell number, modulo cMax, where channelPut will write the next incoming record */
   int out ;                 /* cell number, modulo cMax, where channelGet will read the next exportedg record */
   int nPut1, nPut2, nGet ;  /* global counters */
+  int nSources ;            /* used by channelAddSources and by channelCloseSource */
   char title[24] ;
   BOOL isClosed ;
   BOOL debug ;

@@ -35,6 +35,19 @@ void wiggleCumulate (BigArray aaa, BigArray aa)
 } /* wiggleCumulate */
   
 /**************************************************************/
+
+static int shadowOrder2 (const void *va, const void *vb)
+{
+  const ALIGN *up = va ;
+  const ALIGN *vp = vb ;
+  int n ;
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  n = up->w1 - vp->w1  ; if (n) return n ;
+
+  return 0 ;
+} /* wiggleOrder */
+
+/**************************************************************/
   
 static int wiggleCreate (const PP *pp, BB *bb)
 {
@@ -45,7 +58,10 @@ static int wiggleCreate (const PP *pp, BB *bb)
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
   Array wiggles = bb->wiggles = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
 
-  saSort (bb->aligns, 4) ;
+  if (0)
+    saSort (bb->aligns, 4) ;
+  else
+    bigArraySort (bb->aligns, shadowOrder2) ;
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
     {
       int w1 = ap->w1, w2 = ap->w2 ;
@@ -65,6 +81,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
 		wig = array (wiggles,  chrom, BigArray) = bigArrayHandleCreate (100000, int, bb->h) ;
 	    }
 	}
+      if (w1 > w2) { int w0 = w1 ; w1 = w2 ; w2 = w0 ; }
       if (wig && w1 < w2)
 	for (int i = w1 ; i <= w2 ; i++)
 	  bigArray (wig, i, int) += weight ;
@@ -143,6 +160,7 @@ void wiggleExportAgent (const void *vp)
       wiggleExportOne (pp, nn) ;
       channelPut (pp->wwDoneChan, &nn, int) ;
     }
+  channelCloseSource (pp->wwDoneChan) ;
   return ;
 } /* wiggleExportAgent */
 
@@ -165,7 +183,7 @@ void saWiggleExport (PP *pp, int nAgents)
   for (int ii = 0 ; ii < nAgents ; ii++)
     {
       pp->agent = ii ;
-      wego_go (wiggleExportAgent, pp, PP) ;
+      wego_go (wiggleExportAgent, pp, PP) ; channelAddSources (pp->wwDoneChan, 1) ;
     }
   
   /* load the channel to start execution */ 
@@ -183,11 +201,9 @@ void saWiggleExport (PP *pp, int nAgents)
   channelClose (pp->wwChan) ;
 
   /* synchronize */
-  while (n < nn)
-    {
-      channelGet (pp->wwDoneChan, &k, int) ;
-      n++ ;
-    }
+  while (channelGet (pp->wwDoneChan, &k, int))
+    n++ ;
+
   fprintf (stderr, "%s: stop wiggle export\n", timeBufShowNow (tBuf)) ;
   ac_free (h) ;
   return ;

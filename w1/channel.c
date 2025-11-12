@@ -127,6 +127,64 @@ void channelCloseAt (CHAN *c, int nGet)
 
 /*******************************************************************************************************/
 
+void channelAddSources (CHAN *c, int nSources)
+{
+  if (c && nSources >= 0)
+    {
+      pthread_mutex_lock (&(c->c.mutex)) ;
+      if (c->c.debug)
+	fprintf (stderr, "channel %s add %d sources, new total %d\n"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 , nSources, c->c.nSources + nSources
+		 ) ;
+      if (! c->c.isClosed)
+	c->c.nSources += nSources ;
+      else
+	messcrash ("channel %s Add %d Sources called on closed channel"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 , nSources
+		 ) ;
+      pthread_mutex_unlock (&(c->c.mutex)) ;
+    }
+} /* chanAddSources */
+
+/*******************************************************************************************************/
+
+void channelCloseSource (CHAN *c)
+{
+  if (c)
+    {
+      pthread_mutex_lock (&(c->c.mutex)) ;
+      if (c->c.debug)
+	fprintf (stderr, "channel %s received closeSources, %d remaining sources"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 , c->c.nSources - 1
+		 ) ;
+      if (! c->c.isClosed)
+	c->c.nSources-- ;
+      else
+	messcrash ("channel %s closeSource called on closed channel"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 ) ;
+      if (c->c.nSources < 0)
+	messcrash ("channel %s closeSources called beyond the number of added sources"
+		 , c->c.title[0] ? c->c.title : "no-name"
+		 ) ;
+      if (c->c.nSources == 0)
+	{
+	  c->c.isClosed = TRUE ;
+	  if (c->c.debug)
+	    fprintf (stderr, " - Closing channel %s\n"
+		     , c->c.title[0] ? c->c.title : "no-name"
+		     ) ;
+	  pthread_cond_signal(&(c->c.notEmpty)) ;
+	}
+      pthread_mutex_unlock (&(c->c.mutex)) ;
+    }
+} /* chanCloseAt */
+
+/*******************************************************************************************************/
+
 static void uChannelDestroy (void *vp)
 {
   CHAN *c = (CHAN *) vp ;

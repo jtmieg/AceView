@@ -335,7 +335,7 @@ static void npCounter (const void *vp)
 	      timeBufShowNow (tBuf), ++n, nf, nPuts, nn) ;
     }
   printf ("--- %s: npCounter Processed %d files, closing pcChan at %d blocks\n", timeBufShowNow (tBuf), nf, nn) ;
-  channelCloseAt (pp->plChan, nn) ;
+  channelCloseSource  (pp->plChan) ;
   return ;
 } /* npCounter */
 
@@ -427,10 +427,11 @@ static void codeWords (const void *vp)
   while (channelGet (pp->lcChan, &bb, BB))
     {
       long int nn= 0 ;
+
       if (pp->debug) printf ("+++ %s: Start code words\n", timeBufShowNow (tBuf)) ;
 
       t1 = clock () ;
-      parseReadsDo (pp, &bb, pp->iStep, FALSE) ;
+      saSequenceParseGzBuffer (pp, &bb) ;
       saCodeSequenceSeeds (pp, &bb, pp->iStep, FALSE) ;
       t2 = clock () ;
 
@@ -442,12 +443,13 @@ static void codeWords (const void *vp)
 
       channelPut (pp->csChan, &bb, BB) ;
     }
-  if (1)
-    {
-      int n = channelCount (pp->plChan) ;
-      if (pp->debug) printf ("..... close csChan at %d,  coded %ld words\n", n, nnn) ;
-      channelCloseAt (pp->csChan, n) ;
-    }
+
+  int n = channelCount (pp->plChan) ;
+  if (pp->debug) printf ("..... close csChan at %d,  coded %ld words\n", n, nnn) ;
+  if (0)
+    channelCloseAt (pp->csChan, n) ;
+  else
+    channelCloseSource (pp->csChan) ;
 
   return ;
 } /* codeWords */
@@ -464,11 +466,14 @@ static void sortWords (const void *vp)
   char tBuf[25] ;
   long int nnn = 0 ;
   clock_t  t1, t2 ;
-	    
+  int k ;
+  
   memset (&bb, 0, sizeof (BB)) ;
-  while (channelGet (pp->csChan, &bb, BB))
+  while ((k = channelGet (pp->csChan, &bb, BB)))
     {
-      if (1)
+      if (k < 0)
+	sleep (1) ;
+      else
 	{
 	  long int nn = 0 ;
 	  if (pp->debug) printf ("+++ %s: Start sort words\n", timeBufShowNow (tBuf)) ;
@@ -484,16 +489,17 @@ static void sortWords (const void *vp)
 	
 	  saCpuStatRegister ("4.SortWords", pp->agent, bb.cpuStats, t1, t2, nn) ;
 	  if (pp->debug) printf ("--- %s: Stop sort words %ld\n", timeBufShowNow (tBuf), bigArrayMax (bb.cwsN[0])) ;
+	  channelPut (pp->smChan, &bb, BB) ;
 	}
-      channelPut (pp->smChan, &bb, BB) ;
+    }
 
-    }
-  if (1)
-    {
-      int n = channelCount (pp->plChan) ;
-      if (pp->debug) printf ("..... close smChan at %d,  sorted %ld words\n", n, nnn) ;
-      channelCloseAt (pp->smChan, n) ;
-    }
+  int n = channelCount (pp->plChan) ;
+  if (pp->debug) printf ("..... close smChan at %d,  sorted %ld words\n", n, nnn) ;
+  
+  if (0)
+    channelCloseAt (pp->smChan, n) ;
+  else
+    channelCloseSource (pp->smChan) ;
 
   return ;
 } /* sortWords */
@@ -807,12 +813,13 @@ static void matchHits (const void *vp)
 	}
       channelPut (pp->moChan, &bb, BB) ;
     }
-  if (1)
-    {
-      int n = channelCount (pp->plChan) ;
-      if (pp->debug) printf ("..... close moChan at %d,  found %ld hits\n", n, nnn) ;
-      channelCloseAt (pp->moChan, n) ;
-    }
+
+  int n = channelCount (pp->plChan) ;
+  if (pp->debug) printf ("..... close moChan at %d,  found %ld hits\n", n, nnn) ;
+  if (0)
+    channelCloseAt (pp->moChan, n) ;
+  else
+    channelCloseSource (pp->moChan) ;
 
   return ;
 } /* matchHits */
@@ -957,10 +964,16 @@ static void sortHits (const void *vp)
       memset (&bb, 0, sizeof (BB)) ;
       bb.isGenome = TRUE ;
       channelPut (pp->doneChan, &bb, BB) ; /* destroy bbG.cws, all Matches are already computed */ 
-
+    }
+  if (0)
+    {
       int n = channelCount (pp->plChan) ;
-      if (pp->debug) printf ("..... close oaChan at %d,  sorted %ld hits\n", n, nnn) ;
       channelCloseAt (pp->oaChan, n) ;
+    }
+  else
+    {
+      channelCloseSource (pp->oaChan) ;
+      channelCloseSource (pp->doneChan) ;
     }
   return ;
 } /* sortHits */
@@ -3162,13 +3175,15 @@ static void align (const void *vp)
 	}
       channelPut (pp->aeChan, &bb, BB) ;
     }
-  
-  if (1)
-    {
-      int n = channelCount (pp->plChan) ;
-      if (pp->debug) printf ("..... close aeChan at %d,  found %ld ali\n", n, nnn) ;
-      channelCloseAt (pp->aeChan, n) ;
-    }
+
+  int n = channelCount (pp->plChan) ;
+  if (pp->debug) printf ("..... close aeChan at %d,  found %ld ali\n", n, nnn) ;
+
+  if (0)
+    channelCloseAt (pp->aeChan, n) ;
+  else
+    channelCloseSource (pp->aeChan) ;
+
   return ;
 } /* align */
 #endif
@@ -3308,8 +3323,7 @@ static void export (const void *vp)
   int n, nn = 0 ;
   float nG = 0 ;
 
-  if (pp->agent != 0) /* sequential agent */
-    return ;
+
   AC_HANDLE h = ac_new_handle () ;
   int runMax = dictMax (pp->runDict) ;
   ACEOUT aos[runMax + 1]  ;
@@ -3348,8 +3362,11 @@ static void export (const void *vp)
 
   n = channelCount (pp->plChan) ;
   printf ("--- %s: Export closes doneChan at %d\n", timeBufShowNow (tBuf), n) ;
-  channelCloseAt (pp->doneChan, n) ;
-
+  if (0)
+    channelCloseAt (pp->doneChan, n) ;
+  else
+    channelCloseSource (pp->doneChan) ;
+  
   ac_free (h) ;
   return ;
 } /* export */
@@ -3430,11 +3447,14 @@ static void wholeWork (const void *vp)
       saCpuStatRegister ("5.WholeWork", pp->agent, bb.cpuStats, t1, t2, nnn) ;
       channelPut (pp->aeChan, &bb, BB) ;
     }
-  if (1)
+
+  if (0)
     {
       int n = channelCount (pp->plChan) ;
       channelCloseAt (pp->aeChan, n) ;
     }
+  else
+    channelCloseSource (pp->aeChan) ;
 
   return ;
 } /* wholeWork */
@@ -4417,7 +4437,12 @@ int main (int argc, const char *argv[])
 
   /* check the existence of the input sequence files */
   inArray = saConfigGetRuns (&p, runStats) ;
-
+  n = dictMax (p.runDict) + 1 ;
+  p.runLanes = arrayHandleCreate (n, atomic_int, p.h) ;
+  p.runLanesDone = arrayHandleCreate (n, atomic_int, p.h) ;
+  array (p.runLanes, n - 1, atomic_int) = 0 ;
+  array (p.runLanesDone, n - 1, atomic_int) = 0 ;
+  
   /******************** launch the multiprocessing ***************************************/
 
   wego_max_threads (maxThreads) ;
@@ -4478,23 +4503,23 @@ int main (int argc, const char *argv[])
        * and recurssibvely all program layers
        * to close after having processed N BB blocks
        */
-      wego_go (npCounter, &p, PP) ;
-      channelCloseAt (p.npChan, p.nFiles) ; /* close the counter of BB blocks */
-      
+      wego_go (npCounter, &p, PP) ; channelAddSources (p.plChan, 1) ;
       /* Read preprocessing agents, they do not require the genome */
       for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
 	{
 	  fprintf (stderr, "Launch readParser %d\n", i) ;
 	  p.agent = i ;
-	  wego_go (readParser, &p, PP) ;
+	  wego_go (readParser, &p, PP) ; channelAddSources (p.npChan, 1) ;
 	}
+      if (0)
+	channelCloseAt (p.npChan, p.nFiles) ; /* close the counter of BB blocks */
       for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
 	{
 	  p.agent = i ;
 
 #ifndef YANN
-	  wego_go (codeWords, &p, PP) ;
-	  wego_go (sortWords, &p, PP) ;
+	  wego_go (codeWords, &p, PP) ; channelAddSources (p.csChan, 1) ;
+	  wego_go (sortWords, &p, PP) ; channelAddSources (p.smChan, 1) ;
 #endif
 	}
 
@@ -4522,10 +4547,16 @@ int main (int argc, const char *argv[])
 	  p.agent = i ;
 #ifdef YANN
 	  wego_go (wholeWork, &p, PP) ;
+	  channelAddSources (p.aeChan, 1) ;
 #else
 
 	  wego_go (matchHits, &p, PP) ;
+	  channelAddSources (p.moChan, 1) ;
+		  
 	  wego_go (sortHits, &p, PP) ;
+	  channelAddSources (p.oaChan, 1) ;
+	  channelAddSources (p.doneChan, 1) ;
+	      
 	  if (!i || p.align) /* at least 1 agent */
 	    {
 	      p.agent = 3*i ;
@@ -4535,10 +4566,14 @@ int main (int argc, const char *argv[])
 	      p.agent = 3*i + 2 ;
 	      wego_go (align, &p, PP) ;
 	      p.agent = i ;
+	      channelAddSources (p.aeChan, 3) ;
 	    }
 #endif
 	  if (! p.sam || !i) /* only 1 export agent in sam case */
-	    wego_go (export, &p, PP) ;
+	    {
+	      wego_go (export, &p, PP) ;
+	      channelAddSources (p.doneChan, 1) ;
+	    }
 	}
     }
 
@@ -4555,7 +4590,8 @@ int main (int argc, const char *argv[])
   while (channelGet (p.doneChan, &bb, BB))
     {
       long int n = (bb.hits ? bigArrayMax (bb.hits) : 0) ;
-
+      int laneToDo ;
+      int laneDone ;
       if (bb.isGenome && p.bbG.cwsN)
 	{
 	  cpuStatCumulate (cpuStats, p.bbG.cpuStats) ;
@@ -4603,6 +4639,14 @@ int main (int argc, const char *argv[])
 	  if (p.wiggle) saWiggleCumulate (&p, &bb) ;
 	}
       
+      laneToDo = atomic_fetch_add (arrp (p.runLanes, bb.run, atomic_int), 0) + 0 ;
+      laneDone = atomic_fetch_add (arrp (p.runLanesDone, bb.run, atomic_int), 1) + 1 ;
+
+      if (laneToDo == laneDone)
+	{
+	  fprintf (stderr, "run %s done\n", dictName (p.runDict, bb.run)) ;
+	}
+
       /* release block  memory */
       if (bb.dnas)
 	{
@@ -4631,7 +4675,7 @@ int main (int argc, const char *argv[])
 	      arr (bb.quals, i, Array) = 0 ;
 	    }
 	}
-      if (1)
+      if (bb.run)
 	{
 	  int ns = 0 ;
 	  char tBuf[25], tBuf2[25] ;

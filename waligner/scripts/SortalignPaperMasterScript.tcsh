@@ -962,6 +962,9 @@ foreach run ($allRuns)
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam_sorted.gz
       if (! -e $sam) continue
 
+      
+      samtools stat $sam | awk -f scripts/sam_stats.awk 
+
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" > 	RESULTS/$mm/$run/sam2gold.out					

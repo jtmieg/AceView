@@ -102,6 +102,7 @@ SA_OBJS = sa.main.o sa.sort.o sa.sam.o sa.config.o \
 	
 SA_SOURCES =  $(SA_OBJS:.o=.c) 
 
+
 $(SA_SOURCES)  :
 	$(TEST) -L $@ || ln -s ../wsa/$@ . 
 

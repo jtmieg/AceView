@@ -405,7 +405,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
     }
   
   return ;
-} /* parseReadsDo */
+} /* saSequenceParseGzBuffer */
 
 /**************************************************************/
 /* aug 2
@@ -504,7 +504,12 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
-      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
+      /*
+	bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
+      */
+
+      bb->lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 1) + 1 ;
+
       bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
       bb->rc.fileName1 = fileName1 ;
       /* copy the buffer */
@@ -629,8 +634,7 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
-      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
-      bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
+      bb->lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 1) + 1 ;
       bb->rc.fileName1 = sraID ;
       /* copy the buffer */
       bb->gzBuffer = halloc (bytes + 1, bb->h) ;
@@ -712,7 +716,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb = &b ;
       bb->readerAgent = pp->agent ;
       bb->start = timeNow () ;
-      bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
+      bb->lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 1) + 1 ;
       memset (bb, 0, sizeof (BB)) ;
       chan = pp->plChan ;
       namBufX = namBuf ;
@@ -899,7 +903,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	  nn = 0 ;
 	  bb->readerAgent = pp->agent ;
 	  bb->start = timeNow () ;
-	  bb->lane = atomic_fetch_add (rc ? &(rc->lane) : &lane, 1) + 1 ;
+	  bb->lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 1) + 1 ;
 	  bb->h = ac_new_handle () ;
 	  bb->txt1 = vtxtHandleCreate (bb->h) ;
 	  bb->txt2 = vtxtHandleCreate (bb->h) ;
