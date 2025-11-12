@@ -446,10 +446,7 @@ static void codeWords (const void *vp)
 
   int n = channelCount (pp->plChan) ;
   if (pp->debug) printf ("..... close csChan at %d,  coded %ld words\n", n, nnn) ;
-  if (0)
-    channelCloseAt (pp->csChan, n) ;
-  else
-    channelCloseSource (pp->csChan) ;
+  channelCloseSource (pp->csChan) ;
 
   return ;
 } /* codeWords */
@@ -496,10 +493,7 @@ static void sortWords (const void *vp)
   int n = channelCount (pp->plChan) ;
   if (pp->debug) printf ("..... close smChan at %d,  sorted %ld words\n", n, nnn) ;
   
-  if (0)
-    channelCloseAt (pp->smChan, n) ;
-  else
-    channelCloseSource (pp->smChan) ;
+  channelCloseSource (pp->smChan) ;
 
   return ;
 } /* sortWords */
@@ -816,10 +810,7 @@ static void matchHits (const void *vp)
 
   int n = channelCount (pp->plChan) ;
   if (pp->debug) printf ("..... close moChan at %d,  found %ld hits\n", n, nnn) ;
-  if (0)
-    channelCloseAt (pp->moChan, n) ;
-  else
-    channelCloseSource (pp->moChan) ;
+  channelCloseSource (pp->moChan) ;
 
   return ;
 } /* matchHits */
@@ -965,16 +956,9 @@ static void sortHits (const void *vp)
       bb.isGenome = TRUE ;
       channelPut (pp->doneChan, &bb, BB) ; /* destroy bbG.cws, all Matches are already computed */ 
     }
-  if (0)
-    {
-      int n = channelCount (pp->plChan) ;
-      channelCloseAt (pp->oaChan, n) ;
-    }
-  else
-    {
-      channelCloseSource (pp->oaChan) ;
-      channelCloseSource (pp->doneChan) ;
-    }
+  channelCloseSource (pp->oaChan) ;
+  channelCloseSource (pp->doneChan) ;
+  
   return ;
 } /* sortHits */
 #endif
@@ -3179,10 +3163,7 @@ static void align (const void *vp)
   int n = channelCount (pp->plChan) ;
   if (pp->debug) printf ("..... close aeChan at %d,  found %ld ali\n", n, nnn) ;
 
-  if (0)
-    channelCloseAt (pp->aeChan, n) ;
-  else
-    channelCloseSource (pp->aeChan) ;
+  channelCloseSource (pp->aeChan) ;
 
   return ;
 } /* align */
@@ -3361,11 +3342,8 @@ static void export (const void *vp)
     }
 
   n = channelCount (pp->plChan) ;
-  printf ("--- %s: Export closes doneChan at %d\n", timeBufShowNow (tBuf), n) ;
-  if (0)
-    channelCloseAt (pp->doneChan, n) ;
-  else
-    channelCloseSource (pp->doneChan) ;
+  if (0) printf ("--- %s: Export closes doneChan at %d\n", timeBufShowNow (tBuf), n) ;
+  channelCloseSource (pp->doneChan) ;
   
   ac_free (h) ;
   return ;
@@ -3448,13 +3426,7 @@ static void wholeWork (const void *vp)
       channelPut (pp->aeChan, &bb, BB) ;
     }
 
-  if (0)
-    {
-      int n = channelCount (pp->plChan) ;
-      channelCloseAt (pp->aeChan, n) ;
-    }
-  else
-    channelCloseSource (pp->aeChan) ;
+  channelCloseSource (pp->aeChan) ;
 
   return ;
 } /* wholeWork */
@@ -4511,8 +4483,6 @@ int main (int argc, const char *argv[])
 	  p.agent = i ;
 	  wego_go (readParser, &p, PP) ; channelAddSources (p.npChan, 1) ;
 	}
-      if (0)
-	channelCloseAt (p.npChan, p.nFiles) ; /* close the counter of BB blocks */
       for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
 	{
 	  p.agent = i ;

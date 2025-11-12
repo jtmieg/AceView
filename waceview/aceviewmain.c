@@ -377,7 +377,7 @@ static int  cgi_sanitize_word (char *txt, const char *w)
   int nn = 0, n = strlen (w) ;
   char *cp = txt ;
 
-  while ((cp = strcasestr (cp, w)))
+  while ((cp = (char *) strcasestr (cp, w)))
     { 
       memset (cp, ' ', n) ; cp += n ; nn += n ; 
     }

@@ -141,7 +141,7 @@ all: go2gene bly2hosac kscount akg sakg gene_nm_remap sgene_nm_remap gene2gene g
 	wiggle_smoother  dna2dna dnastitch kmercount  wiggle histo snp tsnp tricoteur \
 	mega3psort2ace  geneindex pg2pg seqc g2x qcsummary snpsummary dnabloom snpbloom \
 	chanserver chanclient mir cnv sv chantest dnawalk pi_channel_test \
-	sra_metadata introns table_histo tsf sam2gold tfali postMagicBlast altintrons
+	sra_metadata introns table_histo tsf sam2gold tfali postMagicBlast altintrons \
 	dirsync_nfs 
 
 dirsync_nfs: dirsync_nfs.o $(LINK_ACC)

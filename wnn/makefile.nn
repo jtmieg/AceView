@@ -113,22 +113,22 @@ nn1: nn1.o $(LINK_ACS)
 	$(LINKER)  -o $@  $@.o  $(LINK_ACS) $(LIBS)
 
 dnaNN: dnaNN.o $(LINK_LIGHT) $(NN_LIBS) 
-	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) -lpthread
 
 tictactoe: tictactoe.o $(LINK_LIGHT) $(NN_LIBS) 
-	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) -lpthread
 
 tictactoe2: tictactoe2.o $(LINK_LIGHT) $(NN_LIBS) 
-	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) -lpthread
 
 marienbad: marienbad.o $(LINK_LIGHT) $(NN_LIBS) 
-	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(NN_LIBS) $(LINK_LIGHT) $(LIBS) -lpthread
 
 motifNN: motifNN.o $(LINK_LIGHT)
-	$(LINKER)  -o $@  $@.o   $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(LINK_LIGHT) $(LIBS) -lpthread
 
 nnaligner: nnaligner.o $(LINK_LIGHT)
-	$(LINKER)  -o $@  $@.o   $(LINK_LIGHT) $(LIBS) 
+	$(LINKER)  -o $@  $@.o   $(LINK_LIGHT) $(LIBS) -lpthread
 
 ###########################################################
 ########### end of     acedb makefile.nn   ################

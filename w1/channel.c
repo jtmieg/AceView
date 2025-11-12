@@ -102,31 +102,6 @@ void channelClose (CHAN *c)
 
 /*******************************************************************************************************/
 
-void channelCloseAt (CHAN *c, int nGet)
-{
-  if (c && nGet >= 0)
-    {
-      pthread_mutex_lock (&(c->c.mutex)) ;
-      if (c->c.debug)
-	fprintf (stderr, "channel %s received close at %d current nGet=%d p1=%d put2=%d\n"
-		 , c->c.title[0] ? c->c.title : "no-name"
-		 , nGet, c->c.nGet, c->c.nPut1, c->c.nPut2
-		 ) ;
-      if (c && ! c->c.isClosed && c->c.nPut1 >= nGet)
-	{
-	  c->c.isClosed = TRUE ;
-	  if (c->c.debug)
-	    fprintf (stderr, " - Closing channel %s\n"
-		     , c->c.title[0] ? c->c.title : "no-name"
-		     ) ;
-	  pthread_cond_signal(&(c->c.notEmpty)) ;
-	}
-      pthread_mutex_unlock (&(c->c.mutex)) ;
-    }
-} /* chanCloseAt */
-
-/*******************************************************************************************************/
-
 void channelAddSources (CHAN *c, int nSources)
 {
   if (c && nSources >= 0)

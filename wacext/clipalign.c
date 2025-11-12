@@ -8678,7 +8678,7 @@ static int clipAlignRunOne (CLIPALIGN *pp)
 		      if (pp->mutantMalus)
 			pp->targetMutantMalus =  strncmp (stackText (s, 0), "M:", 2) ? 0 : pp->mutantMalus ;
 		      pp->targetGene = 0 ;
-		      cq = strcasestr(stackText (s, 0), "|Gene|") ;
+		      cq = (char *)strcasestr(stackText (s, 0), "|Gene|") ;
 		      if (cq) 
 			{
 			  *cq=0 ;
@@ -8868,7 +8868,7 @@ static int clipAlignRunOne (CLIPALIGN *pp)
       if (pp->mutantMalus)
 	pp->targetMutantMalus =  strncmp (stackText (s, 0), "M:", 2) ? 0 : pp->mutantMalus ;
       pp->targetGene = 0 ;
-      cq = strcasestr(stackText (s, 0), "|Gene|") ;
+      cq = (char *)strcasestr(stackText (s, 0), "|Gene|") ;
       if (cq) 
 	{
 	  *cq=0 ;

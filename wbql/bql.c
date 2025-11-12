@@ -2892,7 +2892,8 @@ static BOOL bqlCreatePhonyVariables  (BQL *bql, NODE *node0)
 		cz = messprintf ("select _%d from _%d in class %s where _%d %s", nsc, nsc, ccl, nsc, cq) ;
 	      else
 		{
-		  char *cw, *cs, *ct, *cfrom, *newDna = "" ;
+		  char *cfrom ;
+		  char *cw, *cs, *ct, *newDna = "" ;
 		  int k = 0;
 		  /* after the coma we want to edit ', >tag' into ', ?->tag' */
 		  if (0 && ncoma)
@@ -2912,7 +2913,7 @@ static BOOL bqlCreatePhonyVariables  (BQL *bql, NODE *node0)
 		  /* we need to edit @ into _%d */
 		  ct = cs = halloc (1 + 5 * strlen(cq), bql->h) ; /* room to add the nsc numbers after each occurence of ? */
 		  
-		  cfrom = strcasestr (cr, "from") ;
+		  cfrom = (char *) strcasestr (cr, "from") ;
 		  cr-- ;
 		  while (*++cr)
 		    switch ((int)*cr)
