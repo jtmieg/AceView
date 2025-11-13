@@ -4240,7 +4240,7 @@ int main (int argc, const char *argv[])
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggle") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
-  
+  p.wiggle = TRUE ;
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;

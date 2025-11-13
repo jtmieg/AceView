@@ -46,6 +46,8 @@ setenv SV v42.nov2        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann
 setenv SVlast v42.nov2
 setenv SV v43.nov2        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl pin to best
 setenv SVlast v43.nov2
+setenv SV v44.nov12        # idem --wiggle
+setenv SVlast v44.nov12
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV

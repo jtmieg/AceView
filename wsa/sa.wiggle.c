@@ -173,8 +173,8 @@ static void wiggleExportOne (const PP *pp, int nn)
       
 
       	  xp = arrayp (a, 0, unsigned int) ;
-	  for (ii = 0 ; ii < iMax ; ii++)
-	    aceOutf (ao, "%u\n", xp[ii]/720) ;
+	  for (int j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
+	    aceOutf (ao, "%u\n", xp[j]/720) ;
 	}
       ac_free (h) ;
     }
