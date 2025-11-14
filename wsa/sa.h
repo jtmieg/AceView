@@ -370,6 +370,17 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb) ;
 void saWiggleCumulate (const PP *pp, BB *bb) ;
 void saWiggleExport (PP *pp, int nAgents) ;
 
+/* sa.stats */
+void saRunStatExport (const PP *pp, Array runStats) ;
+void saCpuStatExport (const PP *pp, Array stats) ;
+void saCpuStatCumulate (Array aa, Array a) ;
+void saRunStatsCumulate (int run, Array aa, RunSTAT *vp) ;
+
+/* sa.align */
+void saAlign (const void *vp) ;
+void saAlignDo (const PP *pp, BB *bb) ;
+int saAlignOrder (const void *va, const void *vb) ;
+
 /**************************************************************/
 /**************************************************************/
 /**************************************************************/
