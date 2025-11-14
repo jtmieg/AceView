@@ -313,7 +313,7 @@ static BOOL setPage(float *z)
       }
   }
   else{
-    if(look->scrolllen==MINSCROLLBARLENTH)
+    if((int)look->scrolllen==MINSCROLLBARLENTH)
       temp = (*z-top)/(bottom-top-look->scrolllen);
     else
       temp = (*z-top)/(bottom-top);
@@ -2023,7 +2023,7 @@ static void drawScrollBar(int max)
     if(look->base == 0)
       boxstart = top;
     else{
-      if(look->scrolllen == MINSCROLLBARLENTH)
+      if((int)look->scrolllen == MINSCROLLBARLENTH)
 	boxstart = (((float)look->base/(float)max)*(bottom-top-look->scrolllen)) + top;
       else
 	boxstart = (((float)look->base/(float)max)*(bottom-top)) + top;

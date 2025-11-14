@@ -2471,27 +2471,6 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   dna2 = arr (bb->dnas, read2, Array) ;
   
   /* create chains */
-
-  /* register the wiggle boundaries */
-  if (pp->wiggle)
-    {
-      int wiggleStep = WIGGLE_STEP ;  /* examples s=10, 5, 1 */
-      int demiStep = wiggleStep/2 ;
-      if (2*demiStep == wiggleStep) demiStep-- ; /* examples d=4, 2, 0 */
-      
-      iMax = arrayMax (aa) ;
-      if (iMax)
-	for (ii = 0, up = arrp (aa, ii, ALIGN) ; ii < iMax ; ii++, up++)
-	  if (read == up->read)
-	    {
-	      int a1 = up->a1 ;
-	      int a2 = up->a2 ;
-	      if (up->read & 0x1) { int a0 = a1 ; a1 = a2 ; a2 = a0 ;}
-	      up->w1 = (a1 + demiStep)/wiggleStep ;
-	      up->w2 = (a2 + demiStep)/wiggleStep ;
-	    }
-    }
-
   /* overhangs */
   iMax = arrayMax (aa) ;
   if (iMax)
@@ -3846,9 +3825,11 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//    When the requested sequences are is SRA format they are automatically downloaded from NCBI SRA archive\n"
 	       "//    If --sraCaching is set, the (large) downloaded fasta.gz files are copied and saved in the ./SRA local directory\n"
 	       "//    This is only useful if you intend to align these sequences several times or reuse them in other programs\n" 
-	       "//  --sraDownload SRR123,SRR456,SRR999\n"
+	       "//  --sraDownload SRR123,SRR456,SRR999 \n"
 	       "//    Just download a set of SRR entries into the cache directory ./SRA/SRR123.fasta.gz ... \n"
 	       "//    This command is optional, since sortalign provides direct SRA access\n"
+	       "//    --maxGB <int> : [default no limit]\n"
+	       "//      Limit the sraDownload to <int> Gigabases per SRR entry\n" 
 	       "//  --gzi\n"
 	       "//    Forces decompression of the input files, useful when piping into sortalign\n"
 	       "//    All files named *.gz are automatically decompressed\n"
@@ -3995,7 +3976,7 @@ int main (int argc, const char *argv[])
 	    {
 	      char *cq = strchr (cp, ',') ;
 	      if (cq) *cq = 0 ;
-	      saSequenceParseSraDownload (cp) ;
+	      saSequenceParseSraDownload (cp, p.maxSraGb) ;
 	      cp = cq ? cq + 1 : 0 ;
 	    }
 	  exit (0) ;
@@ -4262,6 +4243,10 @@ int main (int argc, const char *argv[])
   p.raw = getCmdLineBool (&argc, argv, "--raw");
   p.sra = getCmdLineBool (&argc, argv, "--sra");
 
+  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
+  if (p.maxSraGb < 0)
+    saUsage ("--maxGB parameter should be positive", argc, argv) ;
+  
   /***************** run name  ***********/
 
   /* force the run name

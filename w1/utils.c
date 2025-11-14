@@ -1021,7 +1021,7 @@ BOOL utStr2LongInt(char *num_str, long int *num_out)
 
 /************************************************************/
 
-const char *strcasestr (const char *str1, const char *str2)
+char *strcasestr (const char *str1, const char *str2)
 {
   char *s1 = strnew (str1, 0) ;
   char *s2 = strnew (str2, 0) ;
@@ -1037,7 +1037,7 @@ const char *strcasestr (const char *str1, const char *str2)
     }
   ac_free (s1) ;
   ac_free (s2) ;
-  return cp ; 
+  return (char *) cp ; 
 }
 
 

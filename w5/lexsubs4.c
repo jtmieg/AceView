@@ -1740,7 +1740,7 @@ BOOL lexAlias(KEY *keyp, const char* newName, BOOL doAsk, BOOL keepOldName)
   KEY  newKey, key ;
   extern BOOL bsFuseObjects(KEY key, KEY new) ;
   BOOL isCaseSensitive = pickList[classe & 255 ].isCaseSensitive ;
-  int (*lexstrIsCasecmp)() = isCaseSensitive ?
+  int (*lexstrIsCasecmp)(const char *, const char *) = isCaseSensitive ?
     strcmp : strcasecmp ;
   AC_HANDLE h = 0 ;
 
@@ -1918,8 +1918,8 @@ BOOL lexword2key (const char *cp, KEY *key, KEY classe)
   LEXI1 *lexi ;
   char *voc, *cq ;
   BOOL isCaseSensitive ;
-  int (*lexstrIsCasecmp)() ; 
-
+  int (*lexstrIsCasecmp)(const char *, const char *) ;
+    
   chrono ("lexword2key") ;
   pickIsA(&classe, &mask) ; 
   t = classe ;

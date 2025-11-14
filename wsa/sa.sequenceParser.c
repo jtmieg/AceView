@@ -987,7 +987,7 @@ void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 
 /**************************************************************/
 
-int saSequenceParseSraDownload (const char *sraID)
+int saSequenceParseSraDownload (const char *sraID, int Gb)
 {
   AC_HANDLE h = ac_new_handle () ;
   char *fName = hprintf (h, "SRA/%s.fasta", sraID) ;
@@ -1003,11 +1003,13 @@ int saSequenceParseSraDownload (const char *sraID)
     messcrash ("\nCannot create the SRA cache file %s", fName) ;
   
   SRAObj* sra = SraObjNew(sraID);
-  int num_bases = 1 << 27 ; /* 128 M */
-  long unsigned int nMax = (0x1L << 31) / num_bases ; /* 2Gb */
   const char *ccp ;
+  int num_bases = 1 << 27 ; /* 128 M */
+  long unsigned int nMax = Gb ;
+  nMax <<= 30 ; /* to be in Gigabases */
+  nMax /=  num_bases ; 
   
-  while (nMax-- > 0 && (ccp = SraGetReadBatch(sra, num_bases)))
+  while ((! Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, num_bases)))
     aceOutf (ao, "%s", ccp) ;
 
   SraObjFree(sra);

@@ -151,7 +151,8 @@ uid_t geteuid () ;
 
 /************************************/
 extern BOOL swapData;
-void swapSuperBlock();
+void swapSuperBlock(void *bp) ;
+
 /************************************/
 
 /********************** ace server callbacks   *******************************/

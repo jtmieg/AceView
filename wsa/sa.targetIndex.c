@@ -664,6 +664,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
       dnaR->base = bigArrp(bbG->globalDnaR, x1, char) ; 
       dnaR->max = dnaR->dim = x2 - x1 ;
     }
+#ifdef JUNK
   if (pp->wiggle)
     {
       bbG->wiggles = arrayHandleCreate (4*iMax, Array, bbG->h) ;
@@ -677,6 +678,8 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
 	  array (bbG->wiggles, 4*ii + 3, Array) = arrayHandleCreate (ln, int, bbG->h) ;
 	}
     }
+#endif
+  
   /*  Get thread CPU time at end */
   t2 = clock () ;
   saCpuStatRegister ("1.memMapTargets" , pp->agent, bbG->cpuStats, t1, t2, nn) ; 

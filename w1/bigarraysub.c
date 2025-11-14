@@ -1847,7 +1847,7 @@ static unsigned char *mmapCreate (const char *fName, long int *size, int *fdp, u
   if (fd == -1)
     {
       messerror ("Failed to open for reading a memory map file : %s", fName) ;
-      return FALSE ;
+      return NULL ;
     }
 
   /*  Get file size */
@@ -1856,7 +1856,7 @@ static unsigned char *mmapCreate (const char *fName, long int *size, int *fdp, u
     {
       messerror ("Failed to stat for reading a memory map file of size %ld : %s", size, fName) ;
       close(fd);
-      return FALSE ;
+      return NULL ;
     }
   *size = st.st_size;
 
@@ -1876,7 +1876,7 @@ static unsigned char *mmapCreate (const char *fName, long int *size, int *fdp, u
     {
       messerror ("Failed to map for reading a memory map file of size %ld : %s", size, fName) ;
       close(fd);
-      return FALSE ;
+      return NULL ;
     }  /* the last arg, hemre 0, says that mapping should start n pages down whwere pageSize = sysconf(_SC_PAGE_SIZE). */
   
   /* Real size */

@@ -37,7 +37,6 @@
 
 #define YANN 1
 
-#define WIGGLE_STEP 10
 #define MAXJUMP 3
 #define MAXJUMP2 8
 #define NAMMAX 1024
@@ -182,6 +181,8 @@ typedef struct pStruct {
   Array runStats ;
   Array runLanes ;
   Array runLanesDone ;
+  Array genes ;           /* gene coordinates */
+  Array geneCounts ;      /* gene expression */
   BigArray intronSeeds ;
   BigArray exonSeeds ;
   Array wiggles ;
@@ -212,6 +213,7 @@ typedef struct pStruct {
   int minScore, minAli, minAliPerCent ;
   int errRateMax ;       /* (--align case) max number of errors in seed extension */
   int OVLN ;
+  int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   BOOL splice ;
   long int nRawReads, nRawBases ; 
 } PP ;
@@ -243,7 +245,7 @@ typedef struct countChromStruct {
   int i1, i2, x1, x2 ;
   unsigned int a1 ;  /* bio coordinates on chrom (base 1) */
   unsigned int a2 ;  /* bio coordinate on read */
-}  COUNTCHROM ;
+}  __attribute__((aligned(32))) COUNTCHROM ;
 
 typedef struct alignStruct {
   int read ;
@@ -269,16 +271,16 @@ typedef struct alignStruct {
 
 
 typedef struct geneStruct {
-  int gene ; /* index in pp->geneDict */
   int chrom ;
   int a1, a2 ; 
-} GENE ;
+  int gene ; /* index in pp->geneDict */
+} __attribute__((aligned(16))) GENE ;
 		  
 typedef struct mrnaStruct {
-  int mrna ; /* index in pp->mrnaDict */
   int chrom ;
   int a1, a2 ; 
-} MRNA ;
+  int mrna ; /* index in pp->mrnaDict */
+} __attribute__((aligned(16))) MRNA ;
 		  
 
 typedef struct intronStruct {
@@ -286,13 +288,13 @@ typedef struct intronStruct {
   int mrna ;
   int chrom ;
   int n, a1, a2 ; 
-} INTRON ;
+} __attribute__((aligned(32))) INTRON ;
 		  
 typedef struct exonStruct {
-  int mrna ;
   int chrom ;
   int a1, a2 ; 
-} EXON ;
+  int mrna ;
+} __attribute__((aligned(32))) EXON ;
 		  
 
 typedef struct cpuStatStruct {
@@ -361,7 +363,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget) ;
   
 /* sa.sequenceParser.c */
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome) ;
-int saSequenceParseSraDownload (const char *sraID) ;
+int saSequenceParseSraDownload (const char *sraID, int maxGb) ;
 void saSequenceParseGzBuffer (const PP *pp, BB *bb) ;
 
 /* sa.wiggle */

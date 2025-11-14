@@ -17,6 +17,7 @@
  *
  */
 
+#define WIGGLE_STEP 10
 #define WIGGLETYPEMAX 2 /* strand */
 #include "sa.h"
 
@@ -63,32 +64,40 @@ static int wiggleCreate (const PP *pp, BB *bb)
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
   Array wiggles = bb->wiggles = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
   char tBuf[25] ;
+  int step = WIGGLE_STEP ;  /* examples s=10, 5, 1 */
+  int demiStep = step/2 ;
+  if (2*demiStep == step) demiStep-- ; /* examples d=4, 2, 0 */
 
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
     {
-      int w1 = ap->w1, w2 = ap->w2 ;
       int mult = ap->nTargetRepeats ;
       int weight = 720/mult ;
-      
-      if (! weight)
-	continue ;
-      if (chrom != ap->chrom)
+      if (weight)
 	{
-	  nsw++ ;
-	  wig = 0 ;
-	  chrom = ap->chrom ;
-	  if (*dictName (pp->bbG.dict, chrom >> 1) == 'G')
+	  int a1 = ap->a1 ;
+	  int a2 = ap->a2 ;
+	  int w1 = (a1 + demiStep)/step ;
+	  int w2 = (a2 + demiStep)/step ;
+
+	  if (chrom != ap->chrom)
 	    {
-	      wig = array (wiggles, chrom, BigArray) ;
-	      if (! wig)
-		wig = array (wiggles,  chrom, BigArray) = bigArrayHandleCreate (100000, WP, bb->h) ;
+	      nsw++ ;
+	      wig = 0 ;
+	      chrom = ap->chrom ;
+	      if (*dictName (pp->bbG.dict, chrom >> 1) == 'G')
+		{
+		  wig = array (wiggles, chrom, BigArray) ;
+		  if (! wig)
+		    wig = array (wiggles,  chrom, BigArray) = bigArrayHandleCreate (100000, WP, bb->h) ;
+		}
 	    }
-	}
-      if (w1 > w2) { int w0 = w1 ; w1 = w2 ; w2 = w0 ; }
-      if (wig && w1 < w2)
-	{
-	  WP *wp = bigArrayp (wig, bigArrayMax (wig), WP) ;
-	  wp->pos = w1 ; wp->ln = w2 - w1 + 1 ; wp->weight = weight ;
+
+	  if (w1 > w2) { int w0 = w1 ; w1 = w2 ; w2 = w0 ; }
+	  if (wig && w1 < w2)
+	    {
+	      WP *wp = bigArrayp (wig, bigArrayMax (wig), WP) ;
+	      wp->pos = w1 ; wp->ln = w2 - w1 + 1 ; wp->weight = weight ;
+	    }
 	}
     }
   fprintf (stderr, "%s: lane %d: wiggleCreate created %d wiggles, %d switching\n", timeBufShowNow (tBuf), bb->lane, arrayMax (wiggles), nsw) ;
@@ -125,18 +134,23 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 
 /**************************************************************/
 
-static void wiggleExportOne (const PP *pp, int nn)
+static void wiggleExportOne (const PP *pp, int nw)
 {
-  BigArray wig = array (pp->wiggles, nn, BigArray) ;
+  BigArray wig = array (pp->wiggles, nw, BigArray) ;
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
-  int run = nn / (2 * chromMax) ;
-  int chrom = (nn % (2 * chromMax)) >> 1 ;
-  char strand = ( nn & 0x1) ? 'r' : 'f' ;
+  int run = nw / (2 * chromMax) ;
+  int chrom = (nw % (2 * chromMax)) ;
+  char strand = ( nw & 0x1) ? 'r' : 'f' ;
   long int ii, iMax = bigArrayMax (wig) ;
   unsigned int pos0 ;
-  
+  Array genes = pp->genes ? array (pp->genes, chrom, Array) : 0 ;
+  Array geneC = array (pp->geneCounts, nw, Array) ;
+  int step = WIGGLE_STEP ;
+  int demiStep = step/2 ;
+  if (2*demiStep == step) demiStep-- ; /* examples d=4, 2, 0 */
+
   bigArraySort (wig, wpOrder) ;
-  
+    
   if (wig && iMax)
     {
       AC_HANDLE h = ac_new_handle () ;
@@ -160,22 +174,38 @@ static void wiggleExportOne (const PP *pp, int nn)
 	    }
 	}
 
-      if (arrayMax (a))
+      if (arrayMax(a))
 	{
-	  const char *chromNam = dictName (pp->bbG.dict, chrom) ;
+	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) ;
 	  const char *runNam = dictName (pp->runDict, run) ;
 	  char *fNam = hprintf (h, ".%s.%s.u.%c.BF", runNam, chromNam, strand) ;
 	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, pp->gzo, h) ;
 	  aceOutDate (ao, "##", "wiggle") ;
 	  aceOutf (ao, "track type=wiggle_0\n") ;
 
-	  aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0 * WIGGLE_STEP , WIGGLE_STEP) ;
-      
+	  aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0 * step, step) ;
 
       	  xp = arrayp (a, 0, unsigned int) ;
 	  for (int j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
 	    aceOutf (ao, "%u\n", xp[j]/720) ;
 	}
+
+      if (arrayMax(a) && genes)
+	{
+	  int ig = 0, igMax = arrayMax (genes) ;
+	  GENE *gp = arrayp (genes, 0, GENE) ;
+      	  xp = arrayp (a, 0, unsigned int) ;
+
+	  for (int j = 0, jMax = arrayMax(a), x = WIGGLE_STEP * (j + pos0) ; j < jMax ; j++, x += WIGGLE_STEP)
+	    {
+	      while (ig > 0 && gp->a1 > x) { gp-- ; ig-- ; }
+	      while (ig < igMax && gp->a2 < x) { gp++ ; ig++ ; }
+	      while (ig < igMax && gp->a1 <= x + demiStep && gp->a2 >= x - demiStep)
+		{ array (geneC, gp->gene, int) += xp[j]/720 ; gp++ ; ig++ ; }
+	    }
+	}
+
+	  
       ac_free (h) ;
     }
 
@@ -187,17 +217,87 @@ static void wiggleExportOne (const PP *pp, int nn)
 void wiggleExportAgent (const void *vp)
 {
   const PP *pp = vp ;
-  int nn ;
+  int nw ;
   
-  while (channelGet (pp->wwChan, &nn, int))
+  while (channelGet (pp->wwChan, &nw, int))
     {
-      wiggleExportOne (pp, nn) ;
-      channelPut (pp->wwDoneChan, &nn, int) ;
+      wiggleExportOne (pp, nw) ;
+      channelPut (pp->wwDoneChan, &nw, int) ;
     }
   channelCloseSource (pp->wwDoneChan) ;
   return ;
 } /* wiggleExportAgent */
 
+/**************************************************************/
+/**************************************************************/
+
+typedef struct gcStruct {
+  int gene, run, count, dummy ; 
+} __attribute__((aligned(16))) GC ;
+
+/**************************************************************/
+
+static int gcOrder (const void *va, const void *vb)
+{
+  const GC *up = va ;
+  const GC *vp = vb ;
+  int n ;
+  
+  n = up->gene - vp->gene ; if (n) return n ;
+  n = up->run - vp->run ; if (n) return n ;
+
+  return 0 ;
+} /* wiggleOrder */
+
+/**************************************************************/
+
+static void wiggleExportGeneCounts (const PP *pp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int nw, wMax = arrayMax (pp->wiggles) ;
+  int chromMax = dictMax (pp->bbG.dict) + 1 ;
+  BigArray allGeneC ;
+  long int igc = 0, igcMax = 0 ;
+  GC *gc ; 
+  char tBuf[25] ;
+  
+  fprintf (stderr, "%s: start geneCounts export\n", timeBufShowNow (tBuf)) ;
+  
+  allGeneC = bigArrayHandleCreate (1000000, GC, h) ;
+  for (nw = 0 ; nw < wMax ; nw++)
+    {
+      Array geneC = array (pp->geneCounts, nw, Array) ;
+      int run = nw / (2 * chromMax) ;
+      int gMax = geneC ? arrayMax (geneC) : 0 ;
+      int gene, *xp ;
+      
+      if (gMax)
+	for (gene = 0, xp = arrp (geneC, 0, int) ; gene < gMax ; gene++, xp++)
+	  if (*xp > 0)
+	    {
+	      gc = bigArrayp (allGeneC, igcMax++, GC) ;
+	      gc->gene = gene ;
+	      gc->run = run ;
+	      gc->count = *xp ;
+	    }
+    }
+  bigArraySort (allGeneC, gcOrder) ;
+  
+  ACEOUT ao = aceOutCreate (pp->outFileName, ".geneCounts.tsf", pp->gzo, h) ;
+  aceOutDate (ao, "##", "wiggle") ;
+  for (igc = 0, gc = bigArrp (allGeneC, 0, GC) ; igc < igcMax ; igc++, gc++)
+    aceOutf (ao, "%s\t%s\ti\t%d\n"
+	     , dictName (pp->geneDict, gc->gene)
+	     , dictName (pp->runDict, gc->run)
+	     , gc->count
+	     ) ;
+  
+  fprintf (stderr, "%s: stop geneCounts export\n", timeBufShowNow (tBuf)) ;
+  ac_free (h) ;
+  return ;
+} /* wiggleExportGeneCounts */
+
+/**************************************************************/
 /**************************************************************/
 
 void saWiggleExport (PP *pp, int nAgents)
@@ -206,7 +306,9 @@ void saWiggleExport (PP *pp, int nAgents)
   int wMax = arrayMax (pp->wiggles) ;
   BOOL debug = FALSE ;
   char tBuf[25] ;
-  
+
+  if (pp->genes)
+    pp->geneCounts = arrayHandleCreate (wMax, Array, h) ;
   fprintf (stderr, "%s: start exportation of  %d wiggles\n", timeBufShowNow (tBuf), wMax) ;
   /* parallelize: open a channel and start agents */
   pp->wwChan = channelCreate (wMax + 1, int, h) ;
@@ -222,14 +324,14 @@ void saWiggleExport (PP *pp, int nAgents)
   
   /* load the channel to start execution */ 
 
-  int k = 0, n = 0, nn = 0 ;
-  for (int w = 0 ; w < wMax ; w++)
+  int k = 0, n = 0 ;
+  for (int nw = 0 ; nw < wMax ; nw++)
     {
-      Array wig = arr (pp->wiggles, w, Array) ;
+      Array wig = arr (pp->wiggles, nw, Array) ;
       if (wig)
 	{
-	  channelPut (pp->wwChan, &w, int) ;
-	  nn++ ;
+	  array (pp->geneCounts, nw, Array) = arrayHandleCreate (2048, dictMax (pp->geneDict) + 1, h) ;
+	  channelPut (pp->wwChan, &nw, int) ;
 	}
     }
   channelClose (pp->wwChan) ;
@@ -239,6 +341,10 @@ void saWiggleExport (PP *pp, int nAgents)
     n++ ;
 
   fprintf (stderr, "%s: stop wiggle export\n", timeBufShowNow (tBuf)) ;
+
+  if (pp->genes)
+    wiggleExportGeneCounts (pp) ;
+  
   ac_free (h) ;
   return ;
 }
@@ -246,3 +352,4 @@ void saWiggleExport (PP *pp, int nAgents)
 /**************************************************************/
 /**************************************************************/
 /**************************************************************/
+ 
