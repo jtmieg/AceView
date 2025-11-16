@@ -629,7 +629,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
       cp += 256 ;
       dictAdd (dict, cp, &n) ;
       if (n != ii)
-	messcrash ("\nIndexing error, sorry, please rerun sortalign --createIndex\n") ;
+	messcrash ("\nIndexing error, n=%d ii=%d : %s,  sorry, please rerun sortalign --createIndex\n", n, ii, cp) ;
     }
 
   /* create ancilary target dna arrays,

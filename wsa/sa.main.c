@@ -1035,305 +1035,44 @@ static void wholeWork (const void *vp)
 static void reportRunStats (PP *pp, Array runStats)
 {
   AC_HANDLE h = ac_new_handle () ;
-  const char *METHOD = pp->method ? pp->method : "01_SortAlign" ;
   Array aa = runStats ;
-  int ii, iMax = arrayMax (aa) ;
   RunSTAT *s0 = arrayp (aa, 0, RunSTAT) ;
-  ACEOUT ao = aceOutCreate (pp->outFileName, ".s2g.samStats", 0, h) ;	
-  const char *run = pp->runName ? pp->runName : "xxx" ;
 
-  printf ("\n####### Run Statistics") ;
-  fprintf (stderr, "\n####### Run Statistics") ;
+  printf ("\n####### Global Statistics, see details in file %s.runStats.tsf", pp->outFileName ? pp->outFileName : "") ;
+  if (pp->runName) printf ("\n#:Run\t%s", pp->runName) ;
+  if (pp->method) printf ("\n#:Method\t%s", pp->method) ;
   
-  printf ("\n# Run") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%s", s->run ? dictName (pp->runDict, s->run) : "Any") ;
-    }
-  
-  printf ("\nFiles") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%d", s->nFiles) ;
-    }
-  
-  printf ("\nPairs") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nPairs) ;
-    }
-  printf ("\nAlignedPairs") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nAlignedPairs) ;
-    }
-  
-  fprintf (stderr, "AlignedPairs: %ld\n", s0->nAlignedPairs) ;
-  
-  printf ("\nCompatiblePairs") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nCompatiblePairs) ;
-    }
-  
-  fprintf (stderr, "CompatiblePairs: %ld\n", s0->nCompatiblePairs) ;
-  
-  printf ("\nCirclePairs") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nCirclePairs) ;
-    }
-  
-  fprintf (stderr, "CirclePairs: %ld\n", s0->nCirclePairs) ;
-  
-  printf ("\nReads") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nReads) ;
-    }
-    
-  
-  printf ("\nBase1") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nBase1) ;
-    }
-  
-  printf ("\nBase2") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nBase2) ;
-    }
+  printf ("\n#:Pairs\t%ld", s0->nPairs) ;
+  printf ("\n#:Pairs_aligned\t%ld\t%.3f%%", s0->nPairsAligned, 100.0 * s0->nPairsAligned/ (0.0000001 + s0->nPairs)) ;
+  printf ("\n#:CompatiblePairs\t%ld\t%.3f%%", s0->nCompatiblePairs, 100.0 * s0->nCompatiblePairs/ (0.000001 + s0->nPairsAligned)) ;
 
-  printf ("\nA") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->NATGC[1]) ;
-    }
+  printf ("\n\n#:Reads\t%ld", s0->nReads) ;
+  if (pp->nRawReads) printf ("\n#:RawReads\t%ld", pp->nRawReads) ;
+  printf ("\n#:Reads_aligned\t%ld\t%.3f%%", s0->nMultiAligned[0], 100.0 * s0->nMultiAligned[0]/ (0.0000001 + s0->nReads)) ;
+  printf ("\n#:PerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->nReads + .000001)) ;
 
-  printf ("\nT") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->NATGC[2]) ;
-    }
-
-  printf ("\nG") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->NATGC[3]) ;
-    }
-
-  printf ("\nC") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->NATGC[4]) ;
-    }
-
-  printf ("\nN") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->NATGC[0]) ;
-    }
-
-  printf ("\nLn1") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      float nR1 = s->nPairs ? s->nPairs : s->nReads ;
-      printf ("\t%.1f", s->nBase1/nR1) ;
-    }
-  
-  printf ("\nLn2") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      float nR2 = s->nPairs ? s->nPairs : 1 ;
-      printf ("\t%.1f", s->nBase2/nR2) ;
-    }
-    
-  printf ("\nAlignedReads\t%ld\t%.2f%%", s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(s0->nReads + .000001)) ;
-  printf ("\nMultiAligned\t%ld\t%.2f%%", s0->nMultiAligned[0] - s0->nMultiAligned[1], (100.0 * (s0->nMultiAligned[0] - s0->nMultiAligned[1]))/(s0->nReads + .000001)) ;
-  printf ("\nPerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->nReads + .000001)) ;
-  printf ("\nAlignments\t%ld\t%.2f per aligned read", s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
-  printf ("\nCompatiblePairs\t%ld\t%.2f%%", s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(s0->nPairs + .000001)) ;
-  printf ("\nCirclePairs\t%ld\t%.2f%%", s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(s0->nPairs + .000001)) ;
-  printf ("\nReads supporting introns") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nIntronSupports) ;
-    }
-  fprintf (stderr, "Reads supporting introns : %ld, plus %ld, minus %ld, stranding %.2f%%\n"
+  printf ("\n#:Reads supporting introns %ld, plus %ld, minus %ld, stranding %.2f%%\n"
 	   , s0->nIntronSupports
 	   , s0->nIntronSupportPlus
 	   , s0->nIntronSupportMinus
 	   , (100.0 * s0->nIntronSupportPlus + 0.00001)/(s0->nIntronSupportPlus+s0->nIntronSupportMinus - 0.00001)
 	   ) ;
-  
-  printf ("\nSupportedIntrons") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	  continue ;
-      printf ("\t%ld", s->nSupportedIntrons) ;
-    }
-  
-  
-  printf ("\nBase aligned") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nBaseAligned1) ;
-    }
-  
-  printf ("\nBase2 aligned") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nBaseAligned2) ;
-    }
-  
-  
-   
-  printf ("\nMismatches") ;
-  for (ii = 0 ; ii < iMax ; ii++) 
-    {	
-      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-      if (! s->nReads)
-	continue ;
-      printf ("\t%ld", s->nErr) ;
-    }
-  
-  for (int j = 0 ; j < 256 ; j++)
-    if (s0->nAlignedPerTargetClass[j])
-      {
-	printf ("\nReads Aligned in %c", j ? j : '-' ) ;
-	for (ii = 0 ; ii < iMax ; ii++) 
-	  {	
-	    RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-	    if (! s->nReads)
-	      continue ;
-	    printf ("\t%ld", s->nAlignedPerTargetClass[j]) ;
-	  }
-      }
-  
-  for (int j = 0 ; j < 256 ; j++)
-    {
-      if (s0->nAlignedPerTargetClass[j])
-	{
-	  printf ("\nStranding in  %c", j ? j : '-' ) ;
-	  for (ii = 0 ; ii < iMax ; ii++) 
-	    {	
-	      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-	      int t = s->GF[j] + s->GR[j]  ;
-	      printf ("\t") ;
-	      if (t)
-		printf ("\t%.3f", 100.0 * s->GF[j]/t) ;
-	    }
-      }
-    }
-  
-    for (int j = 1 ; j < 11 ; j++)
-      if (s0->nMultiAligned[j])
-	{
-	  printf ("\nReads with %d alignments", j) ;
-	  for (ii = 0 ; ii < iMax ; ii++) 
-	    {	
-	      RunSTAT *s = arrayp (aa, ii, RunSTAT) ;
-	      if (! s->nReads)
-		continue ;
-	      printf ("\t%ld", s->nMultiAligned[j]) ;
-	    }
-	}
+  printf ("\n#:SupportedIntrons\t%ld", s0->nSupportedIntrons) ;
 
-  aceOutf (ao, "%s\t%s\tnRawReads\t%ld\n", run, METHOD, pp->nRawReads) ;
-  aceOutf (ao, "%s\t%s\tnReads\t%ld\n", run, METHOD, s0->nReads) ;  
-  aceOutf (ao, "%s\t%s\tnRawBases\t%ld\n", run, METHOD, pp->nRawBases) ;
-  aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
-  aceOutf (ao, "%s\t%s\tnAlignedPairs\t%ld\n", run, METHOD, s0->nAlignedPairs) ;
-  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\n", run, METHOD, s0->nCompatiblePairs) ;
-    aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\n", run, METHOD, s0->nCirclePairs) ;
-  if (! pp->nRawReads) pp->nRawReads = s0->nReads ;
-  if (! pp->nRawBases) pp->nRawBases = s0->nBase1 + s0->nBase2 ;
+
+  printf ("\n\n#:Bases\t%ld", s0->nBase1 + s0->nBase2) ;
+  if (pp->nRawBases) printf ("\n#:RawBases\t%ld", pp->nRawBases) ;
+  printf ("\n#:Bases_aligned\t%ld\t%.3f%%"
+	  , s0->nBaseAligned1 + s0->nBaseAligned2
+	  , 100.0*(s0->nBaseAligned1 + s0->nBaseAligned2)/(.0001 + s0->nBase1 + s0->nBase2)
+	  ) ;
+
+  printf ("\n#:Mismatches\t%ld\t%.5f%%"
+	  , s0->nErr
+	  , 100.0 * s0->nErr /(.0001 + s0->nBaseAligned1 + s0->nBaseAligned2)
+	  ) ;
   
-  aceOutf (ao, "%s\t%s\tnPerfectReads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(pp->nRawReads + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(pp->nRawReads + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(pp->nRawReads/2 + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(pp->nRawReads/2 + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnAlignments\t%ld\t%.2f per aligned read\n", run, METHOD, s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnMultiAligned\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0] - s0->nMultiAligned[1], (100.0 * (s0->nMultiAligned[0] - s0->nMultiAligned[1]))/(s0->nReads + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (pp->nRawBases + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
-  long int nUnaligned = pp->nRawReads - s0->nMultiAligned[0] ;
-  aceOutf (ao, "%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD, 0
-	   , nUnaligned
-	   , 100.0 * nUnaligned / (pp->nRawReads + .000001)
-	   ) ;
-  for (int j = 1 ; j < 11 ; j++)
-    if (s0->nMultiAligned[j])
-      {
-	aceOutf (ao, "%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD
-		 , j, s0->nMultiAligned[j]
-		 , 100.0 * s0->nMultiAligned[j] / (pp->nRawReads + .000001)
-		 ) ;
-      }
-  long int verif = 0 ;
-  for (int j = 1 ; j < 11 ; j++)
-    verif += s0->nMultiAligned[j] ;
-  aceOutf (ao, "nReads = %ld , sum of multiAli = %ld, verif = %ld\n", pp->nRawReads, verif, pp->nRawReads - verif) ; 
+
   printf ("\n") ;
   ac_free (h) ;
 } /* reportRunStats */
@@ -1528,7 +1267,6 @@ int main (int argc, const char *argv[])
   PP p ;
   BB bb ;
   Array cpuStats = 0 ;
-  Array runStats = 0 ;
   Array runErrors = 0 ;
   Array inArray = 0 ;
   int maxThreads = 128 ;
@@ -1576,6 +1314,10 @@ int main (int argc, const char *argv[])
   
   p.gzi = getCmdLineBool (&argc, argv, "--gzi") ;   /* decompress input files (implicit for files named .gz) */
   p.gzo = getCmdLineBool (&argc, argv, "--gzo") ;   /* compress most output files */
+
+  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
+  if (p.maxSraGb < 0)
+    saUsage ("--maxGB parameter should be positive", argc, argv) ;
 
   /**************************  SRA downloader *********************************/
   
@@ -1840,7 +1582,7 @@ int main (int argc, const char *argv[])
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggle") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
-  p.wiggle = TRUE ;
+
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
@@ -1861,10 +1603,6 @@ int main (int argc, const char *argv[])
   p.fastc = getCmdLineBool (&argc, argv, "--fastc");
   p.raw = getCmdLineBool (&argc, argv, "--raw");
   p.sra = getCmdLineBool (&argc, argv, "--sra");
-
-  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
-  if (p.maxSraGb < 0)
-    saUsage ("--maxGB parameter should be positive", argc, argv) ;
   
   /***************** run name  ***********/
 
@@ -1987,7 +1725,7 @@ int main (int argc, const char *argv[])
   printf ("%s: Start\n", timeBufShowNow (tBuf0)) ;
 
   cpuStats = arrayHandleCreate (1024, CpuSTAT, h) ;
-  runStats = arrayHandleCreate (1024, RunSTAT, h) ;
+  p.runStats = arrayHandleCreate (1024, RunSTAT, h) ;
   runErrors = arrayHandleCreate (1024, Array, h) ;
   
   p.runDict = dictHandleCreate (16, p.h) ;
@@ -2012,7 +1750,7 @@ int main (int argc, const char *argv[])
   NN = saConfigCheckTargetIndex (&p) ;
 
   /* check the existence of the input sequence files */
-  inArray = saConfigGetRuns (&p, runStats) ;
+  inArray = saConfigGetRuns (&p, p.runStats) ;
   n = dictMax (p.runDict) + 1 ;
   p.runLanes = arrayHandleCreate (n, atomic_int, p.h) ;
   p.runLanesDone = arrayHandleCreate (n, atomic_int, p.h) ;
@@ -2081,21 +1819,23 @@ int main (int argc, const char *argv[])
        */
       wego_go (npCounter, &p, PP) ; channelAddSources (p.plChan, 1) ;
       /* Read preprocessing agents, they do not require the genome */
-      for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
-	{
-	  fprintf (stderr, "Launch readParser %d\n", i) ;
-	  p.agent = i ;
-	  wego_go (readParser, &p, PP) ; channelAddSources (p.npChan, 1) ;
-	}
-      for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
-	{
-	  p.agent = i ;
-
+      for (int pass = 0 ; pass < 2 ; pass++)
+	for (int i = 0 ; i < p.nFiles && i < nAgents && i < 10 ; i++)
+	  {
+	    if (pass) fprintf (stderr, "Launch readParser %d\n", i) ;
+	    p.agent = i ;
+	    if (pass) wego_go (readParser, &p, PP) ; else channelAddSources (p.npChan, 1) ;
+	  }
+      for (int pass = 0 ; pass < 2 ; pass++)
+	for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
+	  {
+	    p.agent = i ;
+	    
 #ifndef YANN
-	  wego_go (codeWords, &p, PP) ; channelAddSources (p.csChan, 1) ;
-	  wego_go (sortWords, &p, PP) ; channelAddSources (p.smChan, 1) ;
+	    if (pass) wego_go (codeWords, &p, PP) ; else channelAddSources (p.csChan, 1) ;
+	    if (pass) wego_go (sortWords, &p, PP) ; else channelAddSources (p.smChan, 1) ;
 #endif
-	}
+	  }
 
       
       /* Load the fpChan, triggering the readParsers
@@ -2116,37 +1856,38 @@ int main (int argc, const char *argv[])
 	messcrash ("matchHits received no target words") ;
       
       /* map the reads to the genome in parallel */
-      for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
-	{
-	  p.agent = i ;
+      for (int pass = 0 ; pass < 2 ; pass++)
+	for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
+	  {
+	    p.agent = i ;
 #ifdef YANN
-	  wego_go (wholeWork, &p, PP) ;
-	  channelAddSources (p.aeChan, 1) ;
+	    if (pass) wego_go (wholeWork, &p, PP) ;
+	    else channelAddSources (p.aeChan, 1) ;
 #else
 
-	  wego_go (matchHits, &p, PP) ;
-	  channelAddSources (p.moChan, 1) ;
+	  if (pass) wego_go (matchHits, &p, PP) ;
+	  else channelAddSources (p.moChan, 1) ;
 		  
-	  wego_go (sortHits, &p, PP) ;
-	  channelAddSources (p.oaChan, 1) ;
-	  channelAddSources (p.doneChan, 1) ;
+	  if (pass) wego_go (sortHits, &p, PP) ;
+	  else channelAddSources (p.oaChan, 1) ;
+	  else channelAddSources (p.doneChan, 1) ;
 	      
 	  if (!i || p.align) /* at least 1 agent */
 	    {
 	      p.agent = 3*i ;
-	      wego_go (align, &p, PP) ;
+	      if (pass) wego_go (align, &p, PP) ;
 	      p.agent = 3*i + 1 ;
-	      wego_go (align, &p, PP) ;
+	      if (pass) wego_go (align, &p, PP) ;
 	      p.agent = 3*i + 2 ;
-	      wego_go (align, &p, PP) ;
+	      if (pass) wego_go (align, &p, PP) ;
 	      p.agent = i ;
-	      channelAddSources (p.aeChan, 3) ;
+	      else channelAddSources (p.aeChan, 3) ;
 	    }
 #endif
 	  if (! p.sam || !i) /* only 1 export agent in sam case */
 	    {
-	      wego_go (export, &p, PP) ;
-	      channelAddSources (p.doneChan, 1) ;
+	      if (pass) wego_go (export, &p, PP) ;
+	      else channelAddSources (p.doneChan, 1) ;
 	    }
 	}
     }
@@ -2203,8 +1944,8 @@ int main (int argc, const char *argv[])
 	
       if (bb.run)
 	{
-	  saRunStatsCumulate (0, runStats, &(bb.runStat)) ;
-	  saRunStatsCumulate (bb.run, runStats, &(bb.runStat)) ;
+	  saRunStatsCumulate (0, p.runStats, &(bb.runStat)) ;
+	  saRunStatsCumulate (bb.run, p.runStats, &(bb.runStat)) ;
 
 	  runErrorsCumulate (0, runErrors, bb.errors) ;
 	  runErrorsCumulate (bb.run, runErrors, bb.errors) ;
@@ -2259,11 +2000,11 @@ int main (int argc, const char *argv[])
 	}
       ac_free (bb.h) ;
     }
-  saCpuStatExport (&p, cpuStats) ;
-  saRunStatExport (&p, runStats) ;
-  saIntronsExport (&p, confirmedIntrons) ;
   if (p.wiggle)
     saWiggleExport (&p, nAgents) ;
+  saCpuStatExport (&p, cpuStats) ;
+  saRunStatExport (&p, p.runStats) ;
+  saIntronsExport (&p, confirmedIntrons) ;
   
   wego_log ("Done") ;
   wego_flush () ; /* flush the wego logs to stderr */
@@ -2287,10 +2028,10 @@ int main (int argc, const char *argv[])
 			    , p.maxTargetRepeats, p.tMaxTargetRepeats
 			    , nAgents, p.nBlocks, NN
 			    ) ;
-  if (arrayMax (runStats))
-    reportRunStats (&p, runStats) ;
+  if (arrayMax (p.runStats))
+    reportRunStats (&p, p.runStats) ;
   if (p.align)
-    reportRunErrors (&p, runStats, runErrors) ;
+    reportRunErrors (&p, p.runStats, runErrors) ;
   
   /* release memory */
   if (p.bbG.dnas)

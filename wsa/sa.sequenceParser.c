@@ -29,7 +29,7 @@ static void globalDnaCreate (BB *bb)
   unsigned char *cp, *cq ;
   Array dna = 0 ;
 
-  if (iMax & 0x1) /* complete the last read pair with a zero */
+  if (! bb->isGenome && (iMax & 0x1)) /* complete the last read pair with a zero */
     {
       array (bb->dnas, iMax, Array) = 0 ;
       iMax++ ;
@@ -175,6 +175,7 @@ static BOOL parseOneSequence (DnaFormat format, char *namBuf, ACEIN ai, Array dn
 	    messcrash ("\nMissing quality identifier at line %d of fastq sequence file %s\n", *linep, aceInFileName (ai)) ;
 	  if (aceInCard (ai))
 	    {
+
 	      (*linep)++ ;
 	      if (qual) 
 		{
@@ -365,16 +366,16 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 	  bb->nSeqs++ ;
 	  bb->length += n1 ;
 	  bb->runStat.nReads++ ;
-	  bb->runStat.nBase1 += n1 ;
 
 	  switch (bb->rc.format)
 	    {
 	    case SRACACHE2:
-	      cp = namBuf + strlen (namBuf) - 3 ;
+	      cp = namBuf + strlen (namBuf) - 2 ;
 	      if (! strcmp (cp, ".2"))
 		{
 		  isRead2 = 1 ;
 		  *cp = 0 ;
+		  bb->runStat.nPairs++ ;
 		}
 	      if (! strcmp (cp, ".1"))
 		{
@@ -386,6 +387,9 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 	      break ;
 	    }
 	  
+	  if (isRead2) bb->runStat.nBase2 += n1 ;
+	  else  bb->runStat.nBase1 += n1 ;
+
 	  dictAdd (bb->dict, namBuf, &nn1) ;
 	  nn1 = (nn1 << 1) | isRead2 ;
 	  array (bb->dnas, nn1, Array) = dna1 ;
@@ -459,6 +463,23 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       unsigned char *restrict cp ;
 
       bytes += pos ;
+
+
+      if (bytes && format == SRACACHE)
+	{   /* check for identifiers signalling a paired end read */
+	  unsigned char *cq = buffer ;
+	  int nDots = 0, k = 0 ;
+	  while (k++ < bytes && cq && *cq != '\n')
+	    nDots += (*cq++ == '.' ? 1 : 0) ;
+	  if (nDots == 3)
+	    {
+	      format = SRACACHE2 ;
+	      b.rc.pairedEnd = TRUE ;
+	    }
+	  else
+	    format = SRACACHE1 ;
+	}
+      
       if (bytes < BMAX)
 	{
 	  done = TRUE ;
@@ -472,6 +493,12 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	  pos = 0 ;
 	  while (cp > buffer && *cp != '>')
 	    { pos++ ; cp-- ;}
+	  if (*cp == '>' && format == SRACACHE2 && cp > buffer &&  ! strstr ((char *)cp, ".1\n"))
+	    {  /* cp is the second read of the pair, search for the previous read */
+	      cp-- ; pos++ ;
+	      while (cp > buffer && *cp != '>')
+		{ pos++ ; cp-- ;}
+	    }
 	  if (*cp != '>' || (cp > buffer && cp[-1] != '\n'))
 	    messcrash ("gzread found a read > BMAX=%d", BMAX) ;
 	  pos++ ;
@@ -484,23 +511,13 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       if (!nBytes)
 	messcrash ("No sequence found in file %s\n", fileName1) ;
       
-      if (format == SRACACHE)
-	{   /* check for identifiers signalling a paired end read */
-	  unsigned char *cq = buffer ;
-	  int nDots = 0 ;
-	  while (cq && *cq != '\n')
-	    nDots += (*cq++ == '.' ? 1 : 0) ;
-	  if (nDots == 3)
-	    format = SRACACHE2 ;
-	  else
-	    format = SRACACHE1 ;
-	}
 
       /* create a data block */
       bb = &b ;
       memset (bb, 0, sizeof (BB)) ;
       bb->h = ac_new_handle () ;
 	  
+      bb->rc.format = format ;
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
@@ -519,6 +536,7 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       /* position the remnant */
       if (! done) memcpy (buffer, buffer2, pos) ;
       bb->nSeqs = 100 ;  /* a guess */
+      
       /* export the databalock to the channel */
       nPuts++ ;
       channelPut (chan, bb, BB) ;
@@ -556,33 +574,45 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   AC_HANDLE h = ac_new_handle () ;
   ACEOUT ao = 0 ;
   BB b ;
+  CHAN *chan = pp->plChan ;
+  BOOL debug = FALSE ;
   int BMAX = isGenome ? 100000 : (pp->BMAX << 20) ;
   const char *ccp ;
   long int bytes = 0, nBytes = 0 ;
   int nPuts = 0 ;
-
-  CHAN *chan = pp->plChan ;
-  BOOL debug = FALSE ;
-  
   DnaFormat format = rc->format ;
   const char *sraID = rc ? rc->fileName1 : tc->fileName ;
   char tBuf[25] ;
   clock_t t1, t2 ;
+  int Gb = pp->maxSraGb ;
+  int num_bases = 1 << 27 ; /* 128 M */
+  long unsigned int nMax = Gb ;
+  nMax <<= 30 ; /* to be in Gigabases */
+  nMax /=  num_bases ; 
+
+  
 
   if (isGenome || format != SRA)
     messcrash ("Bad internal options in sraSequenceParser, please edit the code, sorry") ;
 
-  char *fNam = hprintf (pp->h, "SRA/%s.fasta.gz", sraID) ;
+  char *fNam = hprintf (pp->h, "SRA/%s.fasta", sraID) ;
   if (1)  /* check in the cache */
     {
       char *cr = filName (fNam, 0, "r") ;
       if (cr)
+	fprintf (stderr, "Found cached file %s\n", fNam) ;
+      else
 	{
-	  fprintf (stderr, "Found cached file %s\n", fNam) ;
+	  cr = filName (fNam, ".gz", "r") ;
+	  if (cr)
+	    fprintf (stderr, "Found cached file %s.gz\n", fNam) ;
+	}
+      if (cr)
+	{
 	  rc->fileName1 = strnew (cr, pp->h) ;
 	  rc->format = SRACACHE ;
 	  ac_free (h) ;
-	  return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
+	  return fastaSequenceParser (pp, rc, tc, bb, isGenome) ; 
 	}
     }
 
@@ -600,14 +630,11 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
 
   t1 = clock () ;
   SRAObj* sra = SraObjNew(sraID);
-  long unsigned int nMax = (0x1L << 31) / BMAX ; /* 2Gb */
-  if (nMax < 1) nMax = 1 ;
-  rc->format = SRACACHE ;
+  format = SRACACHE ;
 
-  while (nMax-- > 0 && (ccp = SraGetReadBatch(sra, BMAX)))
+while ((!Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, BMAX)))
     {
-      if (ao)
-	aceOutf (ao, "%s", ccp) ;
+      if (ao)	aceOut (ao, ccp) ;  /* caching */
 
       bytes = strlen (ccp) ;
       nBytes += bytes ; 
@@ -630,17 +657,21 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       bb = &b ;
       memset (bb, 0, sizeof (BB)) ;
       bb->h = ac_new_handle () ;
-	  
+      bb->rc.format = format ;
+      
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
       bb->lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 1) + 1 ;
+      bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
       bb->rc.fileName1 = sraID ;
       /* copy the buffer */
       bb->gzBuffer = halloc (bytes + 1, bb->h) ;
       memcpy (bb->gzBuffer, ccp, bytes) ;
+
       bb->gzBuffer[bytes] = 0 ;
       bb->nSeqs = 100 ;  /* a guess */
+
       /* export the databalock to the channel */
       nPuts++ ;
       channelPut (chan, bb, BB) ;
@@ -829,20 +860,20 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 		}
 	      if (arrayMax (dna2))
 		array (bb->dnas, nn2, Array) = dna2 ;
-		  if (bb->quals && qual2)
-		    array (bb->quals, nn2, Array) = qual2 ;
-		  if (iMult < mult - 1)
-		    {
-		      dna2 = arrayHandleCopy (dna2, bb->h) ;
-		      if (bb->quals)
-			qual2 = arrayHandleCopy (qual2, bb->h) ;
-		    }
-		  else
-		    {
-		      dna2 = arrayHandleCreate (256, unsigned char, bb->h) ;
-		      if (bb->quals)
-			qual2 = arrayHandleCreate (256, unsigned char, bb->h) ;
-		    }
+	      if (bb->quals && qual2)
+		array (bb->quals, nn2, Array) = qual2 ;
+	      if (iMult < mult - 1)
+		{
+		  dna2 = arrayHandleCopy (dna2, bb->h) ;
+		  if (bb->quals)
+		    qual2 = arrayHandleCopy (qual2, bb->h) ;
+		}
+	      else
+		{
+		  dna2 = arrayHandleCreate (256, unsigned char, bb->h) ;
+		  if (bb->quals)
+		    qual2 = arrayHandleCreate (256, unsigned char, bb->h) ;
+		}
 	    }
 	  else
 	    {
@@ -992,12 +1023,33 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
   AC_HANDLE h = ac_new_handle () ;
   char *fName = hprintf (h, "SRA/%s.fasta", sraID) ;
   ACEOUT ao = 0 ; 
-
+  char tBuf[25] ;
+  
   if (mkdir("./SRA", 0755) == -1)
     {
       if (errno != EEXIST)       /* not "already exists" */
 	messcrash ("\nCannot create or cannot write in the SRA cache directory ./SRA") ;
     }
+
+  char *fNam = hprintf (h, "SRA/%s.fasta", sraID) ;
+  if (1)  /* check in the cache */
+    {
+      char *cr = filName (fNam, 0, "r") ;
+      if (cr)
+	fprintf (stderr, "Found cached file %s\n", fNam) ;
+      else
+	{
+	  cr = filName (fNam, ".gz", "r") ;
+	  if (cr)
+	    fprintf (stderr, "Found cached file %s.gz\n", fNam) ;
+	}
+      if (cr)
+	{
+	  ac_free (h) ;
+	  return 0 ;
+	}
+    }
+
   ao = aceOutCreate (fName, 0, TRUE, h) ;
   if (!ao)
     messcrash ("\nCannot create the SRA cache file %s", fName) ;
@@ -1008,10 +1060,15 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
   long unsigned int nMax = Gb ;
   nMax <<= 30 ; /* to be in Gigabases */
   nMax /=  num_bases ; 
-  
-  while ((! Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, num_bases)))
-    aceOutf (ao, "%s", ccp) ;
+  fprintf (stderr, "%s : SRA download %s ", timeBufShowNow(tBuf), sraID) ;
+  if (Gb) fprintf (stderr, "(top %d GigaBases) ", Gb) ;
 
+  while ((! Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, num_bases)))
+    {
+      fprintf (stderr, ".") ;
+      aceOut (ao, ccp) ;
+    }
+  fprintf (stderr, " done: %s\n", timeBufShowNow(tBuf)) ;
   SraObjFree(sra);
   ac_free (h) ;
   return 0 ;

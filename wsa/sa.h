@@ -70,19 +70,23 @@ typedef struct runStatStruct {
   int run ;   /* index in p.runDict */
   int nFiles ;
   long int nPairs, nReads ;
-  long int nAlignedPairs, nCompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
+  long int nCompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
   long int nBase1, nBase2 ;
+  long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
+  long int intergenic1, intronic1, exonic1 ;
+  long int intergenic2, intronic2, exonic2 ;
   long int nMultiAligned[11] ;
   long int nAlignedPerTargetClass[256] ;
   long int nPerfectReads ;
   long int nAlignments ;
-  long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
   long int nClippedPolyA ;
   long int nClippedVectors ;
   long int nSupportedIntrons ;
   long int nIntronSupports ;
   long int nIntronSupportPlus ;
-  long int nIntronSupportMinus ;    
+  long int nIntronSupportMinus ;
+  long int wiggleCumul ; /* in million bases */
+
   int minReadLength, maxReadLength ;
   char *adaptor1, *adaptor2 ;
   long int nN, nErr ;
@@ -181,11 +185,14 @@ typedef struct pStruct {
   Array runStats ;
   Array runLanes ;
   Array runLanesDone ;
-  Array genes ;           /* gene coordinates */
-  Array geneCounts ;      /* gene expression */
+  Array geneExons ;           /* gene coordinates */
+  Array geneBoxes ;           /* gene coordinates */
+  Array geneExonCounts ;      /* gene expression */
+  Array geneBoxCounts ;      /* gene expression */
   BigArray intronSeeds ;
   BigArray exonSeeds ;
   Array wiggles ;
+  Array wiggleCumuls ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   int bonus[256] ;
@@ -214,6 +221,7 @@ typedef struct pStruct {
   int errRateMax ;       /* (--align case) max number of errors in seed extension */
   int OVLN ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
+  long int wiggleCumul ; /* in million bases */
   BOOL splice ;
   long int nRawReads, nRawBases ; 
 } PP ;
@@ -224,12 +232,6 @@ typedef struct codeWordsStruct {
   int pos ;  /* bio coordinate of first letter of seed */
   unsigned int intron ;
 } __attribute__((aligned(16))) CW ;
-
-typedef struct aWigStruct {
-  int chrom ;
-  int w1, w2 ;
-  unsigned int dummy ;
-} __attribute__((aligned(16))) AWIG ;
 
 typedef struct hitStruct {
   unsigned int read ;  /* index in readDict */
@@ -254,7 +256,6 @@ typedef struct alignStruct {
   int a0, x0 ;  /* coordinate of the hit before extension */
   int a1, a2 ;  /* bio position in chrom, a1 < a2 on minus strand */
   int x1, x2 ;  /* bio position in read, x1 < x2 always */
-  int w1, w2 ;  /* wiggle coords, rounded, flipped if read2 */
   int chain, chainX1, chainX2, chainA1, chainA2 ;
   int id, previous, next ;
   int ali, chainAli, score, chainScore ;

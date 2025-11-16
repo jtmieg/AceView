@@ -94,6 +94,59 @@ void saCpuStatExport (const PP *pp, Array stats)
   return ;
 } /* saCpuStatExport */
 
+/*************************************************************************************/
+
+static void samStatsExports (const PP *pp, Array runStats)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  const char *METHOD = pp->method ? pp->method : "01_SortAlign" ;
+  Array aa = runStats ;
+  RunSTAT *s0 = arrayp (aa, 0, RunSTAT) ;
+  ACEOUT ao = aceOutCreate (pp->outFileName, ".s2g.samStats", 0, h) ;	
+  const char *run = pp->runName ? pp->runName : "xxx" ;
+
+  long int nRawReads = pp->nRawReads ? pp->nRawReads : s0->nReads ;
+  long int nRawBases = pp->nRawBases ? pp->nRawBases : s0->nBase1 + s0->nBase2 ;
+  
+  aceOutf (ao, "%s\t%s\tnRawReads\t%ld\n", run, METHOD, nRawReads) ;
+  aceOutf (ao, "%s\t%s\tnReads\t%ld\n", run, METHOD, s0->nReads) ;  
+  aceOutf (ao, "%s\t%s\tnRawBases\t%ld\n", run, METHOD, nRawBases) ;
+  aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
+  aceOutf (ao, "%s\t%s\tnPairsAligned\t%ld\n", run, METHOD, s0->nPairsAligned) ;
+  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\n", run, METHOD, s0->nCompatiblePairs) ;
+  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\n", run, METHOD, s0->nCirclePairs) ;
+  
+  aceOutf (ao, "%s\t%s\tnPerfectReads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(nRawReads + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(nRawReads + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(nRawReads/2 + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(nRawReads/2 + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnAlignments\t%ld\t%.2f per aligned read\n", run, METHOD, s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnMultiAligned\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0] - s0->nMultiAligned[1], (100.0 * (s0->nMultiAligned[0] - s0->nMultiAligned[1]))/(s0->nReads + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (nRawBases + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
+  long int nUnaligned = nRawReads - s0->nMultiAligned[0] ;
+  aceOutf (ao, "%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD, 0
+	   , nUnaligned
+	   , 100.0 * nUnaligned / (nRawReads + .000001)
+	   ) ;
+  for (int j = 1 ; j < 11 ; j++)
+    if (s0->nMultiAligned[j])
+      {
+	aceOutf (ao, "%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD
+		 , j, s0->nMultiAligned[j]
+		 , 100.0 * s0->nMultiAligned[j] / (nRawReads + .000001)
+		 ) ;
+      }
+  long int verif = 0 ;
+  for (int j = 1 ; j < 11 ; j++)
+    verif += s0->nMultiAligned[j] ;
+  aceOutf (ao, "nReads = %ld , sum of multiAli = %ld, verif = %ld\n", nRawReads, verif, nRawReads - verif) ; 
+
+  ac_free (h) ;
+  return ;
+} /* saSamStatsExport */
+
+/**************************************************************/
 /**************************************************************/
 /* cumulate int global runStats the content of bb->runStats */
 void saRunStatsCumulate (int run, Array aa, RunSTAT *vp)
@@ -106,7 +159,7 @@ void saRunStatsCumulate (int run, Array aa, RunSTAT *vp)
   up->nCirclePairs += vp->nCirclePairs ;
   up->nOrphans += vp->nOrphans ;
   up->n2ChromsPairs += vp->n2ChromsPairs ;
-  up->nAlignedPairs += vp->nAlignedPairs ;
+  up->nPairsAligned += vp->nPairsAligned ;
   up->nReads += vp->nReads ;
   up->nBase1 += vp->nBase1 ;
   up->nBase2 += vp->nBase2 ;
@@ -143,68 +196,145 @@ void saRunStatExport (const PP *pp, Array runStats)
   AC_HANDLE h = ac_new_handle () ;
   ACEOUT ao = aceOutCreate (pp->outFileName, ".runStats.tsf", 0, h) ;
   int run, runMax = arrayMax (runStats) ;
-  RunSTAT *up ;
   
   aceOutDate (ao, "##", "Run statistics") ;
-  aceOut (ao, "#") ;
   for (run = 1 ; run < runMax ; run++)
-    aceOutf (ao, "%c%s", run == 1 ? ' ' : '\t', dictName (pp->runDict, run)) ;
-  aceOutf (ao, "\nPairs") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nPairs) ;
-  aceOutf (ao, "\nAlignedPairs") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nAlignedPairs) ;
-  aceOutf (ao, "\nCompatiblePairs") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nCompatiblePairs) ;
-  aceOutf (ao, "\nCirclePairs") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nCirclePairs) ;
-  aceOutf (ao, "\nReads") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nReads) ;
-  aceOutf (ao, "\nAligned_Reads") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nMultiAligned[0]) ;
-  aceOutf (ao, "\nMissmatches") ;
-  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-    aceOutf (ao, "\t%d", up->nErr) ;
-  for (int ii = 1 ; ii < 5 ; ii++)
     {
-      aceOutf (ao, "\n%d Alis", ii) ;
-      for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-	aceOutf (ao, "\t%d", up->nMultiAligned[ii]) ;
-    }
-  for (int ii = 1 ; ii < 256 ; ii++)
-    {
-      up = arrp (runStats, 0, RunSTAT) ;
-      if (up->nAlignedPerTargetClass[ii])
+      RunSTAT *up = arrp (runStats, run, RunSTAT) ;
+
+      if (up->nReads)
 	{
-	  aceOutf (ao, "\nAligned in class %c", ii) ;
-	  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
-	    aceOutf (ao, "\t%d", up->nAlignedPerTargetClass[ii]) ;
-	}
-    }
-  for (int ii = 1 ; ii < 256 ; ii++)
-    {
-      up = arrp (runStats, 0, RunSTAT) ;
-      if (up->nAlignedPerTargetClass[ii])
-	{
-	  aceOutf (ao, "\nStranding in class %c", ii) ;
-	  for (run = 1,  up = arrp (runStats, run, RunSTAT) ; run < runMax ; up++, run++)
+	  const char *runNam = dictName (pp->runDict, run) ;
+	  
+	  aceOutf (ao, "%s\tPairs\ti\t%ld\n", runNam, up->nPairs) ;
+	  aceOutf (ao, "%s\tAlignedPairs\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nPairsAligned
+		   , 100.0 * up->nPairsAligned / (.000001 + up->nPairs)
+		   ) ;
+	  aceOutf (ao, "%s\tCompatiblePairs\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nCompatiblePairs
+		   , 100.0 * up->nCompatiblePairs / (.000001 + up->nPairsAligned)
+		   ) ;
+	  aceOutf (ao, "%s\tCirclePairs\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nCirclePairs
+		   , 100.0 * up->nCirclePairs / (.000001 + up->nPairsAligned)
+		   ) ;
+	  aceOutf (ao, "%s\tReads\ti\t%ld\n", runNam, up->nReads) ;
+	  aceOutf (ao, "%s\tAligned_Reads\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nMultiAligned[0]
+		   , 100.0 * up->nMultiAligned[0] / (.000001 + up->nReads)
+		   ) ;
+	  aceOutf (ao, "%s\tPerfect_Reads\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nPerfectReads
+		   , 100.0 * up->nPerfectReads / (.000001 + up->nMultiAligned[0])
+		   ) ;
+
+	  aceOutf (ao, "%s\tBases\tiii\t%ld\t%ld\t%ld\n"
+		   , runNam
+		   , up->nBase1 + up->nBase2
+		   , up->nBase1
+		   , up->nBase2
+		   ) ;
+	  aceOutf (ao, "%s\tnAligned_Bases\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nBaseAligned1 + up->nBaseAligned2
+		   , 100.0*(up->nBaseAligned1 + up->nBaseAligned2)/(.0001 + up->nBase1 + up->nBase2)
+		   , up->nBaseAligned1
+		   , 100.0 * up->nBaseAligned1/(.000001 + up->nBase1)
+		   , up->nBaseAligned2
+		   , 100.0 * up->nBaseAligned2/(.000001 + up->nBase2)
+		   ) ;
+	  
+	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases1\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
+		   , runNam
+		   , up->exonic1
+		   , 100.0*(up->exonic1)/(.000001 + up->nBaseAligned1)
+		   , up->intronic1
+		   , 100.0*(up->intronic1)/(.000001 + up->nBaseAligned1)
+		   , up->exonic1
+		   , 100.0*(up->intergenic1)/(.000001 + up->nBaseAligned1)
+		   ) ;
+	  
+	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases2\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
+		   , runNam
+		   , up->exonic2
+		   , 100.0*(up->exonic2)/(.000001 + up->nBaseAligned2)
+		   , up->intronic2
+		   , 100.0*(up->intronic2)/(.000001 + up->nBaseAligned2)
+		   , up->exonic2
+		   , 100.0*(up->intergenic2)/(.000001 + up->nBaseAligned2)
+		   ) ;
+	  
+	  aceOutf (ao, "%s\tATGCN\tiiiii\t%ld\t%ld\t%ld\t%ld\n"
+		   , runNam
+		   , up->NATGC[0]
+		   , up->NATGC[1]
+		   , up->NATGC[2]
+		   , up->NATGC[3]
+		   , up->NATGC[4]
+		   ) ;
+
+	  aceOutf (ao, "%s\tRead_length\tiii\t%ld\t%ld\t%ld\n"
+		   , runNam
+		   , (up->nBase1 + up->nBase2) / (.00000001 + up->nReads) 
+		   , (up->nBase1) / (.00000001 + (up->nPairs ? up->nPairs : up->nReads) )
+		   , (up->nBase2) / (.00000001 + (up->nPairs ? up->nPairs : up->nReads) )
+		   ) ;
+
+	  aceOutf (ao, "%s\twiggleCumul\ti\t%ld\n", runNam, up->wiggleCumul) ;
+	  aceOutf (ao, "%s\tMissmatches\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nErr
+		   , 100.0 * up->nErr /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
+		   ) ;
+	  for (int ii = 1 ; ii < 2 ; ii++)
+	    aceOutf (ao, "%s\tReads_Aligned_once\tif\t%ld\t%.3f\n"
+		     , runNam
+		     , up->nMultiAligned[ii]
+		     , 100.0 * up->nMultiAligned[ii]/(.000001 + up->nMultiAligned[0]) 
+		     ) ;
+	  for (int ii = 2 ; ii < 11 ; ii++)
+	    if (up->nMultiAligned[ii]) 
+	      aceOutf (ao, "%s\tReads_Multi_aligned__%d\tif\t%ld\t%.3f\n"
+		       , runNam, ii
+		       , up->nMultiAligned[ii]
+		       , 100.0 * up->nMultiAligned[ii]/(.000001 + up->nMultiAligned[0])
+		       ) ;
+	  
+	  for (int ii = 1 ; ii < 256 ; ii++)
 	    {
-	      int f = up->GF[ii] ;
-	      int r = up->GR[ii] ;
-	      int t = f + r ;
-	      if (t) aceOutf (ao, "\t%.3f"
-			      , 100.0 * f/t
-			      ) ;
+	      if (up->nAlignedPerTargetClass[ii])
+		aceOutf (ao, "%s\tAligned_in_class_%c\tif\t%ld\t%.3f\n"
+			 , runNam, ii
+			 , up->nAlignedPerTargetClass[ii]
+			 , up->nAlignedPerTargetClass[ii]/(.000001 + up->nMultiAligned[0]) 
+			 ) ;
+	    }
+	  for (int ii = 1 ; ii < 256 ; ii++)
+	    {
+	      if (up->nAlignedPerTargetClass[ii])
+		{
+		  int f = up->GF[ii] ;
+		  int r = up->GR[ii] ;
+		  int t = f + r ;
+		  if (t)		  
+		    aceOutf (ao, "%s\tStranding_in_class_%c\tf\t%.3f\n", runNam, ii
+			     , 100.0 * f/t
+			     ) ;
+		}
 	    }
 	}
     }
-  aceOut (ao, "\n") ;
-  
   ac_free (h) ;
+
+  samStatsExports (pp, runStats) ;
+
+  return ;    
 } /* saRunStatExport */
 
+/**************************************************************/

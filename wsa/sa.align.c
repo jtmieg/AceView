@@ -1508,10 +1508,10 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 /**************************************************************/
 /* Establish chain scores, select best */
 static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array aa, int read, Array bestUp)
-				
+  
 {
   ALIGN *up, *vp ;
-
+  
   int ii ;
   int iMax = alignLocateChains (bestUp, aa, read) ;  
   int nChains = 0 ;
@@ -1521,7 +1521,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   Array dnaG = 0, dnaGR = 0 ;
   int read1 = read & (~0x1) ;
   int read2 = read | 0x1 ;
-
+  
   dna1 = arr (bb->dnas, read1, Array) ;
   dna2 = arr (bb->dnas, read2, Array) ;
   
@@ -1533,19 +1533,29 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
       if (read == up->read)
 	{
 	  dna = up->read & 0x1 ? dna2 : dna1 ;
-	  if (up->chrom != chromA)
-	    {
-	      chromA = up->chrom ;
-	      dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
-	      dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
-	    }
 	  
-	  if (up->x1 && up->x1 == up->chainX1)	
-	    alignFormatLeftOverhang (pp, bb, up, dna, dnaG, dnaGR) ;
-	  if (up->x2 == up->chainX2)	
-	    alignFormatRightOverhang (pp, bb, up, dna, dnaG, dnaGR) ;
+	  if (up->x1 > 1 && up->x1 == up->chainX1)
+	    {
+	      if (up->chrom != chromA)
+		{
+		  chromA = up->chrom ;
+		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
+		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
+		}
+	      alignFormatLeftOverhang (pp, bb, up, dna, dnaG, dnaGR) ;
+	    }
+	  if (up->x2 == up->chainX2 && up->x2 < arrayMax (dna))	
+	    {
+	      if (up->chrom != chromA)
+		{
+		  chromA = up->chrom ;
+		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
+		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
+		}
+	      alignFormatRightOverhang (pp, bb, up, dna, dnaG, dnaGR) ;
+	    }
 	}
-  
+
   /* format the errors */
   iMax = arrayMax (aa) ;
   if (iMax)
@@ -1581,89 +1591,89 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   
   for (int ic = 0 ; ic < arrayMax (bestUp) ; ic++)
     {
-      up = arrp (aa, array (bestUp, ic, int), ALIGN) ; 
-      int a1 = up->a1 ;
-      int a2 = up->a2 ;
-      int tc = up->targetClass ;
-      BOOL s = a1 < a2 ;
-      
-      if (! tc || allTc[tc])
-	continue ;
-      allTc[tc] = 1 ;
-      if (up->read & 0x1)
-	s = !s ;
-      if (s)
-	bb->runStat.GF[tc]++ ;
-      else
-	bb->runStat.GR[tc]++ ;
-      
-      bb->runStat.nAlignedPerTargetClass[tc]++ ;
+      up = arrp (aa, array (bestUp, ic, int), ALIGN) ;
+      if (read == up->read)
+	{
+	  int a1 = up->a1 ;
+	  int a2 = up->a2 ;
+	  int tc = up->targetClass ;
+	  BOOL s = a1 < a2 ;
+	  
+	  if (! tc || allTc[tc])
+	    continue ;
+	  allTc[tc] = 1 ;
+	  if (up->read & 0x1)
+	    s = !s ;
+	  if (s)
+	    bb->runStat.GF[tc]++ ;
+	  else
+	    bb->runStat.GR[tc]++ ;
+	  
+	  bb->runStat.nAlignedPerTargetClass[tc]++ ;
+	}
     }
-  
   /* increase the block stats */
   nChains = 0 ;
   if (arrayMax (bestUp))
     {
+      int tc0 = 0 ;
+      nChains = 0 ;
       memset (allTc, 0, sizeof (allTc)) ;
       
-      up = arrp (aa, array (bestUp, 1, int), ALIGN) ; 
-      int tc0 = up->targetClass ;
-      bb->nAli++ ;
-      bb->runStat.nAlignedPerTargetClass[0]++ ;
-      bb->runStat.nMultiAligned[0]++ ;
-
-      nChains = 1 ;
-
-      bb->runStat.nErr += up->chainErr ;
-      bb->aliDx += up->chainAli ;
-      bb->aliDa += up->chainAli ;
-      bb->runStat.nAlignments++ ;
-      
-      dna = up->read & 0x1 ? dna2 : dna1 ;
-      if (up->chainErr == 0 && up->chainAli == arrayMax (dna))
-	bb->runStat.nPerfectReads++ ;
-      
-      if (up->read & 0x1)
-	bb->runStat.nBaseAligned2 += up->chainAli ;
-      else
-	bb->runStat.nBaseAligned1 += up->chainAli ;
-
-      for (int ic = 2 ; ic < arrayMax (bestUp) ; ic++)
+      up = 0 ;
+      for (int ic = 1 ; ic < arrayMax (bestUp) ; ic++)
 	{
 	  vp = arrp (aa, array (bestUp, ic, int), ALIGN) ;
 	  int tc = vp->targetClass ;
 	  if (read == vp->read)
-	    if (tc == tc0)
-	      { /* count multiali only in main class */
-		int z1 = (up->chainX1 > vp->chainX1 ? up->chainX1 : vp->chainX1) ;
-		int z2 = (up->chainX2 < vp->chainX2 ? up->chainX2 : vp->chainX2) ;
-		int dz = z2 - z1 ;
-		int du = up->chainX2 - up->chainX1 ;
-		int dv = vp->chainX2 - vp->chainX1 ;
+	    {
+	      if (! up)
+		{
+		  up = vp ;
+		  tc0 = up->targetClass ;
+		  bb->nAli++ ;
+		  bb->runStat.nAlignedPerTargetClass[0]++ ;
+		  bb->runStat.nMultiAligned[0]++ ;
+		  bb->runStat.nErr += up->chainErr ;
+		  nChains = 1 ;
+		  
+		  dna = up->read & 0x1 ? dna2 : dna1 ;
+		  if (up->chainErr == 0 && up->chainAli == arrayMax (dna))
+		    bb->runStat.nPerfectReads++ ;
+		}
+      
+	      if (up != vp && tc == tc0)
+		{ /* count multiali only in main class */
+		  int z1 = (up->chainX1 > vp->chainX1 ? up->chainX1 : vp->chainX1) ;
+		  int z2 = (up->chainX2 < vp->chainX2 ? up->chainX2 : vp->chainX2) ;
+		  int dz = z2 - z1 ;
+		  int du = up->chainX2 - up->chainX1 ;
+		  int dv = vp->chainX2 - vp->chainX1 ;
+		  
+		  if (2 * dz > du || 2 * dz > dv) /* significant overlap */
+		    {
+		      bb->runStat.nAlignments++ ;
+		      nChains++ ;
+		      continue ;
+		    }
+		}
 
-		if (2 * dz > du || 2 * dz > dv) /* significant overlap */
-		  {
-		    bb->runStat.nAlignments++ ;
-		    nChains++ ;
-		  }
-		else
-		  {
-		    bb->runStat.nErr += vp->chainErr ;
-		    bb->aliDx += vp->chainAli ;
-		    bb->aliDa += vp->chainAli ;
-		    if (vp->read & 0x1)
-		      bb->runStat.nBaseAligned2 += vp->chainAli ;
-		    else
-		      bb->runStat.nBaseAligned1 += vp->chainAli ;
-		  }
-	      }
+	      bb->runStat.nErr += vp->chainErr ;
+	      bb->aliDx += vp->chainAli ;
+	      bb->aliDa += vp->chainAli ;
+	      if (vp->read & 0x1)
+		bb->runStat.nBaseAligned2 += vp->chainAli ;
+	      else
+		bb->runStat.nBaseAligned1 += vp->chainAli ;
+	    }
 	}
       if (nChains)
 	bb->runStat.nMultiAligned[nChains > 10 ? 10 : nChains]++ ;
     }
+
   /* register the alignments */
   long int kMax = bigArrayMax (aaa) ;
-
+  
   iMax = arrayMax (aa) ;
   if (iMax)
     {
@@ -1678,7 +1688,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	  }
     }
   return ;
-} /* alignSelectBestChain */
+} /* alignDoRegisterOnePair */
 
 /**************************************************************/
 static void alignDoOneRead (const PP *pp, BB *bb
@@ -1903,12 +1913,16 @@ static void alignDoOnePair (const PP *pp, BB *bb
       int iMax1 = arrayMax (bestUp1) ;
       int iMax2 = arrayMax (bestUp2) ;
 
+      BOOL hasPair = FALSE, hasGoodPair = FALSE, hasCirclePair = FALSE ;
+
       if (iMax1 && iMax2)
 	{
 	  Array pairs = arrayHandleCreate (iMax1 * iMax2 , PAIR, h) ;
 	  PAIR *px ;
 	  int i1, i2 ;
 	  int jj = 0 ;
+
+	  hasPair = TRUE ;
 	  for (i1 = 1 ; i1 < iMax1 ; i1++)
 	    for (i2 = 1 ; i2 < iMax2 ; i2++)
 	      {
@@ -1926,6 +1940,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 
 		    if (da > 0 && db < 1000000) /* true pair */
 		      {
+			hasGoodPair = TRUE ;
 			px = arrayp (pairs, jj++, PAIR) ;
 			px->up = up ;
 			px->vp = vp ;
@@ -1936,6 +1951,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		      }
 		  }
 	      }
+
 	  int jMax = jj ;
 	  if (jMax)
 	    {
@@ -1945,7 +1961,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 	      PAIR *px0 = arrayp (pairs, 0, PAIR), *qx = 0, *rx ;
 	      int bestScore = px0->score, kk = 0 ;
 	      Array aaa1 = arrayHandleCreate (arrayMax (aaa), ALIGN, h) ;
-
+	      
 	      for (jj = 0, px = px0 ; jj < jMax && px->score == bestScore ; jj++, px++)
 		{
 		  if (qx && px->up == qx->up && px->a2 > qx->a2)
@@ -1959,9 +1975,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		    continue ;
 		  qx = px ;
 
-		  bb->runStat.nAlignedPairs++ ;
-		  bb->runStat.nCompatiblePairs++ ;
-		  
+		  hasPair = TRUE ;
 		  up = px->up ;
 		  for (vp = up ; vp->chain == up->chain && vp->read == up->read ; vp++)
 		    {
@@ -1989,6 +2003,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		      *zp = *up ;
 		    }	  
 		}
+
 	      arrayMax (aaa) = 0 ;
 	      if (kk)
 		{
@@ -1997,6 +2012,9 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		}
 	    }
 	}
+      if (hasPair) bb->runStat.nPairsAligned++ ;
+      if (hasGoodPair) bb->runStat.nCompatiblePairs++ ;
+      if (hasCirclePair) bb->runStat.nCirclePairs++ ;
     }
   /* alignDoSelectBestPair */ 
   alignDoRegisterOnePair (pp, bb, aaaa, aaa, read1, bestUp1) ;

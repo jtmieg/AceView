@@ -70,7 +70,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
 
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
     {
-      int mult = ap->nTargetRepeats ;
+      int mult = ap->nTargetRepeats ? ap->nTargetRepeats : 1 ;
       int weight = 720/mult ;
       if (weight)
 	{
@@ -100,7 +100,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
 	    }
 	}
     }
-  fprintf (stderr, "%s: lane %d: wiggleCreate created %d wiggles, %d switching\n", timeBufShowNow (tBuf), bb->lane, arrayMax (wiggles), nsw) ;
+  if (0) fprintf (stderr, "%s: lane %d: wiggleCreate created %d wiggles, %d switching\n", timeBufShowNow (tBuf), bb->lane, arrayMax (wiggles), nsw) ;
   return  arrayMax (wiggles) ;
 } /* wiggleCreate */
 
@@ -141,10 +141,14 @@ static void wiggleExportOne (const PP *pp, int nw)
   int run = nw / (2 * chromMax) ;
   int chrom = (nw % (2 * chromMax)) ;
   char strand = ( nw & 0x1) ? 'r' : 'f' ;
+  RunSTAT *rc = arrayp (pp->runStats, run, RunSTAT) ;
   long int ii, iMax = bigArrayMax (wig) ;
+  long int cumul = 0 ;
   unsigned int pos0 ;
-  Array genes = pp->genes ? array (pp->genes, chrom, Array) : 0 ;
-  Array geneC = array (pp->geneCounts, nw, Array) ;
+  Array geneExons = pp->geneExons ? array (pp->geneExons, chrom, Array) : 0 ;
+  Array geneBoxes = pp->geneBoxes ? array (pp->geneBoxes, chrom, Array) : 0 ;
+  Array geneC = pp->geneExons ? array (pp->geneExonCounts, nw, Array) : 0 ;
+  Array geneB = pp->geneBoxes ? array (pp->geneBoxCounts, nw, Array) : 0 ;
   int step = WIGGLE_STEP ;
   int demiStep = step/2 ;
   if (2*demiStep == step) demiStep-- ; /* examples d=4, 2, 0 */
@@ -187,28 +191,57 @@ static void wiggleExportOne (const PP *pp, int nw)
 
       	  xp = arrayp (a, 0, unsigned int) ;
 	  for (int j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
-	    aceOutf (ao, "%u\n", xp[j]/720) ;
+	    {
+	      unsigned int w = xp[j] / 720 ;
+	      aceOutf (ao, "%u\n", w) ;
+	      cumul += w * step ;
+	    }
 	}
 
-      if (arrayMax(a) && genes)
+      if (arrayMax(a) && geneBoxes)
 	{
-	  int ig = 0, igMax = arrayMax (genes) ;
-	  GENE *gp = arrayp (genes, 0, GENE) ;
+	  int ig = 0, igMax = arrayMax (geneExons) ;
+	  int ib = 0, ibMax = arrayMax (geneBoxes) ;
+	  GENE *gp = arrayp (geneExons, 0, GENE) ;
+	  GENE *gb = arrayp (geneBoxes, 0, GENE) ;
       	  xp = arrayp (a, 0, unsigned int) ;
 
 	  for (int j = 0, jMax = arrayMax(a), x = WIGGLE_STEP * (j + pos0) ; j < jMax ; j++, x += WIGGLE_STEP)
 	    {
-	      while (ig > 0 && gp->a1 > x) { gp-- ; ig-- ; }
-	      while (ig < igMax && gp->a2 < x) { gp++ ; ig++ ; }
-	      while (ig < igMax && gp->a1 <= x + demiStep && gp->a2 >= x - demiStep)
-		{ array (geneC, gp->gene, int) += xp[j]/720 ; gp++ ; ig++ ; }
+	      int isGeneTr = 0 ;
+	      int weight = step * xp[j] ; 
+	      while (ib > 0 && gb->a1 > x) { gb-- ; ib-- ; }
+	      while (ib < ibMax && gb->a2 < x) { gb++ ; ib++ ; }
+	      while (ib < ibMax && gb->a1 <= x + demiStep && gb->a2 >= x - demiStep)
+		{ array (geneB, gp->gene, int) += weight ; gb++ ; ib++ ; isGeneTr = 1 ; }
+	      if (isGeneTr)
+		{
+		  while (ig > 0 && gp->a1 > x) { gp-- ; ig-- ; }
+		  while (ig < igMax && gp->a2 < x) { gp++ ; ig++ ; }
+		  while (ig < igMax && gp->a1 <= x + demiStep && gp->a2 >= x - demiStep)
+		    { array (geneC, gp->gene, int) += weight ; gp++ ; ig++ ; isGeneTr = 2 ; }
+		}
+	      if (nw & 0x1)
+		switch (isGeneTr)
+		  {
+		  case 2: rc->exonic2 += weight ; break ;
+		  case 1: rc->intronic2 += weight ; break ;
+		  default: rc->intergenic2 += weight ; break ; 
+		  }
+	      else
+		switch (isGeneTr)
+		  {
+		  case 2: rc->exonic1 += weight ; break ;
+		  case 1: rc->intronic1 += weight ; break ;
+		  default: rc->intergenic1 += weight ; break ; 
+		  }
 	    }
 	}
-
 	  
       ac_free (h) ;
     }
 
+  array (pp->wiggleCumuls, nw, long int) = cumul ;  
   return ;
 } /* wiggleExportOne */
 
@@ -232,7 +265,7 @@ void wiggleExportAgent (const void *vp)
 /**************************************************************/
 
 typedef struct gcStruct {
-  int gene, run, count, dummy ; 
+  int gene, run, boxCount, exonCount ; 
 } __attribute__((aligned(16))) GC ;
 
 /**************************************************************/
@@ -256,6 +289,7 @@ static void wiggleExportGeneCounts (const PP *pp)
   AC_HANDLE h = ac_new_handle () ;
   int nw, wMax = arrayMax (pp->wiggles) ;
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
+  BigArray allGeneB ;
   BigArray allGeneC ;
   long int igc = 0, igcMax = 0 ;
   GC *gc ; 
@@ -263,39 +297,108 @@ static void wiggleExportGeneCounts (const PP *pp)
   
   fprintf (stderr, "%s: start geneCounts export\n", timeBufShowNow (tBuf)) ;
   
+  allGeneB = bigArrayHandleCreate (500000, GC, h) ;
   allGeneC = bigArrayHandleCreate (1000000, GC, h) ;
   for (nw = 0 ; nw < wMax ; nw++)
     {
-      Array geneC = array (pp->geneCounts, nw, Array) ;
+      Array geneC = array (pp->geneExonCounts, nw, Array) ;
+      Array geneB = array (pp->geneBoxCounts, nw, Array) ;
       int run = nw / (2 * chromMax) ;
-      int gMax = geneC ? arrayMax (geneC) : 0 ;
+      int gCMax = geneC ? arrayMax (geneC) : 0 ;
+      int gBMax = geneB ? arrayMax (geneB) : 0 ;
       int gene, *xp ;
-      
-      if (gMax)
-	for (gene = 0, xp = arrp (geneC, 0, int) ; gene < gMax ; gene++, xp++)
+      if (gCMax)
+	for (gene = 0, xp = arrp (geneC, 0, int) ; gene < gCMax ; gene++, xp++)
 	  if (*xp > 0)
 	    {
 	      gc = bigArrayp (allGeneC, igcMax++, GC) ;
 	      gc->gene = gene ;
 	      gc->run = run ;
-	      gc->count = *xp ;
+	      gc->exonCount = *xp ;
+	    }
+      if (gBMax)
+	for (gene = 0, xp = arrp (geneB, 0, int) ; gene < gBMax ; gene++, xp++)
+	  if (*xp > 0)
+	    {
+	      gc = bigArrayp (allGeneB, igcMax++, GC) ;
+	      gc->gene = gene ;
+	      gc->run = run ;
+	      gc->boxCount = *xp ;
 	    }
     }
   bigArraySort (allGeneC, gcOrder) ;
+  bigArraySort (allGeneB, gcOrder) ;
   
   ACEOUT ao = aceOutCreate (pp->outFileName, ".geneCounts.tsf", pp->gzo, h) ;
   aceOutDate (ao, "##", "wiggle") ;
   for (igc = 0, gc = bigArrp (allGeneC, 0, GC) ; igc < igcMax ; igc++, gc++)
-    aceOutf (ao, "%s\t%s\ti\t%d\n"
+    aceOutf (ao, "%s\t%s\tii\t%d\t%d\n"
 	     , dictName (pp->geneDict, gc->gene)
 	     , dictName (pp->runDict, gc->run)
-	     , gc->count
+	     , gc->boxCount, gc->exonCount
 	     ) ;
   
   fprintf (stderr, "%s: stop geneCounts export\n", timeBufShowNow (tBuf)) ;
   ac_free (h) ;
   return ;
 } /* wiggleExportGeneCounts */
+
+/**************************************************************/
+
+static void wiggleExportWiggleStats (PP *pp)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int wMax = arrayMax (pp->wiggles) ;
+  int chromMax = dictMax (pp->bbG.dict) + 1 ;
+  long int nnn = 0 ;
+  ACEOUT ao = aceOutCreate (pp->outFileName, ".wiggleCumuls.tsf", pp->gzo, h) ;
+  aceOutDate (ao, "##", "wiggleCumuls in Million Bases") ;
+
+  /* export the wiggle cunls per run. chromosome, strand */
+  for (int nw = 0 ; nw < wMax ; nw++)
+    {
+      int run = nw / (2 * chromMax) ;
+      int chrom = (nw % (2 * chromMax)) ;
+      char strand = ( nw & 0x1) ? 'r' : 'f' ;
+      long int cumul = array (pp->wiggleCumuls, nw, long int) ;
+
+      if (cumul)
+	{
+	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) ;
+	  const char *runNam = dictName (pp->runDict, run) ;
+
+	  RunSTAT *rc = arrayp (pp->runStats, run, RunSTAT) ;
+	  rc->wiggleCumul += cumul ;
+	  nnn += cumul ;
+	  aceOutf (ao, "%s.%c\t%s\ti\t%ld\n"
+		   , chromNam, strand
+		   , runNam
+		   , cumul 
+		   ) ;	       
+	}
+    }
+
+  /* export the cumul per run and globally */
+  pp->wiggleCumul = 0 ;
+  for (int run = 1 ; run <= dictMax (pp->runDict) ; run++)
+    {
+      RunSTAT *rc = arrayp (pp->runStats, run, RunSTAT) ;
+      long int cumul = rc->wiggleCumul ;
+      if (cumul)
+	{
+	  const char *runNam = dictName (pp->runDict, run) ;
+	  aceOutf (ao, "%s\t%s\ti\t%ld\n"
+		   , "Any"
+		   , runNam
+		   , cumul
+		   ) ;
+	  pp->wiggleCumul += cumul ;
+	}
+    }
+  
+  ac_free (h) ;
+  return ;
+} /* wiggleExportWiggleStats */
 
 /**************************************************************/
 /**************************************************************/
@@ -307,8 +410,12 @@ void saWiggleExport (PP *pp, int nAgents)
   BOOL debug = FALSE ;
   char tBuf[25] ;
 
-  if (pp->genes)
-    pp->geneCounts = arrayHandleCreate (wMax, Array, h) ;
+  pp->wiggleCumuls = arrayHandleCreate (wMax, long int, h) ;
+  if (pp->geneBoxes)
+    {
+      pp->geneExonCounts = arrayHandleCreate (wMax, Array, h) ;
+      pp->geneBoxCounts = arrayHandleCreate (wMax, Array, h) ;
+    }
   fprintf (stderr, "%s: start exportation of  %d wiggles\n", timeBufShowNow (tBuf), wMax) ;
   /* parallelize: open a channel and start agents */
   pp->wwChan = channelCreate (wMax + 1, int, h) ;
@@ -330,7 +437,11 @@ void saWiggleExport (PP *pp, int nAgents)
       Array wig = arr (pp->wiggles, nw, Array) ;
       if (wig)
 	{
-	  array (pp->geneCounts, nw, Array) = arrayHandleCreate (2048, dictMax (pp->geneDict) + 1, h) ;
+	  if (pp->geneBoxCounts)
+	    {
+	      array (pp->geneBoxCounts, nw, Array) = arrayHandleCreate (2048, dictMax (pp->geneDict) + 1, h) ;
+	      array (pp->geneExonCounts, nw, Array) = arrayHandleCreate (2048, dictMax (pp->geneDict) + 1, h) ;
+	    }
 	  channelPut (pp->wwChan, &nw, int) ;
 	}
     }
@@ -342,8 +453,10 @@ void saWiggleExport (PP *pp, int nAgents)
 
   fprintf (stderr, "%s: stop wiggle export\n", timeBufShowNow (tBuf)) ;
 
-  if (pp->genes)
+  if (pp->geneBoxes)
     wiggleExportGeneCounts (pp) ;
+
+  wiggleExportWiggleStats (pp) ;
   
   ac_free (h) ;
   return ;
