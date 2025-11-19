@@ -9422,7 +9422,7 @@ int main (int argc, const char **argv)
   AC_HANDLE h = ac_new_handle () ;
   const char *ccp, *dbName = 0 ;
 
-  freeinit () ; 
+  if (1)   freeinit () ; 
   messErrorInit (argv[0]) ;
 
   memset (&ba, 0, sizeof (BA)) ;

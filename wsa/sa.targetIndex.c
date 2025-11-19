@@ -75,9 +75,6 @@ static Array saTargetParseConfig (PP *pp)
 		       ) ;
 	  tc = arrayp (tcs, nn++, TC) ;
 	  tc->targetClass = cc ;
-	  if (cc == 'M') tc->bonus = 1 ;
-	  if (cc == 'R') tc->bonus = 8 ;
-	  if (cc == 'C') tc->bonus = 8 ;	  
 	  /* file names */
 	  aceInStep (ai, '\t') ;
 	  cp = aceInWord (ai) ;
@@ -397,6 +394,8 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
       tc = arrayp (tArray, nn, TC) ;
       if (tc->targetClass == 'I')
 	continue ; /* we need to parse thge genome before the introns */
+      if (tc->targetClass == 'S')
+	continue ; /* we need to parse thge genome before the introns */
       nTc++ ;
     }
 
@@ -405,9 +404,12 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
       tc = arrayp (tArray, nn, TC) ;
       RC rc ;
       int step ;
-      
+
+      /* we need to parse the genome before the annotations */
       if (tc->targetClass == 'I')
-	continue ; /* we need to parse the genome before the introns */
+	continue ; 
+      if (tc->targetClass == 'S')
+	continue ; 
       ntc++ ;
       
       memset (&rc, 0, sizeof (RC)) ;
@@ -433,7 +435,7 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
       tc = arrayp (tArray, nn, TC) ;
 
       if (tc->targetClass == '*')
-	saIntronParser (pp, bbG, tc) ;
+	saIntronParser (pp, tc) ;
     }
   
   for (int nn = 0 ; nn < nMax ; nn++)
@@ -441,7 +443,15 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
       tc = arrayp (tArray, nn, TC) ;
 
       if (tc->targetClass == 'I')
-	saGffParser (pp, bbG, tc) ;
+	saGffParser (pp, tc) ;
+    }
+  
+  for (int nn = 0 ; nn < nMax ; nn++)
+    {
+      tc = arrayp (tArray, nn, TC) ;
+
+      if (tc->targetClass == 'S')
+	{ continue ; saSpongeParser (pp, tc) ; }
     }
   
   t2 = clock () ;

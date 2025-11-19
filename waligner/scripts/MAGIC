@@ -661,7 +661,8 @@ if (-e MetaDB/$MAGIC/compare_runs.txt) then
   echo "pparse MetaDB/$MAGIC/compare_runs.ace" |  bin/tacembly MetaDB -noprompt
 endif
 
-echo "--- check the group hierarchy"
+echo "--- check the group hierarchy in project $MAGIC"
+pwd
 if (-e tmp/COUNT) then
   bin/bestali -checkGroupHierarchy -project $MAGIC -db MetaDB
   if ($status > 0) exit 1

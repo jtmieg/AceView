@@ -1125,8 +1125,9 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//      Column 1: one of G, M, R, C, A, I, T, B, V : target class.\n"
 	       "//         G: Genome fasta files, RNA will be aligned on the genome jumping introns\n"
 	       "//         M: Mitochondial fasta file\n"
+	       "//         C: Chloroplast fasta file\n"
 	       "//         R: Ribosomal RNA fasta file\n"
-	       "//         C: Control sequences (i.e. ERCC)\n"
+	       "//         E: Control sequences (i.e. ERCC)\n"
 	       "//         A: Adaptor fasta file \n"
 
 
@@ -1321,7 +1322,7 @@ int main (int argc, const char *argv[])
 
   /**************************  SRA downloader *********************************/
   
-  {{  /* --sraDownloar SRR1,SRR2,,...
+  {{  /* --sraDownload SRR1,SRR2,,...
        * Just download SRA files from NCBI/SRA into the local SRA caching directory
        * This is not needed by the aligner, but is provided as a service to the user
        * since it costs us nothing as we have a real-time downloader available
@@ -1538,6 +1539,8 @@ int main (int argc, const char *argv[])
   getCmdLineText (h, &argc, argv, "--index", &(p.indexName)) ;
   getCmdLineText (h, &argc, argv, "-t", &(p.tFileName)) ;
   getCmdLineText (h, &argc, argv, "-T", &(p.tConfigFileName)) ;
+  getCmdLineText (h, &argc, argv, "--spongeF", &(p.tFileSpongeFileNameF)) ;
+  getCmdLineText (h, &argc, argv, "--spongeR", &(p.tFileSpongeFileNameR)) ;
   p.createIndex = getCmdLineText (h, &argc, argv, "--createIndex", &(p.indexName)) ;
   
   if (p.createIndex)
@@ -1583,6 +1586,9 @@ int main (int argc, const char *argv[])
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
 
+  p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
+  getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
+  
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
@@ -1757,6 +1763,13 @@ int main (int argc, const char *argv[])
   array (p.runLanes, n - 1, atomic_int) = 0 ;
   array (p.runLanesDone, n - 1, atomic_int) = 0 ;
   
+  /* Set bonus for over represented sequences */
+  p.bonus['M'] = 4 ; /* mitochondria */
+  p.bonus['C'] = 4 ; /* chloroplast */
+  p.bonus['R'] = 8 ; /* rRNA */
+  p.bonus['E'] = 8 ; /* ERCC spikeIns */
+
+
   /******************** launch the multiprocessing ***************************************/
 
   wego_max_threads (maxThreads) ;
@@ -1854,6 +1867,8 @@ int main (int argc, const char *argv[])
       channelGet (p.gmChan, &p.bbG, BB) ;
       if (! p.bbG.cwsN[0])
 	messcrash ("matchHits received no target words") ;
+      
+      saSpongeParserDirect (&p) ;
       
       /* map the reads to the genome in parallel */
       for (int pass = 0 ; pass < 2 ; pass++)
@@ -2003,8 +2018,8 @@ int main (int argc, const char *argv[])
   if (p.wiggle)
     saWiggleExport (&p, nAgents) ;
   saCpuStatExport (&p, cpuStats) ;
-  saRunStatExport (&p, p.runStats) ;
   saIntronsExport (&p, confirmedIntrons) ;
+  saRunStatExport (&p, p.runStats) ;
   
   wego_log ("Done") ;
   wego_flush () ; /* flush the wego logs to stderr */

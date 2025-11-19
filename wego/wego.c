@@ -583,11 +583,17 @@ static void *wego_threadrunner (void *thread_parameter)
       /*
        * execute the user's function
        */
-      if (w->lightInterface)
+      /*
+	if (w->lightInterface)
 	w->function(w->parameter_struct) ;
       else
 	w->function(w, w->parameter_struct, w->result_struct);
+      */
       
+      if (w->lightInterface)
+	((void(*)(const void*))w->function)(w->parameter_struct);
+      else
+	((void(*)(const void*, void*, void*))w->function)(w, w->parameter_struct, w->result_struct);
       /*
        * Flag the task as finished.
        * Wake up anybody who is waiting for the results.

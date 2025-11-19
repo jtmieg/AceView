@@ -1697,11 +1697,13 @@ static void gxCounts (GX *gx)
 
 static void gxOneAltIntrons (GX *gx, AC_OBJ obj)
 {
-  AC_HANDLE h = ac_new_handle () ;
+  /*
+    AC_HANDLE h = ac_new_handle () ;
   AC_TABLE map = ac_tag_table (obj, "IntMap", h) ;
   AC_TABLE uno = ac_tag_table (obj, "de_uno", h) ;
 
   ac_free (h) ;
+  */
   return ;
 } /* gxAltIntrons */
 
@@ -1709,7 +1711,8 @@ static void gxOneAltIntrons (GX *gx, AC_OBJ obj)
 
 static void gxAltIntrons (GX *gx)
 {
-  AC_HANDLE h = ac_new_handle () ;
+  /*
+    AC_HANDLE h = ac_new_handle () ;
   AC_ITER iter ;
   AC_OBJ obj = 0 ;
   int nn = 0, ir ;
@@ -1721,6 +1724,8 @@ static void gxAltIntrons (GX *gx)
     gxOneAltIntrons (gx, obj) ;
 
   ac_free (h) ;
+  */
+  gxOneAltIntrons (gx, 0) ; /* for compiler happiness */
   return ;
 } /* gxAltIntrons */
 

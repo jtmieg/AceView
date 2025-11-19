@@ -152,6 +152,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  else if (strstr (rc->fileName1, ".fna") == rc->fileName1 + ln - 4) rc->format = FASTA ;
 	  else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	  else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
+	  else if (! strncmp (rc->fileName1, "DRR", 3)) rc->format = SRA ;
 	  
 	  /* user can override the defaults */
 	  if (pp->raw) rc->format = RAW ;
@@ -272,6 +273,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	      else if (strstr (rc->fileName1, ".fna") == rc->fileName1 + ln - 4) rc->format = FASTA ;
 	      else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	      else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
+	      else if (! strncmp (rc->fileName1, "DRR", 3)) rc->format = SRA ;
 	    }
 
 	  if (rc->format == SRA)  /* check in the cache */
@@ -377,8 +379,9 @@ int saConfigCheckTargetIndex (PP *pp)
   if (!ok)
     saUsage ("Some of the target binary index files are missing, please run sortalign --createIndex <indexName> ", 0, 0) ;
   
-  if (pp->iStep > pp->tStep)      /* impose phasing */
-    pp->iStep -= (pp->iStep % pp->tStep) ;
+  if (0)
+    if (pp->iStep > pp->tStep)      /* impose phasing */
+      pp->iStep -= (pp->iStep % pp->tStep) ;
       
   ac_free (h) ;
   return NN ;

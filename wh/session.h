@@ -151,7 +151,6 @@ uid_t geteuid () ;
 
 /************************************/
 extern BOOL swapData;
-void swapSuperBlock(void *bp) ;
 
 /************************************/
 

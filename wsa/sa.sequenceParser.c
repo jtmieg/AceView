@@ -1014,7 +1014,7 @@ void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
     return sraSequenceParser (pp, rc, tc, bb, isGenome) ;
   else
     return otherSequenceParser (pp, rc, tc, bb, isGenome) ;
-} /* sequenceParser */
+} /* saSequenceParse */
 
 /**************************************************************/
 

@@ -1658,13 +1658,16 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		    }
 		}
 
-	      bb->runStat.nErr += vp->chainErr ;
-	      bb->aliDx += vp->chainAli ;
-	      bb->aliDa += vp->chainAli ;
-	      if (vp->read & 0x1)
-		bb->runStat.nBaseAligned2 += vp->chainAli ;
-	      else
-		bb->runStat.nBaseAligned1 += vp->chainAli ;
+	      if (tc == tc0)
+		{
+		  bb->runStat.nErr += vp->chainErr ;
+		  bb->aliDx += vp->chainAli ;
+		  bb->aliDa += vp->chainAli ;
+		  if (vp->read & 0x1)
+		    bb->runStat.nBaseAligned2 += vp->chainAli ;
+		  else
+		    bb->runStat.nBaseAligned1 += vp->chainAli ;
+		}
 	    }
 	}
       if (nChains)
@@ -1685,6 +1688,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	    vp = bigArrayp (aaa, kMax++, ALIGN) ;
 	    *vp = *up ;
 	    vp->nChains = nChains ;
+	    vp->nTargetRepeats = nChains ;
 	  }
     }
   return ;
@@ -1926,8 +1930,8 @@ static void alignDoOnePair (const PP *pp, BB *bb
 	  for (i1 = 1 ; i1 < iMax1 ; i1++)
 	    for (i2 = 1 ; i2 < iMax2 ; i2++)
 	      {
-		int j1 = arr (bestUp1, 1, int) ;
-		int j2 = arr (bestUp2, 1, int) ;
+		int j1 = arr (bestUp1, i1, int) ;
+		int j2 = arr (bestUp2, i2, int) ;
 
 		up = arrp (aaa, j1, ALIGN) ;
 		vp = arrp (aaa, j2, ALIGN) ;

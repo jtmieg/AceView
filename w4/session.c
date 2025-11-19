@@ -249,8 +249,9 @@ VoidRoutine sessionChangeRegister (VoidRoutine func)
 
 #ifndef ACEDB5
 #ifdef ACEDB4
-void swapSuperBlock(BLOCKP bp)	/* used also by disknew.c */
-{ bp->h.disk = swapDISK(bp->h.disk);
+void swapSuperBlock(BLOCK *bp)	/* used also by disknew.c */
+{
+  bp->h.disk = swapDISK(bp->h.disk);
   bp->h.nextdisk = swapDISK(bp->h.nextdisk);
   bp->h.session = swapInt(bp->h.session);
   bp->h.key = swapKEY(bp->h.key);

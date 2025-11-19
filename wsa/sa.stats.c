@@ -250,26 +250,16 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , 100.0 * up->nBaseAligned2/(.000001 + up->nBase2)
 		   ) ;
 	  
-	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases1\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
+	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
 		   , runNam
-		   , up->exonic1
-		   , 100.0*(up->exonic1)/(.000001 + up->nBaseAligned1)
-		   , up->intronic1
-		   , 100.0*(up->intronic1)/(.000001 + up->nBaseAligned1)
-		   , up->exonic1
-		   , 100.0*(up->intergenic1)/(.000001 + up->nBaseAligned1)
+		   , up->exonic
+		   , 100.0*(up->exonic)/(.000001 + up->exonic + up->intronic + up->intergenic)
+		   , up->intronic
+		   , 100.0*(up->intronic)/(.000001 + up->exonic + up->intronic + up->intergenic)
+		   , up->intergenic
+		   , 100.0*(up->intergenic)/(.000001 + up->exonic + up->intronic + up->intergenic)
 		   ) ;
-	  
-	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases2\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
-		   , runNam
-		   , up->exonic2
-		   , 100.0*(up->exonic2)/(.000001 + up->nBaseAligned2)
-		   , up->intronic2
-		   , 100.0*(up->intronic2)/(.000001 + up->nBaseAligned2)
-		   , up->exonic2
-		   , 100.0*(up->intergenic2)/(.000001 + up->nBaseAligned2)
-		   ) ;
-	  
+
 	  aceOutf (ao, "%s\tATGCN\tiiiii\t%ld\t%ld\t%ld\t%ld\n"
 		   , runNam
 		   , up->NATGC[0]
@@ -279,11 +269,11 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->NATGC[4]
 		   ) ;
 
-	  aceOutf (ao, "%s\tRead_length\tiii\t%ld\t%ld\t%ld\n"
+	  aceOutf (ao, "%s\tRead_length\tiii\t%.0f\t%0.f\t%.0f\n"
 		   , runNam
-		   , (up->nBase1 + up->nBase2) / (.00000001 + up->nReads) 
-		   , (up->nBase1) / (.00000001 + (up->nPairs ? up->nPairs : up->nReads) )
-		   , (up->nBase2) / (.00000001 + (up->nPairs ? up->nPairs : up->nReads) )
+		   , (up->nBase1 + up->nBase2) / (- .00000001 + up->nReads) 
+		   , (up->nBase1) / (- .00000001 + (up->nPairs ? up->nPairs : up->nReads) )
+		   , (up->nBase2) / (- .00000001 + (up->nPairs ? up->nPairs : up->nReads) )
 		   ) ;
 
 	  aceOutf (ao, "%s\twiggleCumul\ti\t%ld\n", runNam, up->wiggleCumul) ;
@@ -312,7 +302,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 		aceOutf (ao, "%s\tAligned_in_class_%c\tif\t%ld\t%.3f\n"
 			 , runNam, ii
 			 , up->nAlignedPerTargetClass[ii]
-			 , up->nAlignedPerTargetClass[ii]/(.000001 + up->nMultiAligned[0]) 
+			 , 100.0 * up->nAlignedPerTargetClass[ii]/(.000001 + up->nMultiAligned[0]) 
 			 ) ;
 	    }
 	  for (int ii = 1 ; ii < 256 ; ii++)

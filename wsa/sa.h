@@ -73,8 +73,7 @@ typedef struct runStatStruct {
   long int nCompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
   long int nBase1, nBase2 ;
   long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
-  long int intergenic1, intronic1, exonic1 ;
-  long int intergenic2, intronic2, exonic2 ;
+  long int intergenic, intronic, exonic ;
   long int nMultiAligned[11] ;
   long int nAlignedPerTargetClass[256] ;
   long int nPerfectReads ;
@@ -154,6 +153,8 @@ typedef struct pStruct {
   const char *tFileBinaryDnaRName ;
   const char *tFileBinaryIdsName ;
   const char *tFileBinaryCoordsName ;
+  const char *tFileSpongeFileNameF ;
+  const char *tFileSpongeFileNameR ;
 
   /* Agents:
      R read parser
@@ -193,6 +194,9 @@ typedef struct pStruct {
   BigArray exonSeeds ;
   Array wiggles ;
   Array wiggleCumuls ;
+  Array exonics ;
+  Array intronics ;
+  Array intergenics ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   int bonus[256] ;
@@ -222,8 +226,10 @@ typedef struct pStruct {
   int OVLN ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   long int wiggleCumul ; /* in million bases */
+  long int exonic, intronic, intergenic ;
   BOOL splice ;
-  long int nRawReads, nRawBases ; 
+  long int nRawReads, nRawBases ;
+  int wiggle_step ;
 } PP ;
 
 typedef struct codeWordsStruct {
@@ -339,8 +345,10 @@ int saConfigCheckTargetIndex (PP *pp) ;
 Array saConfigGetRuns (PP *pp, Array runStats) ;    
 
 /* sa.gff.c */
-long int saGffParser (PP *pp, BB *bbG, TC *tc) ;
-long int saIntronParser (PP *pp, BB *bbG, TC *tc) ; 
+long int saGffParser (PP *pp, TC *tc) ;
+long int saIntronParser (PP *pp, TC *tc) ; 
+int saSpongeParser (PP *pp, TC *tc) ;
+int saSpongeParserDirect (PP *pp) ;
 
 /* sa.sort.c */
 void saSort (BigArray aa, int type) ;                  

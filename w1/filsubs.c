@@ -354,6 +354,12 @@ static char *filDoName (const char *name, const char *ending, const char *spec, 
   * walk down the directory path, looking for the specified file
   * in each directory
   */
+  if (! dirPath && ! strict)
+    filAddDir (".") ; 
+  stackCursor (dirPath, 0) ;
+  dir = stackNextText (dirPath) ;
+  if (! dir && ! strict)
+    filAddDir (".") ; 
   stackCursor (dirPath, 0) ;
   while ((dir = stackNextText (dirPath)))
     { 

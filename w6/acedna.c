@@ -1362,6 +1362,7 @@ static void spliceTrackSlideErrors (Array errors, Array dnaLong, Array dnaShort)
   return ;
 } /* spliceTrackSlideErrors  */
 
+#ifdef JUNK
 static void spliceTrackSlideErrorsOld (Array err, Array dnaLong, Array dnaShort)
 {
   int i, n ;
@@ -1434,6 +1435,7 @@ static void spliceTrackSlideErrorsOld (Array err, Array dnaLong, Array dnaShort)
         }
     }
 }
+#endif
 
 /*************************************************************/
 /*********************************************************************/

@@ -6584,7 +6584,8 @@ static BOOL qcExportRun (QC *qc, int irc, int type)
   MM *mm ;
   RC *rc = 0 ;
   char *cp ;
-
+  KEY srp1, srp2 ;
+  
   switch (type)
     {
     case 0: 
@@ -6599,6 +6600,12 @@ static BOOL qcExportRun (QC *qc, int irc, int type)
       break ;
     case 2: 
       rc = arrp (qc->runs, irc, RC) ;
+      if (irc && rc->run && rc[-1].run &&
+	  (srp1 = ac_tag_key (rc->run, "SRP", 0)) &&
+	  (srp2 = ac_tag_key (rc[-1].run, "SRP", 0)) &&
+	  srp1 != srp2
+	  )
+	aceOut (qc->ao, "\n") ;
       lineName = ac_name (rc->run) ;
       qcSetAli (qc, rc) ;
 
