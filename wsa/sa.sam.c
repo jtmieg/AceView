@@ -181,9 +181,19 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
 	{
 	  exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
 	  int da = ap[-1].a2 - ap[0].a1 - 1 ;
-	  vtxtPrintf (cigar, "%dN", da) ;
-	  *nGapp += da ;
 	  int dx = ap[0].x1 - ap[-1].x2 - 1 ;
+	  if (da > 0)
+	    {
+	      vtxtPrintf (cigar, "%dN", da) ;
+	      *nGapp += da ;
+	    }
+	  else
+	    {
+	      vtxtPrintf (cigar, "%dI", -da) ;
+	      *nInsp += da ;
+	      ap[-1].x2 += da ;
+	      ap[-1].a2 -= da ;
+	    }
 	  if (dx > 0) vtxtPrintf (cigar, "%dS", dx) ;
 	}
       exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
@@ -457,3 +467,21 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h)
 /**************************************************************/
 /**************************************************************/
 
+/*
+runX/rob1	272	G.chr14.T2T.NC_060938.1	24	1	12M-12N24M
+
+runX/rob1	272	G.chr15.T2T.NC_060939.1	24	1	12M-12N24M
+runX/rob1	256	G.chr15.T2T.NC_060939.1	78327069	1	7M29M
+
+
+runX/rob1	36	1	36	36	1	24	G	-	6	G.chr14.T2T.NC_060938.1	24	1
+runX/rob1	36	1	36	36	25	36	G	-	6	G.chr14.T2T.NC_060938.1	12	1
+
+
+runX/rob1	36	1	36	36	1	24	G	-	6	G.chr15.T2T.NC_060939.1	24	1
+runX/rob1	36	1	36	36	25	36	G	-	6	G.chr15.T2T.NC_060939.1	12	1
+
+
+runX/rob1	36	1	36	36	1	7	G	-	6	G.chr15.T2T.NC_060939.1	78327069	78327075	0	0	-	-	-	-	-	chain 4 1	36
+runX/rob1	36	1	36	36	8	36	G	-	6	G.chr15.T2T.NC_060939.1	78327070	78327098	0	0	-	-	-	-	-	chain 4 1	36
+*/
