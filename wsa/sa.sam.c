@@ -24,7 +24,7 @@
  * as befits a good Cuban CIGAR
  */
 
-static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nMp, int *nSubp, int *nInsp, int *nDelp)
+static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nMp, int *nSubp, int *nInsp, int *nDelp, int dnaMax)
 {
   A_ERR *ep ;
   Array errors = ap->errors ;
@@ -33,7 +33,6 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
   const int L = 16 ;
   char segs[2*iMax + 4][L] ;
   int iSeg = 0 ;
-  KEYSET ks = keySetCreate () ;
   static int nn = 0 ;
   
   if (iMax)
@@ -41,6 +40,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
       {
 	int j = isDown ? ii : iMax - 1 - ii ;
 	ep = arrp (errors, j, A_ERR)  ;
+	if (ep->iShort < ap->x1 - 1 || ep->iShort >= ap->x2) continue ; /* may happen when fixing a dulication not authorized ion sam */
 	
 	int xShort = ep->iShort + 1 ;
 	int xLong = ep->iLong + 1 ;
@@ -62,7 +62,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    *nInsp  += 1 ;
 	    x1 = ep->iShort + 2 ;
 	    if (x1 >= ap->x2) dx-- ;
-	    keySet (ks, iSeg) = dx + 1 ;
+	    lSam += dx + 1 ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "1I") ;
 	    *nMp += dx ;
@@ -71,7 +71,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    *nInsp += 2 ;
 	    x1 = ep->iShort + 3 ;
 	    if (x1 >= ap->x2) dx-- ;
-	    keySet (ks, iSeg) = dx + 2 ;
+	    lSam += dx + 2 ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "2I") ;
 	    *nMp += dx ;
@@ -80,7 +80,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    *nInsp += 3 ;
 	    x1 = ep->iShort + 4 ;
 	    if (x1 >= ap->x2) dx-- ;
-	    keySet (ks, iSeg) = dx + 3 ;
+	    lSam += dx + 3 ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "3I") ;
 	    *nMp += dx ;
@@ -88,7 +88,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	  case  TROU:
 	    *nDelp += 1 ;
 	    x1 = ep->iShort + 1 ;
-	    keySet (ks, iSeg) = dx ;
+	    lSam += dx ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "1D") ;
 	    *nMp += dx ;
@@ -96,7 +96,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	  case TROU_DOUBLE:
 	    *nDelp += 2 ;
 	    x1 = ep->iShort + 1 ;
-	    keySet (ks, iSeg) = dx ;
+	    lSam += dx ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "2D") ;
 	    *nMp += dx ;
@@ -104,7 +104,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	  case TROU_TRIPLE:
 	    *nDelp += 3 ;
 	    x1 = ep->iShort + 1 ;
-	    keySet (ks, iSeg) = dx ;
+	    lSam += dx ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "3D") ;
 	    *nMp += dx ;
@@ -115,23 +115,26 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
   dx = ap->x2 - x1 + 1 ;
   if (dx > 0)
     {
-      keySet (ks, iSeg) = dx ;
+      int dx2 =  dnaMax ;
+      lSam += dx ;
+      if (lSam > dx2)
+	{
+	  dx -= (lSam - dx2) ;
+	  ap->x2 -= (lSam - dx2) ;
+	  lSam = dx2 ;
+	}
       snprintf(segs[iSeg++], L, "%dM", dx) ;
       *nMp += dx ;
     }
 
-  dx = ap->x2 - ap->x1 + 1 ;
-  for (int i = 0 ; i < iSeg ; i++)
-    lSam += keySet (ks, i) ;
-
   for (int i = 0 ; i < iSeg ; i++)    
     vtxtPrintf (cigar, segs[isDown ? i : iSeg - i - 1]) ;
 
-  if (lSam != dx && nn++ < 100)
-    fprintf (stderr,  "Bad length in sam cigar lSam=%d dx=%d ap->x1=%d ap->x2=%d\t%s\t%s\n", lSam, dx, ap->x1, ap->x2, vtxtPtr (cigar), dictName (bb->dict, ap->read >> 1)) ;
+  dx =  ap->x2 - ap->x1 + 1 ;
+  if (0 && lSam != dx && nn++ < 100)
+    fprintf (stderr,  "Bad length in sam cigar lSam=%d dx=%d ap->x1=%d ap->x2=%d\t%s\t\tread %d : %s\n", lSam, dx, ap->x1, ap->x2, vtxtPtr (cigar), ap->read, dictName (bb->dict, ap->read >> 1)) ;
 
-  keySetDestroy (ks) ;
-  return lSam - dx ;
+  return lSam ;
 } /*  exportOneSamExon */
 
 /*********************************************************************/
@@ -143,6 +146,8 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
   int x1, x2 ;
   int dnaMax = dna ? arrayMax (dna) : 0 ;
   BOOL isDown = ap->a1 < ap->a2 ? TRUE : FALSE ;
+  int lSam = 0 ;
+  BOOL ok = TRUE ;
   
   vtxtClear (cigar) ;
   if (isDown)
@@ -150,23 +155,55 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
       /* gap en tete */
       x1 = ap->x1 ;
       if (x1 > 1)
-	vtxtPrintf (cigar, "%dS", x1 - 1) ;
-
+	{
+	  lSam += x1 - 1 ;
+	  vtxtPrintf (cigar, "%dS", x1 - 1) ;
+	}
+      
       for (ii = 0 ; ii < iMax - 1 ; ii++, ap++)
 	{
-	  exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
-	  int da = ap[1].a1 - ap[0].a2 - 1 ;
-	  if (da > 0) vtxtPrintf (cigar, "%dN", da) ;
-	  *nGapp += da ;
+	  lSam += exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp, dnaMax -lSam) ;
+
 	  int dx = ap[1].x1 - ap[0].x2 - 1 ;
-	  if (dx > 0) vtxtPrintf (cigar, "%dS", dx) ;
+	  if (dx > 0)
+	    {
+	      lSam += dx ;
+	      vtxtPrintf (cigar, "%dS", dx) ;
+	    }
+	  if (dx < 0)
+	    {
+	      ap[1].x1 -= dx ;
+	      ap[1].a1 -= dx ;
+	    }
+
+	  int da = ap[1].a1 - ap[0].a2 - 1 ;
+	  if (da > 0)
+	    {
+	      vtxtPrintf (cigar, "%dN", da) ;
+	      *nGapp += da ;
+	    }
+	  else
+	    {
+	      if (lSam - da < dnaMax && ap[1].x1 - da < ap[1].x2)
+		{ /* alignement is not finished */
+		  lSam -= da ;
+		  vtxtPrintf (cigar, "%dI", -da) ;
+		  ap[1].x1 -= da ; ap[1].a1 -= da ;
+		}
+	      else  /* just export the final nS */
+		{
+		  ok = FALSE ;
+		  break ;
+		}
+	    }
 	}
-      exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
+      if (ok) 
+	lSam += exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp, dnaMax - lSam) ;
       
       /* gap en queue */
       x2 = ap->x2 ;
-      if (x2 < dnaMax)
-	vtxtPrintf (cigar, "%dS", dnaMax - x2) ; 
+      if (lSam < dnaMax)
+	vtxtPrintf (cigar, "%dS", dnaMax - lSam) ; 
     }
   else
     {
@@ -175,13 +212,24 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
       /* gap en tete */
       x2 = ap->x2 ;
       if (x2 < dnaMax)
-	vtxtPrintf (cigar, "%dS", dnaMax - x2) ; 
+	{ lSam += dnaMax - x2 ; vtxtPrintf (cigar, "%dS", dnaMax - x2) ;  }
       
       for (ii = 0 ; ii < iMax - 1 ; ii++, ap--)
 	{
-	  exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
-	  int da = ap[-1].a2 - ap[0].a1 - 1 ;
+	  lSam += exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp, dnaMax - lSam) ;
 	  int dx = ap[0].x1 - ap[-1].x2 - 1 ;
+	  if (dx > 0)
+	    {
+	      lSam += dx ;
+	      vtxtPrintf (cigar, "%dS", dx) ;
+	    }
+	  if (dx < 0)
+	    {
+	      ap[-1].x2 += dx ;
+	      ap[-1].a2 -= dx ;
+	    }
+
+	  int da = ap[-1].a2 - ap[0].a1 - 1 ;
 	  if (da > 0)
 	    {
 	      vtxtPrintf (cigar, "%dN", da) ;
@@ -189,19 +237,28 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
 	    }
 	  else
 	    {
-	      vtxtPrintf (cigar, "%dI", -da) ;
-	      *nInsp += da ;
-	      ap[-1].x2 += da ;
-	      ap[-1].a2 -= da ;
+	      if (lSam - da < dnaMax && ap[-1].x2 + da > ap[-1].x1)
+	      {
+		lSam -= da ;
+		vtxtPrintf (cigar, "%dI", -da) ;
+		ap[-1].x2 += da ;
+		ap[-1].a2 -= da ;
+	      }
+	      else  /* just export the final nS */
+		{
+		  ok = FALSE ;
+		  break ;
+		}
 	    }
-	  if (dx > 0) vtxtPrintf (cigar, "%dS", dx) ;
+
 	}
-      exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp) ;
+      if (ok)
+	lSam += exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp, dnaMax - lSam) ;
       
       /* gap en queue */
       x1 = ap->x1 ;
-      if (x1 > 1)
-	vtxtPrintf (cigar, "%dS", x1 - 1) ;
+      if (lSam < dnaMax)
+	vtxtPrintf (cigar, "%dS", dnaMax - lSam) ;
     }
   return vtxtPtr (cigar) ;
 } /* exportOneSamCigar */
@@ -224,6 +281,7 @@ static int exportOneSam (ACEOUT ao, const PP *pp, BB *bb, vTXT cigar, Array ciga
   int mate = 0 ;
   BOOL isDown = (ap->a1 <= ap->a2 ? TRUE : FALSE)  ;
   int chainA1 = ap->a1 ;
+  int chainA2 = ap->a2 ;
   BOOL pairedEnd = bb->rc.pairedEnd ;
   BOOL mateIsDown = TRUE ;
   BOOL isPrimary = ap->chain == 1 ? TRUE : FALSE ;
@@ -313,8 +371,15 @@ if (1)
 
   aceOutf (ao, "\t%d", flag) ;
   aceOutf (ao, "\t%s", dictName (dictG, chrom)) ;
-  aceOutf (ao, "\t%d", chainA1) ;
 
+  if (ap->read == 187746 && chrom==10)
+    invokeDebugger () ;
+  /* a chain [i0, iMax[, is reported as a single CIGAR */
+  chainA1 = ap->chainA1 ;
+  for (ii = i0, ap = ap0 ; ii < aMax && ap->chain == chain && ap->read == read ; ii++, ap++)
+    chainA2 = ap->chainA2 ;
+  
+  aceOutf (ao, "\t%d", chainA1 < chainA2 ? chainA1 : chainA2) ;    
   ap = ap0 ;
   if (1)
     {

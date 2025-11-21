@@ -889,7 +889,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestUp, Array aa, Arra
 		    {
 		      int du = vp[1].x1 - vp->x2 - 1 ;
 		      BOOL isDonor = TRUE ;
-		      if (du >= 0)
+		      if (du > 0)
 			{ /* in the overlap OR the bases form the donor and acceptor exon */
 			  cq = arrp (dnaG, vp->a2 - 1, char) ;
 			  char *cr = arrp (dnaG, vp[1].a1 - 1, char) ;
