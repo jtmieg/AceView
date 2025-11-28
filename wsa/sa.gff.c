@@ -90,13 +90,16 @@ long int saGffParser (PP *pp, TC *tc)
       else if (i >= 8 && !strcmp (cp + i - 8, ".gff3.gz")) isGff = TRUE ;
       else if (i >= 7 && !strcmp (cp + i - 7, ".gtf.gz")) isGtf = TRUE ;
 
-      if (isIntrons) fprintf (stderr, "Parsing gff file %s\n", cp) ;
+      if (isIntrons) fprintf (stderr, "Parsing .intron file %s\n", cp) ;
       else if (isGff) fprintf (stderr, "Parsing gff file %s\n", cp) ;
       else if (isGtf) fprintf (stderr, "Parsing gtf file %s\n", cp) ;
       else messcrash ("\n\tOption I in -T tConfig_file_name expects a gff or gtf file\n\tCannot parse file %s found in tConfig file %s\n"
 		      , cp, pp->tConfigFileName ) ;
     }
-      
+
+  if (isIntrons)
+    return saIntronParser (pp, tc) ;
+  
   if (pp->seedLength < 16)
     messcrash ("\nSorry, to study the introns defined in file %s,\n the seed length must be at least 16, not %d\n"
 	       , aceInFileName (ai)
@@ -125,20 +128,17 @@ long int saGffParser (PP *pp, TC *tc)
 		   , aceInFileName (ai)
 		   ) ;
 
-      if (! isIntrons)
-	{
-	  aceInStep (ai, '\t') ;
-	  cp = aceInWord (ai) ;  /* method, drop it */
 
-	  aceInStep (ai, '\t') ;
-	  cp = aceInWord (ai) ;  /* type */
-	  type = 0 ;
-	  if (! strcasecmp (cp, "exon")) type = 1 ;
-	  else if (! strcasecmp (cp, "intron")) type = 2 ;
-	  if (! type) continue ;
-	}
-      else
-	type = 2 ;
+      aceInStep (ai, '\t') ;
+      cp = aceInWord (ai) ;  /* method, drop it */
+      
+      aceInStep (ai, '\t') ;
+      cp = aceInWord (ai) ;  /* type */
+      type = 0 ;
+      if (! strcasecmp (cp, "exon")) type = 1 ;
+      else if (! strcasecmp (cp, "intron")) type = 2 ;
+      if (! type) continue ;
+  
 
       aceInStep (ai, '\t') ;
       aceInInt (ai, &a1) ;
@@ -147,24 +147,21 @@ long int saGffParser (PP *pp, TC *tc)
       if (!a1 || !a2 || a1 == a2)
 	continue ;
 
-      if (! isIntrons)
+      aceInStep (ai, '\t') ;
+      cp = aceInWord (ai) ;  /* some kind of score or a dot, drop it */
+      aceInStep (ai, '\t') ;
+      cp = aceInWord (ai) ;  /* strand */
+      if (! cp)
+	continue ;
+      else if (*cp == '+')
+	;
+      else if (*cp == '-')
 	{
-	  aceInStep (ai, '\t') ;
-	  cp = aceInWord (ai) ;  /* some kind of score or a dot, drop it */
-	  aceInStep (ai, '\t') ;
-	  cp = aceInWord (ai) ;  /* strand */
-	  if (! cp)
-	    continue ;
-	  else if (*cp == '+')
-	    ;
-	  else if (*cp == '-')
-	    {
-	      int a0 = a1 ; a1 = a2 ; a2 = a0 ;
-	    }
-	  else
-	    continue ;
+	  int a0 = a1 ; a1 = a2 ; a2 = a0 ;
 	}
-
+      else
+	continue ;
+      
       if (type == 1)
 	{
 	  CW *up = bigArrayp (pp->exonSeeds, nnE++, CW) ;
@@ -258,9 +255,19 @@ long int saIntronParser (PP *pp, TC *tc)
       if (da >= twoMb) /* our format only allows 21 bits for the intron length */ 
 	continue ;
       up = bigArrayp (pp->intronSeeds, nn++, CW) ;
-      up->nam = chrom ;
-      up->pos = a1 ;
-      up->intron = a2 ;
+      if (a1 < a2)
+	{
+	  up->nam = chrom << 1 ; 
+	  up->pos = a1 ;
+	  up->intron = a2 ;
+	}
+      else
+	{
+	  up->nam = (chrom << 1) | 0x1 ;
+	  up->pos = a2 ;
+	  up->intron = a1 ;
+	}
+	
     }
   fprintf (stderr, "+++++++ Found %ld introns in file %s\n", nn, aceInFileName (ai)) ;
   ac_free (h) ;
@@ -287,6 +294,7 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
   DICT *chromDict = bbG->dict ;
   DICT *geneDict = pp->geneDict ;
   DICT *mrnaDict = pp->mrnaDict ;
+  const int twoMb = (0x1 << 21) ;
   
   if (! geneDict) geneDict = pp->geneDict = dictHandleCreate (1 << 15, pp->h) ;
   if (! mrnaDict) mrnaDict = pp->mrnaDict = dictHandleCreate (1 << 15, pp->h) ;
@@ -341,17 +349,8 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
       if (!a1 || !a2 || a1 == a2)
 	continue ;
       chrom <<= 1 ;
-      da = a2 - a1 ;
-      if (da < 0)
-	{
-	  int a0 = a1 ; a1 = a2 ; a2 = a0 ;
-	  da = - da ;
-	  chrom = chrom | 0x1 ;
-	}
-    
-      if (da <= 1)
-	continue ;
-      
+      if (a1 > a2) { int a0 = a1 ; a1 = a2 ; a2 = a0 ; chrom |= 0x1 ;}
+      da = a2 - a1 + 1 ;
       geneBoxes = array (pp->geneBoxes, chrom, Array) ;
       geneExons = array (pp->geneExons, chrom, Array) ;
       if (! geneBoxes) geneBoxes = array (pp->geneBoxes, chrom, Array) = arrayHandleCreate (1000, GENE, pp->h) ;
@@ -367,12 +366,20 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
 
       /* register intronSeeds */
       if (mrna == oldMrna && oldGene == gene && oldChrom == chrom && oldExon + 1 == exon)
-	{ /* register  intronSeeds */
-	  up = bigArrayp (pp->intronSeeds, nnI++, CW) ;
-	  up->nam = chrom ;
-	  up->pos = b2 + 1 ;
-	  up->intron = a1 ;
-	}
+	if (da < twoMb) /* our format only allows 21 bits for the intron length */ 
+	  { /* register  intronSeeds */
+	    int u1 = b2 + 1 ;
+	    int u2 = a1 - 1 ;
+	    int da =  u2 - u1 + 1 ;
+	    
+	    if (da > 3 && da < twoMb) /* our format only allows 21 bits for the intron length */ 
+	      {
+		up = bigArrayp (pp->intronSeeds, nnI++, CW) ;
+		up->nam = chrom ;
+		up->pos = u1 ;
+		up->intron = u2 ;
+	      }
+	  }
 
       /* register exonSeeds */
       up = bigArrayp (pp->exonSeeds, nnES++, CW) ;
@@ -402,7 +409,7 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
   for (chrom = 0 ; chrom < arrayMax (pp->geneBoxes) ; chrom++)
     {
       geneBoxes = array (pp->geneBoxes, chrom, Array) ;
-      geneExons = array (pp->geneBoxes, chrom, Array) ;
+      geneExons = array (pp->geneExons, chrom, Array) ;
 
       
       if (geneBoxes)
@@ -411,25 +418,28 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
 	  GENE *gb, *gb2 ;
 
 	  arraySort (geneBoxes, geneA1Order) ;
-	  arraySort (geneExons, geneA1Order) ;
 	  
 	  gb = gb2 = arrp (geneBoxes, 0, GENE) ;
 	  for (ii = 0, jj = 0 ; ii < iMax ; ii++, gb++)
 	    {
-	      if (gb2->gene != gb->gene)
+	      if (gb->gene)
 		{
-		  gb2++ ; jj++ ;
-		  if (gb2 != gb) *gb2 = *gb ;
-		}
-	      else
-		{
-		  gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
-		  gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
+		  if (gb2->gene != gb->gene)
+		    {
+		      if (gb2->gene) { gb2++ ; jj++ ;}
+		      if (gb2 != gb) *gb2 = *gb ;
+		    }
+		  else
+		    {
+		      gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
+		      gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
+		    }
 		}
 	    }
-	  arrayMax (geneBoxes) = jj ;
+	  arrayMax (geneBoxes) = jj + 1 ;
+	  arraySort (geneBoxes, a1GeneOrder) ;
 
-	  nnnB += jj ;
+	  nnnB += arrayMax (geneBoxes) ;
 	}
 
       if (geneExons)
@@ -437,26 +447,30 @@ static int saSpongeParserDo (PP *pp, const char *filNam)
 	  int ii, jj, iMax = arrayMax (geneExons) ;
 	  GENE *gb, *gb2 ;
 
+	  arraySort (geneExons, geneA1Order) ;
+
 	  gb = gb2 = arrp (geneExons, 0, GENE) ;
 	  for (ii = 0, jj = 0 ; ii < iMax ; ii++, gb++)
 	    {
-	      if (gb2->gene != gb->gene || gb->a1 > gb2->a2 + 1)
+	      if (gb->gene)
 		{
-		  gb2++ ; jj++ ;
-		  if (gb2 != gb) *gb2 = *gb ;
-		}
-	      else
-		{
-		  gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
-		  gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
+		  if (gb2->gene != gb->gene || gb->a1 > gb2->a2 + 1)
+		    {
+		      if (gb2->gene) { gb2++ ; jj++ ;}
+		      if (gb2 != gb) *gb2 = *gb ;
+		    }
+		  else
+		    {
+		      gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
+		      gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
+		    }
 		}
 	    }
-	  arrayMax (geneExons) = jj ;
+	  arrayMax (geneExons) = jj + 1 ;
 
-	  arraySort (geneBoxes, a1GeneOrder) ;
 	  arraySort (geneExons, a1GeneOrder) ;
 	  
-	  nnnE += jj ;
+	  nnnE += arrayMax (geneExons) ;
 	}
 
     }

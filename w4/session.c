@@ -280,6 +280,7 @@ static void sessionSetPath (const char *ace_path)
   else
     filAddDir ("/usr/local/acedb") ;
 #endif
+  filAddDir (".") ;
 #endif /* MACINTOSH */
 } /* sessionSetPath */
 

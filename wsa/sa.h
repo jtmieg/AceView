@@ -81,10 +81,13 @@ typedef struct runStatStruct {
   long int nClippedPolyA ;
   long int nClippedVectors ;
   long int nSupportedIntrons ;
+  long int nSupportedPolyA ;
   long int nIntronSupports ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
   long int wiggleCumul ; /* in million bases */
+  long int wiggleLCumul ; /* in million bases */
+  long int wiggleRCumul ; /* in million bases */
 
   int minReadLength, maxReadLength ;
   char *adaptor1, *adaptor2 ;
@@ -124,9 +127,15 @@ typedef struct bStruct {
   Array cpuStats ;
   Array errors ;
   Array wiggles ;
+  Array wigglesL ;
+  Array wigglesR ;
+  Array wigglesP ;
+  Array wigglesNU ;
   Array confirmedIntrons ;
   BOOL isGenome ;
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
+  long int nPolyASuppor ;
+  long int nPolyASupport ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;    
   vTXT txt1, txt2 ; /* a pair of reusable txt buffer */ 
@@ -138,6 +147,7 @@ typedef struct pStruct {
   BOOL createIndex ;
   BOOL align ;
   BOOL wiggle ;
+  BOOL wiggleEnds ;
   BOOL introns ;
   BOOL snps ;
   BOOL ignoreIntronSeeds ;
@@ -194,6 +204,12 @@ typedef struct pStruct {
   BigArray exonSeeds ;
   Array wiggles ;
   Array wiggleCumuls ;
+  Array wigglesL ;
+  Array wiggleLCumuls ;
+  Array wigglesR ;
+  Array wiggleRCumuls ;
+  Array wigglesP ;
+  Array wigglesNU ;
   Array exonics ;
   Array intronics ;
   Array intergenics ;
@@ -270,6 +286,8 @@ typedef struct alignStruct {
   int nTargetRepeats ;
   int nChains ;
   int readLength ;
+  int leftClip, rightClip ;
+  int pA ;
   int errShort, errLong ; /* bb->dict */
   int leftOverhang, rightOverhang ; /* bb->dict */
   int donor, acceptor ;
@@ -302,6 +320,13 @@ typedef struct exonStruct {
   int a1, a2 ; 
   int mrna ;
 } __attribute__((aligned(32))) EXON ;
+		  
+
+typedef struct polyAStruct {
+  int chrom ;
+  int a1, a2 ; 
+  int n ;
+} __attribute__((aligned(32))) POLYA ;
 		  
 
 typedef struct cpuStatStruct {
@@ -360,7 +385,7 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h) ;
 /* sa.introns.c */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 
 void saIntronsExport (const PP *pp, BigArray aaa) ;
-void saIntronsCumulate (BigArray aaa, Array aa) ;
+long int saIntronsCumulate (BigArray aaa, Array aa) ;
 
 /* sa.targetIndex.c */
 void saTargetIndexCreate (PP *pp) ;
@@ -383,7 +408,7 @@ void saWiggleExport (PP *pp, int nAgents) ;
 void saRunStatExport (const PP *pp, Array runStats) ;
 void saCpuStatExport (const PP *pp, Array stats) ;
 void saCpuStatCumulate (Array aa, Array a) ;
-void saRunStatsCumulate (int run, Array aa, RunSTAT *vp) ;
+void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI) ;
 
 /* sa.align */
 void saAlign (const void *vp) ;

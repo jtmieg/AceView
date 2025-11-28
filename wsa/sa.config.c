@@ -48,17 +48,20 @@ void saConfigIsOutDirWritable (PP *pp)
   if (pp->outFileName)
     {
       AC_HANDLE h = ac_new_handle () ;
+
+      char *buf = strnew (pp->outFileName, h) ;
+      char *cp = buf + strlen(buf) - 1 ;
+
+      while (cp >= buf && *cp == '/') *cp-- = 0 ;
       
-      char *cp = strrchr (pp->outFileName, '/') ;
-      if (cp)
+      if (buf[0])
 	{
-	  *cp = 0 ;
-	  char *cmd = hprintf (h, "mkdir -p %s", pp->outFileName) ;
+	  char *cmd = hprintf (h, "mkdir -p %s", buf) ;
 	  system (cmd) ;
-	  *cp = '/' ;
 	}
+      pp->outFileName = hprintf (pp->h, "%s/", buf) ;
       
-      ACEOUT ao = aceOutCreate (pp->outFileName, ".test", 0, h) ;
+      ACEOUT ao = aceOutCreate (buf, "/test", 0, h) ;
       if (ao)
 	{
 	  int n = randint (), n2 = 0 ;
@@ -76,14 +79,12 @@ void saConfigIsOutDirWritable (PP *pp)
 		saUsage (hprintf (h, "Unable to open a test file -o %s.test", pp->outFileName), 0, 0) ;
 	      ac_free (ai) ;
 	    }
-	  char *cmd = hprintf (h, "rm %s", nam) ;
-	  system (cmd) ;
 	}
       ac_free (h) ;
     }
   
   return ;
-} /* saConfigOutFiles */
+} /* saConfigIsOutFDirWritable */
 
 /*********************************************************************/
 
@@ -141,7 +142,9 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 
 	  rc->format = FASTA ; /* default */
 	  int ln = strlen (rc->fileName1) ;
-	  if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
+	  if (strstr (rc->fileName1, ".sra.fasta.gz") == rc->fileName1 + ln - 13) rc->format = SRACACHE ;
+	  else if (strstr (rc->fileName1, ".sra.fasta") == rc->fileName1 + ln - 10) rc->format = SRACACHE ;
+	  else if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
 	  else if (strstr (rc->fileName1, ".fastq.gz") == rc->fileName1 + ln - 9) rc->format = FASTQ ;
 	  else if (strstr (rc->fileName1, ".fasta") == rc->fileName1 + ln - 6) rc->format = FASTA ;
 	  else if (strstr (rc->fileName1, ".fastq") == rc->fileName1 + ln - 6) rc->format = FASTQ ;
@@ -153,6 +156,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	  else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
 	  else if (! strncmp (rc->fileName1, "DRR", 3)) rc->format = SRA ;
+	  else if (! strncmp (rc->fileName1, "ERR", 3)) rc->format = SRA ;
 	  
 	  /* user can override the defaults */
 	  if (pp->raw) rc->format = RAW ;
@@ -262,7 +266,9 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	    {
 	      int ln = strlen (rc->fileName1) ;
 	      rc->format = FASTA ; /* default */
-	      if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
+	      if (strstr (rc->fileName1, ".sra.fasta.gz") == rc->fileName1 + ln - 13) rc->format = SRACACHE ;
+	      else if (strstr (rc->fileName1, ".sra.fasta") == rc->fileName1 + ln - 10) rc->format = SRACACHE ;
+	      else if (strstr (rc->fileName1, ".fasta.gz") == rc->fileName1 + ln - 9) rc->format = FASTA ;
 	      else if (strstr (rc->fileName1, ".fastq.gz") == rc->fileName1 + ln - 9) rc->format = FASTQ ;
 	      else if (strstr (rc->fileName1, ".fasta") == rc->fileName1 + ln - 6) rc->format = FASTA ;
 	      else if (strstr (rc->fileName1, ".fastq") == rc->fileName1 + ln - 6) rc->format = FASTQ ;
@@ -274,6 +280,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	      else if (strstr (rc->fileName1, ".fa") == rc->fileName1 + ln - 3) rc->format = FASTA ;
 	      else if (! strncmp (rc->fileName1, "SRR", 3)) rc->format = SRA ;
 	      else if (! strncmp (rc->fileName1, "DRR", 3)) rc->format = SRA ;
+	      else if (! strncmp (rc->fileName1, "ERR", 3)) rc->format = SRA ;
 	    }
 
 	  if (rc->format == SRA)  /* check in the cache */
@@ -284,7 +291,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	      cr = filName (rc->fileName1, 0, "r") ;
 	      if (! cr)
 		saUsage (hprintf (pp->h, "Cannot open sequence file %s listed in configuration file -I %s \tDid you mean -i %s\n"
-				  , cp, pp->inConfigFileName, pp->inConfigFileName
+				  , cp ? cp : "NULL", pp->inConfigFileName, pp->inConfigFileName
 				  ), 0, 0) ;
 	      rc->fileName1 = strnew (cr, pp->h) ;
 	    }
@@ -356,6 +363,28 @@ int saConfigCheckTargetIndex (PP *pp)
     }
   else
     ok = FALSE ;
+
+  cp = filName (pp->indexName, "/tConfig", "r") ;
+  ai = cp ? aceInCreate (cp, 0, h) : 0 ;
+  if (ai)
+    {
+      aceInSpecial (ai, "\n") ;
+      while (aceInCard (ai))
+	{
+	  cp = aceInWord (ai) ;
+	  if (cp && ! strcmp (cp, "S"))
+	    {
+	      aceInStep (ai, '\t') ;
+	      cp = aceInWord (ai) ;
+	      if (1 && cp && strstr (cp, ".f.sponge"))
+		pp->tFileSpongeFileNameF = strnew (cp, pp->h) ;
+	      if (1 && cp && strstr (cp, ".r.sponge"))
+		pp->tFileSpongeFileNameR = strnew (cp, pp->h) ;
+	    }
+	}
+      ac_free (ai) ;
+    }
+
   cp = filName (pp->indexName, "/dna.sortali", "rb") ;
   if (cp)
     pp->tFileBinaryDnaName = strnew (cp, pp->h) ;

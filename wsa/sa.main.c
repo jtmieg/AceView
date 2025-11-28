@@ -1174,6 +1174,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//        For paired end sequencing, provide, as in the second example (f1.F+f1.R), two file names separated by a plus\n"
 	       "//        A file named (.fa, .fasta, .fastq, .fastc) implies that format, the file may be gzipped (.gz)\n"
 	       "//        A file named (SRR[0-9]*) implies direct SRA download, with optional caching in the ./SRA directory\n"
+	       "//        A file named (.sra.fasta.gz) is a fasta file with read-pairs on successive lines\n"
 	       "//     2: Run name, optional,the name must not contain spaces or special characters, as it will be used to name subdirectories\n"
 	       "//     3: Descriptors, optional, the options are coma separated, possibilities are\n"
 	       "//        DNA/RNA : [default RNA], if DNA sortalign will not clip polyA or jump introns\n"
@@ -1583,12 +1584,14 @@ int main (int argc, const char *argv[])
 
   /* future options ***/
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggle") ;
+  p.wiggleEnds = getCmdLineBool (&argc, argv, "--wiggleEnds") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
 
   p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
-  
+
+  if (0) { p.wiggle = p.wiggleEnds = TRUE ; }
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
@@ -1911,10 +1914,25 @@ int main (int argc, const char *argv[])
   int chromMax = dictMax (p.bbG.dict) + 1 ;
   int runMax = dictMax (p.runDict) + 2 ;
   p.wiggles = 0 ;
+  p.wigglesL = 0 ;
+  p.wigglesR = 0 ;
+  p.wigglesP = 0 ;
+  p.wigglesNU = 0 ;
   if (p.wiggle)
     {
       p.wiggles = arrayHandleCreate (2 * chromMax * runMax, Array, h) ;
       array (p.wiggles, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
+      p.wigglesP = arrayHandleCreate (2 * chromMax * runMax, Array, h) ;
+      array (p.wigglesP, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
+      p.wigglesNU = arrayHandleCreate (2 * chromMax * runMax, Array, h) ;
+      array (p.wigglesNU, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
+    }
+  if (p.wiggleEnds)
+    {
+      p.wigglesL = arrayHandleCreate (2 * chromMax * runMax, Array, h) ;
+      p.wigglesR = arrayHandleCreate (2 * chromMax * runMax, Array, h) ;
+      array (p.wigglesR, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
+      array (p.wigglesR, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
     }
   
   while (channelGet (p.doneChan, &bb, BB))
@@ -1959,13 +1977,13 @@ int main (int argc, const char *argv[])
 	
       if (bb.run)
 	{
-	  saRunStatsCumulate (0, p.runStats, &(bb.runStat)) ;
-	  saRunStatsCumulate (bb.run, p.runStats, &(bb.runStat)) ;
+	  long int nI = saIntronsCumulate (confirmedIntrons, bb.confirmedIntrons) ;
+	  saRunStatsCumulate (0, p.runStats, &(bb.runStat), 0) ;
+	  saRunStatsCumulate (bb.run, p.runStats, &(bb.runStat), nI) ;
 
 	  runErrorsCumulate (0, runErrors, bb.errors) ;
 	  runErrorsCumulate (bb.run, runErrors, bb.errors) ;
 
-	  saIntronsCumulate (confirmedIntrons, bb.confirmedIntrons) ;
 	  if (p.wiggle) saWiggleCumulate (&p, &bb) ;
 	}
       

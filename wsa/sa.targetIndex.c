@@ -393,9 +393,9 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
     {
       tc = arrayp (tArray, nn, TC) ;
       if (tc->targetClass == 'I')
-	continue ; /* we need to parse thge genome before the introns */
+	continue ; /* we need to parse the genome before the introns */
       if (tc->targetClass == 'S')
-	continue ; /* we need to parse thge genome before the introns */
+	continue ; /* we need to parse the genome before the introns */
       nTc++ ;
     }
 
@@ -467,6 +467,7 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
   t1 = clock () ;
   printf ("%s : extract the target seeds\n" , timeBufShowNow (tBuf)) ;
   saCodeSequenceSeeds (pp, bbG, pp->tStep, TRUE) ;
+  saSpongeParserDirect (pp) ;
   if (pp->intronSeeds)
     saCodeIntronSeeds (pp, bbG) ;
   int NN = pp->nIndex ;
@@ -550,7 +551,7 @@ void saTargetIndexCreate (PP *pp)
 
   /* copy the actual config file used to create the index */
   if (pp->tConfigFileName)
-    system (hprintf(h, "\\cp %s %s\n", pp->tConfigFileName, pp->indexName)) ;
+    system (hprintf(h, "\\cp %s %s/tConfig\n", pp->tConfigFileName, pp->indexName)) ;
   ac_free (h) ;
   return ;
 }  /* saTargetIndexCreate */

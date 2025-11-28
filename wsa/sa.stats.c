@@ -104,28 +104,32 @@ static void samStatsExports (const PP *pp, Array runStats)
   RunSTAT *s0 = arrayp (aa, 0, RunSTAT) ;
   ACEOUT ao = aceOutCreate (pp->outFileName, ".s2g.samStats", 0, h) ;	
   const char *run = pp->runName ? pp->runName : "xxx" ;
-
+  
   long int nRawReads = pp->nRawReads ? pp->nRawReads : s0->nReads ;
   long int nRawBases = pp->nRawBases ? pp->nRawBases : s0->nBase1 + s0->nBase2 ;
   
-  aceOutf (ao, "%s\t%s\tnRawReads\t%ld\n", run, METHOD, nRawReads) ;
-  aceOutf (ao, "%s\t%s\tnReads\t%ld\n", run, METHOD, s0->nReads) ;  
-  aceOutf (ao, "%s\t%s\tnRawBases\t%ld\n", run, METHOD, nRawBases) ;
-  aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
-  aceOutf (ao, "%s\t%s\tnPairsAligned\t%ld\n", run, METHOD, s0->nPairsAligned) ;
-  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\n", run, METHOD, s0->nCompatiblePairs) ;
-  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\n", run, METHOD, s0->nCirclePairs) ;
-  
-  aceOutf (ao, "%s\t%s\tnPerfectReads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(nRawReads + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(nRawReads + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnPairs\t%ld\n", run, METHOD, s0->nPairs) ;
+  aceOutf (ao, "%s\t%s\tnPairsAligned\t%ld\t%.2f%%\n", run, METHOD, s0->nPairsAligned, (100.0 * s0->nPairsAligned)/(nRawReads/2 + .000001)) ;
   aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(nRawReads/2 + .000001)) ;
   aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(nRawReads/2 + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnAlignments\t%ld\t%.2f per aligned read\n", run, METHOD, s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
+  
+  
+  aceOutf (ao, "\n%s\t%s\tnRawReads\t%ld\n", run, METHOD, nRawReads) ;
+  aceOutf (ao, "%s\t%s\tnReads\t%ld\n", run, METHOD, s0->nReads) ;  
+  aceOutf (ao, "%s\t%s\tnPerfectReads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(nRawReads + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(nRawReads + .000001)) ;
+  
+  aceOutf (ao, "\n%s\t%s\tnAlignments\t%ld\t%.2f per aligned read\n", run, METHOD, s0->nAlignments, (1.0 * s0->nAlignments)/(s0->nMultiAligned[0] + .000001)) ;
   aceOutf (ao, "%s\t%s\tnMultiAligned\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0] - s0->nMultiAligned[1], (100.0 * (s0->nMultiAligned[0] - s0->nMultiAligned[1]))/(s0->nReads + .000001)) ;
+
+  aceOutf (ao, "\n%s\t%s\tnRawBases\t%ld\n", run, METHOD, nRawBases) ;
+  aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
   aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (nRawBases + .000001)) ;
   aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
+  
+
   long int nUnaligned = nRawReads - s0->nMultiAligned[0] ;
-  aceOutf (ao, "%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD, 0
+  aceOutf (ao, "\n%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD, 0
 	   , nUnaligned
 	   , 100.0 * nUnaligned / (nRawReads + .000001)
 	   ) ;
@@ -149,7 +153,7 @@ static void samStatsExports (const PP *pp, Array runStats)
 /**************************************************************/
 /**************************************************************/
 /* cumulate int global runStats the content of bb->runStats */
-void saRunStatsCumulate (int run, Array aa, RunSTAT *vp)
+void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI)
 {
   RunSTAT *up = arrayp (aa, run, RunSTAT) ;
     
@@ -176,7 +180,8 @@ void saRunStatsCumulate (int run, Array aa, RunSTAT *vp)
   up->nAlignments += vp->nAlignments ;
   up->nBaseAligned1 += vp->nBaseAligned1 ;
   up->nBaseAligned2 += vp->nBaseAligned2 ;
-
+  up->nSupportedIntrons = nI ;
+  
   up->nErr += vp->nErr ;
   if (vp->errors)
     for (int i = 0 ; i < arrayMax (vp->errors) ; i++)
@@ -249,7 +254,8 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->nBaseAligned2
 		   , 100.0 * up->nBaseAligned2/(.000001 + up->nBase2)
 		   ) ;
-	  
+
+	  up->intergenic = up->wiggleCumul - up->exonic - up->intronic ;
 	  aceOutf (ao, "%s\tnExonic_intronic_intergenic_Bases\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
 		   , runNam
 		   , up->exonic
@@ -282,6 +288,18 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->nErr
 		   , 100.0 * up->nErr /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
 		   ) ;
+	  aceOutf (ao, "%s\tIntronSupport\tiif\t%ld\t%ld\t%.2f%%\n"
+		   , runNam
+		   , up->nIntronSupports
+		   , up->nIntronSupportPlus
+		   , up->nIntronSupportMinus
+		   , (100.0 * up->nIntronSupportPlus + 0.00001)/(up->nIntronSupportPlus+up->nIntronSupportMinus - 0.00001)
+		   ) ;
+	  aceOutf (ao, "%s\tSupportedIntrons\ti\t%ld\n"
+		   , runNam
+		   , up->nSupportedIntrons
+		   ) ;
+
 	  for (int ii = 1 ; ii < 2 ; ii++)
 	    aceOutf (ao, "%s\tReads_Aligned_once\tif\t%ld\t%.3f\n"
 		     , runNam

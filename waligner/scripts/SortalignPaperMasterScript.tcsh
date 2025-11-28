@@ -48,6 +48,8 @@ setenv SV v43.nov2        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3, Yann
 setenv SVlast v43.nov2
 setenv SV v44.nov12        # idem --wiggle
 setenv SVlast v44.nov12
+setenv SV v45.nov21        # no wiggle, no sam,    fixed sam and pairs (but i do not use --sam ) , added new T2T index to Hisat, star and minimap
+setenv SVlast v45.nov21
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
@@ -96,13 +98,13 @@ setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
 
 
-setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 02_ClipAlign 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
+setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
 
 setenv methods "$allMethods"
+# setenv methods "011_SortAlignG5R5"
 
 set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3"
-# setenv methods "011_SortAlignG5R5"
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2"
 
 
 
@@ -166,6 +168,7 @@ setenv runs "iRefSeq PacBio SRR5189652 SRR5189667 ONG ONG2 ONG3 ONG4 ONG5 Roche 
 # setenv runs "PFALt1r1"
 # setenv runs "ONG3"
 # setenv runs "ONG3 ONG4 ONG5"
+
 setenv nanoRuns "pilot1_A_ION_f2e5b881_noCap_capA_RNA  pilot1_A_ION_b6cfebf0_noCap_RNA AGLR2_A_MinION_FAK4078_1xCAP_RNA"
 setenv runs "$nanoRuns"
 setenv runs "iRefSeq  RS5pcSNV_100_0 RS5pcSNV_95_5 RS5pcSNV_60_40 RS5pcSNV_0_100  RS10pcSNV_100_0 RS10pcSNV_95_5 RS10pcSNV_60_40 RS10pcSNV_0_100 RS15pcSNV_100_0 RS15pcSNV_95_5 RS15pcSNV_60_40 RS15pcSNV_0_100 RS20pcSNV_100_0 RS20pcSNV_95_5 RS20pcSNV_60_40 RS20pcSNV_0_100 "
@@ -181,20 +184,26 @@ setenv runs "Roche"
 setenv runs "iRefSeq Roche"
 setenv runs "HG19t1r1 iRefSeq"
 setenv runs "HG19t1r1 HG19t2r1 HG19t3r1"
-setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1 PacBio Nanopore ChipSeq1 ChipSeq2"
+setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1  ChipSeq1 ChipSeq2"
+setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_PTM_Macaque FrontalCortex_CMC_Macaque TemporalLobe_BAB_Baboon BrainRight_MST_Marmoset  TemporalLobe_SQM_SquirrelMonkey TemporalLobe_MLM_MouseLemur  WormSRR548309 A_WTS_PacBio A_ROCR3_Nanopore-F3 A_ROCR3_PacBio-F3 B_ROCR3_Nanopore-F3 B_ROCR3_PacBio-F3"
+
+
 
 
 # setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1"
-setenv runs "$allRuns"
+setenv runs "$allRuns  $monkeyRuns"
 # setenv runs "Roche"
 # setenv runs "iRefSeq38"
 # setenv runs Nanopore
+# setenv runs "B_ROCR3_PacBio-F3"
 
 # to create all IDX use these runs
 if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1"
 # setenv runs "RNA_PolyA_B_1"
 # setenv runs "ChipSeq1 ChipSeq2"
 # setenv runs "ChipSeq1"
+#setenv runs "WormSRR548309"
+#setenv runs "FrontalCortex_CHP_Chimpanzee"
 
 echo "### S.tcsh SV=$SV"
 echo "$methods"
@@ -348,6 +357,7 @@ date
 
 echo "runs = $runs"
 echo "methods = $methods"
+
 
 if ($1 == init) goto phase_Init
 if ($1 == download) goto phase_Download
@@ -822,6 +832,7 @@ foreach run ($runs)
       if (-e Fasta/$run/$run.reverse.fastq.gz) set read_2=Fasta/$run/$run.reverse.fastq.gz
       if (-e Fasta/$run/$run.forward.fasta.gz) set read_1=Fasta/$run/$run.forward.fasta.gz
       if (-e Fasta/$run/$run.reverse.fasta.gz) set read_2=Fasta/$run/$run.reverse.fasta.gz
+      if ($read_1 == "x" && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
 
       if (! -e $read_1) then
         echo "Run $run Missing read file $read_1"
@@ -837,6 +848,8 @@ foreach run ($runs)
 	\rm RESULTS/$method/$run/*
         scripts/submit RESULTS/$method/$run/$run "Aligners/$method/align.tcsh $method $run $target $read_1 $read_2"  64G
         if (-e RESULTS/$method/$run/s2g.samSats) \rm RESULTS/$method/$run/s2g.samSats
+        if (-e RESULTS/$method/$run/$run.s2g.samSats) \rm RESULTS/$method/$run/$run.s2g.samSats
+        if (-e RESULTS/$method/$run/$run/s2g.samSats) \rm RESULTS/$method/$run/$run/s2g.samSats
       endif
   end
 end
@@ -863,14 +876,23 @@ echo -n "phase_Timing :"
 date
 
 # Create a tsf table
-set out=RESULTS/compare
-\rm $out.*.tsf
+echo -n "### Timings of all methods version : $SV :" > COMPARE/timing.txt
+#hs other
+foreach species (any)
+
+ set out=RESULTS/compare.$species
+ \rm $out.*.tsf
   foreach type (cpu wallT maxMem parallel)
     echo "### $type" > $out.$type.tsf
   end
 
-foreach mm ($allMethods)
-  foreach run ($allRuns)
+ setenv speciesRuns "$allRuns"
+ if ($species == other) then
+  setenv speciesRuns "$monkeyRuns"
+ endif
+ setenv speciesRuns "$allRuns $monkeyRuns"
+ foreach mm ($allMethods)
+  foreach run ($speciesRuns)
 
     if (! -e RESULTS/$mm/$run/align.done) continue
 
@@ -900,7 +922,6 @@ foreach mm ($allMethods)
   end
 end
 
-  echo -n "### Timings of all methods version : $SV :" > COMPARE/timing.txt
   date >> COMPARE/timing.txt
 
   set type=wallT
@@ -932,7 +953,8 @@ end
   echo "### $title" >>  COMPARE/timing.txt
   cat $out.$type.tsf  | gawk -F '\t' '/^#/{next;}{z=$4/60.0;if($4+0>=10)printf("%s\t%s\tt\t%.2f\n",$1,$2,z);}' | bin/tsf -I tsf -O table --title $type.$SV >> COMPARE/timing.txt
   echo "" >> COMPARE/timing.txt
-
+  echo "\n" >> COMPARE/timing.txt
+end
   mv COMPARE/timing.txt COMPARE/timing.$SV.txt
     
 goto phaseLoop
@@ -947,7 +969,7 @@ phase_aliqc:
 echo -n "phase_aliqc :"
 date
 
-foreach run ($allRuns)
+ foreach run ($allRuns $monkeyRuns)
   set nRawReads=`cat Fasta/$run/$run*.count | gawk '/^Sequence_kept/{n+=$2;}END{print n+0}'`
   set nRawBases=`cat Fasta/$run/$run*.count | gawk '/^Bases_seq_kept/{n+=$2;}END{print n+0}'`
   foreach mm ($allMethods)
@@ -958,6 +980,7 @@ foreach run ($allRuns)
     if (! -e RESULTS/$mm/$run/s2g.samStats) then
       set sam=RESULTS/$mm/$run/sam
       if (! -e $sam) set sam=RESULTS/$mm/$run/$run.sam
+      if (! -e $sam) set sam=RESULTS/$mm/$run/Aligned.out.sam
       if (! -e $sam) set sam=RESULTS/$mm/$run/$mm.$run.sam
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam.gz
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam_sorted
@@ -979,6 +1002,9 @@ foreach run ($allRuns)
     if (! -e RESULTS/$mm/$run/align.done) continue
     if (-e RESULTS/$mm/$run/$run.s2g.samStats) then
       \cp RESULTS/$mm/$run/$run.s2g.samStats RESULTS/$mm/$run/s2g.samStats
+    endif
+    if (-e RESULTS/$mm/$run/$run/s2g.samStats) then
+      \cp RESULTS/$mm/$run/$run/s2g.samStats RESULTS/$mm/$run/s2g.samStats
     endif
   end
 end
@@ -1754,6 +1780,24 @@ foreach run ($runs)
 end
 
 goto phaseLoop
+
+##############################################################################
+##############################################################################
+## Create a worm database to verify the wiggles
+
+if (! -d WormDB) mkdir WormDB
+if (! -e WormDB/database) then
+  pushd WormDB
+    ln -s ~/ace/waligner/metaData/wspec.aceview_web_site wspec
+    mkdir database
+    echo y | tace .
+    if (! -d DATA) mkdir DATA
+      pushd DATA
+      rr
+      tace .. < _r
+    popd
+  popd
+endif
 
 ##############################################################################
 ##############################################################################

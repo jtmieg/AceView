@@ -462,7 +462,7 @@ EOF
   pushd tmp/X.$MAGIC/$chrom
     if (-e TABIX) \rm TABIX
     ln -s ../../TABIX
-    if (! -e tables) ln -s ../../metaData/tables
+    if (! -e tables) ln -s ../../../metaData/tables
   popd
   if ($species == worm && ! -e tmp/X.$MAGIC/$chrom/genes.ace) then
     tbly ~/yknew <<EOF

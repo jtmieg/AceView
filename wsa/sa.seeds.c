@@ -135,16 +135,14 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
       
       if (up->nam != chrom)
 	{
-	  chrom = up->nam ;
+	  chrom = up->nam >> 1 ;
 	  dna = array (dnas, chrom, Array) ;
 	}
 
       a1 = up->pos ;           /* 1-based Gt_ag position */
       a2 = up->intron ;        /* 1-based gt_aG position */
-      if (a1 > a2)
-	{ int a0 = a1 ; a1 = a2 ; a2 = a0 ; isIntronDown = FALSE ; }
-      else
-	isIntronDown = TRUE ;
+      isIntronDown = (chrom & 0x1) ? FALSE : TRUE ;
+      
       da = a2 - a1 + 1 ;
       if (da >= (0x1 << 26))
 	continue ; /* we use only 25 bits to code the intron length */
@@ -156,14 +154,9 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
 	  CW *restrict vp = up - 1 ;
 	  if (vp->nam == up->nam)
 	    {
-	      if (isIntronDown && vp->pos < vp->intron && vp->intron > a1 - 17)
+	      if (vp->pos < vp->intron && vp->intron > a1 - 17)
 		{
 		  v1 = vp->pos ; v2 = vp->intron ;
-		  dv = a1 - v2 - 1 ; /* length of left exon */
-		}
-	      else if (! isIntronDown && vp->pos > vp->intron && vp->pos > a1 - 17)
-		{
-		  v2 = vp->pos ; v1 = vp->intron ;
 		  dv = a1 - v2 - 1 ; /* length of left exon */
 		}
 	    }
@@ -176,14 +169,9 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
 	  CW *restrict wp = up + 1 ;
 	  if (wp->nam == up->nam)
 	    {
-	      if (isIntronDown && wp->pos < wp->intron && wp->pos < a2 + 17)
+	      if (wp->pos < wp->intron && wp->pos < a2 + 17)
 		{
 		  w1 = wp->pos ; w2 = wp->intron ;
-		  dw = w1 - a2 - 1 ; /* length of right exon */
-		}
-	      else if (! isIntronDown && wp->pos > wp->intron && wp->intron < a2 + 17)
-		{
-		  w2 = wp->pos ; w1 = wp->intron ;
 		  dw = w1 - a2 - 1 ; /* length of right exon */
 		}
 	    }

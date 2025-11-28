@@ -1,5 +1,13 @@
 #!bin/tcsh -f
 
+# bql to export mrna shadows
+# select -o /home/mieg/toto.unc116.mrna.preshadow m,type,c,a1,a2,g from m in @, c in m->intmap, m1 in c[1], m2 in c[2], s1 in m->splicing, s2 in s1[1], type in s1[4], g in m->from_gene, a1=m1-s1+1,a2=m1-s2+1
+# cat  /home/mieg/toto.unc116.mrna.preshadow | gawk -F '\t' '/Exon/{if($1!=old)n=0;n++;old=$1;printf("%s\t%d\t%s\t%s\t%s\t%s\n",$1,n,$3,$4,$5,$6);}' > /home/mieg/toto.unc116.mrna.shadow
+# cat  /home/mieg/toto.unc116.mrna.preshadow | gawk -F '\t' '/Intron/{printf("%s\t%d\t%d\n",$3,$4,$5);}' > /home/mieg/toto.unc116.introns
+# select -o /home/mieg/toto.unc32.mrna.preshadow m,type,c,a1,a2,g from m in @, c in m->intmap, m1 in c[1], m2 in c[2], s1 in m->splicing, s2 in s1[1], type in s1[4], g in m->from_gene, a1=m1+s1-1,a2=m1+s2-1
+# cat  /home/mieg/toto.unc32.mrna.preshadow | gawk -F '\t' '/Exon/{if($1!=old)n=0;n++;old=$1;printf("%s\t%d\t%s\t%s\t%s\t%s\n",$1,n,$3,$4,$5,$6);}' > /home/mieg/toto.unc32.mrna.shadow
+# cat  /home/mieg/toto.unc32.mrna.preshadow | gawk -F '\t' '/Intron/{printf("%s\t%d\t%d\n",$3,$4,$5);}' > /home/mieg/toto.unc32.introns
+
 set chrom=$1
 
 set target=magic

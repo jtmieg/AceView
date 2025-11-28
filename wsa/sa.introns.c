@@ -59,17 +59,19 @@ static long int confirmedIntronsCompress (BigArray aaa)
 
 /**************************************************************/
 
-void saIntronsCumulate (BigArray aaa, Array aa) 
+long int saIntronsCumulate (BigArray aaa, Array aa) 
 {
   int iMax = arrayMax (aa) ;
+  long int jMax = 0 ;
   
   if (iMax)
     {
       long int jj = bigArrayMax (aaa) ;
       bigArrayp (aaa, jj + iMax - 1, INTRON)->n = 0 ; /*  make room */
       memcpy (bigArrp (aaa, jj, INTRON), arrp (aa, 0, INTRON), iMax * sizeof (INTRON)) ;
-      confirmedIntronsCompress (aaa) ;
+      jMax = confirmedIntronsCompress (aaa) ;
     }
+  return jMax ;
 } /* confirmedIntronsCumulate */
 
 /**************************************************************/

@@ -595,7 +595,7 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   if (isGenome || format != SRA)
     messcrash ("Bad internal options in sraSequenceParser, please edit the code, sorry") ;
 
-  char *fNam = hprintf (pp->h, "SRA/%s.fasta", sraID) ;
+  char *fNam = hprintf (pp->h, "SRA/%s.sra.fasta", sraID) ;
   if (1)  /* check in the cache */
     {
       char *cr = filName (fNam, 0, "r") ;
@@ -631,8 +631,8 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   t1 = clock () ;
   SRAObj* sra = SraObjNew(sraID);
   format = SRACACHE ;
-
-while ((!Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, BMAX)))
+  
+  while ((!Gb || nMax-- > 0) && (ccp = SraGetReadBatch(sra, BMAX)))
     {
       if (ao)	aceOut (ao, ccp) ;  /* caching */
 
@@ -1008,7 +1008,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   DnaFormat format = rc ? rc->format : tc->format ;
-  if (! isGenome && ! rc->pairedEnd &&  format == FASTA)
+  if (! isGenome && ! rc->pairedEnd &&  (format == FASTA || format == SRACACHE))
     return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
   else if (! isGenome && format == SRA)
     return sraSequenceParser (pp, rc, tc, bb, isGenome) ;
@@ -1021,7 +1021,7 @@ void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 int saSequenceParseSraDownload (const char *sraID, int Gb)
 {
   AC_HANDLE h = ac_new_handle () ;
-  char *fName = hprintf (h, "SRA/%s.fasta", sraID) ;
+  char *fNam = hprintf (h, "SRA/%s.sra.fasta", sraID) ;
   ACEOUT ao = 0 ; 
   char tBuf[25] ;
   
@@ -1031,7 +1031,6 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
 	messcrash ("\nCannot create or cannot write in the SRA cache directory ./SRA") ;
     }
 
-  char *fNam = hprintf (h, "SRA/%s.fasta", sraID) ;
   if (1)  /* check in the cache */
     {
       char *cr = filName (fNam, 0, "r") ;
@@ -1050,9 +1049,9 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
 	}
     }
 
-  ao = aceOutCreate (fName, 0, TRUE, h) ;
+  ao = aceOutCreate (fNam, 0, TRUE, h) ;
   if (!ao)
-    messcrash ("\nCannot create the SRA cache file %s", fName) ;
+    messcrash ("\nCannot create the SRA cache file %s", fNam) ;
   
   SRAObj* sra = SraObjNew(sraID);
   const char *ccp ;
