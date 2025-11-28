@@ -1263,6 +1263,7 @@ void saUsage (char *message, int argc, const char **argv)
 /*************************************************************************************/
 /************ Public interface, get params, set channels and agents, launch **********/
 /*************************************************************************************/
+FILE *myErrFile ;
 
 int main (int argc, const char *argv[])
 {
@@ -1311,6 +1312,7 @@ int main (int argc, const char *argv[])
       exit (0) ;
     }     
 
+  myErrFile = fopen ("myErrors.txt", "w") ;
   p.debug  = getCmdLineText (h, &argc, argv, "--debug", 0) ;
   p.debug |= getCmdLineText (h, &argc, argv, "--verbose", 0) ;
   

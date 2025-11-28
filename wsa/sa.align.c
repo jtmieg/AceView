@@ -341,9 +341,10 @@ static void alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna
 
 /**************************************************************/
 
-static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
+static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, int read)
 {
-  A_ERR *ep = arrp (up->errors, 0, A_ERR) ;
+  extern FILE *myErrFile ;
+ A_ERR *ep = arrp (up->errors, 0, A_ERR) ;
   int ii, nerr = arrayMax (up->errors) ;
   vTXT txt1 = bb->txt1 ;
   vTXT txt2 = bb->txt2 ;
@@ -355,9 +356,9 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
     aceDnaShowErr (up->errors) ;
   vtxtClear (txt1) ;
   vtxtClear (txt2) ;
-  
+
   for (ii = 0, sep = "" ; ii < nerr ; ii++, ep++, sep = ",")
-    {
+   {
       xShort = ep->iShort + 1 ;
       xLong = ep->iLong + 1 ;
 
@@ -609,6 +610,11 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 		     , 'Z', 'Z'
 		     ) ;
 	}
+    }
+  if (bb->lane == 169)
+    {
+      fprintf (myErrFile, "%d::%s\n%s\n\n", read, vtxtPtr (txt1), vtxtPtr (txt2)) ;
+      fflush (myErrFile) ;
     }
   dictAdd (bb->errDict, vtxtPtr (txt1), &up->errShort) ;
   dictAdd (bb->errDict, vtxtPtr (txt2), &up->errLong) ;
@@ -1558,6 +1564,12 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	}
 
   /* format the errors */
+  if (bb->lane == 169 && read == 41874)
+    invokeDebugger() ;
+  /*
+    run -x Aligners/011_SortAlignG5R5/IDX.T2T.18.31 --maxTargetRepeats 31 -i titi.f.fasta+titi.r.fasta --align --method 011_SortAlignG5R5 --run FrontalCortex_CHP_Chimpanzee -o toto4 --step 5 --numactl --nB 1 --nA 1
+  */
+  
   iMax = arrayMax (aa) ;
   if (iMax)
     for (ii = 0, ap = arrp (aa, ii, ALIGN) ; ii < iMax ; ii++, ap++)
@@ -1580,7 +1592,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	      if (arrayMax (ap->errors))
 		mergeErrors (bb->errors, ap->errors, flip) ;
 	      if (arrayMax (ap->errors))
-		alignFormatErrors (pp, bb, ap, dna, dnaG, dnaGR) ;	  
+		alignFormatErrors (pp, bb, ap, dna, dnaG, dnaGR, read) ;	  
 	      if (! pp->sam)
 		arrayDestroy (ap->errors) ;
 	    }

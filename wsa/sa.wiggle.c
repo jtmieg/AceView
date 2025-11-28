@@ -530,7 +530,7 @@ static long int wiggleExportGeneCounts (const PP *pp)
   aceOutDate (ao, "##", "Gene counts") ;
   aceOutf (ao, "#Gene\tRun\tFormat\tGene coverage\tExons coverage\n") ;
   for (igc = jgc = 0, gc = bigArrp (allGeneC, 0, GC), gc2 = gc ; igc < igcMax ; igc++, gc++)
-    if (gc->boxCount)
+    if (gc->gene && gc->boxCount)
       aceOutf (ao, "%s\t%s\tii\t%d\t%d\n"
 	       , dictName (pp->geneDict, gc->gene)
 	       , dictName (pp->runDict, gc->run)
