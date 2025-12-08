@@ -110,8 +110,9 @@ static void samStatsExports (const PP *pp, Array runStats)
   
   aceOutf (ao, "%s\t%s\tnPairs\t%ld\n", run, METHOD, s0->nPairs) ;
   aceOutf (ao, "%s\t%s\tnPairsAligned\t%ld\t%.2f%%\n", run, METHOD, s0->nPairsAligned, (100.0 * s0->nPairsAligned)/(nRawReads/2 + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(nRawReads/2 + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(nRawReads/2 + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnCompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCompatiblePairs, (100.0 * s0->nCompatiblePairs)/(s0->nPairsAligned + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnCirclePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nCirclePairs, (100.0 * s0->nCirclePairs)/(s0->nPairsAligned + .000001)) ;
+  aceOutf (ao, "%s\t%s\tnIncompatiblePairs\t%ld\t%.2f%%\n", run, METHOD, s0->nIncompatiblePairs, (100.0 * s0->nIncompatiblePairs)/(s0->nPairsAligned + .000001)) ;
   
   
   aceOutf (ao, "\n%s\t%s\tnRawReads\t%ld\n", run, METHOD, nRawReads) ;
@@ -126,8 +127,15 @@ static void samStatsExports (const PP *pp, Array runStats)
   aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
   aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (nRawBases + .000001)) ;
   aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
-  
 
+  aceOutf (ao, "\n%s\t%s\tnSupportedIntrons\t%ld\n", run, METHOD, arrayMax (pp->confirmedIntrons)) ;
+  aceOutf (ao, "%s\t%s\tnIntronSupports\t%ld\t%ld\t%ld\t%.3f\n", run, METHOD
+	   , s0->nIntronSupportPlus + s0->nIntronSupportMinus
+	   , s0->nIntronSupportPlus
+	   , s0->nIntronSupportMinus
+	   , s0->intronStranding
+	   ) ;
+  
   long int nUnaligned = nRawReads - s0->nMultiAligned[0] ;
   aceOutf (ao, "\n%s\t%s\tnMultiAligned %d times\t%ld\t%.2f%%\n", run, METHOD, 0
 	   , nUnaligned
@@ -153,13 +161,16 @@ static void samStatsExports (const PP *pp, Array runStats)
 /**************************************************************/
 /**************************************************************/
 /* cumulate int global runStats the content of bb->runStats */
-void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI)
+void saRunStatsCumulate (int run, PP *pp, BB *bb)
 {
+  Array aa = pp->runStats ;
   RunSTAT *up = arrayp (aa, run, RunSTAT) ;
-    
+  RunSTAT *vp = &(bb->runStat) ;
+      
   up->run = run ;
   up->nPairs += vp->nPairs ;
   up->nCompatiblePairs += vp->nCompatiblePairs ;
+  up->nIncompatiblePairs += vp->nIncompatiblePairs ;
   up->nCirclePairs += vp->nCirclePairs ;
   up->nOrphans += vp->nOrphans ;
   up->n2ChromsPairs += vp->n2ChromsPairs ;
@@ -167,7 +178,7 @@ void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI)
   up->nReads += vp->nReads ;
   up->nBase1 += vp->nBase1 ;
   up->nBase2 += vp->nBase2 ;
-  up->nIntronSupports += vp->nIntronSupports ;
+  up->nSupportedIntrons += vp->nSupportedIntrons ;
   up->nIntronSupportPlus += vp->nIntronSupportPlus ;
   up->nIntronSupportMinus += vp->nIntronSupportMinus ;
   for (int i = 0 ; i < 5 ; i++)
@@ -180,7 +191,7 @@ void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI)
   up->nAlignments += vp->nAlignments ;
   up->nBaseAligned1 += vp->nBaseAligned1 ;
   up->nBaseAligned2 += vp->nBaseAligned2 ;
-  up->nSupportedIntrons = nI ;
+  up->nSupportedIntrons = saSupportedIntrons (pp, run) ;
   
   up->nErr += vp->nErr ;
   if (vp->errors)
@@ -226,6 +237,11 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , runNam
 		   , up->nCirclePairs
 		   , 100.0 * up->nCirclePairs / (.000001 + up->nPairsAligned)
+		   ) ;
+	  aceOutf (ao, "%s\tIncompatiblePairs\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nIncompatiblePairs
+		   , 100.0 * up->nIncompatiblePairs / (.000001 + up->nPairsAligned)
 		   ) ;
 	  aceOutf (ao, "%s\tReads\ti\t%ld\n", runNam, up->nReads) ;
 	  aceOutf (ao, "%s\tAligned_Reads\tif\t%ld\t%.3f\n"
@@ -288,12 +304,12 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->nErr
 		   , 100.0 * up->nErr /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
 		   ) ;
-	  aceOutf (ao, "%s\tIntronSupport\tiif\t%ld\t%ld\t%.2f%%\n"
+	  aceOutf (ao, "%s\tIntronSupport\tiiif\t%ld\t%ld\t%ld\t%.2f%%\n"
 		   , runNam
-		   , up->nIntronSupports
+		   , up->nIntronSupportPlus + up->nIntronSupportMinus
 		   , up->nIntronSupportPlus
 		   , up->nIntronSupportMinus
-		   , (100.0 * up->nIntronSupportPlus + 0.00001)/(up->nIntronSupportPlus+up->nIntronSupportMinus - 0.00001)
+		   , up->intronStranding
 		   ) ;
 	  aceOutf (ao, "%s\tSupportedIntrons\ti\t%ld\n"
 		   , runNam

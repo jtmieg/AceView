@@ -343,7 +343,6 @@ static void alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna
 
 static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, int read)
 {
-  extern FILE *myErrFile ;
  A_ERR *ep = arrp (up->errors, 0, A_ERR) ;
   int ii, nerr = arrayMax (up->errors) ;
   vTXT txt1 = bb->txt1 ;
@@ -352,6 +351,7 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
   int xShort, xLong  ;
   BOOL isUp = (up->a1 > up->a2) ;
   const BOOL debug = FALSE ;
+
   if (debug)
     aceDnaShowErr (up->errors) ;
   vtxtClear (txt1) ;
@@ -409,189 +409,192 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 	    vtxtPrintf(txt1, "%s%d:%c>%c"
 		       , sep
 		       , xShort 
-		       , ccL, ccSR
+		       , ccLR, ccS
 		       ) ;
 
 	    vtxtPrintf(txt2, "%s%d:%c>%c"
 		       , sep
 		       , xLong 
-		       , ccLR, ccS
+		       , ccL, ccSR
 		       ) ;
 	  }  
 	  break ;
 	case TROU: 
 	  {
-	    char *ss = "-", cc1a, cc2a, cc1ac, cc2ac ;
+	    char *ss = "-", ccL, ccLR ;
 	    
-	    cc1a = arr(dnaG, xLong - 1, unsigned char) ;
-	    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
+	    ccL = arr(dnaG, xLong - 1, unsigned char) ;
+	    ccLR = isUp ? complementBase[(int)ccL] : ccL ; 
 	    
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
+	    ccL = dnaDecodeChar[(int)ccL] ;
+	    ccLR = dnaDecodeChar[(int)ccLR] ;
 
-	    vtxtPrintf (txt2,"%s%d:%s%c"
-			, sep
-			, xLong 
-			, ss 
-			, cc1ac 
-			) ;
-	    
 	    vtxtPrintf (txt1, "%s%d:%s%c"
 			, sep
 			, xShort
 			, ss
-			, cc2ac
+			, ccLR
 			) ;
+	    vtxtPrintf (txt2,"%s%d:%s%c"
+			, sep
+			, xLong 
+			, ss 
+			, ccL 
+			) ;
+	    
 	  }
 	  break ;
 
 	case TROU_DOUBLE:
 	  {
-	    char *ss = "--", cc1a, cc1b, cc2a, cc2b, cc1ac, cc1bc, cc2ac, cc2bc ;
-	    cc1a = arr(dnaG, xLong - 1 , unsigned char) ;
-	    cc1b = arr(dnaG, xLong - 1 + 1, unsigned char) ;
+	    char *ss = "--", cc1L, cc2L, cc1LR, cc2LR ;
 	    
-	    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
-	    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
+	    cc1L = arr(dnaG, xLong - 1, unsigned char) ;
+	    cc2L = arr(dnaG, xLong - 1 + 1, unsigned char) ;
+	    cc1LR = isUp ? complementBase[(int)cc2L] : cc1L ; 
+	    cc2LR = isUp ? complementBase[(int)cc1L] : cc2L ; 
 	    
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc1bc = dnaDecodeChar[(int)cc1b] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    cc2bc = dnaDecodeChar[(int)cc2b] ;
-	    
-	    vtxtPrintf (txt2, "%s%d:%s%c%c"
-			, sep
-			, xLong 
-			, ss 
-			, cc1ac, cc1bc
-			) ;
-	    
+	    cc1L = dnaDecodeChar[(int)cc1L] ;
+	    cc2L = dnaDecodeChar[(int)cc2L] ;
+	    cc1LR = dnaDecodeChar[(int)cc1LR] ;
+	    cc2LR = dnaDecodeChar[(int)cc2LR] ;
+
 	    vtxtPrintf (txt1, "%s%d:%s%c%c"
 			, sep
 			, xShort + (isUp ? 1 : 0)
 			, ss
-			, cc2ac, cc2bc
+			, cc1LR, cc2LR
 			) ;
+	    vtxtPrintf (txt2, "%s%d:%s%c%c"
+			, sep
+			, xLong 
+			, ss 
+			, cc1L, cc2L
+			) ;
+	    
 	  }
 	  break ;
 	case TROU_TRIPLE:
 	  {
-	    char *ss = "---", cc1a, cc1b, cc1c, cc2a, cc2b, cc2c, cc1ac, cc1bc, cc1cc, cc2ac, cc2bc, cc2cc ;
-	    cc1a = arr(dnaG, xLong - 1 , unsigned char) ;
-	    cc1b = arr(dnaG, xLong - 1 + 1 , unsigned char) ;
-	    cc1c = arr(dnaG, xLong - 1 + 2 , unsigned char) ;
+	    char *ss = "---", cc1L, cc2L, cc3L, cc1LR, cc2LR, cc3LR ;
 	    
-	    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
-	    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
-	    cc2c = isUp ? complementBase[(int)cc1a] : cc1c ; 
+	    cc1L = arr(dnaG, xLong - 1, unsigned char) ;
+	    cc2L = arr(dnaG, xLong - 1 + 1, unsigned char) ;
+	    cc3L = arr(dnaG, xLong - 1 + 2, unsigned char) ;
+	    cc1LR = isUp ? complementBase[(int)cc3L] : cc1L ; 
+	    cc2LR = isUp ? complementBase[(int)cc2L] : cc2L ;
+	    cc3LR = isUp ? complementBase[(int)cc1L] : cc3L ; 
 	    
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc1bc = dnaDecodeChar[(int)cc1b] ;
-	    cc1cc = dnaDecodeChar[(int)cc1c] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    cc2bc = dnaDecodeChar[(int)cc2b] ;
-	    cc2cc = dnaDecodeChar[(int)cc2c] ;
-	    
-	    vtxtPrintf (txt2, "%s%d:%s%c%c%c"
-			, sep
-			, xLong 
-			, ss 
-			, cc1ac, cc1bc, cc1cc
-			) ;
-	    
+	    cc1L = dnaDecodeChar[(int)cc1L] ;
+	    cc2L = dnaDecodeChar[(int)cc2L] ;
+	    cc3L = dnaDecodeChar[(int)cc3L] ;
+	    cc1LR = dnaDecodeChar[(int)cc1LR] ;
+	    cc2LR = dnaDecodeChar[(int)cc2LR] ;
+	    cc3LR = dnaDecodeChar[(int)cc3LR] ;
+
 	    vtxtPrintf (txt1, "%s%d:%s%c%c%c"
 			, sep
 			, xShort + (isUp ? 1 : 0)
 			, ss
-			, cc2ac, cc2bc, cc2cc
+			, cc1LR, cc2LR, cc3LR
+			) ;
+	    vtxtPrintf (txt2, "%s%d:%s%c%c%c"
+			, sep
+			, xLong 
+			, ss 
+			, cc1L, cc2L, cc3L
 			) ;
 	  }
 	  break ;
 	case INSERTION: 
 	  {
-	    char *ss = "+", cc1a, cc2a, cc1ac, cc2ac ;
+	    char *ss = "+", cc1S, cc1SR ;
+	    
+	    cc1S = arr(dna, xShort - 1, unsigned char) ;
+	    cc1SR = isUp ? complementBase[(int)cc1S] : cc1S ;
+	    
+	    cc1S = dnaDecodeChar[(int)cc1S] ;
+	    cc1SR = dnaDecodeChar[(int)cc1SR] ;
 
-	    cc1a = arr (dna, xShort - 1, char) ;
-	    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    
-	    vtxtPrintf (txt2,"%s%d:%s%c"
+	    vtxtPrintf (txt1, "%s%d:%s%c"
 			, sep
-			, xLong 
-			, ss 
-			, cc2ac
-			  ) ;
-	    
-	    vtxtPrintf (txt1,"%s%d:%s%c"
-			, sep
-			, xShort 
+			, xShort + (isUp ? 0 : 0)
 			, ss
-			, cc1ac
+			, cc1S
 			) ;
+	    vtxtPrintf (txt2, "%s%d:%s%c"
+			, sep
+			, xLong
+			, ss 
+			, cc1SR
+			) ;
+	    
 	  }
 	  break ;
 
 	case INSERTION_DOUBLE:
 	  {
-	    char *ss = "++", cc1a, cc1b, cc2a, cc2b, cc1ac, cc1bc, cc2ac, cc2bc ;
+	    char *ss = "++", cc1S, cc2S, cc1SR, cc2SR ;
 
-	    cc1a = arr (dna, xShort - 1 + (isUp ? -1 : 0), char) ;
-	    cc1b = arr (dna, xShort - 1 + (isUp ? 0 : 1), char) ;
-
-	    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
-	    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc1bc = dnaDecodeChar[(int)cc1b] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    cc2bc = dnaDecodeChar[(int)cc2b] ;
+	    xShort = isUp ? xShort - 1 : xShort ; 
+	    cc1S = arr(dna, xShort - 1, unsigned char) ;
+	    cc2S = arr(dna, xShort - 1 + 1, unsigned char) ;
+	    cc1SR = isUp ? complementBase[(int)cc2S] : cc1S ; 
+	    cc2SR = isUp ? complementBase[(int)cc1S] : cc2S ;
 	    
+	    cc1S = dnaDecodeChar[(int)cc1S] ;
+	    cc2S = dnaDecodeChar[(int)cc2S] ;
+	    cc1SR = dnaDecodeChar[(int)cc1SR] ;
+	    cc2SR = dnaDecodeChar[(int)cc2SR] ;
+
+	    vtxtPrintf (txt1, "%s%d:%s%c%c"
+			, sep
+			, xShort + (isUp ? 0 : 0)
+			, ss
+			, isUp ? cc1S : cc1S
+			, isUp ? cc2S : cc2S
+			) ;
 	    vtxtPrintf (txt2, "%s%d:%s%c%c"
 			, sep
 			, xLong
 			, ss 
-			, cc2ac, cc2bc
+			, cc1SR, cc2SR
 			) ;
 	    
-	    vtxtPrintf (txt1, "%s%d:%s%c%c"
-			, sep
-			, xShort + (isUp ? -1 : 0) 
-			, ss
-			, cc1ac, cc1bc
-			) ;
 	  }
 	  break ;
 	  
 	case INSERTION_TRIPLE:
 	  {
-	    char *ss = "+++", cc1a, cc1b, cc1c, cc2a, cc2b, cc2c, cc1ac, cc1bc, cc1cc, cc2ac, cc2bc, cc2cc ;
+	    char *ss = "+++", cc1S, cc2S, cc3S, cc1SR, cc2SR, cc3SR ;
+	    xShort = isUp ? xShort - 2 : xShort ; 
+	    cc1S = arr(dna, xShort - 1, unsigned char) ;
+	    cc2S = arr(dna, xShort - 1 + 1, unsigned char) ;
+	    cc3S = arr(dna, xShort - 1 + 2, unsigned char) ;
+	    cc1SR = isUp ? complementBase[(int)cc3S] : cc1S ; 
+	    cc2SR = isUp ? complementBase[(int)cc2S] : cc2S ;
+	    cc3SR = isUp ? complementBase[(int)cc1S] : cc3S ; 
+	    
+	    cc1S = dnaDecodeChar[(int)cc1S] ;
+	    cc2S = dnaDecodeChar[(int)cc2S] ;
+	    cc3S = dnaDecodeChar[(int)cc3S] ;
+	    cc1SR = dnaDecodeChar[(int)cc1SR] ;
+	    cc2SR = dnaDecodeChar[(int)cc2SR] ;
+	    cc3SR = dnaDecodeChar[(int)cc3SR] ;
 
-	    cc1a = arr (dna, xShort - 1 + (isUp ? -2 : 0), char) ;
-	    cc1b = arr (dna, xShort - 1 + (isUp ? -1 : 1), char) ;
-	    cc1c = arr (dna, xShort - 1 + (isUp ? 0 : 2), char) ;
-	    
-	    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
-	    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
-	    cc2c = isUp ? complementBase[(int)cc1a] : cc1c ; 
-	    cc1ac = dnaDecodeChar[(int)cc1a] ;
-	    cc1bc = dnaDecodeChar[(int)cc1b] ;
-	    cc1cc = dnaDecodeChar[(int)cc1c] ;
-	    cc2ac = dnaDecodeChar[(int)cc2a] ;
-	    cc2bc = dnaDecodeChar[(int)cc2b] ;
-	    cc2cc = dnaDecodeChar[(int)cc2c] ;
-	    
+	    vtxtPrintf (txt1, "%s%d:%s%c%c%c"
+			, sep
+			, xShort + (isUp ? 0 : 0)
+			, ss
+			, isUp ? cc1S : cc1S
+			, isUp ? cc2S : cc2S
+			, isUp ? cc3S : cc3S
+			) ;
 	    vtxtPrintf (txt2, "%s%d:%s%c%c%c"
 			, sep
 			, xLong
 			, ss 
-			, cc2ac, cc2bc, cc2cc
-			) ;
-	    
-	    vtxtPrintf (txt1, "%s%d:%s%c%c%c"
-			, sep
-			, xShort + (isUp ? -2 : 0)
-			, ss
-			, cc1ac, cc1bc, cc1cc
+			, cc1SR, cc2SR, cc3SR
 			) ;
 	    
 	  }
@@ -611,11 +614,22 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 		     ) ;
 	}
     }
+
+  #ifdef JUNK
+  int nk1 = strlen (vtxtPtr (txt1)) ;
+  int nk2 = strlen (vtxtPtr (txt2)) ;
+  if (nk1 > 200)
+    invokeDebugger () ;
+  if (nk2 > 200)
+    invokeDebugger () ;
   if (bb->lane == 169)
     {
-      fprintf (myErrFile, "%d::%s\n%s\n\n", read, vtxtPtr (txt1), vtxtPtr (txt2)) ;
+      nnE++ ;
+      fprintf (myErrFile, "nnE=%d\tread=%d::%s\n%s\n\n", nnE, read, vtxtPtr (txt1), vtxtPtr (txt2)) ;
       fflush (myErrFile) ;
     }
+  #endif
+  
   dictAdd (bb->errDict, vtxtPtr (txt1), &up->errShort) ;
   dictAdd (bb->errDict, vtxtPtr (txt2), &up->errLong) ;
   
@@ -1157,6 +1171,9 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
   /* for each exon moving left to right, construct the chains */
   i2 = 0 ; vp = arrp (aa, 0, ALIGN) ; /* preposition */
   
+  if (bb->lane == 169 && myRead == 41873)
+    invokeDebugger() ;
+
   for (i1 = 0, up = arrp (aa, 0, ALIGN) ; i1 < iMax ; i1++, up++)
     {
       int chrom = up->chrom ;
@@ -1564,7 +1581,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	}
 
   /* format the errors */
-  if (bb->lane == 169 && read == 41874)
+  if (bb->lane == 169 && read == 41873)
     invokeDebugger() ;
   /*
     run -x Aligners/011_SortAlignG5R5/IDX.T2T.18.31 --maxTargetRepeats 31 -i titi.f.fasta+titi.r.fasta --align --method 011_SortAlignG5R5 --run FrontalCortex_CHP_Chimpanzee -o toto4 --step 5 --numactl --nB 1 --nA 1
@@ -1703,7 +1720,114 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	    vp->nTargetRepeats = nChains ;
 	  }
     }
+
+  /* register the introns */
+  kMax = bigArrayMax (aaa) ;
+  
+  iMax = arrayMax (aa) ;
+  if (iMax)
+    {
+      ALIGN *bp ;
+      int jj ;
+      
+      ap = arrp (aa, 0, ALIGN) ;
+      /*   bitSet (bb->isAligned, ap->read) ; */
+      for (ii = 0 ; ii < iMax ; ii++, ap++)
+	if (read == ap->read)
+	  {
+	    for (jj = ii + 1, bp = ap + 1 ; jj < iMax && bp->read == read && bp->chain == ap->chain && bp->x1 == ap->x2 + 1 ; jj++, bp++)
+	      { /* found one intron */
+		INTRON *zp = arrayp (bb->confirmedIntrons, arrayMax (bb->confirmedIntrons), INTRON) ;
+		int chrom = ap->chrom ;
+		int a1 = ap->a1 ;
+		int a2 = ap->a2 ;
+		int b1 = bp->a1 ;
+		    
+		BOOL isReadDown = a1 < a2 ? TRUE : FALSE ;
+
+		zp->run = bb->run ;
+
+		if (chrom != chromA)
+		  {
+		    chromA = chrom ;
+		    dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
+		    dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
+		  }
+
+		if (read & 0x1)
+		  {
+		    if (isReadDown)
+		      { 
+			zp->a1 = a2 + 1 ;
+			zp->a2 = b1 - 1 ;
+			bb->nIntronSupportPlus++ ;
+			const char *cp = arrp (dnaG, zp->a1 - 1, char) ;
+			zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)cp[0]]] ;
+			zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)cp[1]]] ;
+			zp->feet[2] = '_' ;
+			cp = arrp (dnaG, zp->a2 - 2, char) ;
+			zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)cp[0]]] ;
+			zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)cp[1]]] ;
+			zp->feet[5] = 0 ;
+		      }
+		    else
+		      {
+			zp->a1 = a2 - 1 ;
+			zp->a2 = b1 + 1 ;
+			bb->nIntronSupportMinus++ ;
+			const char *cp = arrp (dnaG, zp->a1 - 1, char) ;
+			zp->feet[4] = dnaDecodeChar[(int)cp[0]] ;
+			zp->feet[3] = dnaDecodeChar[(int)cp[-1]]  ;
+			zp->feet[2] = '_' ;
+			cp = arrp (dnaG, zp->a2 - 1, char) ;
+			zp->feet[1] = dnaDecodeChar[(int)cp[1]] ;
+			zp->feet[0] = dnaDecodeChar[(int)cp[0]] ;
+			zp->feet[5] = 0 ;
+		      }
+		    int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
+		    zp->n = 1 ;
+		    zp->chrom = chrom ^ 0x1;
+		  }
+		else
+		  {
+		    if (isReadDown)
+		      { 
+			zp->a1 = a2 + 1 ;
+			zp->a2 = b1 - 1 ;
+			bb->nIntronSupportPlus++ ;
+			const char *cp = arrp (dnaG, zp->a1 - 1, char) ;
+			zp->feet[0] = dnaDecodeChar[(int)cp[0]] ;
+			zp->feet[1] = dnaDecodeChar[(int)cp[1]] ;
+			zp->feet[2] = '_' ;
+			cp = arrp (dnaG, zp->a2 - 2, char) ;
+			zp->feet[3] = dnaDecodeChar[(int)cp[0]] ;
+			zp->feet[4] = dnaDecodeChar[(int)cp[1]] ;
+			zp->feet[5] = 0 ;
+		      }
+		    else
+		      {
+			zp->a1 = a2 - 1 ;
+			zp->a2 = b1 + 1 ;
+			bb->nIntronSupportMinus++ ;
+			const char *cp = arrp (dnaG, zp->a1 - 1, char) ;
+			zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)cp[0]]] ;
+			zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)cp[-1]]] ;
+			zp->feet[2] = '_' ;
+			cp = arrp (dnaG, zp->a2 - 1, char) ;
+			zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)cp[1]]] ;
+			zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)cp[0]]] ;
+			zp->feet[5] = 0 ;
+		      }
+		    zp->n = 1 ;
+		    zp->chrom = chrom ;
+		  }
+		break ;
+	      }
+	  }
+    }
+  
   return ;
+  
 } /* alignDoRegisterOnePair */
 
 /**************************************************************/
@@ -1923,6 +2047,10 @@ static void alignDoOnePair (const PP *pp, BB *bb
   else
     alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp1) ;
 
+  iMax = arrayMax (aaa) ;
+  array (aaa, iMax, ALIGN).read = 0 ; /* impose a zero terminal record */
+  arrayMax (aaa) = iMax ;
+  
   if (bestAp2) /* we have a pair, good  example polyA_B_1 read 144/145*/
     {
       ALIGN *up, *vp ;
@@ -2002,7 +2130,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		      vp->mateA2 = wp->chainA2 ;
 
 		      zp = arrayp (aaa1, kk++, ALIGN) ;
-		      *zp = *up ;
+		      *zp = *vp ;
 		    }	  
 
 
@@ -2016,7 +2144,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		      vp->mateA2 = wp->chainA2 ;
 
 		      zp = arrayp (aaa1, kk++, ALIGN) ;
-		      *zp = *up ;
+		      *zp = *vp ;
 		    }	  
 		}
 
@@ -2028,13 +2156,28 @@ static void alignDoOnePair (const PP *pp, BB *bb
 		}
 	    }
 	}
-      if (hasPair) bb->runStat.nPairsAligned++ ;
-      if (hasGoodPair) bb->runStat.nCompatiblePairs++ ;
-      if (hasCirclePair) bb->runStat.nCirclePairs++ ;
+      if (hasPair)
+	{
+	  bb->runStat.nPairsAligned++ ;
+	  if (hasGoodPair)
+	    bb->runStat.nCompatiblePairs++ ;
+	  else if (hasCirclePair)
+	    bb->runStat.nCirclePairs++ ;
+	  else
+	    bb->runStat.nIncompatiblePairs++  ;
+	}
     }
-  /* alignDoSelectBestPair */ 
-  alignDoRegisterOnePair (pp, bb, aaaa, aaa, read1, bestAp1) ;
-  if (bestAp2) alignDoRegisterOnePair (pp, bb, aaaa, aaa, read2, bestAp2) ;
+
+
+  /* alignDoSelectBestPair */
+  iMax = arrayMax (aaa) ;
+  if (iMax)
+    {
+      arraySort (aaa, saAlignOrder) ;
+      arrayCompress (aaa) ;
+      alignDoRegisterOnePair (pp, bb, aaaa, aaa, read1, bestAp1) ;
+      if (bestAp2) alignDoRegisterOnePair (pp, bb, aaaa, aaa, read2, bestAp2) ;
+    }
   ac_free (h) ;
 } /* alignDoOnePair */
 

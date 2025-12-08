@@ -50,6 +50,8 @@ setenv SV v44.nov12        # idem --wiggle
 setenv SVlast v44.nov12
 setenv SV v45.nov21        # no wiggle, no sam,    fixed sam and pairs (but i do not use --sam ) , added new T2T index to Hisat, star and minimap
 setenv SVlast v45.nov21
+setenv SV v46.dec1        # no wiggle, no sam, fixed pairs again => fixed multiAligned, modified sam2gold to not count introns
+setenv SVlast v46.dec1
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
@@ -101,7 +103,7 @@ setenv methods "50_Minimap2"
 setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
 
 setenv methods "$allMethods"
-# setenv methods "011_SortAlignG5R5"
+#setenv methods "012_SortAlignG3R3"
 
 set createIndex=0
 if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2"
@@ -184,7 +186,7 @@ setenv runs "Roche"
 setenv runs "iRefSeq Roche"
 setenv runs "HG19t1r1 iRefSeq"
 setenv runs "HG19t1r1 HG19t2r1 HG19t3r1"
-setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1  ChipSeq1 ChipSeq2"
+setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1  ChipSeq1 ChipSeq2  B_ROCR2_Illumina_DNA "
 setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_PTM_Macaque FrontalCortex_CMC_Macaque TemporalLobe_BAB_Baboon BrainRight_MST_Marmoset  TemporalLobe_SQM_SquirrelMonkey TemporalLobe_MLM_MouseLemur  WormSRR548309 A_WTS_PacBio A_ROCR3_Nanopore-F3 A_ROCR3_PacBio-F3 B_ROCR3_Nanopore-F3 B_ROCR3_PacBio-F3"
 
 
@@ -367,6 +369,7 @@ if ($1 == countFasta) goto phase_countFasta
 if ($1 == samDownLoad) goto phase_SamDownLoadFromNCBI
 if ($1 == timing) goto phase_Timing
 if ($1 == accuracy) goto phase_Accuracy
+if ($1 == introns) goto phase_introns
 if ($1 == aliqc) goto phase_aliqc
 if ($1 == perfect) goto phase_perfect
 if ($1 == errors) goto phase_DirectErrorCount
@@ -977,6 +980,10 @@ date
       if (-e RESULTS/$mm/$run/s2g.samStats) \rm RESULTS/$mm/$run/s2g.samStats
       continue
     endif
+    if (-e RESULTS/$mm/$run/Aligned.out.sam && ! -e RESULTS/$mm/$run/sam) then
+       mv RESULTS/$mm/$run/Aligned.out.sam RESULTS/$mm/$run/sam
+    endif
+
     if (! -e RESULTS/$mm/$run/s2g.samStats) then
       set sam=RESULTS/$mm/$run/sam
       if (! -e $sam) set sam=RESULTS/$mm/$run/$run.sam
@@ -992,8 +999,9 @@ date
 
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
-                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" > 	RESULTS/$mm/$run/sam2gold.out					
-            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" 64G
+                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" > 	RESULTS/$mm/$run/sam2gold.cmd
+            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
+	    # 64G
     
     endif
     # wc RESULTS/$mm/$run/s2g.samStats
@@ -1072,6 +1080,51 @@ foreach tag (nMultiAligned)
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
+foreach tag (nSupportedIntrons)
+  echo $tag
+  if (-e  toto.tag) \rm toto.tag
+  echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  foreach run ($allRuns)
+    foreach mm ($allMethods)
+      echo "$run\t$mm\tf\t0" >> toto.tag
+    end
+  end
+  echo "\nSupported introns\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\ti\t%s\n", $1,$2,$4);}}' tag=$tag >> toto.tag
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Supported introns" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
+
+foreach tag (nIntronSupports)
+  echo $tag
+  if (-e  toto.tag) \rm toto.tag
+  echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  foreach run ($allRuns)
+    foreach mm ($allMethods)
+      echo "$run\t$mm\tf\t0" >> toto.tag
+    end
+  end
+  echo "\nIntron supports\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\ti\t%s\n", $1,$2,$4);}}' tag=$tag >> toto.tag
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Intron supports" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+foreach tag (nIntronSupports)
+  echo $tag
+  if (-e  toto.tag) \rm toto.tag
+  echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  foreach run ($allRuns)
+    foreach mm ($allMethods)
+      echo "$run\t$mm\tf\t0" >> toto.tag
+    end
+  end
+  echo "\nIntron stranding\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($7) >= 1 && $3 == tag) {gsub("%","",$7);printf("%s\t%s\tf\t%s\n", $1,$2,$7);}}' tag=$tag >> toto.tag
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Intron strandings" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
 foreach tag (nCompatiblePairs)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
@@ -1083,7 +1136,22 @@ foreach tag (nCompatiblePairs)
   end
   echo "\nConsistent pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Consistent pairs" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Compatible pairs" >> COMPARE/samStats.$SV.txt
+  echo "\n" >> COMPARE/samStats.$SV.txt
+end
+
+foreach tag (nIncompatiblePairs)
+  echo $tag
+  if (-e  toto.tag) \rm toto.tag
+  echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
+  foreach run ($allRuns)
+    foreach mm ($allMethods)
+      echo "$run\t$mm\tf\t0" >> toto.tag
+    end
+  end
+  echo "\nIncompatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
+   cat toto.tag | bin/tsf  -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1782,6 +1850,73 @@ end
 goto phaseLoop
 
 ##############################################################################
+
+phase_introns:
+
+echo "Creating the INTRON_DB databases"
+foreach target (GRCh38)
+  set IDB=$target.INTRON_DB
+  if (! -d $IDB) then
+    mkdir $IDB
+    pushd $IDB
+      mkdir database
+      ln -s ~/ace/waligner/metaData/wspec.aceview_web_site wspec
+      echo y | tace .
+    popd
+  endif
+  if (! -e $target.GFF/mrna2intron.ace) then
+     mkdir $target.GFF
+     pushd $target.GFF
+       ln -s ../Reference_genome/$target.genome.fasta.gz
+       ln -s ../Reference_genome/$target.mito.fasta.gz
+       ln -s ../Reference_genome/$target.gtf.gz
+       dna2dna -gtf $target.gtf.gz -gtfRemap KT_RefSeq  -o gtf.$target
+       # construct the intron file needed for --createIndex
+       cat gtf.GRCh38.introns | cut -f 6,7,8 | sort -u > g.introns.gz
+       # construct the intron.ace file needed in INTRON_DB
+       cat gtf.GRCh38.introns | gawk -F '\t' '{g=$2;m=$3;c=$4;x1=$5;x2=$6;c=$6;i1=$7;i2=$8;printf("Intron %s__%d_%d\nIntMap %s %d %d\nGene %s\nIn_mRNA %s %d %d\n\n",c,i1,i2,c,i1,i2,g,m,x1,x2);}' > mrna2intron.ace
+    popd
+  endif
+  if (! -e $IDB/genome.done) then
+     tace $IDB <<EOF
+       pparse $target.GFF/$target.genome.fasta.gz
+       query find sequence DNA
+       edit genomic
+       pparse $target.GFF/$target.mito.fasta.gz
+       pparse $target.GFF/mrna2intron.ace
+       save
+       quit
+EOF
+    touch  $IDB/genome.done
+  endif
+
+  echo '#' > $IDB/introns.tsf
+  foreach mm (013_SortAlignG3R1)
+    foreach run ($runs)
+      set target2=`cat Fasta/$run/target`
+      echo "$run $target $target2"
+      if ($target != $target2) continue
+      set ff=RESULTS/$mm/$run/$run/introns.tsf
+      if (! -e $ff) continue
+      wc $ff
+      cat $ff | gawk '/^#/{next;}{printf("%s\t",mm);print;}' mm=$mm   >> $IDB/introns.tsf
+    end
+  end
+  cat $IDB/introns.tsf | sort | gawk -F '\t' '/^#/{next;}{if($2 != old){old=$2;split(old,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1<100 || a2<100){old=0;next;}ln=a2-a1;if(ln<0)ln=-ln;ln+=1;printf("\nIntron %s\nIntron\nIntMap %s %d %d\nLength %d\n", old,aa[1],a1,a2, ln);}printf("de_duo %s__%s %d\n",$1,$3,$5);}END{printf("\n");}' > $IDB/introns.ace
+
+  echo "parse  $IDB/introns.ace" | tace $IDB -no_prompt
+
+
+          
+  endif
+end
+
+SRR24518509 
+ B_ROCR2_Illumina_DNA
+goto phaseLoop
+# iRefSeq38 NR_024540.1 is aligned but has no produced intron
+
+##############################################################################
 ##############################################################################
 ## Create a worm database to verify the wiggles
 
@@ -1798,6 +1933,8 @@ if (! -e WormDB/database) then
     popd
   popd
 endif
+
+goto phaseLoop
 
 ##############################################################################
 ##############################################################################

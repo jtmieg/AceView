@@ -223,7 +223,7 @@ typedef struct cigaretteStruct {
   int a1, a2, x1, x2, type, dx ;
 } SAMCIGAR ;
 
-BOOL samParseCigar (char *cigar, Array cigarettes, int a1, int *a2p, int *x1p, int *x2p, int *alip, int *insp, int *delp) ;
+BOOL samParseCigar (char *cigar, Array cigarettes, int a1, int *a2p, int *x1p, int *x2p, int *alip, int *insp, int *delp, int *bigDelp) ;
 BOOL samCheckCigar (const char * readName, char *cigar, Array cigarettes, int a1, int ln) ;
 int  samScoreCigar (const char * readName, char *cigar, Array cigarettes, int a1, int ln) ;
 

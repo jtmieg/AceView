@@ -327,7 +327,7 @@ static void s2gParseGoldFile (S2G *s2g, const char *fNam, int method)
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
   BigArray hits = s2g->hits ;
   long int nn , nn0 = bigArrayMax (hits) ;
-  int seq, target, x1, x2, a1, a2, score, ali, ins, del, strand ;
+  int seq, target, x1, x2, a1, a2, score, ali, ins, del, bigDel, strand ;
   HIT *hit ;
 
   nn = nn0 ;
@@ -354,8 +354,8 @@ static void s2gParseGoldFile (S2G *s2g, const char *fNam, int method)
       aceInStep (ai, '\t') ; cigar = aceInWord (ai) ;
       if (! cigar)
 	continue ;
-      ali = ins = del = 0 ;
-      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del) ; 
+      ali = ins = del = bigDel = 0 ;
+      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del, &bigDel) ; 
       score = 1 ;
       if (! strcmp (cigar, "100M") || ! strcmp (cigar, "100="))
 	score = 100 ;
@@ -409,7 +409,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   BigArray hits = s2g->hits ;
   long int nn, nn0 = bigArrayMax (hits) ;
   int dnaLn ;
-  int seq, seq2, flag, target, a1, a2, x1, x2, score, nerr, ali, ins, del, strand ;
+  int seq, seq2, flag, target, a1, a2, x1, x2, score, nerr, ali, ins, del, bigDel, strand ;
   HIT *hit ;
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
   KEYSET ksu = keySetHandleCreate (h) ;
@@ -421,8 +421,12 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   long int nPerfectReads = 0 ;
   BOOL isNewPerfectCandidate = FALSE ;
   ACEOUT aoPerfect = aceOutCreate (s2g->outFileName, ".perfect.list", 0, h) ;  
+  BOOL nmDoesNotCountInDels = FALSE ;
   nn = nn0 ;
 
+  if (s2g->method && strstr (s2g->method, "STAR")) nmDoesNotCountInDels =  TRUE ;
+  if (s2g->method && strstr (s2g->method, "11_MagicBLAST_2018")) nmDoesNotCountInDels =  TRUE ;
+  
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai)) 
     { /* parse a sam file
@@ -530,8 +534,8 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
       */
       
       arrayMax (cigarettes) = 0 ;
-      ali = ins = del = 0 ;
-      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del) ; 
+      ali = ins = del = bigDel = 0 ;
+      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, &ali, &ins, &del, &bigDel) ; 
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate target */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* mate a1 coordinate */
       aceInStep (ai, '\t') ; aceInWord (ai) ;  /* distance to mate */
@@ -554,23 +558,20 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	  else if (sscanf (ccp, "nM:i:%d%c", &n_, &c_) == 1)
 	    nerr = n_ ;	      
 	}
-      /* if (nerr >= del) nerr -= del ; */
-      if (0)
-	{
-	  if (isMulti == 1)  /* first  primary alignment */
-	    {
-	      nAlignedBases += x2 - x1 + 1 - ins ;
-	      nErrors += (nerr > 0 ? nerr : 0) ;
-	    }
-	}
+
+      if (nmDoesNotCountInDels)
+	nerr += del + ins ;
       else
-	{
-	  if (! (flag & (256 + 2048)))  /* primary alignment */
-	    {
-	      nAlignedBases += x2 - x1 + 1 - ins ;
-	      nErrors += (nerr > 0 ? nerr : 0) ;
-	    }
-	}
+	nerr -= bigDel ;
+      if (nerr < -1)
+	messcrash ("nerr < 0 file %s line %d\n", aceInFileName (ai), aceInStreamLine (ai)) ;
+      /* if (nerr >= del) nerr -= del ; */
+	if (! (flag & (256 + 2048)))  /* primary alignment */
+	  {
+	    nAlignedBases += x2 - x1 + 1 - ins ;
+	    nErrors += (nerr > 0 ? nerr : 0) ;
+	  }
+
       if (isNewPerfectCandidate)
 	{
 	  if (ali == dnaLn && nerr == 0)

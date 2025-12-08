@@ -70,7 +70,7 @@ typedef struct runStatStruct {
   int run ;   /* index in p.runDict */
   int nFiles ;
   long int nPairs, nReads ;
-  long int nCompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
+  long int nCompatiblePairs, nIncompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
   long int nBase1, nBase2 ;
   long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
   long int intergenic, intronic, exonic ;
@@ -82,7 +82,7 @@ typedef struct runStatStruct {
   long int nClippedVectors ;
   long int nSupportedIntrons ;
   long int nSupportedPolyA ;
-  long int nIntronSupports ;
+  float intronStranding ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
   long int wiggleCumul ; /* in million bases */
@@ -213,8 +213,10 @@ typedef struct pStruct {
   Array exonics ;
   Array intronics ;
   Array intergenics ;
+  Array confirmedIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
+  BOOL strand, antiStrand ;
   int bonus[256] ;
   DICT *runDict ;
   DICT *targetClassDict ;
@@ -312,7 +314,8 @@ typedef struct intronStruct {
   int run ;
   int mrna ;
   int chrom ;
-  int n, a1, a2 ; 
+  int n, nR, a1, a2 ;
+  char feet[6] ;
 } __attribute__((aligned(32))) INTRON ;
 		  
 typedef struct exonStruct {
@@ -384,8 +387,9 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h) ;
 
 /* sa.introns.c */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 
-void saIntronsExport (const PP *pp, BigArray aaa) ;
-long int saIntronsCumulate (BigArray aaa, Array aa) ;
+void saIntronsExport (PP *pp, Array aaa) ;
+void saIntronsCumulate (PP *pp, BB *bb) ;
+int saSupportedIntrons (const PP *pp, int run) ;
 
 /* sa.targetIndex.c */
 void saTargetIndexCreate (PP *pp) ;
@@ -408,7 +412,7 @@ void saWiggleExport (PP *pp, int nAgents) ;
 void saRunStatExport (const PP *pp, Array runStats) ;
 void saCpuStatExport (const PP *pp, Array stats) ;
 void saCpuStatCumulate (Array aa, Array a) ;
-void saRunStatsCumulate (int run, Array aa, RunSTAT *vp, long int nI) ;
+void saRunStatsCumulate (int run, PP *pp, BB *bb) ;
 
 /* sa.align */
 void saAlign (const void *vp) ;

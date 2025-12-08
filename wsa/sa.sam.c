@@ -40,7 +40,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
       {
 	int j = isDown ? ii : iMax - 1 - ii ;
 	ep = arrp (errors, j, A_ERR)  ;
-	if (ep->iShort < ap->x1 - 1 || ep->iShort >= ap->x2) continue ; /* may happen when fixing a dulication not authorized ion sam */
+	if (ep->iShort < ap->x1 - 1 || ep->iShort >= ap->x2) continue ; /* may happen when fixing a duplication not authorized in sam */
 	
 	int xShort = ep->iShort + 1 ;
 	int xLong = ep->iLong + 1 ;
@@ -69,8 +69,9 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    break ;
 	  case INSERTION_DOUBLE:     
 	    *nInsp += 2 ;
-	    x1 = ep->iShort + 3 ;
+	    x1 = ep->iShort + (isDown ? 3 : 2) ;
 	    if (x1 >= ap->x2) dx-- ;
+	    dx += (isDown ? 0 : -1) ;
 	    lSam += dx + 2 ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "2I") ;
@@ -78,8 +79,9 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    break ;
 	  case INSERTION_TRIPLE:     
 	    *nInsp += 3 ;
-	    x1 = ep->iShort + 4 ;
+	    x1 = ep->iShort + (isDown ? 4 : 2) ;
 	    if (x1 >= ap->x2) dx-- ;
+	    dx += (isDown ? 0 : -2) ;
 	    lSam += dx + 3 ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "3I") ;
@@ -96,6 +98,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	  case TROU_DOUBLE:
 	    *nDelp += 2 ;
 	    x1 = ep->iShort + 1 ;
+	    dx += (isDown ? 0 : 1) ;
 	    lSam += dx ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "2D") ;
@@ -104,6 +107,7 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	  case TROU_TRIPLE:
 	    *nDelp += 3 ;
 	    x1 = ep->iShort + 1 ;
+	    dx += (isDown ? 0 : 2) ;
 	    lSam += dx ;
 	    snprintf(segs[iSeg++], L, "%dM", dx) ;
 	    snprintf(segs[iSeg++], L, "3D") ;

@@ -16,6 +16,27 @@
 #include "sa.h"
 
 /**************************************************************/
+/**************************************************************/
+
+static void showIntrons (Array aa)
+{
+  if (aa && arrayMax (aa))
+    {
+      INTRON *zp ;
+      int ii, iMax = arrayMax (aa) ;
+
+      for (ii = 0, zp = arrp (aa, 0, INTRON) ; ii < iMax ; ii++, zp++)
+	{
+	  fprintf (stderr, "%d\trun %d\tchrom %d\ta1 %d\ta2 %d\tn %d\tnR %d\t%s\n"
+		   , ii, zp->run, zp->chrom
+		   , zp->a1, zp->a2
+		   , zp->n, zp->nR, zp->feet
+		   ) ;
+	}
+    }
+} /* showIntrons */
+
+/**************************************************************/
 
 static int confirmedIntronsOrder (const void *va, const void *vb)
 {
@@ -29,82 +50,73 @@ static int confirmedIntronsOrder (const void *va, const void *vb)
   n = up->a1 - vp->a1 ; if (n) return n ;
   n = up->a2 - vp->a2 ; if (n) return n ;
   /* run order */
-    n = up->run - vp->run ; if (n) return n ;
+  n = up->run - vp->run ; if (n) return n ;
+  /* feet order, this clears the nR lines */
+  n = up->feet[0] - vp->feet[0] ; if (n) return -n ;
   return 0 ;
 } /* confirmedIntronOrder */
 
 /**************************************************************/
 
-static long int confirmedIntronsCompress (BigArray aaa) 
+static int confirmedIntronsCompress (Array aaa) 
 {
-  long int ii, jj = 0, iMax = bigArrayMax (aaa) ;
-  bigArraySort (aaa, confirmedIntronsOrder) ;
+  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  arraySort (aaa, confirmedIntronsOrder) ;
   INTRON *up, *vp, *wp ;
 
   if (iMax)
-    for (ii = 0, jj = 0, up = bigArrp (aaa, 0, INTRON), vp = up, wp = up ; ii < iMax ; ii++, up++)
+    for (ii = 0,  jj = 0, up = arrp (aaa, 0, INTRON), vp = up ; ii < iMax ; ii += kk, up += kk)
       {
-	if (vp && up->a1 == vp->a1 && up->a2 == vp->a2 && up->chrom == vp->chrom && up->run == vp->run)
-	  vp->n += up->n ;
-	else
-	  {
-	    vp = wp ;
-	    if (wp < up) *wp = *up ;
-	    wp++ ; jj++ ;
-	  }
+	if (! up->feet[0])
+	  continue ;
+	for (wp = up + 1, kk = 1 ; ii + kk < iMax ; kk++, wp++)
+	  if (up->a1 == wp->a1 && up->a2 == wp->a2 && up->chrom == wp->chrom && up->run == wp->run)
+	    {
+	      up->n += wp->n ; wp->n = 0 ;
+	      up->nR += wp->nR ; wp->nR = 0 ;
+	    }
+	  else
+	    break ;
+	if (vp < up) *vp = *up ;
+	vp++ ; jj++ ;
       }
-  bigArrayMax (aaa) = jj ;
+  arrayMax (aaa) = jj ;
   return jj ;
 } /* confirmedIntronsCompress */
 
 /**************************************************************/
 
-long int saIntronsCumulate (BigArray aaa, Array aa) 
+void saIntronsCumulate (PP *pp, BB *bb) 
 {
+  Array aaa = pp->confirmedIntrons, aa = bb->confirmedIntrons ;
   int iMax = arrayMax (aa) ;
-  long int jMax = 0 ;
   
   if (iMax)
     {
-      long int jj = bigArrayMax (aaa) ;
-      bigArrayp (aaa, jj + iMax - 1, INTRON)->n = 0 ; /*  make room */
-      memcpy (bigArrp (aaa, jj, INTRON), arrp (aa, 0, INTRON), iMax * sizeof (INTRON)) ;
-      jMax = confirmedIntronsCompress (aaa) ;
+      int jj = arrayMax (aaa) ;
+      arrayp (aaa, jj + iMax - 1, INTRON)->n = 0 ; /*  make room */
+      memcpy (arrp (aaa, jj, INTRON), arrp (aa, 0, INTRON), iMax * sizeof (INTRON)) ;
+      confirmedIntronsCompress (aaa) ;
     }
-  return jMax ;
+  return ;
 } /* confirmedIntronsCumulate */
 
 /**************************************************************/
 
-void saIntronsExport (const PP *pp, BigArray aaa)
+int saSupportedIntrons (const PP *pp, int run)
 {
-  long int iMax = aaa ? confirmedIntronsCompress (aaa) : 0 ;
-  
-  if (iMax)
-    {
-      AC_HANDLE h = ac_new_handle () ;
-      ACEOUT ao = aceOutCreate (pp->outFileName, ".introns.tsf", 0, h) ;
-      INTRON *up ;
-      long int ii ;
-      
-      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, i (format for one integer), nb of supporting reads\n") ;
-      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
-	       aceOutFileName (ao)
-	       ) ;
-      for (ii = 0, up = bigArrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
-	{
-	  aceOutf (ao, "%s__%d_%d\t%s\ti\t%d\n"
-		   , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2
-		   , dictName (pp->runDict, up->run)
-		   , up->n
-		   ) ;
-	}
-      
-      ac_free (h) ;
-    }
-} /* saIntronsExport */
+  int nn = 0 ;
+  Array aa = pp->confirmedIntrons ;
+  int ii, iMax = arrayMax (aa) ;
+  INTRON *up ;
 
-/**************************************************************/
+  if (iMax)
+    for (ii = 0, up = arrp (aa, 0, INTRON) ; ii < iMax ; ii++, up++)
+      if (! run || up->run == run) nn++ ;
+
+  return nn ;
+} /* saSupportedIntrons */
+
 /**************************************************************/
 /* sliding intron, clip errors in overlap r636 r452 */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  
@@ -268,7 +280,6 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     }
 
   
-  BOOL isIntronDown = TRUE ;
   BOOL foundDonor = FALSE ;
   BOOL foundAcceptor = FALSE ;
   int donor = 0, acceptor = 0 ;
@@ -282,9 +293,9 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       donor = vp->donor ;
       acceptor = wp->acceptor ;
       if (donor < 0)
-	{ donor = - donor ; acceptor = -acceptor ; isIntronDown = FALSE ; }
+	{ donor = - donor ; acceptor = -acceptor ; }
       else if (donor == 0 && acceptor < 0)
-	{ acceptor = - acceptor ;  isIntronDown = FALSE ; }
+	{ acceptor = - acceptor ; }
       if (donor > acceptor)
 	donor = acceptor = 0 ;
       
@@ -304,9 +315,9 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       acceptor = wp->acceptor ;
 
       if (donor < 0)
-	{ donor = - donor ; acceptor = -acceptor ; isIntronDown = FALSE ; }
+	{ donor = - donor ; acceptor = -acceptor ; }
       if (donor == 0 && acceptor < 0)
-	{ acceptor = - acceptor ;  isIntronDown = FALSE ; }
+	{ acceptor = - acceptor ; }
       if (donor && donor < acceptor)
 	donor = acceptor = 0 ;
       
@@ -362,11 +373,6 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	}
     }
 
-  BOOL gt_ag = FALSE ;
-  BOOL gc_ag = FALSE ;
-  BOOL ct_ac = FALSE ;
-  BOOL ct_gc = FALSE ;
-
   /* no annotated junction, look for gt_ag */
   dy = vp->x2 - wp->x1 + 1 ;
   if (dy > 0 && isReadDown && ! foundDonor && !foundAcceptor  && wp->a1 > 3 && vp->a2 > dy)  
@@ -379,13 +385,13 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	{     /* favor gt_ag over ct_ac */
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == G_)
-	      { gt_ag = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == C_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == C_)
-	      { ct_ac = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == C_ && cq[i] == A_ && cq[i+1] == G_)
-	      { gc_ag = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == C_ && cp[i+1] == T_ && cq[i] == G_ && cq[i+1] == C_)
 	      { bestI = i ; goto ok1 ; }
@@ -400,13 +406,13 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	{ /* favor ct_ac over gt_ag */
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == C_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == C_)
-	      { ct_ac = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == G_)
-	      { gt_ag = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == C_ && cp[i+1] == T_ && cq[i] == G_ && cq[i+1] == C_)
-	      { ct_gc = TRUE ; bestI = i ; goto ok1 ; }
+	      { bestI = i ; goto ok1 ; }
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == C_ && cq[i] == A_ && cq[i+1] == G_)
 	      { bestI = i ; goto ok1 ; }
@@ -420,14 +426,15 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     ok1:
       if (bestI >= 0)
 	{
-	  bestI = (bestI ? bestI : (dy+1) / 2) ; /* avod zero to keep vp oriented */
 	  dy -= bestI ;
 	  vp->x2 -= dy ;
 	  vp->a2 -= dy ;
-
+	  donor = vp->a2 + 1 ;
+	  
 	  dy = bestI ;
 	  wp->x1 += dy ;
 	  wp->a1 += dy ;
+	  acceptor = wp->a1 - 1 ;
 	}	    
     }
   else if (dy > 0 && !isReadDown && ! foundDonor && !foundAcceptor && wp->a1 > dy && vp->a2 > 3) 
@@ -484,10 +491,12 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	  dy -= bestI ;
 	  wp->x1 += dy ;
 	  wp->a1 -= dy ;
-
+	  donor = vp->a2 - 1 ;
+	  
 	  dy = bestI ;
 	  vp->x2 -= dy ;
 	  vp->a2 += dy ;
+	  acceptor = wp->a1 + 1 ;
 	}	    
     }
   
@@ -516,32 +525,148 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       return ;
     }
 
-  /* register exact intron support */
-  if (isReadDown && donor == vp->a2 + 1 && acceptor == wp->a1 - 1)
-    {  /* this intron is confirmed */
-      INTRON *zp = arrayp (bb->confirmedIntrons, arrayMax (bb->confirmedIntrons), INTRON) ;
-      zp->chrom = vp->chrom ;
-      zp->run = bb->run ;
-      zp->n = 1 ;
-      zp->a1 = isIntronDown ? donor : acceptor ;
-      zp->a2 = isIntronDown ? acceptor : donor ;
-      bb->nIntronSupportPlus += (isIntronDown ? 1 : 0) ;
-      bb->nIntronSupportMinus += (isIntronDown ? 0 : 1) ;
-    }
-  else if (! isReadDown && donor == vp->a2 - 1 && acceptor == wp->a1 + 1)
-    {  /* this intron is confirmed */
-      INTRON *zp = arrayp (bb->confirmedIntrons, arrayMax (bb->confirmedIntrons), INTRON) ;
-      zp->chrom = vp->chrom ;
-      zp->run = bb->run ;
-      zp->n = 1 ;
-      zp->a1 = isIntronDown ? acceptor : donor ;
-      zp->a1 = isIntronDown ? donor : acceptor ;
-      bb->nIntronSupportPlus += (isIntronDown ? 0 : 1) ;
-      bb->nIntronSupportMinus += (isIntronDown ? 1 : 0) ;
-    }
-  gt_ag = gc_ag ^ gt_ag ^ ct_ac ^ ct_gc ; /* for compiler happiness */
 
 } /* alignOptimizeIntron */
+
+/**************************************************************/
+/**************************************************************/
+
+static void saIntronStranding (PP *pp, Array aa)
+{
+  INTRON *zp, *zpR ;
+  int runMax = dictMax (pp->runDict) + 1 ;
+  int nGt_ag[runMax] ;
+  int nCt_ac [runMax] ;
+  float s0[runMax], minS = 100 ;
+  int run, ii, iMax = arrayMax (aa) ;
+
+  memset (nGt_ag, 0, sizeof (nGt_ag)) ;
+  memset (nCt_ac, 0, sizeof (nCt_ac)) ;
+  
+
+  for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
+    {
+      if (! strcmp (zp->feet, "gt_ag"))
+	nGt_ag[zp->run]++ ;
+      else if (! strcmp (zp->feet, "ct_ac"))
+	nCt_ac[zp->run]++ ;
+    }
+  for (run = 0 ; run < runMax ; run++)
+    {
+      s0[run] = array(pp->runStats, run, RunSTAT).intronStranding = 100.0 * (nGt_ag[run] + 1.0) / (nGt_ag[run] + nCt_ac[run] + .0001) ;
+      
+      if (pp->strand)
+	s0[run] = 100 ;
+      else if (pp->antiStrand)
+	s0[run] = 0 ;
+      if (s0[run] < minS && nCt_ac[run])
+	minS = s0[run] ;
+    }
+
+  if (minS < 70) /* flip needed */
+    {
+      char feet[6] ;
+      for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
+	{
+	  if (s0[zp->run] < 40)
+	    {  /* flip the whole run */
+	      int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
+
+	      memcpy (feet, zp->feet, 6) ;
+	      zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[4]]]] ;
+	      zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[3]]]] ;
+	      zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[1]]]] ;
+	      zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[0]]]] ;
+	    }
+	  else if (s0[zp->run] < 60)  
+	    {  /* non stranded case, choose for very intron */
+	      if (! strcmp (zp->feet, "ct_ac") || ! strcmp (zp->feet, "ct_gc"))
+		{
+		  int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
+
+		  memcpy (feet, zp->feet, 6) ;
+		  zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[4]]]] ;
+		  zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[3]]]] ;
+		  zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[1]]]] ;
+		  zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[0]]]] ;
+		}
+	    }
+	}
+    }
+
+  /* compute the anti counts */
+  array (aa, 2*iMax -1, INTRON).n = 0 ;
+  for (ii = 0, zp = arrp (aa, ii, INTRON), zpR = zp + iMax ; ii < iMax ; ii++, zp++, zpR++)
+    {
+      *zpR = *zp ;
+      zpR->a1 = zp->a2 ; zpR->a2 = zp->a1 ; 
+      zpR->nR = zp->n ; zpR->n = zp->nR ; zpR->feet[0] = 0 ;
+    }
+  /* merged counts and antiCounts */
+  for (run = 0 ; run < runMax ; run++)
+    {
+      array(pp->runStats, run, RunSTAT).nIntronSupportPlus = 0 ;
+      array(pp->runStats, run, RunSTAT).nIntronSupportMinus = 0 ;
+    }
+  iMax = confirmedIntronsCompress (aa) ;
+  for (ii = 0, zp = arrp (aa, ii, INTRON); ii < iMax ; ii++, zp++)
+    {
+      array(pp->runStats, zp->run, RunSTAT).nIntronSupportPlus +=  (s0[zp->run] < 40 ? zp->nR : zp->n) ;
+      array(pp->runStats, zp->run, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
+      array(pp->runStats, 0, RunSTAT).nIntronSupportPlus += (s0[zp->run] < 40 ? zp->nR : zp->n) ;
+      array(pp->runStats, 0, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
+    }
+  for (run = 0 ; run < runMax ; run++)
+    {
+      int np = array(pp->runStats, run, RunSTAT).nIntronSupportPlus ;
+      int nm = array(pp->runStats, run, RunSTAT).nIntronSupportMinus ;
+      array(pp->runStats, run, RunSTAT).intronStranding = 100.0 * np / (np + nm + 0.0000001) ;
+    }
+
+  return ;
+} /* saIntronStranding */
+
+/**************************************************************/
+
+void saIntronsExport (PP *pp, Array aaa)
+{
+  int iMax = aaa ? confirmedIntronsCompress (aaa) : 0 ;
+  showIntrons (0) ; /* for compiler happiness */
+  
+  if (iMax)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (pp->outFileName, ".introns.tsf", 0, h) ;
+      INTRON *up ;
+      long int ii ;
+      
+      saIntronStranding (pp, aaa) ;
+      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, i (format for one integer), nb of reads supportingt thr intron, number antistrand, intron feet\n") ;
+      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
+	       aceOutFileName (ao)
+	       ) ;
+      aceOutf (ao, "Inron\tRun\tiit\rn\tnA\tfeet\n") ;
+      for (ii = 0, up = arrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
+	{
+	  int min = 0 ;
+	  if (! up->feet[0])
+	    continue ;
+	  else if (!strcmp (up->feet, "gt_ag"))
+	   min = 1 ;
+	  else if (!strcmp (up->feet, "gc_ag"))
+	    min = 2 ;
+	  if (up->n >= min || up->nR >= min)
+	    aceOutf (ao, "%s__%d_%d\t%s\tiit\t%d\t%d\t%s\n"
+		     , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2
+		     , dictName (pp->runDict, up->run)
+		     , up->n, up->nR
+		     , up->feet
+		     ) ;
+	}
+      
+      ac_free (h) ;
+    }
+} /* saIntronsExport */
 
 /**************************************************************/
 /**************************************************************/

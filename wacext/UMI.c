@@ -3439,7 +3439,7 @@ static BOOL umiGetOneSamHit (const UMI *umi, LANE *lane)
       aceInStep (ai, '\t') ; aceInInt (ai, &dummy) ; /* a quality coefficient */
 
       aceInStep (ai, '\t') ; cigar =  aceInWord (ai) ; /* cigar */
-      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, 0, 0, 0) ;
+      samParseCigar (cigar, cigarettes, a1, &a2, &x1, &x2, 0, 0, 0, 0) ;
 
       aceInStep (ai, '\t') ; cp =  aceInWord (ai) ; /* not used */
       aceInStep (ai, '\t') ; cp =  aceInWord (ai) ; /* not used */

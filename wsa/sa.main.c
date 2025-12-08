@@ -574,7 +574,7 @@ static void matchHits (const void *vp)
     {
       if (bb.length)
 	{
-	  if (pp->debug) printf ("+++ %s: Start match %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
+	  if (pp->debug) printf ("+++ %s: Start match %ld bases against %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
 
 
 	  t1 = clock () ;
@@ -969,7 +969,7 @@ static void wholeWork (const void *vp)
       saSequenceParseGzBuffer (pp, &bb) ;
       saCodeSequenceSeeds (pp, &bb, pp->iStep, FALSE) ;
 
-      if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases againt %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
+      if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases against %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
 
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
@@ -1052,11 +1052,11 @@ static void reportRunStats (PP *pp, Array runStats)
   printf ("\n#:PerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->nReads + .000001)) ;
 
   printf ("\n#:Reads supporting introns %ld, plus %ld, minus %ld, stranding %.2f%%\n"
-	   , s0->nIntronSupports
-	   , s0->nIntronSupportPlus
-	   , s0->nIntronSupportMinus
-	   , (100.0 * s0->nIntronSupportPlus + 0.00001)/(s0->nIntronSupportPlus+s0->nIntronSupportMinus - 0.00001)
-	   ) ;
+	  , s0->nIntronSupportPlus + s0->nIntronSupportMinus 
+	  , s0->nIntronSupportPlus
+	  , s0->nIntronSupportMinus
+	  , s0->intronStranding
+	  ) ;
   printf ("\n#:SupportedIntrons\t%ld", s0->nSupportedIntrons) ;
 
 
@@ -1263,7 +1263,6 @@ void saUsage (char *message, int argc, const char **argv)
 /*************************************************************************************/
 /************ Public interface, get params, set channels and agents, launch **********/
 /*************************************************************************************/
-FILE *myErrFile ;
 
 int main (int argc, const char *argv[])
 {
@@ -1312,7 +1311,6 @@ int main (int argc, const char *argv[])
       exit (0) ;
     }     
 
-  myErrFile = fopen ("myErrors.txt", "w") ;
   p.debug  = getCmdLineText (h, &argc, argv, "--debug", 0) ;
   p.debug |= getCmdLineText (h, &argc, argv, "--verbose", 0) ;
   
@@ -1460,6 +1458,36 @@ int main (int argc, const char *argv[])
   
   /**************************  debugging modules, ignore *********************************/
 
+  if ( getCmdLineBool (&argc, argv, "--checkDict"))
+    {                                           /* check the dictionary lib */
+      DICT *dict = dictHandleCreate (1024, p.h) ;
+      ACEIN ai = aceInCreate ("myErrors1.txt", 0, h) ;
+      int n = 0, nnn = 0 ;
+      char *cp ;
+      
+      aceInSpecial (ai, "\n") ;
+      while (aceInCard (ai))
+	{
+	  cp = aceInWord (ai) ;
+	  if (! cp || ! *cp)
+	    continue ;
+	  if (!strncmp (cp, "nnE=", 4))
+	    {
+	      aceInStep (ai, '\t') ;
+	      cp = aceInWord (ai) ;
+	      if (! cp || ! *cp)
+		continue ;
+	    }
+	  dictAdd (dict, cp, &n) ;
+	  nnn++ ;
+	}
+      fprintf (stderr, "success: loaded %d words\n", nnn) ;
+      
+      exit (0) ;
+    }
+
+  /**************************  debugging modules, ignore *********************************/
+
   if ( getCmdLineInt (&argc, argv, "--checkSorter", &n))
     {                                           /* check the sorting algorithm */
       BigArray b, a = bigArrayHandleCreate (n, HIT, 0) ;
@@ -1555,7 +1583,7 @@ int main (int argc, const char *argv[])
     }
   
   if (! p.indexName)
-    saUsage ("missing parameter -x or --createIndex", argc, argv) ;
+    saUsage ("missing parameter -x <indexName> or --createIndex <indexName> or missing indexName", argc, argv) ;
 
   /******************* sequence files to be analysed , not used if --createIndex *************/
 
@@ -1842,6 +1870,7 @@ int main (int argc, const char *argv[])
 	  {
 	    if (pass) fprintf (stderr, "Launch readParser %d\n", i) ;
 	    p.agent = i ;
+	    
 	    if (pass) wego_go (readParser, &p, PP) ; else channelAddSources (p.npChan, 1) ;
 	  }
       for (int pass = 0 ; pass < 2 ; pass++)
@@ -1876,6 +1905,12 @@ int main (int argc, const char *argv[])
       saSpongeParserDirect (&p) ;
       
       /* map the reads to the genome in parallel */
+
+      /* frist we register the topology of our workflow (pass == 0)
+       * then we launch (pass == 1)
+       * otherwise the first agent which finishes could close the out channel
+       */
+       
       for (int pass = 0 ; pass < 2 ; pass++)
 	for (int i = 0 ; i < nAgents && i < p.nBlocks ; i++)
 	  {
@@ -1912,7 +1947,7 @@ int main (int argc, const char *argv[])
 	}
     }
 
-  BigArray confirmedIntrons  = bigArrayHandleCreate (1000, INTRON, h) ;
+  p.confirmedIntrons  = arrayHandleCreate (1000, INTRON, p.h) ;
   int chromMax = dictMax (p.bbG.dict) + 1 ;
   int runMax = dictMax (p.runDict) + 2 ;
   p.wiggles = 0 ;
@@ -1972,16 +2007,14 @@ int main (int argc, const char *argv[])
       aliDx += bb.aliDx ;
       if (bb.cpuStats)
 	saCpuStatCumulate (cpuStats, bb.cpuStats) ;
-      bb.runStat.nIntronSupports = bb.confirmedIntrons ?
-	arrayMax (bb.confirmedIntrons) : 0 ;
       bb.runStat.nIntronSupportPlus = bb.nIntronSupportPlus ;
       bb.runStat.nIntronSupportMinus = bb.nIntronSupportMinus ;
 	
       if (bb.run)
 	{
-	  long int nI = saIntronsCumulate (confirmedIntrons, bb.confirmedIntrons) ;
-	  saRunStatsCumulate (0, p.runStats, &(bb.runStat), 0) ;
-	  saRunStatsCumulate (bb.run, p.runStats, &(bb.runStat), nI) ;
+	  saIntronsCumulate (&p, &bb) ;
+	  saRunStatsCumulate (0, &p, &bb) ;
+	  saRunStatsCumulate (bb.run, &p, &bb) ;
 
 	  runErrorsCumulate (0, runErrors, bb.errors) ;
 	  runErrorsCumulate (bb.run, runErrors, bb.errors) ;
@@ -2038,7 +2071,7 @@ int main (int argc, const char *argv[])
   if (p.wiggle)
     saWiggleExport (&p, nAgents) ;
   saCpuStatExport (&p, cpuStats) ;
-  saIntronsExport (&p, confirmedIntrons) ;
+  saIntronsExport (&p, p.confirmedIntrons) ;
   saRunStatExport (&p, p.runStats) ;
   
   wego_log ("Done") ;
@@ -2095,4 +2128,56 @@ int main (int argc, const char *argv[])
 /**************************************************************/
 /**************************************************************/
  
+#ifdef JUNK
 
+#include <numa.h>
+#include <numaif.h>  // for set_mempolicy
+
+int main(int argc, char **argv) {
+    // Bind to node 0
+    if (numa_available() >= 0) {
+        struct bitmask *nodemask = numa_allocate_nodemask();
+        numa_bitmask_clearall(nodemask);
+        numa_bitmask_setbit(nodemask, 0);  // node 0
+        numa_set_membind(nodemask);        // memory on node 0
+        
+        // CPUs: only physical cores (0-47 for node 0)
+        struct bitmask *cpumask = numa_allocate_cpumask();
+        numa_bitmask_clearall(cpumask);ieg@lmem12 SORTALIGNTEST]$ cat RESULTS/52_Minimap2_8threads/A_ROCR3_Nanopore-F3/sam | head -100000 | grep SRR24564588.R.142169
+SRR24564588.R.142169 0 chr17.T2T.NC_060941.1 82427097 60 119S13M1D41M2D11M1D12M1I11M3I11M1D24M2D58M1D12M1I30M4D24M3D3M1D45M2D7M3D18M2D6M1D1M149N55M1D7M5I19M1D16M1I51M2D5M2D10M1D27M1I41M1D84M5D27M93N11M5I19M3D24M1I46M3I52M2I27M79N99M1I36M1I3M2D17M1I26M2D38M1I20M1I42M1D13M1D11M1I31M1I53M2I7M2D35M276N7M1I28M1D24M1I24M1I29M2D50M2I4M1I32M2D37M89N58M40I11M2D58M373N4M3I24M1I38M80S * 0 0 CGCCTATCAATTTGTGCTTCGTTCAGTTACGTATTGCTAAGGTTAAGAGGACAAAGGTTTCAACGCTTCAGCACCTAAGCAATTAGTATCAACGCAAATCTTTTTTTTTTTTTGTTTATGGCAGCACTTTTATTTTCCTTACACAATGACGTGTTGCTGGGGCCTAATGTTCTCATAACAGTAGAAACCAAAATTTATTTGTCATCTCTCTTCCAAAGAATCAGAATTGCGTACAAAAAAACCTTTATAAATTAAGAATGAATACATTTACAGGCGTAAATGCAAACCGCTTCCAACTCAAAGCAGTAACAGCCCACCGGTGTTCTGGCCACAGACATCAGCTAAGAAGACTGGGTCCTACGGCTTGGACTCAACCTGACAGACCCGCAAGACAAAACAACTGGTTCTTGCCAGCCTCTAGAAATCGAGCTGCCAGCCCTGGCATTAATACCAAGGGGAACAGTTAACTTCAATACAAGGGTCAAATCAGCAGCAAATTCTACAATCAGTGCTTTTGATATATCAGATACAAGCTTCAGGACAATTTCTTTTCAGAAGGCTTATTCCAGTTTCGTGAGGCTAGCATGAGGTGTGTGCATTTGCCAGGCAATTCTATTCTCATTAACCCATGCAGCAAATGCTACGCAGCCTGCTGAGTCCGTTTAGAAGCATTTGCGGTGGACGATGGAGGGCCCGACTCGTCGTACTCCTGCTTGCTAATCCACATCTGCTGGAAGGTGGACAGTGAGGCCAGGATGGAGCCACCGATCCACGTACTTGCGCTCTGGGGGTGCAGTAGTCTTGATCTTCATGGTGTGGTGCTGGGCGCCAGGGCGATCTCCTTCTGCATCCTGTCAGCTTGTGCCCGGATACATGGTGGTGCCGCCCGACAGCACCGTGTTGGCGGCATACAGGTCTTTGCGGATGTCCACGTCACACTTCATGATGGAGTTGAAGGGCGATTACCGTGGATGCCGCAAGATTCCATACCCAGGAAGGAAGGCTGGAACAGCGCCTCCGGACACCGGAACCGCTCATTGCCAATGGTGATGACCTGGCCATCAGGCAGCTCGTAGCTCTTCTCCAGAGAAAGAGGAGGATGCGGCAGTGGCCATCTCCTGCTCGAGGGTGGGGCGACGTAGCACAGCCTTCTCCTTGATGTCGCGCACGATTTCGCTCGGCCGTGGTGGTGAAGCTGTAGCCTCGCTCAGTAGAGGATCTTCATGAGGTAGTCCGGTCAGGTCCCGGCCAGTCAGGTCCAGACGCGGGATGGCGTGGGGAGGGCGTAGCCTCGTAGATGAAGCACCGTGTGGGTGACTTCGTCTCCAGAGTCCCATGACAATGCCAGTGGTGCGCCCAGAAGCGTAGAGGGACAACACGGCCTGGATATTACAATACATGTCCGGGGTGTTGAAAGTCTCAAACATAATCTGAGTCTCTCTTCTCTCTGTTGGCCTTGGGGTTCAGGGGGCCTCGGTCAGCAGCACTGGAGTGCTCCTCCGGGGCCACGCGCGGCCTCGTTGTAGAAGGTGTGGTGCCAGATCTTCCATGTCGTCCCAGTTGGTGACGATGCCATGCTCAATGGGGTACTTCAGGAGGTCAAGGATGCCACGCTTGCTCTGGGCCTCGTCGCCCGTAGGAGTCCTTCTGGCCCATGCCCACCATGACGCCCTGGTGTCTGGGGCGCCCGACGATGGAAGGAAACACGGCTCGGGGAGCGTCGTCCCCAGCCATGGCAGTGAAGCCGCGGTTGTGGCGACCCCGGCTTTGCAAAACCAGCTGCGCATGCCGGAGCCATTGTCAATGACCAGCGCGGCGATCTCTTCTTCCATTGCGACCGGCAGAAGAGAAACGCGACAGCGGAGCAGCGGGAAGAACAGAGTGCGAGAGTTGGCAGCGGCGACTGAGCCCCTGTACTCTGCGTTGATACCACTGCTTAGGTGCTGAAGCGTTGAAACCTTTGTCCTCTCTTAACCTTAGCAACCGTA * NM:i:186 ms:i:1070 AS:i:842 nn:i:0 ts:A:- tp:A:P cm:i:150 s1:i:1018 s2:i:333 de:f:0.0596 rl:i:16
+[mieg@lmem12 SORTALIGNTEST]$
+
+[mieg@lmem12 SORTALIGNTEST]$ cat RESULTS/12_MagicBLAST_2022/A_ROCR3_Nanopore-F3/sam | head -1000 | grep SRR24564588.R.142169
+SRR24564588.R.142169 0 chr17.T2T.NC_060941.1 82427097 255 119S17M1D39M2D12M1D12M1I10M3I9M1D19M1D5M1D59M1D12M1I30M5D1I25M4D48M24I181D63M1I1M1I5M2I19M1D15M1I56M4D11M1D28M1I42M1D81M5D21M22I110D20M3D25M1I44M3I50M1I5M1I24M79N101M1I34M1D22M1I26M2D37M1I21M1I45M1D11M1D10M1I32M1I100M4I279D32M1D19M1I25M1I30M2D52M3I33M2D36M89N60M114I446D26M1I36M80S * 0 0 CGCCTATCAATTTGTGCTTCGTTCAGTTACGTATTGCTAAGGTTAAGAGGACAAAGGTTTCAACGCTTCAGCACCTAAGCAATTAGTATCAACGCAAATCTTTTTTTTTTTTTGTTTATGGCAGCACTTTTATTTTCCTTACACAATGACGTGTTGCTGGGGCCTAATGTTCTCATAACAGTAGAAACCAAAATTTATTTGTCATCTCTCTTCCAAAGAATCAGAATTGCGTACAAAAAAACCTTTATAAATTAAGAATGAATACATTTACAGGCGTAAATGCAAACCGCTTCCAACTCAAAGCAGTAACAGCCCACCGGTGTTCTGGCCACAGACATCAGCTAAGAAGACTGGGTCCTACGGCTTGGACTCAACCTGACAGACCCGCAAGACAAAACAACTGGTTCTTGCCAGCCTCTAGAAATCGAGCTGCCAGCCCTGGCATTAATACCAAGGGGAACAGTTAACTTCAATACAAGGGTCAAATCAGCAGCAAATTCTACAATCAGTGCTTTTGATATATCAGATACAAGCTTCAGGACAATTTCTTTTCAGAAGGCTTATTCCAGTTTCGTGAGGCTAGCATGAGGTGTGTGCATTTGCCAGGCAATTCTATTCTCATTAACCCATGCAGCAAATGCTACGCAGCCTGCTGAGTCCGTTTAGAAGCATTTGCGGTGGACGATGGAGGGCCCGACTCGTCGTACTCCTGCTTGCTAATCCACATCTGCTGGAAGGTGGACAGTGAGGCCAGGATGGAGCCACCGATCCACGTACTTGCGCTCTGGGGGTGCAGTAGTCTTGATCTTCATGGTGTGGTGCTGGGCGCCAGGGCGATCTCCTTCTGCATCCTGTCAGCTTGTGCCCGGATACATGGTGGTGCCGCCCGACAGCACCGTGTTGGCGGCATACAGGTCTTTGCGGATGTCCACGTCACACTTCATGATGGAGTTGAAGGGCGATTACCGTGGATGCCGCAAGATTCCATACCCAGGAAGGAAGGCTGGAACAGCGCCTCCGGACACCGGAACCGCTCATTGCCAATGGTGATGACCTGGCCATCAGGCAGCTCGTAGCTCTTCTCCAGAGAAAGAGGAGGATGCGGCAGTGGCCATCTCCTGCTCGAGGGTGGGGCGACGTAGCACAGCCTTCTCCTTGATGTCGCGCACGATTTCGCTCGGCCGTGGTGGTGAAGCTGTAGCCTCGCTCAGTAGAGGATCTTCATGAGGTAGTCCGGTCAGGTCCCGGCCAGTCAGGTCCAGACGCGGGATGGCGTGGGGAGGGCGTAGCCTCGTAGATGAAGCACCGTGTGGGTGACTTCGTCTCCAGAGTCCCATGACAATGCCAGTGGTGCGCCCAGAAGCGTAGAGGGACAACACGGCCTGGATATTACAATACATGTCCGGGGTGTTGAAAGTCTCAAACATAATCTGAGTCTCTCTTCTCTCTGTTGGCCTTGGGGTTCAGGGGGCCTCGGTCAGCAGCACTGGAGTGCTCCTCCGGGGCCACGCGCGGCCTCGTTGTAGAAGGTGTGGTGCCAGATCTTCCATGTCGTCCCAGTTGGTGACGATGCCATGCTCAATGGGGTACTTCAGGAGGTCAAGGATGCCACGCTTGCTCTGGGCCTCGTCGCCCGTAGGAGTCCTTCTGGCCCATGCCCACCATGACGCCCTGGTGTCTGGGGCGCCCGACGATGGAAGGAAACACGGCTCGGGGAGCGTCGTCCCCAGCCATGGCAGTGAAGCCGCGGTTGTGGCGACCCCGGCTTTGCAAAACCAGCTGCGCATGCCGGAGCCATTGTCAATGACCAGCGCGGCGATCTCTTCTTCCATTGCGACCGGCAGAAGAGAAACGCGACAGCGGAGCAGCGGGAAGAACAGAGTGCGAGAGTTGGCAGCGGCGACTGAGCCCCTGTACTCTGCGTTGATACCACTGCTTAGGTGCTGAAGCGTTGAAACCTTTGTCCTCTCTTAACCTTAGCAACCGTA * NH:i:1 AS:i:925 NM:i:1306 XS:A:-
+
+minimap reports NM:i:186   you report NM:i:1306     how do we know how many substitution you have, how do we know if minimap counted his short deletions ?
+
+in sortalign I have
+and I do not know how it corresponds
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 308 1 1988 572 817 990 G - 1 G.chr17.T2T.NC_060941.1 82428056 82428226 0 10 837:---gtg,860:a>t,861:a>t,862:+g,907:+++gca,959:t>g,960:g>c,962:t>a,963:c>t,965:++ac 82428076:---gtg,82428102:a>t,82428103:a>t,82428104:+g,82428148:+++gca,82428197:t>g,82428198:g>c,82428200:t>a,82428201:c>t,82428203:++ac - gggggtgcagtagtcttgatcttcatggtg - chain 1 1 308
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 308 1 1988 572 991 1388 G - 1 G.chr17.T2T.NC_060941.1 82428306 82428702 0 23 1064:g>a,1092:+a,1107:g>a,1127:a>g,1129:t>g,1130:c>t,1131:c>g,1132:-a,1149:+c,1176:--cc,1213:+a,1235:+c,1253:c>t,1267:a>g,1281:-g,1292:-c,1301:g>a,1302:+a,1319:c>t,1320:c>t,1335:+c,1362:g>a,1376:g>a 82428379:g>a,82428407:+a,82428421:g>a,82428441:a>g,82428443:t>g,82428444:c>t,82428445:c>g,82428446:-a,82428464:+c,82428490:--cc,82428529:+a,82428550:+c,82428567:c>t,82428581:a>g,82428595:-g,82428607:-c,82428617:g>a,82428618:+a,82428634:c>t,82428635:c>t,82428650:+c,82428676:g>a,82428690:g>a - - - attacaatacatgtccggggtgttgaaagt chain 1 1 308
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 212 1 1988 292 1440 1671 G - 1 G.chr17.T2T.NC_060941.1 82429029 82429260 0 10 1472:-g,1491:+a,1514:a>g,1517:+c,1548:--tc,1597:g>a,1598:t>g,1599:c>g,1600:+++tca,1636:--ac 82429061:-g,82429081:+a,82429103:a>g,82429106:+c,82429136:--tc,82429187:g>a,82429188:t>g,82429189:c>g,82429190:+++tca,82429223:--ac - gttgaaagtctcaaacataatctgagtctc - chain 2 1 212
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 212 1 1988 292 1672 1731 G - 1 G.chr17.T2T.NC_060941.1 82429350 82429409 0 0 - - - catggcagtgaagccgcggttgtggcgacc chain 2 1 212
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 206 1 1988 254 520 610 G - 1 G.chr17.T2T.NC_060941.1 82427661 82427751 0 2 539:-a,554:+a 82427680:-a,82427696:+a - - gcagcaaattctacaatcagtgcttttgat - chain 3 1 206
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 206 1 1988 254 611 773 G - 1 G.chr17.T2T.NC_060941.1 82427756 82427919 0 4 622:-a,648:t>g,650:+c,693:-g 82427767:-a,82427794:t>g,82427796:+c,82427838:-g - - - gtacttgcgctctgggggtgcagtagtctt chain 3 1 206
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 191 1 1988 303 120 349 G - 1 G.chr17.T2T.NC_060941.1 82427097 82427329 0 14 137:-t,176:--ca,188:-a,197:g>a,200:+t,210:t>c,211:+++ttc,223:-g,242:a>c,244:c>t,248:--ca,306:-a,318:+c,332:a>c 82427114:-t,82427154:--ca,82427168:-a,82427178:g>a,82427181:+t,82427190:t>c,82427191:+++ttc,82427200:-g,82427220:a>c,82427222:c>t,82427226:--ca,82427286:-a,82427299:+c,82427312:a>c - - caacgcaaatctttttttttttttgtttat - chain 4 1 191
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 191 1 1988 303 350 374 G - 1 G.chr17.T2T.NC_060941.1 82427334 82427358 0 0 - - - chain 4 1 191
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 191 1 1988 303 375 422 G - 1 G.chr17.T2T.NC_060941.1 82427363 82427410 0 0 - - - aatcgagctgccagccctggcattaatacc chain 4 1 191
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 99 1 1988 139 1770 1845 G - 1 G.chr17.T2T.NC_060941.1 82429408 82429485 0 2 1782:--tt,1784:a>g 82429420:--tt,82429424:a>g - - tgaagccgcggttgtggcgaccccggcttt - chain 5 1 99
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 99 1 1988 139 1846 1908 G - 1 G.chr17.T2T.NC_060941.1 82429856 82429917 0 3 1859:g>a,1867:g>a,1872:+g 82429869:g>a,82429877:g>a,82429882:+g - - - cccctgtactctgcgttgataccactgctt chain 5 1 99
+A_ROCR3_Nanopore-F3/SRR24564588.R.142169 34 1 1988 34 447 480 G - 1 G.chr17.T2T.NC_060941.1 82427592 82427625 0 0 - - - tctagaaatcgagctgccagccctggcatt gtcaaatcagcagcaaattctacaatcagt chain 6 1 34
+
+
+
+        for (int i = 0; i < 48; i++) {
+            numa_bitmask_setbit(cpumask, i);
+        }
+        numa_bind(cpumask);  // or use numa_run_on_node_of_cpu(i) in a loop
+        
+        numa_free_cpumask(cpumask);
+        numa_free_nodemask(nodemask);
+    }
+    // Rest of your code...
+}
+
+#endif
