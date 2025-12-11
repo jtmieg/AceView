@@ -668,7 +668,11 @@ static void sortHits (const void *vp)
 	  sortHitsFuse (pp, &bb) ;
 	  if (bb.hits)
 	    {
-	      saSort (bb.hits, 3) ; /* hitPairOrder */
+#ifdef GREGGPU
+		saGPUSort (bb.hits, 3) ; /* hitPairOrder */
+#else
+		saSort (bb.hits, 3) ; /* hitPairOrder */
+#endif
 	      t2 = clock () ;
 
 	      long int nn = bigArrayMax (bb.hits) ;
@@ -980,7 +984,12 @@ static void wholeWork (const void *vp)
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
 	if (bb.cwsN[k])
-	  saSort (bb.cwsN[k], 1) ; /* cwOrder */
+#ifdef GREGGPU
+		saGPUSort (bb.cwsN[k], 1) ; /* cwOrder */
+#else
+		saSort (bb.cwsN[k], 1) ; /* cwOrder */
+#endif
+
       
       /* match hits */
       if (bb.length)
