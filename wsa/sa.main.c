@@ -98,7 +98,8 @@ static void showAli (Array aligns)
 
 /**************************************************************/
 /**************************************************************/
-/* cumulate the number of BB to be analyzed */  
+/* cumulate the number of BB to be analyzed */
+static int NTODO = 0 ; 
 static void npCounter (const void *vp)
 {
   const PP *pp = vp ;
@@ -116,6 +117,7 @@ static void npCounter (const void *vp)
     }
   printf ("--- %s: npCounter Processed %d files, closing pcChan at %d blocks\n", timeBufShowNow (tBuf), nf, nn) ;
   channelCloseSource  (pp->plChan) ;
+  NTODO = nn ; /* this is global but there is no other place where we wrtie this variable */
   return ;
 } /* npCounter */
 
@@ -259,7 +261,11 @@ static void sortWords (const void *vp)
 	  for (int k = 0 ; k < NN ; k++)
 	    if (bb.cwsN[k])
 	      {
+#ifdef GREGGPU
+		saGPUSort (bb.cwsN[k], 1) ; /* cwOrder */
+#else
 		saSort (bb.cwsN[k], 1) ; /* cwOrder */
+#endif
 		nn += bigArrayMax (bb.cwsN[k]) ;
 	      }
 	  t2 = clock () ;
@@ -1684,18 +1690,18 @@ int main (int argc, const char *argv[])
   p.nIndex = NN ;
 
   /***************** amount or parallelization **************************/
-  nAgents = 40 ;
+  nAgents = NAGENTS ;
   if (! getCmdLineInt (&argc, argv, "--nAgents", &(nAgents)))
     getCmdLineInt (&argc, argv, "--nA", &(nAgents)) ;
 
-  p.nBlocks = 40 ;  /* max number of BB blocks processed in parallel */
+  p.nBlocks = NBLOCKS ;  /* max number of BB blocks processed in parallel */
   if (p.debug)      /* under debugger, it is more convenient to run with a single agent and a single block */
     p.nBlocks = 1 ; /* but we wish to be able to reset nBlocks even in debug mode */
   if (!getCmdLineInt (&argc, argv, "--nBlocks", &(p.nBlocks)))
     getCmdLineInt (&argc, argv, "--nB", &(p.nBlocks));
   if (p.nBlocks == 1)
     { nAgents = 1 ; }
-  channelDepth = p.nBlocks ;
+  channelDepth = 1 + p.nBlocks/2 ;
   maxThreads = 128 ;  /* UNIX  max on lmem12 machine */
   getCmdLineInt (&argc, argv, "--max_threads", &maxThreads) ;
   if (maxThreads < 24)
@@ -1971,7 +1977,8 @@ int main (int argc, const char *argv[])
       array (p.wigglesR, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
       array (p.wigglesR, 2 * chromMax * runMax - 1, Array) = 0 ; /* initialize */
     }
-  
+
+  int nDone = 0 ;
   while (channelGet (p.doneChan, &bb, BB))
     {
       long int n = (bb.hits ? bigArrayMax (bb.hits) : 0) ;
@@ -2064,7 +2071,7 @@ int main (int argc, const char *argv[])
 	  char tBuf[25], tBuf2[25] ;
 	  bb.stop = timeNow () ;
 	  timeDiffSecs (bb.start, bb.stop, &ns) ;
-	  printf ("%s: run %d / slice %d done start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
+	  fprintf (stderr, "%s: run %d / slice %d done (%d/%d)  start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, ++nDone, NTODO, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
 	}
       ac_free (bb.h) ;
     }
@@ -2119,7 +2126,7 @@ int main (int argc, const char *argv[])
 	ac_free (p.bbG.h) ;
     }
   /* wego_log is the thread-safe way to pass messages to stderr */
-  
+  if (1)  system (hprintf (h, "\\rm %s/*.BF.gz %s/*.hits &", p.outFileName  , p.outFileName)) ;  
   if (0)   ac_free (h) ; /* blocks on channel cond destroy */
   return 0 ;
 }

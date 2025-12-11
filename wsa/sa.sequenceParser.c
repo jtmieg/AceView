@@ -13,6 +13,8 @@
 
 #include "sa.h"
 
+#define NAMMAX 1024
+
 static atomic_int lane = 0 ;
 
 /**************************************************************/

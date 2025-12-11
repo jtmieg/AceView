@@ -408,7 +408,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	      switch (isGeneTr)
 		{
 		case 2: exonic += weight ; break ;
-		case 1: intronic += weight ; printf("intronic %d\t%d\n", x, weight) ; break ;
+		case 1: intronic += weight ; break ;
 		default: intergenic += weight ; break ; 
 		}
 	  }

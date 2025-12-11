@@ -277,7 +277,7 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 		  j++ ; vp++ ;
 		}
 	    }
-	  else if (nX < maxRepeats)
+	  else if (nI && nI < maxRepeats)  /* was nX < maxRepeats, but we stall on the RefEq XR */
 	    {
 	      int nnX = n < (1<<16) ? n : (1<<16) - 1 ;
 	      nnX += nX ;
@@ -285,6 +285,7 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 		{
 		  nI = ((wp->intron >> 31) & 0x1) ? 1 : 0 ;
 		  nX = (((wp->intron >> 30) & 0x3) == 0x1) ? 1 : 0 ;
+		  nX = 0 ; /* do not enhance the exon seeds */
 		  if (nI + nX)
 		    {
 		      if (((wp->intron >> 31) & 0x1) == 0x0)

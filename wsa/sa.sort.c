@@ -265,5 +265,40 @@ void saSort (BigArray aa, int type)
 }/* saSsort */
 
 /**************************************************************/
+
+#ifdef GREGGPU
+void saGPUSort (BigArray aa, int type)
+{
+  long int N = bigArrayMax (aa) ;
+  char *cp = N ?  (char *) aa->base : 0 ;
+  int s = aa->size ;
+  int (*cmp)(const void *va, const void *vb) ;
+    
+  switch (type)
+    {
+    case 1:
+      cmp = cwOrder ;
+      break ;
+    case 2:
+      cmp = hitReadOrder ;
+      break ;
+    case 3:
+      cmp = hitPairOrder ;
+      break ;
+    default:
+      messcrash ("Wrong call to saSort typw = %dd>4", type) ;
+    }
+  if (N <= 1) return;
+
+  /* CALL GPU sorting on buffer
+   *   cp    containing N records of size s bytes
+   *   using the comparison function cmp
+   */
+  exit (1) ; /* code not written yet ! */
+  
+  return ;
+} /* saGPUSsort */
+#endif
+
 /**************************************************************/
 /**************************************************************/

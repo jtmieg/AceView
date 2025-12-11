@@ -214,7 +214,9 @@ static BOOL s2gRegisterIntron (S2G *s2g, Array cigarettes, int flag, int method,
 	    {
 	      I2M *i2m ;
 	      int type = 'N' ;
-	      sprintf (buf, "%s:%c:%d-%d", dictName(s2g->targetDict, target), type, cgr->a1, cgr->a2) ;
+	      int a1 = (strand == 1 ? cgr->a1 : cgr->a2) ; 
+	      int a2 = (strand == 1 ? cgr->a2 : cgr->a1) ; 
+	      sprintf (buf, "%s:%c:%d-%d", dictName(s2g->targetDict, target), type, a1, a2) ;
 	      x = 0 ;
 	      dictAdd (s2g->intronDict, buf, &x) ;
 	      i2m = arrayp (s2g->i2m, x, I2M) ;
@@ -236,11 +238,11 @@ static BOOL s2gRegisterIntron (S2G *s2g, Array cigarettes, int flag, int method,
 		  ip->target = target ;
 		  ip->type = type ;
 		  ip->flag = flag ;
-		  ip->a1 = cgr->a1 ; 
-		  ip->a2 = cgr->a2 ; 
+		  ip->a1 = a1 ;
+		  ip->a2 = a2 ;
 		  ip->score = 1 ;
 		  ip->strand = strand ;
-		  ip->strand = 1 ;  /* not defined in BAM format */	
+		    /* not defined in BAM format */	
 		  ip->gold = x ;
 		}
 	      break ;
@@ -1799,9 +1801,9 @@ int main (int argc, const char **argv)
 	s2gExportIntronSupport (&s2g) ;
       if (s2g.exportAliLn)
 	s2gExportAliLn (&s2g) ;
-      s2gExportIntrons (&s2g) ;
     }
 
+  s2gExportIntrons (&s2g) ;
   aceDnaSetIlmJumper (1) ;  /* to please the optimized linker */
 
 

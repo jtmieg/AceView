@@ -154,7 +154,7 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
 	  CW *restrict vp = up - 1 ;
 	  if (vp->nam == up->nam)
 	    {
-	      if (vp->pos < vp->intron && vp->intron > a1 - 17)
+	      if (vp->pos < vp->intron && vp->intron > a1 - 17 && vp->intron < a1)
 		{
 		  v1 = vp->pos ; v2 = vp->intron ;
 		  dv = a1 - v2 - 1 ; /* length of left exon */
@@ -169,7 +169,7 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
 	  CW *restrict wp = up + 1 ;
 	  if (wp->nam == up->nam)
 	    {
-	      if (wp->pos < wp->intron && wp->pos < a2 + 17)
+	      if (wp->pos < wp->intron && wp->pos < a2 + 17 && wp->pos > a2)
 		{
 		  w1 = wp->pos ; w2 = wp->intron ;
 		  dw = w1 - a2 - 1 ; /* length of right exon */

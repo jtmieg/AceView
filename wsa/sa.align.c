@@ -13,6 +13,8 @@
  */
 
 #include "sa.h"
+#define MAXJUMP 3
+#define MAXJUMP2 8
 
 /**************************************************************/
 /**************************************************************/
@@ -187,7 +189,7 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 			    , int *a1p, int *a2p, int *x1p, int *x2p
 			    , int errCost
 			    , BOOL isIntron
-			    , int errMax, int minAli
+			    , int errMax, int minAli, int maxJump
 			    )
 {
   int nN = 0, dx = 0, nerr = 0 ;
@@ -209,7 +211,7 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
   arrayMax (err) = 0 ;
   aceDnaDoubleTrackErrors (dna, &x1, &x2, TRUE /* bio coordinates, extend = TRUE */
 			   , dnaG, dnaGR, &a1, &a2
-			   , &nN, err, MAXJUMP, errMax, TRUE, 0) ;
+			   , &nN, err, maxJump, errMax, TRUE, 0) ;
   if (x1 > *x1p || x2 < *x2p)
     return FALSE ;
   dx = x2 - x1 + 1 ;
@@ -810,14 +812,14 @@ static void alignAdjustIntrons (const PP *pp, BB *bb, Array bestAp, Array aa)
 
 /**************************************************************/
 
-static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Array dna)
+static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Array dna, int maxJump, int maxJump2)
 {
   ALIGN *up, *vp ;
   int chromA = 0, chain = 0 ;
   AC_HANDLE h1 = ac_new_handle () ;
   Array dnaR = 0 ;
   Array dnaG = 0 ;
-
+  
 
   for (int ic = 1 ; ic < arrayMax (bestAp) ; ic++)
     {
@@ -1028,16 +1030,16 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 	      if (1)
 	      {
 		int x2 = zp.x2,  a2 = zp.a2 ;
-		aceDnaDoubleTrackErrors (dnaShort, &(zp.x1), &(zp.x2), TRUE   /* isDown = TRUE */    /* MAXJUMP */
+		aceDnaDoubleTrackErrors (dnaShort, &(zp.x1), &(zp.x2), TRUE   /* isDown = TRUE */
 					 , dnaI, 0, &(zp.a1), &(zp.a2)
-					 , 0, zp.errors, MAXJUMP, -3, TRUE, 0) ; /* bio coordinates, extend right */
+					 , 0, zp.errors, maxJump, -3, TRUE, 0) ; /* bio coordinates, extend right */
 		if (zp.x2 < x2 - 50)
 		  {
 		    zp.x2 = x2 ; zp.a2 = a2 ;
 		    arrayMax (zp.errors) = 0 ;
-		    aceDnaDoubleTrackErrors (dnaShort, &(zp.x1), &(zp.x2), TRUE   /* isDown = TRUE */    /* MAXJUMP */
+		    aceDnaDoubleTrackErrors (dnaShort, &(zp.x1), &(zp.x2), TRUE   /* isDown = TRUE */ 
 					     , dnaI, 0, &(zp.a1), &(zp.a2)
-					     , 0, zp.errors, MAXJUMP2, -1, FALSE, 0) ; /* bio coordinates, jump 8 but do not extend */
+					     , 0, zp.errors, maxJump2, -1, FALSE, 0) ; /* bio coordinates, jump 8 but do not extend */
 		  }
 	      }
 	      alignClipErrorRight (&zp, pp->errCost) ;
@@ -1110,7 +1112,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 /**************************************************************/
 /* Dynamic programming of path score */
 
-static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array aa, Array dna, int chromA, Array dnaG, Array dnaGR, Array bestAp) 
+static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array aa, Array dna, int chromA, Array dnaG, Array dnaGR, Array bestAp, int maxJump, int maxJump2)
 {
   AC_HANDLE h = 0 ;
   int ii, jj, i1, i2, iMax ;
@@ -1192,9 +1194,9 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	{
 	  if (i1 == i2)
 	    continue ;
-	  if (vp->chrom > chrom || (vp->chrom == chrom && vp->x1 > x2 - MAXJUMP2))
+	  if (vp->chrom > chrom || (vp->chrom == chrom && vp->x1 > x2 - maxJump2))
 	    break ;
-	  if (vp->chrom < chrom || vp->x2 < x1 - MAXJUMP2)
+	  if (vp->chrom < chrom || vp->x2 < x1 - maxJump2)
 	    {
 	      if (!foundI2) i02 = i2 + 1 ;
 	      continue ;
@@ -1204,8 +1206,8 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      && vp->x2 >= x1 - 8 && vp->x2 < x2 && vp->x1 < x2
 	      &&
 	      (
-	       ( isDown && vp->a1 < a2 && vp->a2 + maxIntron > a1 && vp->a2 - vp->x2 < a1 - x1 + MAXJUMP2) ||
-	       ( ! isDown && vp->a1 > a2 && vp->a2 - maxIntron < a1 && vp->a2 + vp->x2 > a1 + x1  - MAXJUMP2)
+	       ( isDown && vp->a1 < a2 && vp->a2 + maxIntron > a1 && vp->a2 - vp->x2 < a1 - x1 + maxJump2) ||
+	       ( ! isDown && vp->a1 > a2 && vp->a2 - maxIntron < a1 && vp->a2 + vp->x2 > a1 + x1  - maxJump2)
 	       )
 	      )
 	    {
@@ -1378,7 +1380,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
       alignAdjustIntrons (pp, bb, bestAp, aa) ;
       iMax = alignLocateChains (bestAp, aa, myRead) ;
       /* adjust exons */
-      alignAdjustExons (pp, bb, bestAp, aa, dna) ;
+      alignAdjustExons (pp, bb, bestAp, aa, dna, maxJump, maxJump2) ;
       iMax = alignLocateChains (bestAp, aa, myRead) ;
       
       /* Compute the clean chain score */
@@ -1833,7 +1835,8 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 /**************************************************************/
 static void alignDoOneRead (const PP *pp, BB *bb
 			    , Array aaa, BigArray hits
-			    , Array aa, Array err, Array bestAp)
+			    , Array aa, Array err, Array bestAp
+			    , int maxJump, int maxJump2)
 {   
   BOOL debug = FALSE ;
   AC_HANDLE h = ac_new_handle () ;
@@ -1874,7 +1877,7 @@ static void alignDoOneRead (const PP *pp, BB *bb
 	  read1 = read ;
 	  if (arrayMax (aa))
 	    { /* create chain scores */
-	      alignSelectBestDynamicPath (pp, bb, aaa, aa, dna, chromA, dnaG, dnaGR, bestAp) ;
+	      alignSelectBestDynamicPath (pp, bb, aaa, aa, dna, chromA, dnaG, dnaGR, bestAp, maxJump, maxJump2) ;
 	    }
 	  arrayMax (aa) = kMax = 0 ;
 	}
@@ -1890,7 +1893,9 @@ static void alignDoOneRead (const PP *pp, BB *bb
 	}
 
       x1 = hit->x1 ;
-      nTargetRepeats = (x1 & nTRmask) ; 
+      nTargetRepeats = (x1 & nTRmask) ;
+      if (arrayMax (dna) > 200 &&  nTargetRepeats > 10)
+	continue ;
       x1 = x1 >> NTARGETREPEATBITS ;
       BOOL isIntronDown = (x1 >> 2) & 0x1 ;
       isDown = (chrom & 0x1)  ? FALSE : TRUE ;
@@ -1923,7 +1928,7 @@ static void alignDoOneRead (const PP *pp, BB *bb
       if (! isIntronDown)
 	{ donor = - donor ; acceptor = - acceptor ; }
       if (1 && read == readOld && chrom == chromOld && isDown == isDownOld &&
-	  x1 >= y1 && x2 <= y2 && hit->a1 < ha1 + 3 &&   /* MAXJUMP */
+	  x1 >= y1 && x2 <= y2 && hit->a1 < ha1 + 3 &&   
 	  (
 	   (isDown && a1 >= b1 && a2 <= b2) ||
 	   (! isDown && a1 <= b1 && a2 >= b2)
@@ -1948,7 +1953,7 @@ static void alignDoOneRead (const PP *pp, BB *bb
 	  int a0 = a1, x0 = x1 ;
 	  if (debug) fprintf (stderr, "Hit %ld\tr=%d\t%d\t%d\tc=%d\t%d\t%d\tbefore align\t%s\t%u\n"
 			      , ii, read, x1, x2, chrom, a1, a2, dictName (pp->bbG.dict, chrom >> 1), hit->a1) ;
-	  if (alignExtendHit (dna, dnaG, dnaGR, err, isDown, chromLength, &a1, &a2, &x1, &x2, errCost, isIntron, errMax, 22))
+	  if (alignExtendHit (dna, dnaG, dnaGR, err, isDown, chromLength, &a1, &a2, &x1, &x2, errCost, isIntron, errMax, 22, maxJump))
 	    {
 	      if (debug) fprintf (stderr, "Hit %ld\tr=%d\t%d\t%d\tc=%d\t%d\t%d\tAccepted\t%s, u=%u, nErr=%d\n"
 				  , ii, read, x1, x2, chrom, a1, a2
@@ -1988,7 +1993,7 @@ static void alignDoOneRead (const PP *pp, BB *bb
     }
   if (arrayMax (aa))
     { /* create chain scores */
-      alignSelectBestDynamicPath (pp, bb, aaa, aa, dna, chromA, dnaG, dnaGR, bestAp) ;
+      alignSelectBestDynamicPath (pp, bb, aaa, aa, dna, chromA, dnaG, dnaGR, bestAp, maxJump, maxJump2) ;
     }
   ac_free (h) ;
   return ;
@@ -2022,7 +2027,10 @@ static void alignDoOnePair (const PP *pp, BB *bb
   Array aaa = arrayHandleCreate (128, ALIGN, h) ;
   Array bestAp1 = arrayHandleCreate (8, int, h) ;
   Array bestAp2 = 0 ;
+  int maxJump = MAXJUMP ;
+  int maxJump2 = MAXJUMP2 ;
 
+  /* maxJump = maxJump2 = 1 ; */ 
   read1 = bigArr (hits, 0, HIT).read ;
   read2 = bigArr (hits, iMax -1, HIT).read ;
 
@@ -2033,7 +2041,7 @@ static void alignDoOnePair (const PP *pp, BB *bb
 	if (hit->read == read2)
 	  break ;
       arrayMax (hits)  = iMax1 = ii ;
-      alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp1) ;
+      alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp1, maxJump, maxJump2) ;
       arrayMax (hits) = iMax ;
       if (iMax > iMax1)
 	for (ii = iMax1, hit = bigArrp (hits, ii, HIT) ; ii < iMax ; hit++, ii++)
@@ -2042,10 +2050,10 @@ static void alignDoOnePair (const PP *pp, BB *bb
       arrayMax (aa) = arrayMax (err) = 0 ;
       bestAp2 = arrayHandleCreate (8, int, h) ;
       iMax1 = arrayMax (aaa) ;
-      alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp2) ;
+      alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp2, maxJump, maxJump2) ;
     }
   else
-    alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp1) ;
+    alignDoOneRead (pp, bb, aaa, hits, aa, err, bestAp1, maxJump, maxJump2) ;
 
   iMax = arrayMax (aaa) ;
   array (aaa, iMax, ALIGN).read = 0 ; /* impose a zero terminal record */

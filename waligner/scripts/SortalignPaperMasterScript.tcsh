@@ -52,11 +52,16 @@ setenv SV v45.nov21        # no wiggle, no sam,    fixed sam and pairs (but i do
 setenv SVlast v45.nov21
 setenv SV v46.dec1        # no wiggle, no sam, fixed pairs again => fixed multiAligned, modified sam2gold to not count introns
 setenv SVlast v46.dec1
+setenv SV v47.dec9        # no wiggle, no sam, removd enhanced exon seds, completed intron discovery and using seeds
+setenv SVlast v47.dec9
+setenv SV v48.dec10        # same with wiggle
+setenv SVlast v48.dec10
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
 endif
 
+setenv NOINTRONSEEDS 1
 setenv seedLength 18
 setenv maxTargetRepeats 81
 setenv maxTargetRepeats 31
@@ -907,13 +912,13 @@ foreach species (any)
     set maxMem=""
     set multiP=""
 
-    cat $e | grep TIMING | sort -k 5nr | tail -1 > _t
+    cat $e | grep TIMING | gawk -F '\t' '{n=split($5,aa,":");if(n==3)s=3600*aa[1]+60*aa[2]+aa[3];else s=60*aa[1]+aa[2];printf("%d\t",s);print;}' | sort -k 1nr | tail -1 > _t
     set n=`cat _t | gawk '/TIMING/{n++}END{print n+0}'`
     if ($n == 1) then
-      set wallT=`cat _t | gawk -F '\t' '{print $5}'`
-      set cpu=`cat _t | gawk -F '\t' '{print $7+$9}'`
-      set maxMem=`cat _t | gawk -F '\t' '{print $11}'`
-      set multiP=`cat _t | gawk -F '\t' '{print $13}'`
+      set wallT=`cat _t | gawk -F '\t' '{print $6}'`
+      set cpu=`cat _t | gawk -F '\t' '{print $8+$10}'`
+      set maxMem=`cat _t | gawk -F '\t' '{print $12}'`
+      set multiP=`cat _t | gawk -F '\t' '{print $14}'`
    endif
 
    
@@ -994,13 +999,15 @@ date
       if (! -e $sam) set sam=RESULTS/$mm/$run/sam_sorted.gz
       if (! -e $sam) continue
 
-      
+      set exportitr=""
+      if ($run == iRefSeq || $run == iRefSeq38) set exportitr="--exportIntronSupport"
+
       samtools stat $sam | awk -f scripts/sam_stats.awk 
 
       touch RESULTS/$mm/$run/s2g.samStats
-                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
-                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce" > 	RESULTS/$mm/$run/sam2gold.cmd
-            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce"
+                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"
+                                                echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr" > 	RESULTS/$mm/$run/s2g.cmd
+            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"
 	    # 64G
     
     endif
@@ -1854,7 +1861,7 @@ goto phaseLoop
 phase_introns:
 
 echo "Creating the INTRON_DB databases"
-foreach target (GRCh38)
+foreach target (T2T GRCh38)
   set IDB=$target.INTRON_DB
   if (! -d $IDB) then
     mkdir $IDB
@@ -1872,9 +1879,9 @@ foreach target (GRCh38)
        ln -s ../Reference_genome/$target.gtf.gz
        dna2dna -gtf $target.gtf.gz -gtfRemap KT_RefSeq  -o gtf.$target
        # construct the intron file needed for --createIndex
-       cat gtf.GRCh38.introns | cut -f 6,7,8 | sort -u > g.introns.gz
+       cat gtf.$target.introns | cut -f 6,7,8 | sort -u > g.introns.gz
        # construct the intron.ace file needed in INTRON_DB
-       cat gtf.GRCh38.introns | gawk -F '\t' '{g=$2;m=$3;c=$4;x1=$5;x2=$6;c=$6;i1=$7;i2=$8;printf("Intron %s__%d_%d\nIntMap %s %d %d\nGene %s\nIn_mRNA %s %d %d\n\n",c,i1,i2,c,i1,i2,g,m,x1,x2);}' > mrna2intron.ace
+       cat gtf.$target.introns | gawk -F '\t' '{g=$2;m=$3;c=$4;x1=$5;x2=$6;c=$6;i1=$7;i2=$8;printf("Intron %s__%d_%d\nIntMap %s %d %d\nGene %s\nIn_mRNA %s %d %d\n\n",c,i1,i2,c,i1,i2,g,m,x1,x2);}' > mrna2intron.ace
     popd
   endif
   if (! -e $IDB/genome.done) then
@@ -1890,31 +1897,60 @@ EOF
     touch  $IDB/genome.done
   endif
 
-  echo '#' > $IDB/introns.tsf
-  foreach mm (013_SortAlignG3R1)
-    foreach run ($runs)
-      set target2=`cat Fasta/$run/target`
-      echo "$run $target $target2"
-      if ($target != $target2) continue
-      set ff=RESULTS/$mm/$run/$run/introns.tsf
-      if (! -e $ff) continue
-      wc $ff
-      cat $ff | gawk '/^#/{next;}{printf("%s\t",mm);print;}' mm=$mm   >> $IDB/introns.tsf
+  set runs3="iRefSeq iRefSeq38"
+  if (! -e $IDB/introns.ace) then
+    echo '#' > $IDB/introns.tsf
+    foreach mm ($methods)
+      foreach run ($runs3)
+        set target2=`cat Fasta/$run/target`
+        echo "$run $target $target2"
+        if ($target != $target2) continue
+        set ff=RESULTS/$mm/$run/$run/introns.tsf
+        if (-e $ff) then
+          wc $ff
+          cat $ff | gawk '/^#/{next;}{printf("%s\t",mm);print;}' mm=$mm   >> $IDB/introns.tsf
+	  continue
+	endif
+        set ff=RESULTS/$mm/$run/s2g.Introns
+        if (-e $ff) then
+          wc $ff
+          cat $ff | gawk '/^#/{next;}{split($1,aa,":");split(aa[3],bb,"-");printf("%s\t%s__%d_%d\t%s\tiit\t%d\n",mm,aa[1],bb[1],bb[2],run,$2);}' mm=$mm  run=$run >> $IDB/introns.tsf
+	  continue
+	endif
+      end
     end
-  end
-  cat $IDB/introns.tsf | sort | gawk -F '\t' '/^#/{next;}{if($2 != old){old=$2;split(old,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1<100 || a2<100){old=0;next;}ln=a2-a1;if(ln<0)ln=-ln;ln+=1;printf("\nIntron %s\nIntron\nIntMap %s %d %d\nLength %d\n", old,aa[1],a1,a2, ln);}printf("de_duo %s__%s %d\n",$1,$3,$5);}END{printf("\n");}' > $IDB/introns.ace
+    cat $IDB/introns.tsf | sort | gawk -F '\t' '/^#/{next;}{if($2 != old){old=$2;split(old,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1<100 || a2<100){old=0;next;}ln=a2-a1;if(ln<0)ln=-ln;ln+=1;printf("\nIntron %s\nIntron\nIntMap %s %d %d\nLength %d\n", old,aa[1],a1,a2, ln);}printf("de_duo %s__%s %d\n",$1,$3,$5);}END{printf("\n");}' > $IDB/introns.ace
+    tace $IDB  <<EOF
+      query find intron de_duo
+      edit -D de_duo
+      parse  $IDB/introns.ace
+      bql -o  $IDB/introns.counts.txt select ii,method,mrna from ii in ?Intron where ii#de_duo, method in ii->de_duo, mrna in ii#in_mrna
+      query find intron In_MRNA
+      save
+      quit
+EOF
 
-  echo "parse  $IDB/introns.ace" | tace $IDB -no_prompt
-
-
-          
   endif
+
 end
 
-SRR24518509 
- B_ROCR2_Illumina_DNA
+ cat T2T.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("T2T\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort
+ cat GRCh38.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("GRCh38\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort
+
 goto phaseLoop
 # iRefSeq38 NR_024540.1 is aligned but has no produced intron
+set mm=013_SortAlignG3R1
+set run=iRefSeq
+set ff=RESULTS/$mm/$run/$run/introns.tsf
+set IDB=T2T.INTRON_DB
+cat $ff | gawk '/^#/{next;}{printf("%s\t%s.NoI\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6) ;}'  > $IDB/introns.tsf
+    cat $IDB/introns.tsf | sort | gawk -F '\t' '/^#/{next;}{if($2 != old){old=$2;split(old,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1<100 || a2<100){old=0;next;}ln=a2-a1;if(ln<0)ln=-ln;ln+=1;printf("\nIntron %s\nIntron\nIntMap %s %d %d\nLength %d\n", old,aa[1],a1,a2, ln);}printf("de_duo %s__%s %d\n",$1,$3,$5);}END{printf("\n");}' > $IDB/introns.ace
+
+set run=iRefSeq38
+set ff=RESULTS/$mm/$run/$run/s2g.Introns
+set IDB=GRCh38.INTRON_DB
+cat $ff | gawk '/^#/{next;}{printf("%s\t%s.NoI\t%s\t%s\t%s\t%s\n", $1,$2,$3,$4,$5,$6) ;}'  > $IDB/introns.tsf
+    cat $IDB/introns.tsf | sort | gawk -F '\t' '/^#/{next;}{if($2 != old){old=$2;split(old,aa,"__");split(aa[2],bb,"_");a1=bb[1];a2=bb[2];if(a1<100 || a2<100){old=0;next;}ln=a2-a1;if(ln<0)ln=-ln;ln+=1;printf("\nIntron %s\nIntron\nIntMap %s %d %d\nLength %d\n", old,aa[1],a1,a2, ln);}printf("de_duo %s__%s %d\n",$1,$3,$5);}END{printf("\n");}' > $IDB/introns.ace
 
 ##############################################################################
 ##############################################################################

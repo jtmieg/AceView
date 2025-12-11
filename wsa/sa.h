@@ -26,6 +26,21 @@
 */
 /* Examples:  sortalign -h */
 
+/***********************************************************************************/
+/*  Greg: uncomment this lines and edit the code at the very bottom of sa.sort.c and recompile sa.*.c */
+/* #define GREGGPU */
+
+#ifdef GREGGPU 
+  #define YANN 0
+  #define NAGENTS 12
+  #define NBLOCKS 12
+#else
+  #define YANN 1
+  #define NAGENTS 40
+  #define NBLOCKS 40
+#endif
+
+/***********************************************************************************/
 
 #include "ac.h"
 #include "channel.h"
@@ -35,11 +50,7 @@
 #include "../wsra/sra_read.h"
 
 
-#define YANN 1
 
-#define MAXJUMP 3
-#define MAXJUMP2 8
-#define NAMMAX 1024
 
 typedef struct nodeStruct { double x ; CHAN *cx, *cy, *cu, *cv, *done ; int k ; } NODE ;
 
@@ -379,7 +390,8 @@ int saSpongeParser (PP *pp, TC *tc) ;
 int saSpongeParserDirect (PP *pp) ;
 
 /* sa.sort.c */
-void saSort (BigArray aa, int type) ;                  
+void saSort (BigArray aa, int type) ;
+void saGPUSort (BigArray aa, int type) ;                  
 
 /* sa.sam.c */
 int saSamExport (ACEOUT ao, const PP *pp, BB *bb) ;       

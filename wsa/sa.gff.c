@@ -495,21 +495,28 @@ int saSpongeParserDirect (PP *pp)
 {
   AC_HANDLE h = ac_new_handle () ;
   char *fNam = hprintf (h, "%s/tConfig", pp->indexName) ;
-  ACEIN ai = aceInCreate (fNam, 0, h) ;
+  char *cp = filName (fNam, 0, "r") ;
 
-  aceInSpecial (ai, "\n") ;
-  
-  while (aceInCard (ai))
+  if (cp)
     {
-      char *cp = aceInWord (ai) ;
-      if (! cp || *cp == '#')
-	continue ;
-      if (*cp == 'I')
+      ACEIN ai = aceInCreate (cp, 0, h) ;
+      
+      if (ai)
 	{
-
+	  aceInSpecial (ai, "\n") ;
+	  
+	  while (aceInCard (ai))
+	    {
+	      char *cp = aceInWord (ai) ;
+	      if (! cp || *cp == '#')
+		continue ;
+	      if (*cp == 'I')
+		{
+		  
+		}
+	    }
 	}
     }
-  
 
   if (pp->tFileSpongeFileNameF)
     saSpongeParserDo (pp, pp->tFileSpongeFileNameF) ;
