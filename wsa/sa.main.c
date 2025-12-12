@@ -261,11 +261,7 @@ static void sortWords (const void *vp)
 	  for (int k = 0 ; k < NN ; k++)
 	    if (bb.cwsN[k])
 	      {
-#ifdef GREGGPU
-		saGPUSort (bb.cwsN[k], 1) ; /* cwOrder */
-#else
 		saSort (bb.cwsN[k], 1) ; /* cwOrder */
-#endif
 		nn += bigArrayMax (bb.cwsN[k]) ;
 	      }
 	  t2 = clock () ;
@@ -668,13 +664,9 @@ static void sortHits (const void *vp)
 	  sortHitsFuse (pp, &bb) ;
 	  if (bb.hits)
 	    {
-#ifdef GREGGPU
-		saGPUSort (bb.hits, 3) ; /* hitPairOrder */
-#else
-		saSort (bb.hits, 3) ; /* hitPairOrder */
-#endif
+	      saSort (bb.hits, 3) ; /* hitPairOrder */
 	      t2 = clock () ;
-
+	      
 	      long int nn = bigArrayMax (bb.hits) ;
 	      nnn += nn ;
 	      saCpuStatRegister ("6.SortHits", pp->agent, bb.cpuStats, t1, t2, nn) ;
@@ -984,11 +976,7 @@ static void wholeWork (const void *vp)
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
 	if (bb.cwsN[k])
-#ifdef GREGGPU
-		saGPUSort (bb.cwsN[k], 1) ; /* cwOrder */
-#else
-		saSort (bb.cwsN[k], 1) ; /* cwOrder */
-#endif
+	  saSort (bb.cwsN[k], 1) ; /* cwOrder */
 
       
       /* match hits */

@@ -28,14 +28,13 @@
 
 /***********************************************************************************/
 /*  Greg: uncomment this lines and edit the code at the very bottom of sa.sort.c and recompile sa.*.c */
-/* #define GREGGPU */
+/* #define GREGGPU  */
 
 #ifdef GREGGPU 
-  #define YANN 0
   #define NAGENTS 12
   #define NBLOCKS 12
 #else
-  #define YANN 1
+  #define YANN 
   #define NAGENTS 40
   #define NBLOCKS 40
 #endif
@@ -391,7 +390,8 @@ int saSpongeParserDirect (PP *pp) ;
 
 /* sa.sort.c */
 void saSort (BigArray aa, int type) ;
-void saGPUSort (BigArray aa, int type) ;                  
+/* sa.gpusort.c */
+void saGPUSort (char *cp, long int number_of_records, int size_of_record, int (*cmp)(const void *va, const void *vb)) ;
 
 /* sa.sam.c */
 int saSamExport (ACEOUT ao, const PP *pp, BB *bb) ;       
