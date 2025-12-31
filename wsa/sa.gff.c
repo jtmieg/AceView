@@ -68,7 +68,7 @@ long int saGffParser (PP *pp, TC *tc)
   AC_HANDLE h = ac_new_handle () ;
   long int nnE = 0, nnI = 0 ;
   ACEIN ai = aceInCreate (tc->fileName, 0, h) ;
-  int chrom= 0 ;
+  int chrom = 0, mrna = 0 ;
   int a1, a2 ;
   int line = 0 ;
   BB *bbG = &(pp->bbG) ;
@@ -76,7 +76,8 @@ long int saGffParser (PP *pp, TC *tc)
   BOOL isGff = FALSE ;
   BOOL isGtf = FALSE ;
   BOOL isIntrons = FALSE ;
-  
+  DICT *mrnaDict = dictHandleCreate (100000, h) ;
+
   if (1)
     {
       const char *cp = tc->fileName ;
@@ -162,32 +163,99 @@ long int saGffParser (PP *pp, TC *tc)
       else
 	continue ;
       
+      aceInStep (ai, '\t') ;
+      cp = aceInWord (ai) ;  /* probably . (some kind of score ?) drop it */
+      if (! cp)
+	continue ;
+      
+      aceInStep (ai, '\t') ;
+      char cutter = 0 ;
+      cp = aceInWordCut (ai, "\t", &cutter) ;  /* the metadata */
+      if (! cp)
+	continue ;
+      mrna = 0 ;
+      if (type == 1) /* identify the transcript */
+	{ /* expect : transcript_id "NM_001364814.1"; */
+	  char *cq = strstr (cp, "transcript_id") ;
+	  if (cq)
+	    {
+	      AC_HANDLE h1 = ac_new_handle () ;
+	      ACEIN aj = aceInCreateFromText (cq + 13, 0, h1) ;
+	      aceInCard (aj) ;
+	      char *cr = aceInWord (aj) ;
+	      if (cr)
+		dictAdd (mrnaDict, cr, &mrna) ;
+	      ac_free (h1) ;
+	    }
+	}
+      
       if (type == 1)
 	{
 	  CW *up = bigArrayp (pp->exonSeeds, nnE++, CW) ;
+	  up->seed = mrna ;
 	  up->nam = chrom ;
-	  up->pos = a1 < a2 ? a1 : a2 ;
-	  up->intron = a1 < a2 ? a2 : a1 ;
+	  up->pos = a1 ;
+	  up->intron = a2 ;
 	}
 
-      if (type == 2)
+      if (type == 22222)
 	{
 	  int da = (a1 < a2 ? a2 - a1 + 1 : a1 - a2 + 1) ;
 	  if (da >= twoMb) /* our format only allows 21 bits for the intron length */ 
 	    continue ;
 	  CW *up = bigArrayp (pp->intronSeeds, nnI++, CW) ;
+	  up->seed = 0 ;
 	  up->nam = chrom ;
 	  up->pos = a1 ;
 	  up->intron = a2 ;
 	}
+    }
+
+  if (nnE) /* create the corresponding introns */
+    {
+      CW *up, *vp ;
+      long int ii, jj ;
+
+      bigArraySort (pp->exonSeeds, exonOrder) ;
+      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
+	if (up->seed)
+	  {
+	    for (vp = up + 1, jj = ii + 1 ; jj < nnE && vp->seed == up->seed ; vp++, jj++) 
+	      {
+		int chrom = up->nam ;
+		int a1 = up->pos < up->intron ? vp[-1].intron + 1 : vp[0].intron - 1 ;
+		int a2 = up->pos < up->intron ? vp[0].pos - 1 : vp[-1].pos + 1 ;
+		fprintf (stderr, "Intron %ld : %d %d\n", nnI, a1, a2) ;
+
+		CW *wp = bigArrayp (pp->intronSeeds, nnI++, CW) ;
+		wp->seed = 0 ;
+		if (a1 < a2)
+		  {
+		    wp->nam = chrom << 1 ; 
+		    wp->pos = a1 ;
+		    wp->intron = a2 ;
+		  }
+		else
+		  {
+		    wp->nam = (chrom << 1) | 0x1 ;
+		    wp->pos = a2 ;
+		    wp->intron = a1 ;
+		  }
+		vp->seed = 0 ;
+	      }
+	    up->seed = 0 ;
+	  }
     }
   
   if (nnE) /* fuse exons by projection on the top strand of the genome */
     {
       CW *up, *vp ;
       long int ii, jj ;
-      bigArraySort (pp->exonSeeds, exonOrder) ;
 
+      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
+	if (up->pos > up->intron)
+	  { int a0 = up->pos ; up->pos = up->intron ; up->intron = a0 ; }
+      bigArraySort (pp->exonSeeds, exonOrder) ;
       for (up = vp = bigArrp (pp->exonSeeds, 0, CW), ii = jj = 0 ; ii < nnE ; ii++, up++)
 	{
 	  if (up->nam == vp->nam && up->pos <= vp->intron)
@@ -199,7 +267,9 @@ long int saGffParser (PP *pp, TC *tc)
 	  if (jj < ii) *vp = *up ;
 	  jj++ ; vp++ ;
 	}
-      bigArrayMax (pp->exonSeeds) = jj ; 
+      bigArrayMax (pp->exonSeeds) = jj ;
+      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
+	fprintf (stderr, "Exon %ld : %d %d\n", ii, up->pos, up->intron) ;
     }
 
   fprintf (stderr, "+++++++ Found %ld exons %ld introns in file %s\n", nnE, nnI, aceInFileName (ai)) ;

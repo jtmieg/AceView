@@ -2123,7 +2123,7 @@ int main (int argc, const char *argv[])
 	ac_free (p.bbG.h) ;
     }
   /* wego_log is the thread-safe way to pass messages to stderr */
-  if (1)  system (hprintf (h, "\\rm %s/*.BF.gz %s/*.hits &", p.outFileName  , p.outFileName)) ;  
+  if (p.outFileName)  system (hprintf (h, "\\rm %s/*.BF.gz %s/*.hits &", p.outFileName  , p.outFileName)) ;  
   if (0)   ac_free (h) ; /* blocks on channel cond destroy */
   return 0 ;
 }
