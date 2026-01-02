@@ -330,7 +330,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
       if (arrayMax(a))
 	{
 	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
-	  const char *runNam = dictMax (pp->runDict) == 1 ? "R" : dictName (pp->runDict, run) ;
+	  const char *runNam = dictMax (pp->runDict) == 1 ? "runX" : dictName (pp->runDict, run) ;
 	  char *fNam = hprintf (h, "/%s.%s.%s.BF", runNam, chromNam, typeNam) ;
 	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, 1 || pp->gzo, h) ;
 	  aceOutDate (ao, "##", "wiggle") ;

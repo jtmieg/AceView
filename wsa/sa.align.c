@@ -1731,6 +1731,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
     {
       ALIGN *bp ;
       int jj ;
+      int intronMaxOld = arrayMax (bb->confirmedIntrons) ;
       
       ap = arrp (aa, 0, ALIGN) ;
       /*   bitSet (bb->isAligned, ap->read) ; */
@@ -1787,7 +1788,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 			zp->feet[5] = 0 ;
 		      }
 		    int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
-		    zp->n = 1 ;
+		    zp->n = ap->chain ;
 		    zp->chrom = chrom ^ 0x1;
 		  }
 		else
@@ -1820,12 +1821,39 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 			zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)cp[0]]] ;
 			zp->feet[5] = 0 ;
 		      }
-		    zp->n = 1 ;
+		    zp->n = ap->chain ;
 		    zp->chrom = chrom ;
 		  }
 		break ;
 	      }
 	  }
+
+      /* register the double introns */
+      int intronMax = arrayMax (bb->confirmedIntrons) ;
+      for (ii = intronMaxOld ; ii < intronMax -1 ; ii++)
+	{
+	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
+	  INTRON *zp2 = arrayp (bb->confirmedIntrons, ii + 1, INTRON) ;
+
+	  if (zp1->n == zp2->n) /* actually the chain */
+	    {
+	      DOUBLEINTRON *zzp = arrayp (bb->doubleIntrons, arrayMax (bb->doubleIntrons), DOUBLEINTRON) ;
+	      zzp->chrom = zp1->chrom ;
+	      zzp->run = bb->run ;
+	      zzp->n = 1 ;
+	      zzp->a1 = zp1->a1 ; zzp->a2 = zp1->a2 ;
+	      zzp->b1 = zp2->a1 ; zzp->b2 = zp2->a2 ;
+	      memcpy (zzp->feet1, zp1->feet, 6) ;
+	      memcpy (zzp->feet2, zp2->feet, 6) ;
+	    }
+	}
+
+      /* reset the count which was overlaoded with chain */
+      for (ii = intronMaxOld ; ii < intronMax ; ii++)
+	{
+	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
+	  zp1->n = 1 ;
+	}
     }
   
   return ;
@@ -2212,6 +2240,7 @@ void saAlignDo (const PP *pp, BB *bb)
   int mask = (1 << n) - 1 ;
   
   bb->confirmedIntrons = arrayHandleCreate (64000, INTRON, bb->h) ;
+  bb->doubleIntrons = arrayHandleCreate (64000, DOUBLEINTRON, bb->h) ;
   /*
     bb->isAligned = bitSetHandleCreate (bb->nSeqs, bb->h) ;
   */

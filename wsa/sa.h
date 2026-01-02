@@ -142,6 +142,7 @@ typedef struct bStruct {
   Array wigglesP ;
   Array wigglesNU ;
   Array confirmedIntrons ;
+  Array doubleIntrons ;
   BOOL isGenome ;
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
   long int nPolyASuppor ;
@@ -156,6 +157,7 @@ typedef struct pStruct {
   BOOL debug, gzi, gzo ;
   BOOL createIndex ;
   BOOL align ;
+  BOOL justStats ;
   BOOL wiggle ;
   BOOL wiggleEnds ;
   BOOL introns ;
@@ -173,8 +175,6 @@ typedef struct pStruct {
   const char *tFileBinaryDnaRName ;
   const char *tFileBinaryIdsName ;
   const char *tFileBinaryCoordsName ;
-  const char *tFileSpongeFileNameF ;
-  const char *tFileSpongeFileNameR ;
 
   /* Agents:
      R read parser
@@ -203,6 +203,7 @@ typedef struct pStruct {
 
 
   BB bbG ;  /* genome or genes target */
+  Array tArray ;
   Array runStats ;
   Array runLanes ;
   Array runLanesDone ;
@@ -210,8 +211,8 @@ typedef struct pStruct {
   Array geneBoxes ;           /* gene coordinates */
   Array geneExonCounts ;      /* gene expression */
   Array geneBoxCounts ;      /* gene expression */
-  BigArray intronSeeds ;
-  BigArray exonSeeds ;
+  BigArray knownIntrons ;
+  BigArray knownExons ;
   Array wiggles ;
   Array wiggleCumuls ;
   Array wigglesL ;
@@ -224,6 +225,7 @@ typedef struct pStruct {
   Array intronics ;
   Array intergenics ;
   Array confirmedIntrons ;
+  Array doubleIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   BOOL strand, antiStrand ;
@@ -258,6 +260,7 @@ typedef struct pStruct {
   BOOL splice ;
   long int nRawReads, nRawBases ;
   int wiggle_step ;
+  float *runStranding ;
 } PP ;
 
 typedef struct codeWordsStruct {
@@ -328,11 +331,19 @@ typedef struct intronStruct {
   char feet[6] ;
 } __attribute__((aligned(32))) INTRON ;
 		  
+typedef struct doubleIntronStruct {
+  int run ;
+  int chrom ;
+  int n, nR, a1, a2, b1, b2 ;
+  char feet1[6] ;
+  char feet2[6] ;
+} __attribute__((aligned(32))) DOUBLEINTRON ;
+		  
 typedef struct exonStruct {
   int chrom ;
   int a1, a2 ; 
-  int mrna ;
-} __attribute__((aligned(32))) EXON ;
+  int gene, mrna ;
+} __attribute__((aligned(32))) EXONINTRON ;
 		  
 
 typedef struct polyAStruct {
@@ -385,8 +396,6 @@ Array saConfigGetRuns (PP *pp, Array runStats) ;
 /* sa.gff.c */
 long int saGffParser (PP *pp, TC *tc) ;
 long int saIntronParser (PP *pp, TC *tc) ; 
-int saSpongeParser (PP *pp, TC *tc) ;
-int saSpongeParserDirect (PP *pp) ;
 
 /* sa.sort.c */
 void saSort (BigArray aa, int type) ;
@@ -400,10 +409,13 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h) ;
 /* sa.introns.c */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 
 void saIntronsExport (PP *pp, Array aaa) ;
+void saDoubleIntronsExport (PP *pp, Array aaa) ;
 void saIntronsCumulate (PP *pp, BB *bb) ;
+void saDoubleIntronsCumulate (PP *pp, BB *bb) ;
 int saSupportedIntrons (const PP *pp, int run) ;
 
 /* sa.targetIndex.c */
+Array saTargetParseConfig (PP *pp) ;
 void saTargetIndexCreate (PP *pp) ;
 void saTargetIndexGenomeParser (const void *vp) ;
 

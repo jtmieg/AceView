@@ -58,6 +58,28 @@ static int confirmedIntronsOrder (const void *va, const void *vb)
 
 /**************************************************************/
 
+static int doubleIntronsOrder (const void *va, const void *vb)
+{
+  const DOUBLEINTRON *up = va ;
+  const DOUBLEINTRON *vp = vb ;
+  int n ;
+
+  /* chrom order */
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  /* pos order */
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  n = up->a2 - vp->a2 ; if (n) return n ;
+  n = up->b1 - vp->b1 ; if (n) return n ;
+  n = up->b2 - vp->b2 ; if (n) return n ;
+  /* run order */
+  n = up->run - vp->run ; if (n) return n ;
+  /* feet order, this clears the nR lines */
+  n = up->feet1[0] - vp->feet1[0] ; if (n) return -n ;
+  return 0 ;
+} /* doubleIntronOrder */
+
+/**************************************************************/
+
 static int confirmedIntronsCompress (Array aaa) 
 {
   int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
@@ -86,6 +108,36 @@ static int confirmedIntronsCompress (Array aaa)
 
 /**************************************************************/
 
+static int doubleIntronsCompress (Array aaa) 
+{
+  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  arraySort (aaa, doubleIntronsOrder) ;
+  DOUBLEINTRON *up, *vp, *wp ;
+
+  if (iMax)
+    for (ii = 0,  jj = 0, up = arrp (aaa, 0, DOUBLEINTRON), vp = up ; ii < iMax ; ii += kk, up += kk)
+      {
+	if (! up->feet1[0])
+	  continue ;
+	for (wp = up + 1, kk = 1 ; ii + kk < iMax ; kk++, wp++)
+	  if (up->a1 == wp->a1 && up->a2 == wp->a2 &&
+	      up->b1 == wp->b1 && up->b2 == wp->b2 &&
+	      up->chrom == wp->chrom && up->run == wp->run)
+	    {
+	      up->n += wp->n ; wp->n = 0 ;
+	      up->nR += wp->nR ; wp->nR = 0 ;
+	    }
+	  else
+	    break ;
+	if (vp < up) *vp = *up ;
+	vp++ ; jj++ ;
+      }
+  arrayMax (aaa) = jj ;
+  return jj ;
+} /* doubleIntronsCompress */
+
+/**************************************************************/
+
 void saIntronsCumulate (PP *pp, BB *bb) 
 {
   Array aaa = pp->confirmedIntrons, aa = bb->confirmedIntrons ;
@@ -99,7 +151,24 @@ void saIntronsCumulate (PP *pp, BB *bb)
       confirmedIntronsCompress (aaa) ;
     }
   return ;
-} /* confirmedIntronsCumulate */
+} /* saIntronsCumulate */
+
+/**************************************************************/
+
+void saDoubleIntronsCumulate (PP *pp, BB *bb) 
+{
+  Array aaa = pp->doubleIntrons, aa = bb->doubleIntrons ;
+  int iMax = arrayMax (aa) ;
+  
+  if (iMax)
+    {
+      int jj = arrayMax (aaa) ;
+      arrayp (aaa, jj + iMax - 1, DOUBLEINTRON)->n = 0 ; /*  make room */
+      memcpy (arrp (aaa, jj, DOUBLEINTRON), arrp (aa, 0, DOUBLEINTRON), iMax * sizeof (DOUBLEINTRON)) ;
+      doubleIntronsCompress (aaa) ;
+    }
+  return ;
+} /* saDoubleIntronsCumulate */
 
 /**************************************************************/
 
@@ -524,11 +593,23 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       wp->chain = -1 ;
       return ;
     }
-
-
-} /* alignOptimizeIntron */
+} /* saIntronsOptimize */
 
 /**************************************************************/
+/**************************************************************/
+
+static char *flipFeet (char *feet)
+{
+  char buf[6] ;
+  memcpy (buf, feet, 6) ;
+  feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[4]]]] ;
+  feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[3]]]] ;
+  feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[1]]]] ;
+  feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[0]]]] ;
+
+  return feet ;
+}
+  
 /**************************************************************/
 
 static void saIntronStranding (PP *pp, Array aa)
@@ -537,9 +618,10 @@ static void saIntronStranding (PP *pp, Array aa)
   int runMax = dictMax (pp->runDict) + 1 ;
   int nGt_ag[runMax] ;
   int nCt_ac [runMax] ;
-  float s0[runMax], minS = 100 ;
+  float minS = 100 ;
   int run, ii, iMax = arrayMax (aa) ;
-
+  float *s0 = pp->runStranding ;
+  
   memset (nGt_ag, 0, sizeof (nGt_ag)) ;
   memset (nCt_ac, 0, sizeof (nCt_ac)) ;
   
@@ -565,30 +647,19 @@ static void saIntronStranding (PP *pp, Array aa)
 
   if (minS < 70) /* flip needed */
     {
-      char feet[6] ;
       for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
 	{
 	  if (s0[zp->run] < 40)
 	    {  /* flip the whole run */
 	      int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
-
-	      memcpy (feet, zp->feet, 6) ;
-	      zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[4]]]] ;
-	      zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[3]]]] ;
-	      zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[1]]]] ;
-	      zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[0]]]] ;
+	      flipFeet (zp->feet) ;
 	    }
 	  else if (s0[zp->run] < 60)  
-	    {  /* non stranded case, choose for very intron */
+	    {  /* non stranded case, choose for every intron */
 	      if (! strcmp (zp->feet, "ct_ac") || ! strcmp (zp->feet, "ct_gc"))
 		{
 		  int a0 = zp->a1 ; zp->a1 = zp->a2 ; zp->a2 = a0 ;
-
-		  memcpy (feet, zp->feet, 6) ;
-		  zp->feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[4]]]] ;
-		  zp->feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[3]]]] ;
-		  zp->feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[1]]]] ;
-		  zp->feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)feet[0]]]] ;
+		  flipFeet (zp->feet) ;
 		}
 	    }
 	}
@@ -641,14 +712,14 @@ void saIntronsExport (PP *pp, Array aaa)
       long int ii ;
       
       saIntronStranding (pp, aaa) ;
-      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, i (format for one integer), nb of reads supportingt thr intron, number antistrand, intron feet\n") ;
+      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, iit (format for 2 integers 1 text), nb of reads supportingt the intron, number antistrand, intron feet\n") ;
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
 	       ) ;
       aceOutf (ao, "Inron\tRun\tiit\rn\tnA\tfeet\n") ;
       for (ii = 0, up = arrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
 	{
-	  int min = 0 ;
+	  int min = 3 ;
 	  if (! up->feet[0])
 	    continue ;
 	  else if (!strcmp (up->feet, "gt_ag"))
@@ -669,5 +740,73 @@ void saIntronsExport (PP *pp, Array aaa)
 } /* saIntronsExport */
 
 /**************************************************************/
+
+void saDoubleIntronsExport (PP *pp, Array aaa)
+{
+  int iMax = aaa ? doubleIntronsCompress (aaa) : 0 ;
+  float *s0 = pp->runStranding ;
+  
+  if (iMax)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (pp->outFileName, ".double_introns.tsf", 0, h) ;
+      DOUBLEINTRON *up ;
+      long int ii ;
+      
+
+      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2__b1_b2,  run, iitt (format for 2 integers 2 texts), nb of reads supportingt the intron, number antistrand, intron feet\n") ;
+      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
+	       aceOutFileName (ao)
+	       ) ;
+      aceOutf (ao, "Inron\tRun\tiit\rn\tnA\tfeet\n") ;
+      for (ii = 0, up = arrp (aaa, ii, DOUBLEINTRON) ; ii < iMax ; ii++, up++)
+	{
+	  int min = 2 ;
+	  if (! up->feet1[0])
+	    continue ;
+	  if (s0[up->run] < 40 || /* flip whole run */
+	      (s0[up->run] < 40 && (! strcmp (up->feet1, "ct_ac") || ! strcmp (up->feet2, "ct_ac")))
+	      ) /* flip needed */
+	    {
+	      if (!strcmp (up->feet1, "ct_ac") && !strcmp (up->feet2, "ct_ac"))
+		min = 1 ;
+	      else if (!strcmp (up->feet1, "ct_gc") && !strcmp (up->feet2, "ct_ac"))
+		min = 1 ;
+	      else if (!strcmp (up->feet1, "ct_ac") && !strcmp (up->feet2, "ct_gc"))
+		min = 1 ;
+	      if (up->n >= min || up->nR >= min)
+		aceOutf (ao, "%s__%d_%d__%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
+			 , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->b2, up->b1, up->a2, up->a1
+			 , dictName (pp->runDict, up->run)
+			 , up->nR, up->n
+			 , flipFeet (up->feet2)
+			 , flipFeet (up->feet1)
+			 ) ;
+	    }
+	  else 
+	    {
+	      if (!strcmp (up->feet1, "gt_ag") && !strcmp (up->feet2, "gt_ag"))
+		min = 1 ;
+	      else if (!strcmp (up->feet1, "gc_ag") && !strcmp (up->feet2, "gt_ag"))
+		min = 1 ;
+	      else if (!strcmp (up->feet1, "gt_ag") && !strcmp (up->feet2, "gc_ag"))
+		min = 1 ;
+	      if (up->n >= min || up->nR >= min)
+		aceOutf (ao, "%s__%d_%d__%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
+			 , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2, up->b1, up->b2
+			 , dictName (pp->runDict, up->run)
+			 , up->n, up->nR
+			 , up->feet1
+			 , up->feet2
+			 ) ;
+	    }
+	}
+      
+      ac_free (h) ;
+    }
+} /* saDoubleIntronsExport */
+
 /**************************************************************/
 /**************************************************************/
+/**************************************************************/
+

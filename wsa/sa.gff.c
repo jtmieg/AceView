@@ -13,22 +13,40 @@
  * the parsing the gff annotations 
 
  */
+/* #define ARRAY_CHECK */
 
 #include "sa.h"
 
 /**************************************************************/
 /**************************************************************/
 
-static int exonOrder (const void *va, const void *vb)
+static int exonMrnaOrder (const void *va, const void *vb)
 {
-  const CW *up = va ;
-  const CW *vp = vb ;
+  const EXONINTRON *up = va ;
+  const EXONINTRON *vp = vb ;
   int n ;
-  n = (up->seed > vp->seed) - (up->seed < vp->seed) ; if (n) return n ;
-  n = up->nam - vp->nam ; if (n) return n ;
-  n = (up->pos > vp->pos) - (up->pos < vp->pos) ; if (n) return n ;
+  n = up->gene - vp->gene ; if (n) return n ;
+  n = up->mrna - vp->mrna ; if (n) return n ;
+  n = up->chrom - vp->chrom; if (n) return n ;
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  n = up->a2 - vp->a2 ; if (n) return n ;
   return 0 ;
-} /* exonOrder */
+} /* exonMrnaOrder */
+
+/**************************************************************/
+
+static int exonA1Order (const void *va, const void *vb)
+{
+  const EXONINTRON *up = va ;
+  const EXONINTRON *vp = vb ;
+  int n ;
+  n = up->chrom - vp->chrom; if (n) return n ;
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  n = up->a2 - vp->a2 ; if (n) return n ;
+  n = up->gene - vp->gene ; if (n) return n ;
+  n = up->mrna - vp->mrna ; if (n) return n ;
+  return 0 ;
+} /* exonMrnaOrder */
 
 /**************************************************************/
 
@@ -43,10 +61,10 @@ static int a1GeneOrder (const void *va, const void *vb)
   n = up->gene - vp->gene ; if (n) return n ;
 
   return 0 ;
-} /* exonOrder */
+} /* a1GeneOrder */
 
 /**************************************************************/
-
+#ifdef JUNK
 static int geneA1Order (const void *va, const void *vb)
 {
   const GENE *up = va ;
@@ -58,17 +76,17 @@ static int geneA1Order (const void *va, const void *vb)
   n = up->a2 - vp->a2 ; if (n) return n ;
 
   return 0 ;
-} /* exonOrder */
-
+} /* geneA1Order */
+#endif
 /**************************************************************/
 /**************************************************************/
 
 long int saGffParser (PP *pp, TC *tc)
 {
   AC_HANDLE h = ac_new_handle () ;
-  long int nnE = 0, nnI = 0 ;
+  long int nnE = 0, nnI = 0, nnEX = 0 ;
   ACEIN ai = aceInCreate (tc->fileName, 0, h) ;
-  int chrom = 0, mrna = 0 ;
+  int chrom = 0, gene = 0, mrna = 0 ;
   int a1, a2 ;
   int line = 0 ;
   BB *bbG = &(pp->bbG) ;
@@ -76,8 +94,19 @@ long int saGffParser (PP *pp, TC *tc)
   BOOL isGff = FALSE ;
   BOOL isGtf = FALSE ;
   BOOL isIntrons = FALSE ;
-  DICT *mrnaDict = dictHandleCreate (100000, h) ;
+  DICT *chromDict = bbG->dict ;
+  DICT *geneDict = pp->geneDict ;
+  DICT *mrnaDict = pp->mrnaDict ;
 
+  if (! geneDict) geneDict = pp->geneDict = dictHandleCreate (1 << 15, pp->h) ;
+  if (! mrnaDict) mrnaDict = pp->mrnaDict = dictHandleCreate (1 << 15, pp->h) ;
+
+  if (! pp->knownIntrons)   pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
+  if (! pp->knownExons) pp->knownExons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
+
+  if (! pp->geneBoxes) pp->geneBoxes = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
+  if (! pp->geneExons) pp->geneExons = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
+  
   if (1)
     {
       const char *cp = tc->fileName ;
@@ -98,19 +127,20 @@ long int saGffParser (PP *pp, TC *tc)
 		      , cp, pp->tConfigFileName ) ;
     }
 
-  if (isIntrons)
-    return saIntronParser (pp, tc) ;
-  
   if (pp->seedLength < 16)
     messcrash ("\nSorry, to study the introns defined in file %s,\n the seed length must be at least 16, not %d\n"
 	       , aceInFileName (ai)
 	       , pp->seedLength
 	       ) ;
-  if (! pp->intronSeeds)   pp->intronSeeds = bigArrayHandleCreate (100000, CW, pp->h) ;
-  if (! pp->exonSeeds) pp->exonSeeds = bigArrayHandleCreate (100000, CW, pp->h) ;
 
-  nnE = bigArrayMax (pp->exonSeeds) ;
-  nnI = bigArrayMax (pp->intronSeeds) ;
+  if (isIntrons)
+    return saIntronParser (pp, tc) ;
+  
+  if (! pp->knownIntrons)   pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
+  if (! pp->knownExons) pp->knownExons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
+
+  nnE = bigArrayMax (pp->knownExons) ;
+  nnI = bigArrayMax (pp->knownIntrons) ;
     
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai))
@@ -137,7 +167,6 @@ long int saGffParser (PP *pp, TC *tc)
       cp = aceInWord (ai) ;  /* type */
       type = 0 ;
       if (! strcasecmp (cp, "exon")) type = 1 ;
-      else if (! strcasecmp (cp, "intron")) type = 2 ;
       if (! type) continue ;
   
 
@@ -188,88 +217,171 @@ long int saGffParser (PP *pp, TC *tc)
 	      ac_free (h1) ;
 	    }
 	}
+      gene = 0 ;
+      if (type == 1) /* identify the gene */
+	{ /* expect : transcript_id "NM_001364814.1"; */
+	  char *cq = strstr (cp, "gene_id") ;
+	  if (cq)
+	    {
+	      AC_HANDLE h1 = ac_new_handle () ;
+	      ACEIN aj = aceInCreateFromText (cq + 7, 0, h1) ;
+	      aceInCard (aj) ;
+	      char *cr = aceInWord (aj) ;
+	      if (cr)
+		dictAdd (geneDict, cr, &gene) ;
+	      ac_free (h1) ;
+	    }
+	}
       
       if (type == 1)
 	{
-	  CW *up = bigArrayp (pp->exonSeeds, nnE++, CW) ;
-	  up->seed = mrna ;
-	  up->nam = chrom ;
-	  up->pos = a1 ;
-	  up->intron = a2 ;
+	  EXONINTRON *up = bigArrayp (pp->knownExons, nnE++, EXONINTRON) ;
+	  up->gene = gene ;
+	  up->mrna = mrna ;
+	  up->chrom = chrom ;
+	  up->a1 = a1 ;
+	  up->a2 = a2 ;
 	}
 
-      if (type == 22222)
-	{
-	  int da = (a1 < a2 ? a2 - a1 + 1 : a1 - a2 + 1) ;
-	  if (da >= twoMb) /* our format only allows 21 bits for the intron length */ 
-	    continue ;
-	  CW *up = bigArrayp (pp->intronSeeds, nnI++, CW) ;
-	  up->seed = 0 ;
-	  up->nam = chrom ;
-	  up->pos = a1 ;
-	  up->intron = a2 ;
-	}
     }
 
   if (nnE) /* create the corresponding introns */
     {
-      CW *up, *vp ;
+      EXONINTRON *up, *vp ;
       long int ii, jj ;
 
-      bigArraySort (pp->exonSeeds, exonOrder) ;
-      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
-	if (up->seed)
+      bigArraySort (pp->knownExons, exonMrnaOrder) ;
+      for (up = bigArrp (pp->knownExons, 0, EXONINTRON), ii = 0 ; ii < nnE ; ii++, up++)
+	if (up->mrna)
 	  {
-	    for (vp = up + 1, jj = ii + 1 ; jj < nnE && vp->seed == up->seed ; vp++, jj++) 
+	    for (vp = up + 1, jj = ii + 1 ; jj < nnE && vp->mrna == up->mrna ; vp++, jj++) 
 	      {
-		int chrom = up->nam ;
-		int a1 = up->pos < up->intron ? vp[-1].intron + 1 : vp[0].intron - 1 ;
-		int a2 = up->pos < up->intron ? vp[0].pos - 1 : vp[-1].pos + 1 ;
-		fprintf (stderr, "Intron %ld : %d %d\n", nnI, a1, a2) ;
+		int chrom = up->chrom ;
+		int a1 = up->a1 < up->a2 ? vp[-1].a2 + 1 : vp[0].a2 - 1 ;
+		int a2 = up->a1 < up->a2 ? vp[0].a1 - 1 : vp[-1].a1 + 1 ;
+		int da = a1 < a2 ? a2 - a1 + 1 : a1 - a2 + 1 ;
+		if (0)
+		  fprintf (stderr, "Intron %ld : %d %d\n", nnI, a1, a2) ;
+		if (da >= twoMb) /* our format only allows 21 bits for the intron length */ 
+		  continue ;
 
-		CW *wp = bigArrayp (pp->intronSeeds, nnI++, CW) ;
-		wp->seed = 0 ;
+		EXONINTRON *wp = bigArrayp (pp->knownIntrons, nnI++, EXONINTRON) ;
+		wp->mrna = 0 ;
+		wp->gene = up->gene ;
 		if (a1 < a2)
 		  {
-		    wp->nam = chrom << 1 ; 
-		    wp->pos = a1 ;
-		    wp->intron = a2 ;
+		    wp->chrom = chrom << 1 ; 
+		    wp->a1 = a1 ;
+		    wp->a2 = a2 ;
 		  }
 		else
 		  {
-		    wp->nam = (chrom << 1) | 0x1 ;
-		    wp->pos = a2 ;
-		    wp->intron = a1 ;
+		    wp->chrom = (chrom << 1) | 0x1 ;
+		    wp->a1 = a2 ;
+		    wp->a2 = a1 ;
 		  }
-		vp->seed = 0 ;
+		vp->mrna = 0 ;
 	      }
-	    up->seed = 0 ;
+	    up->mrna = 0 ;
 	  }
+      bigArraySort (pp->knownIntrons, exonA1Order) ;
+      bigArrayCompress (pp->knownIntrons) ;
+      nnI = bigArrayMax (pp->knownIntrons) ;
+    }
+
+
+  if (nnE) /* construct the gene expression shadows */
+    {
+      EXONINTRON *up ;
+      GENE *gb, *ge ;
+      long int ii ;
+      
+      fprintf (stderr, "max knownExons = %ld\n", nnE) ;
+      bigArraySort (pp->knownExons, exonMrnaOrder) ;
+      fprintf (stderr, "max knownExons = %ld\n", nnE) ;
+      bigArrayCompress (pp->knownExons) ;
+      nnE = bigArrayMax (pp->knownExons) ;
+      fprintf (stderr, "max knownExons = %ld\n", nnE) ;
+      
+      for (up = bigArrp (pp->knownExons, 0, EXONINTRON), ii = 0 ; ii < nnE ; ii++, up++)
+	{
+	  gene = up->gene ;
+	  chrom = up->chrom ;
+	  a1 = up->a1 ;
+	  a2 = up->a2 ;
+	  if (a1 < a2)
+	    {
+	      chrom = chrom << 1 ; 
+	    }
+	  else
+	    {
+	      chrom = (chrom << 1) | 0x1 ;
+	      int a0 = a1 ; a1 = a2 ; a2 = a0 ;
+	    }
+
+	  if  (gene)
+	    {
+	      Array geneBoxes = array (pp->geneBoxes, chrom, Array) ;
+	      Array geneExons = array (pp->geneExons, chrom, Array) ;
+	      if (! geneBoxes) geneBoxes = array (pp->geneBoxes, chrom, Array) = arrayHandleCreate (1000, GENE, pp->h) ;
+	      if (! geneExons) geneExons = array (pp->geneExons, chrom, Array) = arrayHandleCreate (1000, GENE, pp->h) ;
+	      
+	      /* register a geneBox */
+	      gb = arrayp (geneBoxes, gene, GENE) ;
+	      gb->gene = gene ;
+	      gb->a1 = (! gb->a1 || gb->a1 > a1) ? a1 : gb->a1 ;
+	      gb->a2 = (! gb->a2 || gb->a2 < a2) ? a2 : gb->a2 ;
+	      
+	      /* register a geneExon */
+	      ge = arrayp (geneExons, nnEX++, GENE) ;
+	      ge->gene = gene ;
+	      ge->a1 = a1 ;
+	      ge->a2 = a2 ;
+	    }
+	}
+    }
+
+  /* sort the gene boxes */
+  if (nnE)
+    {
+      for (int chrom = 0 ; chrom < arrayMax (pp->geneBoxes) ; chrom++)
+	{
+	  Array geneBoxes = array (pp->geneBoxes, chrom, Array) ;
+	  if (geneBoxes)
+	    arraySort (geneBoxes, a1GeneOrder) ;
+	}
+      for (int chrom = 0 ; chrom < arrayMax (pp->geneExons) ; chrom++)
+	{
+	  Array geneExons = array (pp->geneExons, chrom, Array) ;
+	  if (geneExons)
+	    arraySort (geneExons, a1GeneOrder) ;
+	}
     }
   
   if (nnE) /* fuse exons by projection on the top strand of the genome */
     {
-      CW *up, *vp ;
+      EXONINTRON *up, *vp ;
       long int ii, jj ;
 
-      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
-	if (up->pos > up->intron)
-	  { int a0 = up->pos ; up->pos = up->intron ; up->intron = a0 ; }
-      bigArraySort (pp->exonSeeds, exonOrder) ;
-      for (up = vp = bigArrp (pp->exonSeeds, 0, CW), ii = jj = 0 ; ii < nnE ; ii++, up++)
+      for (up = bigArrp (pp->knownExons, 0, EXONINTRON), ii = 0 ; ii < nnE ; ii++, up++)
+	if (up->a1 > up->a2)
+	  { int a0 = up->a1 ; up->a1 = up->a2 ; up->a2 = a0 ; }
+      bigArraySort (pp->knownExons, exonA1Order) ;
+      for (up = vp = bigArrp (pp->knownExons, 0, EXONINTRON), ii = jj = 0 ; ii < nnE ; ii++, up++)
 	{
-	  if (up->nam == vp->nam && up->pos <= vp->intron)
+	  if (up->chrom == vp->chrom && up->a1 <= vp->a2 + 1)
 	    {
-	      if (up->intron > vp->intron)
-		vp->intron = up->intron ;
+	      if (up->a2 > vp->a2)
+		vp->a2 = up->a2 ;
 	      continue ;
 	    }
 	  if (jj < ii) *vp = *up ;
 	  jj++ ; vp++ ;
 	}
-      bigArrayMax (pp->exonSeeds) = jj ;
-      for (up = bigArrp (pp->exonSeeds, 0, CW), ii = 0 ; ii < nnE ; ii++, up++)
-	fprintf (stderr, "Exon %ld : %d %d\n", ii, up->pos, up->intron) ;
+      bigArrayMax (pp->knownExons) = jj ;
+      if (0)
+	for (up = bigArrp (pp->knownExons, 0, EXONINTRON), ii = 0 ; ii < nnE ; ii++, up++)
+	  fprintf (stderr, "Exon %ld : %d %d\n", ii, up->a1, up->a2) ;
     }
 
   fprintf (stderr, "+++++++ Found %ld exons %ld introns in file %s\n", nnE, nnI, aceInFileName (ai)) ;
@@ -296,8 +408,8 @@ long int saIntronParser (PP *pp, TC *tc)
 	       , aceInFileName (ai)
 	       , pp->seedLength
 	       ) ;
-  pp->intronSeeds = bigArrayHandleCreate (100000, CW, pp->h) ;
-  CW *up ;
+  pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
+  EXONINTRON *up ;
 
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai))
@@ -324,18 +436,18 @@ long int saIntronParser (PP *pp, TC *tc)
       da = (a1 < a2 ? a2 - a1 + 1 : a1 - a2 + 1) ;
       if (da >= twoMb) /* our format only allows 21 bits for the intron length */ 
 	continue ;
-      up = bigArrayp (pp->intronSeeds, nn++, CW) ;
+      up = bigArrayp (pp->knownIntrons, nn++, EXONINTRON) ;
       if (a1 < a2)
 	{
-	  up->nam = chrom << 1 ; 
-	  up->pos = a1 ;
-	  up->intron = a2 ;
+	  up->chrom = chrom << 1 ; 
+	  up->a1 = a1 ;
+	  up->a2 = a2 ;
 	}
       else
 	{
-	  up->nam = (chrom << 1) | 0x1 ;
-	  up->pos = a2 ;
-	  up->intron = a1 ;
+	  up->chrom = (chrom << 1) | 0x1 ;
+	  up->a1 = a2 ;
+	  up->a2 = a1 ;
 	}
 	
     }
@@ -344,258 +456,6 @@ long int saIntronParser (PP *pp, TC *tc)
 
   return nn ;
 } /* saIntronParser */
-
-/**************************************************************/
-
-static int saSpongeParserDo (PP *pp, const char *filNam)
-{
-  AC_HANDLE h = ac_new_handle () ;
-  int nnnE = 0, nnnB = 0 ;
-  ACEIN ai = aceInCreate (filNam, 0, h) ;
-  int mrna, gene, exon, chrom ;
-  int oldMrna, oldGene, oldExon, oldChrom ;
-  int a1, a2, da, b2 ;
-  int line = 0 ;
-  int nnES, nnI, nnE ;
-  CW *up ; ;
-  GENE *gb, *ge ;
-  BB *bbG = &(pp->bbG) ;
-  Array geneBoxes = 0, geneExons = 0 ;
-  DICT *chromDict = bbG->dict ;
-  DICT *geneDict = pp->geneDict ;
-  DICT *mrnaDict = pp->mrnaDict ;
-  const int twoMb = (0x1 << 21) ;
-  
-  if (! geneDict) geneDict = pp->geneDict = dictHandleCreate (1 << 15, pp->h) ;
-  if (! mrnaDict) mrnaDict = pp->mrnaDict = dictHandleCreate (1 << 15, pp->h) ;
-
-  if (! pp->intronSeeds)   pp->intronSeeds = bigArrayHandleCreate (100000, CW, pp->h) ;
-  if (! pp->exonSeeds) pp->exonSeeds = bigArrayHandleCreate (100000, CW, pp->h) ;
-
-  if (! pp->geneBoxes) pp->geneBoxes = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
-  if (! pp->geneExons) pp->geneExons = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
-
-  
-  nnES = bigArrayMax (pp->exonSeeds) ;
-  nnI = bigArrayMax (pp->intronSeeds) ;
-  nnE = bigArrayMax (pp->geneExons) ;
-
-  
-  
-  aceInSpecial (ai, "\n") ;
-  while (aceInCard (ai))
-    {
-      char *cp = aceInWord (ai) ;
-      line++ ;
-      if (! cp || *cp == '#')
-	continue ;
-      mrna = chrom = gene = exon = 0 ; a1 = a2 = 0 ;
-
-      dictAdd (mrnaDict, cp, &mrna) ;
-
-      aceInStep (ai, '\t') ;
-      aceInInt (ai, &exon) ;
-
-      aceInStep (ai, '\t') ;
-      cp = aceInWord (ai) ;
-      if (! cp || *cp == '#')
-	continue ;
-      
-      if (! dictFind (bbG->dict, hprintf (h, "G.%s", cp), &chrom) &&
-	  ! dictFind (bbG->dict, hprintf (h, "M.%s", cp), &chrom) &&
-	  ! dictFind (bbG->dict, hprintf (h, "R.%s", cp), &chrom) &&
-	  ! dictFind (bbG->dict, hprintf (h, "C.%s", cp), &chrom) 
-	  )
-	messcrash ("\nUnknown chromosome name %s, not matching the G targets, at line %d of file %s\n"
-		   , cp
-		   , line
-		   , aceInFileName (ai)
-		   ) ;
-
-      aceInStep (ai, '\t') ;
-      aceInInt (ai, &a1) ;
-      aceInStep (ai, '\t') ;
-      aceInInt (ai, &a2) ;
-      if (!a1 || !a2 || a1 == a2)
-	continue ;
-      chrom <<= 1 ;
-      if (a1 > a2) { int a0 = a1 ; a1 = a2 ; a2 = a0 ; chrom |= 0x1 ;}
-      da = a2 - a1 + 1 ;
-      geneBoxes = array (pp->geneBoxes, chrom, Array) ;
-      geneExons = array (pp->geneExons, chrom, Array) ;
-      if (! geneBoxes) geneBoxes = array (pp->geneBoxes, chrom, Array) = arrayHandleCreate (1000, GENE, pp->h) ;
-      if (! geneExons) geneExons = array (pp->geneExons, chrom, Array) = arrayHandleCreate (1000, GENE, pp->h) ;
-      
-
-      aceInStep (ai, '\t') ;
-      cp = aceInWord (ai) ;
-      if (! cp || *cp == '#')
-	continue ;
-
-      dictAdd (geneDict, cp, &gene) ;
-
-      /* register intronSeeds */
-      if (mrna == oldMrna && oldGene == gene && oldChrom == chrom && oldExon + 1 == exon)
-	if (da < twoMb) /* our format only allows 21 bits for the intron length */ 
-	  { /* register  intronSeeds */
-	    int u1 = b2 + 1 ;
-	    int u2 = a1 - 1 ;
-	    int da =  u2 - u1 + 1 ;
-	    
-	    if (da > 3 && da < twoMb) /* our format only allows 21 bits for the intron length */ 
-	      {
-		up = bigArrayp (pp->intronSeeds, nnI++, CW) ;
-		up->nam = chrom ;
-		up->pos = u1 ;
-		up->intron = u2 ;
-	      }
-	  }
-
-      /* register exonSeeds */
-      up = bigArrayp (pp->exonSeeds, nnES++, CW) ;
-      up->nam = chrom ;
-      up->pos = a1 ;
-      up->intron = a2 ;
-
-      /* register a geneBox */
-      gb = arrayp (geneBoxes, gene, GENE) ;
-      gb->gene = gene ;
-      gb->a1 = (! gb->a1 || gb->a1 > a1) ? a1 : gb->a1 ;
-      gb->a2 = (! gb->a2 || gb->a2 < a2) ? a2 : gb->a2 ;
-
-      /* register a geneExon */
-      ge = arrayp (geneExons, nnE++, GENE) ;
-      ge->gene = gene ;
-      ge->a1 = a1 ;
-      ge->a2 = a2 ;
-
-      oldMrna = mrna ;
-      oldGene = gene ;
-      oldChrom = chrom ;
-      oldExon = exon ;
-      b2 = a2 ;
-    }
-
-  for (chrom = 0 ; chrom < arrayMax (pp->geneBoxes) ; chrom++)
-    {
-      geneBoxes = array (pp->geneBoxes, chrom, Array) ;
-      geneExons = array (pp->geneExons, chrom, Array) ;
-
-      
-      if (geneBoxes)
-	{
-	  int ii, jj, iMax = arrayMax (geneBoxes) ;
-	  GENE *gb, *gb2 ;
-
-	  arraySort (geneBoxes, geneA1Order) ;
-	  
-	  gb = gb2 = arrp (geneBoxes, 0, GENE) ;
-	  for (ii = 0, jj = 0 ; ii < iMax ; ii++, gb++)
-	    {
-	      if (gb->gene)
-		{
-		  if (gb2->gene != gb->gene)
-		    {
-		      if (gb2->gene) { gb2++ ; jj++ ;}
-		      if (gb2 != gb) *gb2 = *gb ;
-		    }
-		  else
-		    {
-		      gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
-		      gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
-		    }
-		}
-	    }
-	  arrayMax (geneBoxes) = jj + 1 ;
-	  arraySort (geneBoxes, a1GeneOrder) ;
-
-	  nnnB += arrayMax (geneBoxes) ;
-	}
-
-      if (geneExons)
-	{
-	  int ii, jj, iMax = arrayMax (geneExons) ;
-	  GENE *gb, *gb2 ;
-
-	  arraySort (geneExons, geneA1Order) ;
-
-	  gb = gb2 = arrp (geneExons, 0, GENE) ;
-	  for (ii = 0, jj = 0 ; ii < iMax ; ii++, gb++)
-	    {
-	      if (gb->gene)
-		{
-		  if (gb2->gene != gb->gene || gb->a1 > gb2->a2 + 1)
-		    {
-		      if (gb2->gene) { gb2++ ; jj++ ;}
-		      if (gb2 != gb) *gb2 = *gb ;
-		    }
-		  else
-		    {
-		      gb2->a1 = (gb2->a1 < gb->a1 ? gb2->a1 : gb->a1) ;
-		      gb2->a2 = (gb2->a2 > gb->a2 ? gb2->a2 : gb->a2) ;
-		    }
-		}
-	    }
-	  arrayMax (geneExons) = jj + 1 ;
-
-	  arraySort (geneExons, a1GeneOrder) ;
-	  
-	  nnnE += arrayMax (geneExons) ;
-	}
-
-    }
-
-
-  fprintf (stderr, "+++++++ Found %d genes %d projected exons in file %s\n", nnnB, nnnE, filNam) ;
-  ac_free (h) ;
-
-  return nnnB ;
-} /* saSpongeParserDo */
-
-/**************************************************************/
-
-int saSpongeParser (PP *pp, TC *tc)
-{
-  return saSpongeParserDo (pp, tc->fileName) ;
-} /* saSpongeParser */
-
-/**************************************************************/
-
-int saSpongeParserDirect (PP *pp)
-{
-  AC_HANDLE h = ac_new_handle () ;
-  char *fNam = hprintf (h, "%s/tConfig", pp->indexName) ;
-  char *cp = filName (fNam, 0, "r") ;
-
-  if (cp)
-    {
-      ACEIN ai = aceInCreate (cp, 0, h) ;
-      
-      if (ai)
-	{
-	  aceInSpecial (ai, "\n") ;
-	  
-	  while (aceInCard (ai))
-	    {
-	      char *cp = aceInWord (ai) ;
-	      if (! cp || *cp == '#')
-		continue ;
-	      if (*cp == 'I')
-		{
-		  
-		}
-	    }
-	}
-    }
-
-  if (pp->tFileSpongeFileNameF)
-    saSpongeParserDo (pp, pp->tFileSpongeFileNameF) ;
-  if (pp->tFileSpongeFileNameR)
-    saSpongeParserDo (pp, pp->tFileSpongeFileNameR) ;
-
-  ac_free (h) ;
-  return 0 ;
-} /* saSpongeParserDirect */
 
 /**************************************************************/
 /**************************************************************/

@@ -364,27 +364,6 @@ int saConfigCheckTargetIndex (PP *pp)
   else
     ok = FALSE ;
 
-  cp = filName (pp->indexName, "/tConfig", "r") ;
-  ai = cp ? aceInCreate (cp, 0, h) : 0 ;
-  if (ai)
-    {
-      aceInSpecial (ai, "\n") ;
-      while (aceInCard (ai))
-	{
-	  cp = aceInWord (ai) ;
-	  if (cp && ! strcmp (cp, "S"))
-	    {
-	      aceInStep (ai, '\t') ;
-	      cp = aceInWord (ai) ;
-	      if (1 && cp && strstr (cp, ".f.sponge"))
-		pp->tFileSpongeFileNameF = strnew (cp, pp->h) ;
-	      if (1 && cp && strstr (cp, ".r.sponge"))
-		pp->tFileSpongeFileNameR = strnew (cp, pp->h) ;
-	    }
-	}
-      ac_free (ai) ;
-    }
-
   cp = filName (pp->indexName, "/dna.sortali", "rb") ;
   if (cp)
     pp->tFileBinaryDnaName = strnew (cp, pp->h) ;

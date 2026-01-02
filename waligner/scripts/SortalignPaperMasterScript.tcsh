@@ -56,12 +56,18 @@ setenv SV v47.dec9        # no wiggle, no sam, removd enhanced exon seds, comple
 setenv SVlast v47.dec9
 setenv SV v48.dec10        # same with wiggle
 setenv SVlast v48.dec10
+setenv SV v50.jan1
+setenv SVlast v50.jan1
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
+  touch bin/wsa.$SV.toto
+  \rm -rf bin/wsa.$SV*
+  mkdir bin/wsa.$SV
+  cp ~/ace/wsa/sa.[ch] bin/wsa.$SV
 endif
 
-setenv NOINTRONSEEDS 1
+setenv NOINTRONSEEDS 0
 setenv seedLength 18
 setenv maxTargetRepeats 81
 setenv maxTargetRepeats 31
@@ -205,7 +211,7 @@ setenv runs "$allRuns  $monkeyRuns"
 # setenv runs "B_ROCR3_PacBio-F3"
 
 # to create all IDX use these runs
-if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1"
+if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1 WormSRR548309 "
 # setenv runs "RNA_PolyA_B_1"
 # setenv runs "ChipSeq1 ChipSeq2"
 # setenv runs "ChipSeq1"

@@ -21,8 +21,9 @@
  * identify their absolute file names
  * associate each file to a target class and to its optional parameters
  */
-static Array saTargetParseConfig (PP *pp)
+Array saTargetParseConfig (PP *pp)
 {
+  const char *tConfigFileName = pp->createIndex ? pp->tConfigFileName : hprintf (pp->h, "%s/tConfig", pp->indexName) ;
   Array tcs = arrayHandleCreate (64, TC, pp->h) ;
   TC *tc = 0 ;
   int nn = 0 ;
@@ -47,11 +48,11 @@ static Array saTargetParseConfig (PP *pp)
       if (pp->raw) tc->format = RAW ;
       if (pp->fasta) tc->format = FASTA ;
     }
-  else if (pp->tConfigFileName)
+  else if (tConfigFileName)
     {
       AC_HANDLE h = ac_new_handle () ;
       DICT *fDict = dictHandleCreate (64, h) ;
-      ACEIN ai = aceInCreate (pp->tConfigFileName, 0, h) ;
+      ACEIN ai = aceInCreate (tConfigFileName, 0, h) ;
       int nn = 0, line = 0 ;
 
       while (aceInCard (ai))
@@ -68,11 +69,18 @@ static Array saTargetParseConfig (PP *pp)
 	  if (!(cc >= 'A' && cc <= 'Z')) cc = 0 ;
 	  if (cp[1]) cc = 0 ;
 	  if (! cc)
-	    messcrash ("\n\nThe target class must be specified as a single character (A-Z), not %s,  at line %d of -T target config file %s\n try sortalign --help\n"
+	    messcrash ("\n\nThe target class must be specified as a single character (A-Z), not %s,  at line %d of -T target config file %s\n Please try sortalign --help\n"
 		       , cp
 		       , line
 		       , pp->tConfigFileName
 		       ) ;
+	  if (! strchr ("GMCREAIBV", cc))
+	    messcrash ("\n\nThe target class must be specified as a single character [GMCREAIBV], not %c,  at line %d of -T target config file %s\n Please try sortalign --help\n"
+		       , cc
+		       , line
+		       , pp->tConfigFileName
+		       ) ;
+	    
 	  tc = arrayp (tcs, nn++, TC) ;
 	  tc->targetClass = cc ;
 	  /* file names */
@@ -245,7 +253,7 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 	  int m, n = 0, nI = 0, nX = 0 ;
 	  wp = up ;
 
-	  if (maxRepeats && pp->exonSeeds)
+	  if (maxRepeats && pp->knownExons)
 	    {
 	      while (wp < upMax && wp->seed == up->seed)
 		{
@@ -261,10 +269,6 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 	    }
 	  n = wp - up ;
 	  
-	  int nnX = n < (1<<16) ? n : (1<<16) - 1 ;
-	  nnX += nX ;
-	  if (0 && kk == 1 && up->seed == 185667857)
-	    fprintf (stderr, "seed 185667857 kk=%d n=%d, nX=%d, nI=%d\n", kk, n, nX, nI) ;
 
 	  if (!maxRepeats || n < maxRepeats)
 	    {
@@ -279,8 +283,6 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 	    }
 	  else if (nI && nI < maxRepeats)  /* was nX < maxRepeats, but we stall on the RefEq XR */
 	    {
-	      int nnX = n < (1<<16) ? n : (1<<16) - 1 ;
-	      nnX += nX ;
 	      for (wp = up, m = 0 ; m < n ; wp++, m++)
 		{
 		  nI = ((wp->intron >> 31) & 0x1) ? 1 : 0 ;
@@ -364,9 +366,10 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 /* parse, code, sort the genome and create the index on disk
  * the human index takes around 18 GigaBytes
  */
-static long int saTargetIndexCreateDo (PP *pp, Array tArray)
+static long int saTargetIndexCreateDo (PP *pp)
 {
   AC_HANDLE h = ac_new_handle () ;
+  Array tArray = pp->tArray ;
   BigArray cwsN[pp->nIndex] ;
   int nMax = arrayMax (tArray) ;
   TC *tc = 0 ;
@@ -443,16 +446,8 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
     {
       tc = arrayp (tArray, nn, TC) ;
 
-      if (tc->targetClass == 'I')
-	saGffParser (pp, tc) ;
-    }
-  
-  for (int nn = 0 ; nn < nMax ; nn++)
-    {
-      tc = arrayp (tArray, nn, TC) ;
-
       if (tc->targetClass == 'S')
-	{ continue ; saSpongeParser (pp, tc) ; }
+	messcrash ("\n Unrecognized class S in traget configuration, please try sortalign --help") ;
     }
   
   t2 = clock () ;
@@ -468,8 +463,7 @@ static long int saTargetIndexCreateDo (PP *pp, Array tArray)
   t1 = clock () ;
   printf ("%s : extract the target seeds\n" , timeBufShowNow (tBuf)) ;
   saCodeSequenceSeeds (pp, bbG, pp->tStep, TRUE) ;
-  saSpongeParserDirect (pp) ;
-  if (pp->intronSeeds)
+  if (pp->knownIntrons)
     saCodeIntronSeeds (pp, bbG) ;
   int NN = pp->nIndex ;
   for (int k = 0 ; k < NN ; k++)
@@ -539,10 +533,9 @@ void saTargetIndexCreate (PP *pp)
 {
   AC_HANDLE h = ac_new_handle () ;
   /* check that input files were provided */
-  Array tArray = saTargetParseConfig (pp) ;
 
   pp->tMaxTargetRepeats = pp->maxTargetRepeats ;
-  saTargetIndexCreateDo (pp, tArray) ;
+  saTargetIndexCreateDo (pp) ;
 
   /* create short utility files in the IDX index directory */
   ACEOUT ao = aceOutCreate (filName (pp->indexName, "/seedLength", "w") , 0, 0, h) ;
@@ -713,6 +706,8 @@ void saTargetIndexGenomeParser (const void *vp)
   memset (&bbG, 0, sizeof (BB)) ;
   long int nn = genomeParseBinary (pp, &bbG) ;
   t2 = clock () ;
+
+
   saCpuStatRegister ("1.GParserDone" , pp->agent, bbG.cpuStats, t1, t2, nn) ;
   channelPut (pp->gmChan, &bbG, BB) ;
   channelClose (pp->gmChan) ;

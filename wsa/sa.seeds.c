@@ -85,20 +85,20 @@ static void showCws (const PP *pp, BB *bb, BigArray cws)
 
 /**************************************************************/
 
-static int intronOrder (const void *va, const void *vb)
+static int knownIntronOrder (const void *va, const void *vb)
 {
-  const CW *up = va ;
-  const CW *vp = vb ;
+  const EXONINTRON *up = va ;
+  const EXONINTRON *vp = vb ;
   int n ;
 
   /* chrom order */
-  n = up->nam - vp->nam ; if (n) return n ;
-  /* strand order */
-  n = (up->pos > up->intron) - (vp->pos > vp->intron) ; if (n) return n ;
-  /* pos order */
-  n = (up->pos > vp->pos) - (up->pos < vp->pos) ; if (n) return n ;
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  /* strand order is implied by the parity of up->chrom */
+  /* n = (up->a1 > up->a2) - (vp->a1 > vp->a2) ; if (n) return n ; */
+  /* a1 order */
+  n = up->a1 - vp->a1 ; if (n) return n ;
   return 0 ;
-} /* intronOrder */
+} /* knownIntronOrder */
 
 /**************************************************************/
 
@@ -119,28 +119,28 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
   const long unsigned int mask32 = 0xffffffff ; /* 4 bytes integer */
   const long unsigned int maskSeedLn = (1L << 2*wLen) - 1 ;
   const unsigned int mask26 = (1L << 26) - 1 ;
-  BigArray aa = pp->intronSeeds ; 
+  BigArray aa = pp->knownIntrons ;
   long int ii, iMax = bigArrayMax (aa) ;
-  CW *restrict up = 0 ;
+  EXONINTRON *restrict upx = 0 ;
   int chrom = 0, a1, a2, da, v1, v2, dv, w1, w2, dw ;
   Array dna = 0 ;
   BOOL isIntronDown ;
   
-  bigArraySort (aa, intronOrder) ;
+  bigArraySort (aa, knownIntronOrder) ;
   
-  up = iMax ? bigArrp (aa, 0, CW) : 0 ;
-  for (ii = 0 ; ii < iMax ; ii++, up++)
+  upx = iMax ? bigArrp (aa, 0, EXONINTRON) : 0 ;
+  for (ii = 0 ; ii < iMax ; ii++, upx++)
     {
       long unsigned int w, wr ;
       
-      if (up->nam != chrom)
+      if (upx->chrom != chrom)
 	{
-	  chrom = up->nam >> 1 ;
+	  chrom = upx->chrom >> 1 ;
 	  dna = array (dnas, chrom, Array) ;
 	}
 
-      a1 = up->pos ;           /* 1-based Gt_ag position */
-      a2 = up->intron ;        /* 1-based gt_aG position */
+      a1 = upx->a1 ;           /* 1-based Gt_ag position */
+      a2 = upx->a2 ;        /* 1-based gt_aG position */
       isIntronDown = (chrom & 0x1) ? FALSE : TRUE ;
       
       da = a2 - a1 + 1 ;
@@ -151,12 +151,12 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
       v1 = v2 = 0 ; dv = 16 ;
       if (ii > 0)
 	{
-	  CW *restrict vp = up - 1 ;
-	  if (vp->nam == up->nam)
+	  EXONINTRON *restrict vpx = upx - 1 ;
+	  if (vpx->chrom == upx->chrom)
 	    {
-	      if (vp->pos < vp->intron && vp->intron > a1 - 17 && vp->intron < a1)
+	      if (vpx->a1 < vpx->a2 && vpx->a2 > a1 - 17 && vpx->a2 < a1)
 		{
-		  v1 = vp->pos ; v2 = vp->intron ;
+		  v1 = vpx->a1 ; v2 = vpx->a2 ;
 		  dv = a1 - v2 - 1 ; /* length of left exon */
 		}
 	    }
@@ -166,12 +166,12 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
       w1 = w2 = 0 ; dw = 16 ;
       if (ii < iMax - 1)
 	{
-	  CW *restrict wp = up + 1 ;
-	  if (wp->nam == up->nam)
+	  EXONINTRON *restrict wpx = upx + 1 ;
+	  if (wpx->chrom == upx->chrom)
 	    {
-	      if (wp->pos < wp->intron && wp->pos < a2 + 17 && wp->pos > a2)
+	      if (wpx->a1 < wpx->a2 && wpx->a1 < a2 + 17 && wpx->a1 > a2)
 		{
-		  w1 = wp->pos ; w2 = wp->intron ;
+		  w1 = wpx->a1 ; w2 = wpx->a2 ;
 		  dw = w1 - a2 - 1 ; /* length of right exon */
 		}
 	    }
@@ -352,8 +352,8 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   const long unsigned int maskN = NN - 1 ;
   const long unsigned int mask32 = 0xffffffff ; /* 4 bytes integer */
   const long unsigned int maskSeedLn = (1L << 2*wLen) - 1 ;
-  long int icwx = 0, icwxMax = pp->exonSeeds ? bigArrayMax (pp->exonSeeds) : 0 ;
-  CW *cwX = pp->exonSeeds ? bigArrp (pp->exonSeeds, 0, CW) : 0 ;
+  long int icwx = 0, icwxMax = pp->knownExons ? bigArrayMax (pp->knownExons) : 0 ;
+  EXONINTRON *cwX = pp->knownExons ? bigArrp (pp->knownExons, 0, EXONINTRON) : 0 ;
   const int seedLength = pp->seedLength ;
   
   memset (cwsN, 0, sizeof (cwsN)) ;
@@ -460,10 +460,10 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
 	      cw->intron = 0 ;
 	      if (icwxMax)
 		{
-		  for ( ; icwx < icwxMax && cwX->nam < ia ; icwx++, cwX++) ;
-		  for ( ; icwx < icwxMax && cwX->nam == ia && cwX->intron < cw->pos + seedLength - 1 ; icwx++, cwX++) ;
+		  for ( ; icwx < icwxMax && cwX->chrom < ia ; icwx++, cwX++) ;
+		  for ( ; icwx < icwxMax && cwX->chrom == ia && cwX->a2 < cw->pos + seedLength - 1 ; icwx++, cwX++) ;
 		  ;
-		  if (cwX->nam == ia && cwX->intron >= cw->pos + seedLength - 1 && cwX->pos <= cw->pos)
+		  if (cwX->chrom == ia && cwX->a2 >= cw->pos + seedLength - 1 && cwX->a1 <= cw->pos)
 		    cw->intron = 0x1 << 30 ;		  
 		}
 	      cStep = dx ;

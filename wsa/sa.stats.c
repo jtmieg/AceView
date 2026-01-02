@@ -129,6 +129,7 @@ static void samStatsExports (const PP *pp, Array runStats)
   aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
 
   aceOutf (ao, "\n%s\t%s\tnSupportedIntrons\t%ld\n", run, METHOD, arrayMax (pp->confirmedIntrons)) ;
+  aceOutf (ao, "\n%s\t%s\tnDoubleIntrons\t%ld\n", run, METHOD, arrayMax (pp->doubleIntrons)) ;
   aceOutf (ao, "%s\t%s\tnIntronSupports\t%ld\t%ld\t%ld\t%.3f\n", run, METHOD
 	   , s0->nIntronSupportPlus + s0->nIntronSupportMinus
 	   , s0->nIntronSupportPlus
