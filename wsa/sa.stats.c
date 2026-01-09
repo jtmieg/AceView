@@ -519,9 +519,10 @@ void saRunStatExport (const PP *pp, Array runStats)
 		  if (! LD[3] && *xp >= 95*j/100) LD[3] = i ;
 		  if (! LD[4] && *xp >= 99*j/100) LD[4] = i ;
 		}
-	      aceOutf (ao, "%s\tLength_distribution_1_5_50_95_99_mode_av\tiiiiiii\n", runNam) ;
+	      aceOutf (ao, "%s\tLength_distribution_1_5_50_95_99_mode_av\tiiiiiii", runNam) ;
 	      for (i=0;i<7;i++)
-		printf ("\t%ld", LD[i]) ;
+		aceOutf (ao, "\t%ld", LD[i]) ;
+	      aceOutf (ao, "\n") ;
 	    }
 	  
 	  for (int ii = 1 ; ii < 2 ; ii++)
