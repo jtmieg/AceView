@@ -27,7 +27,6 @@
 /* Examples:  sortalign -h */
 
 /***********************************************************************************/
-#define YANN
 
 #ifdef USEGPU
   #define NAGENTS 12

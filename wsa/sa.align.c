@@ -2457,7 +2457,7 @@ void saAlignDo (const PP *pp, BB *bb)
 /**************************************************************/
 
 #ifndef YANN
-static void saAlign (const void *vp)
+void saAlign (const void *vp)
 {
   BB bb ;
   const PP *pp = vp ;

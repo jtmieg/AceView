@@ -38,11 +38,16 @@ static inline int cwOrder (const void *va, const void *vb)
 {
   const CW *up = va ;
   const CW *vp = vb ;
+
+  return (up->seed > vp->seed ? 1 : 0) ;
+
+  /*
   int n ;
   n = (up->seed > vp->seed) - (up->seed < vp->seed) ; if (n) return n ;
   n = up->nam - vp->nam ; if (n) return n ;
   n = (up->pos > vp->pos) - (up->pos < vp->pos) ; if (n) return n ;
   return 0 ;
+  */
 } /* cwOrder */
 
 /**************************************************************/
@@ -98,7 +103,7 @@ static BOOL newInsertionSort (char *b, mysize_t n, int s, int (*cmp)(const void 
   for (i = 1 ; i < n ; i++)
     {
       j = i - 1 ;
-      if ((*cmp) (b + i*s, b + j*s) >= 0)
+      if ((*cmp) (b + j*s, b + i*s) <= 0)
 	continue ;
       clean = FALSE ;
       memcpy (buf, b + i*s, s) ;

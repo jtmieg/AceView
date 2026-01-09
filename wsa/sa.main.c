@@ -1938,33 +1938,47 @@ int main (int argc, const char *argv[])
 	  {
 	    p.agent = i ;
 #ifdef YANN
-	    if (pass) wego_go (wholeWork, &p, PP) ;
-	    else channelAddSources (p.aeChan, 1) ;
+	    if (pass)
+	      wego_go (wholeWork, &p, PP) ;
+	    else
+	      channelAddSources (p.aeChan, 1) ;
 #else
 
-	  if (pass) wego_go (matchHits, &p, PP) ;
-	  else channelAddSources (p.moChan, 1) ;
+	  if (pass)
+	    wego_go (matchHits, &p, PP) ;
+	  else
+	    channelAddSources (p.moChan, 1) ;
 		  
-	  if (pass) wego_go (sortHits, &p, PP) ;
-	  else channelAddSources (p.oaChan, 1) ;
-	  else channelAddSources (p.doneChan, 1) ;
+	  if (pass)
+	    wego_go (sortHits, &p, PP) ;
+	  else
+	    {
+	      channelAddSources (p.oaChan, 1) ;
+	      channelAddSources (p.doneChan, 1) ;
+	    }
 	      
 	  if (!i || p.align) /* at least 1 agent */
 	    {
-	      p.agent = 3*i ;
-	      if (pass) wego_go (align, &p, PP) ;
-	      p.agent = 3*i + 1 ;
-	      if (pass) wego_go (align, &p, PP) ;
-	      p.agent = 3*i + 2 ;
-	      if (pass) wego_go (align, &p, PP) ;
-	      p.agent = i ;
-	      else channelAddSources (p.aeChan, 3) ;
+	      if (pass)
+		{
+		  p.agent = 3*i ;
+		  wego_go (saAlign, &p, PP) ;
+		  p.agent = 3*i + 1 ;
+		  wego_go (saAlign, &p, PP) ;
+		  p.agent = 3*i + 2 ;
+		  wego_go (saAlign, &p, PP) ;
+		  p.agent = i ;
+		}
+	      else
+		channelAddSources (p.aeChan, 3) ;
 	    }
 #endif
 	  if (! p.sam || !i) /* only 1 export agent in sam case */
 	    {
-	      if (pass) wego_go (export, &p, PP) ;
-	      else channelAddSources (p.doneChan, 1) ;
+	      if (pass)
+		wego_go (export, &p, PP) ;
+	      else
+		channelAddSources (p.doneChan, 1) ;
 	    }
 	}
     }

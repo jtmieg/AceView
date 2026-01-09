@@ -23,8 +23,10 @@ struct compare_CW {
     // compare code words, same as cwOrder in sa.sort.c
     __host__ __device__
     bool operator()(const CW& a, const CW& b)
-    {return a.seed < b.seed || (a.seed == b.seed && a.nam < b.nam) ||
-    (a.seed == b.seed && a.nam == b.nam && a.pos < b.pos);}
+    {return a.seed <= b.seed }  // we do not need a more detailled comparisons
+
+// {return a.seed < b.seed || (a.seed == b.seed && a.nam < b.nam) ||
+//    (a.seed == b.seed && a.nam == b.nam && a.pos < b.pos);}
 };
 
 
