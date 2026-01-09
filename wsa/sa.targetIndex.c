@@ -546,6 +546,8 @@ void saTargetIndexCreate (PP *pp)
   /* copy the actual config file used to create the index */
   if (pp->tConfigFileName)
     system (hprintf(h, "\\cp %s %s/tConfig\n", pp->tConfigFileName, pp->indexName)) ;
+  else
+    system (hprintf(h, "touch %s/tConfig\n", pp->indexName)) ;
   ac_free (h) ;
   return ;
 }  /* saTargetIndexCreate */

@@ -10,12 +10,7 @@
 # Check farm usage
 # qstat -u '*' | gawk '{n[$4]++}END{for(k in n) printf ("%d\t%s\n",n[k],k);}' | $tab_sort -k 1n
 
-# cat scripts/MAGIC | gawk -f scripts/csh.beautifier.awk >! scripts/MAGIC.beau
-
-#set ff=`ls Fastc/RNA_AGLR1_B_1.*/*.fastc.gz | head -32 | gawk '{printf("%s,",$1);}'`
-#numactl --cpunodebind=0 --membind=0 bin/sortalign -x HSA.16.step5 -i $ff --align --nB 50 --nA 25 -o tatouN.16.step5 --max_threads 256
-
-
+# cat scripts2/MAGIC2 | gawk -f scripts2/csh.beautifier.awk >! scripts2/MAGIC2.beau
 
 ############################################################################################
 # Master script for short sequence alignments
@@ -30,12 +25,8 @@ set phaseSet="$*"
 setenv LANG C
 unset noclobber
 
-if (0 && -e /var/lib/envs/facilities/bin/fac-switch.csh) then
-  source /var/lib/envs/facilities/bin/fac-sbqwitch.csh python 2.7
-endif
 # set the UGE (normally already done by .ncbi_hints, option sge
 if (-e  /netmnt/gridengine/current/settings.csh) source /netmnt/gridengine/current/settings.csh
-if (0 && -e  /netmnt/gridengine/test/settings.csh) source /netmnt/gridengine/test/settings.csh
 
 # export current UGE version
 qsub -help | head -1
@@ -71,7 +62,7 @@ setenv metaData `pwd`/metaData
 setenv bin `pwd`/bin
 setenv tacembly $bin/tacembly
 setenv Verbose 0
-setenv tab_sort `pwd`/scripts/tab_sort
+setenv tab_sort `pwd`/scripts2/tab_sort
 
 if ($1 == ii5) goto phaseii5
 if ($1 == ii5A) goto phaseii5A
@@ -86,7 +77,7 @@ if ("$phaseSet" == "" || "$phaseSet" == "help"  || "$phaseSet" == "-h" || "$phas
 if ("$phaseSet" == clean) goto phaseClean
 if ($1 == cleanRunList) goto phaseCleanRunList
 
-if ($1 == wait) scripts/submit wait
+if ($1 == wait) scripts2/submit wait
 
 
 if (! -e ZZZZZ || ! -e ZZZZZ.gz)  then
@@ -120,7 +111,7 @@ if ("$1" == init) then
       \rm $ici/_b
     endif 
     if ($n > 1) then
-      echo "FATAL ERROR: While installing MAGIC in directory $MAGIC_SRC "
+      echo "FATAL ERROR: While installing MAGIC2 in directory $MAGIC_SRC "
       echo "You compiled for several machines"
       cat  $ici/_b | sed -e 's/bin\.//'
       echo "Please select the correct compilation by using: setenv ACEDB_MACHINE"
@@ -130,7 +121,7 @@ if ("$1" == init) then
       exit 1
     endif
     if ($n == 0) then
-      echo "FATAL ERROR: While installing MAGIC in directory $MAGIC_SRC "
+      echo "FATAL ERROR: While installing MAGIC2 in directory $MAGIC_SRC "
       echo "You have not yet compiled the program"
       echo "Please cd $MAGIC_SRC ; setenv ACEDB_MACHINE ... ; make -k all"
       \rm $ici/_b
@@ -138,8 +129,8 @@ if ("$1" == init) then
     endif
   endif
 
-  if ( -x scripts/MAGIC && -d MetaDB) then
-    echo "The MetaDB and MAGIC already exist, run   'MAGIC clean' if you want to re-initialise"
+  if ( -x scripts2/MAGIC2 && -d MetaDB) then
+    echo "The MetaDB and MAGIC2 already exist, run   'MAGIC2 clean' if you want to re-initialise"
     exit 1
   endif
 
@@ -147,35 +138,35 @@ if ("$1" == init) then
     # echo "#\!bin/tcsh -f " >! ./LIMIT
     echo >> ./LIMITS
     echo "##############################################################" >> ./LIMITS
-    echo -n "## MAGIC Project created ">>  ./LIMITS
+    echo -n "## MAGIC2 Project created ">>  ./LIMITS
     date >> ./LIMITS
     echo "##############################################################" >> ./LIMITS
-    echo "## Please edit the self documented files scripts/submit and scripts/LIMITS for optional choices of configuration"
+    echo "## Please edit the self documented files scripts2/submit and scripts2/LIMITS for optional choices of configuration"
     echo >> ./LIMITS
 
     echo "setenv MOLECULE_TYPE $2" >> ./LIMITS
-    echo 'source scripts/LIMITS   # this will define basic default parameters' >> ./LIMITS
+    echo 'source scripts2/LIMITS   # this will define basic default parameters' >> ./LIMITS
     echo 'source TARGET/LIMITS    # this will override the default in a species dependant way' >> ./LIMITS
      echo >> ./LIMITS
 
     if ($2 == RNA) echo "setenv Strategy RNA_seq" >>  ./LIMITS
     echo >> ./LIMITS
   else
-    echo "missing DNA/RNA parameter: usage MAGIC init [DNA | RNA]"
+    echo "missing DNA/RNA parameter: usage MAGIC2 init [DNA | RNA]"
     exit 1
   endif
 
     if (! -d tmp) mkdir tmp
-    if (! -d tmp/LOGS) mkdir tmp/LOGS
+    # if (! -d tmp/LOGS) mkdir tmp/LOGS
     if (! -e ZZZZZ || ! -e ZZZZZ.gz)  then
       echo 'ZZZZZ' > ZZZZZ
       gzip -c ZZZZZ > ZZZZZ.gz
     endif
 
-    ln -s $MAGIC_SRC/waligner/scripts
+    ln -s $MAGIC_SRC/waligner/scripts2
     ln -s $MAGIC_SRC/waligner/metaData
     ln -s $MAGIC_BIN bin
-    ln -s scripts/MAGIC
+    ln -s scripts2/MAGIC
     ln -s bin/tacembly tbly
     ln -s bin/xacembly bly
     if (! -d RESULTS) mkdir RESULTS
@@ -209,45 +200,41 @@ endif
 ## Verify that we are inside an initialized project directory
 
 if (! $?MAGIC) then
-  echo 'MAGIC should be set to the project name'
+  echo 'MAGIC2 should be set to the project name'
   exit 0
 endif
 
-# CALI was a previous name for the variable MAGIC
-# by defining CALI all legacy codes still work
-setenv CALI $MAGIC > /dev/null
-
-if (! -x bin/clipalign) then
-    echo 'The executable bin/clipalign does not exist'
+if (! -x bin/sortalign) then
+    echo 'The executable bin/sortalign does not exist'
     echo 'You may be in the wrong directory, our you should run the command'
-    echo '$MAGIC_SRC/waligner/scritps/MAGIC init [DNA | RNA]'
+    echo '$MAGIC_SRC/waligner/scritps2/MAGIC2 init [DNA | RNA]'
     exit 1
 endif
 
-if (! -e scripts/MAGIC) then
+if (! -e scripts2/MAGIC2) then
     echo 'The directory scripts does not exist'
     echo 'You may be in the wrong directory, our you should run the command'
-    echo '$MAGIC_SRC/waligner/scritps/MAGIC init [DNA | RNA]'
+    echo '$MAGIC_SRC/waligner/scritps2/MAGIC2 init [DNA | RNA]'
     exit 1
 endif
 
 if (! -e TARGET/LIMITS || ! -d TARGET/Targets || ! -d TARGET/CHROMS) then
     echo "The TARGET directory, which should contains at least LIMITS, CHROMS and Targets is missing or incomplete"
     echo 'You may be in the wrong directory, our you should run the command'
-    echo '$MAGIC_SRC/waligner/scritps/MAGIC init [DNA | RNA]'
+    echo '$MAGIC_SRC/waligner/scritps2/MAGIC2 init [DNA | RNA]'
   exit 1
 endif
 
 if (! -d tmp) then
   echo "The directory ./tmp where all alignments will be stored does not exist"
     echo 'You may be in the wrong directory, our you should run the command'
-    echo '$MAGIC_SRC/waligner/scritps/MAGIC init [DNA | RNA]'
+    echo '$MAGIC_SRC/waligner/scritps2/MAGIC2 init [DNA | RNA]'
   exit 1
 endif
 if (! -d RESULTS) then
   echo "The directory RESULTS where the main results will be reported does not exist"
     echo 'You may be in the wrong directory, our you should run the command'
-    echo '$MAGIC_SRC/waligner/scritps/MAGIC init [DNA | RNA]'
+    echo '$MAGIC_SRC/waligner/scritps2/MAGIC2 init [DNA | RNA]'
   exit 1
 endif
 
@@ -306,21 +293,21 @@ endif
 ## verify that the submit script has been configured
 
 
-if (! -e scripts/submit) then
-  echo "The file scripts/submit is missing, sorry"
+if (! -e scripts2/submit) then
+  echo "The file scripts2/submit is missing, sorry"
   exit 1
 endif
-if (! -x scripts/submit) then
-  echo "The file scripts/submit is not executable, sorry"
+if (! -x scripts2/submit) then
+  echo "The file scripts2/submit is not executable, sorry"
   exit 1
 endif
-set ok=`head -30 scripts/submit | gawk '/ZERO/{next}/^set/{if(index($2,"farm=")>0)n=1;}END{printf("%d",0+n);}'`
+set ok=`head -30 scripts2/submit | gawk '/ZERO/{next}/^set/{if(index($2,"farm=")>0)n=1;}END{printf("%d",0+n);}'`
 if (ok == 0) then
   if ($?MAGIC_FARM_CONFIG) then
     echo " "
   else
     # generate the scripts self diagnostic message
-    scripts/submit wait
+    scripts2/submit wait
     exit 1
   endif
 endif
@@ -328,7 +315,7 @@ endif
 ############################################################################################
 ## copy the major tcsh commands to tmp 
 ## because on some farms /bin/tcsh is not accessible from the nodes
-## we cannot copy to bin, because bin belongs to MAGIC admin which may not be writable
+## we cannot copy to bin, because bin belongs to MAGIC2 admin which may not be writable
 
 if (! -x bin/tcsh) cp `which tcsh` bin
 if (! -x bin/rsync) cp `which rsync` bin
@@ -355,19 +342,19 @@ if (! -d tmp/INTRONRUNS) mkdir tmp/INTRONRUNS
 if (! -d tmp/INTRON_INDEX) mkdir tmp/INTRON_INDEX
 
 ############################################################################################
-## general definitions are in scripts/LIMITS
+## general definitions are in scripts2/LIMITS
 ## definition particular to the species are in TARGET/LIMITS
 ## but may be overridden by a local file LIMITS
 
-echo -n "--- MAGIC start "
+echo -n "--- MAGIC2 start "
 date
 echo "=== Project $MAGIC"
 
 setenv Strategy ZERO
 
-source scripts/LIMITS   # this will define basic default parameters
+source scripts2/LIMITS   # this will define basic default parameters
 source TARGET/LIMITS    # this will override the default in a species dependant way
-echo "..... Standard configuration parameters were read in scripts/LIMITS and TARGET/LIMITS"
+echo "..... Standard configuration parameters were read in scripts2/LIMITS and TARGET/LIMITS"
 
 if (-e ./LIMITS) then
   echo "..... User specified parameters were read in  ./LIMITS"
@@ -388,7 +375,7 @@ if ($MOLECULE_TYPE == DNA) then
 endif
 if ($Strategy == ZERO) then
   echo "The MOLECULE_TYPE is not defined as it should in ./LIMITS"
-  echo "Please run 'MAGIC init [DNA | RNA]'"
+  echo "Please run 'MAGIC2 init [DNA | RNA]'"
   exit 1
 endif
 
@@ -442,17 +429,17 @@ foreach target ($Etargets)
 end
 
 ############################################################################################
-## verify hat the TMPDIR has been configured in scripts/LIMITS or ~/.MAGICrc
+## verify hat the TMPDIR has been configured in scripts2/LIMITS or ~/.MAGICrc
 
 if (! $?TMPDIR) then
   echo "FATAL CONFIGURATION ERROR"
-  echo "the variable TMPDIR has not been set, please edit praragraph 4 of scripts/LIMITS"
+  echo "the variable TMPDIR has not been set, please edit praragraph 4 of scripts2/LIMITS"
   exit 1 
 endif
 
 if (! -d $TMPDIR) then
   echo "FATAL CONFIGURATION ERROR"
-  echo "The directory TMPDIR = $TMPDIR does not exist,  please edit praragraph 4 of scripts/LIMITS"
+  echo "The directory TMPDIR = $TMPDIR does not exist,  please edit praragraph 4 of scripts2/LIMITS"
   exit 1 
 endif
 
@@ -461,7 +448,7 @@ if (! -e $TMPDIR/toto.$$) then
   echo "FATAL CONFIGURATION ERROR"
   echo "The directory TMPDIR = $TMPDIR is not writable"
   echo "The command touch $TMPDIR/toto.$$ failed"
-  echo "Please edit praragraph 4 of scripts/LIMITS"
+  echo "Please edit praragraph 4 of scripts2/LIMITS"
   exit 1 
 endif
 \rm $TMPDIR/toto.$$
@@ -471,7 +458,7 @@ if ($n < 50000) then
   echo "FATAL CONFIGURATION ERROR"
   echo "The directory TMPDIR = $TMPDIR doeas not have 50Gb free space"
   df -m $TMPDIR
-  echo "Please edit praragraph 4 of scripts/LIMITS"
+  echo "Please edit praragraph 4 of scripts2/LIMITS"
   exit 1 
 endif
 echo "..... TMPDIR = $TMPDIR is writable with $n free Mb $phaseSet"
@@ -508,7 +495,6 @@ cat <<EOF > _x.awk
   if (Strategy == "ChIP") C = 1 ;    
 
   qc = index(z, "QC") ;
-  a0  = index(z, "MAKEFASTC") ;
   a  = index(z, "ALIGN") ;
   w  = index(z, "WIGGLE") ;
   gx = index(z, "GENE") ;
@@ -595,7 +581,7 @@ setenv MetaDB `pwd`/MetaDB
 set phase=`echo $phaseSet | gawk '{print $1}'`
 if ($phase == wait) then
   echo "waiting for the completion of previous tasks"
-  scripts/submit wait
+  scripts2/submit wait
 endif
 
 ############################################################################################
@@ -612,7 +598,7 @@ setenv projectDir tmp
     setenv projectDir `cat MetaDB/$MAGIC/project2tmp_directory | gawk -F '\t' 'BEGIN{t="tmp";}{if($1 == p) t=$2;}END{print t}' p=$MAGIC`
   endif
 
-setenv mkDir "source scripts/mkDir"
+setenv mkDir "source scripts2/mkDir"
 echo "-- Verify the existence of the tmp directory $projectDir"
 
   if (! -d $projectDir) then
@@ -990,11 +976,11 @@ if ($phase == a0) goto phasea0
 
 ### verify once the metadata
 
-if ($firstPhase == 1) scripts/metadata.tcsh
+if ($firstPhase == 1) scripts2/metadata.tcsh
 
 set firstPhase=0
 if (! -e  tmp/METADATA/metadata.ok) then
-  echo "FATAL ERROR scripts/metadata.tcsh reported an error. the TARGET data are incomplete"
+  echo "FATAL ERROR scripts2/metadata.tcsh reported an error. the TARGET data are incomplete"
   echo
   exit 1
 endif
@@ -1049,7 +1035,7 @@ if ($phase == createGenomicTestSet) goto phasecreateGenomicTestSet
 set n=`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList | wc | gawk '{print $1}'`
 if ($n < 1) then 
   echo "\nERROR: No run in MetaDB has the tag: project $MAGIC"
-  echo "       Please edit the MetaDB database and/or setenv MAGIC to a correct value"
+  echo "       Please edit the MetaDB database and/or setenv MAGIC2 to a correct value"
   exit 1
 endif
 if ($phase == a0C) goto phasea0C
@@ -1315,7 +1301,7 @@ if ($phase == 99) goto phase99
 
 # other value of $phase : fall through, print usage and die
 echo "Sorry unknown phase=#$phase# "
-echo "Try MAGIC -help"
+echo "Try MAGIC2 -help"
 if ($Verbose == 0) exit 1 
 
 goto usage
@@ -1324,9 +1310,9 @@ goto usage
 ## Usage 
 usage:
 
-echo 'MAGIC options'
+echo 'MAGIC2 options'
 echo 'First the system should be initialized as explained in the user manual.'
-echo '      You must run "$MAGIC_SRC/waligner/scripts/MAGIC init [DNA | RNA]",'
+echo '      You must run "$MAGIC_SRC/waligner/scripts2/MAGIC2 init [DNA | RNA]",'
 echo '      and create a local link to the TARGET directory of the correct species.'
 echo '      Then you must declare your runs in the MetaDB database created by "init".'
 echo '      We recommend very simple chronological names like Ghs1, Ghs2 for human genome runs'
@@ -1339,12 +1325,12 @@ echo '      and if the protocol was strand-specific. The later is critical for g
 echo '      and exon discovery. '
 echo '      Finally, you can declare Groups of Runs to obtain more synthetic views.'
 echo ' '
-echo '      MAGIC createRNATestSet (or createGenomicTestSet or createMitoTestSet)'
+echo '      MAGIC2 createRNATestSet (or createGenomicTestSet or createMitoTestSet)'
 echo '      will create a set of 48M reads as a benchmark for the code'
 echo ' '
-echo '      Then, run "MAGIC a0" to create the Fastc files for the Runs declared in MetaDB. '
+echo '      Then, run "MAGIC2 a0" to create the Fastc files for the Runs declared in MetaDB. '
 echo '      Please verify that, for each run, files Fastc/$run/*.fastc.gz have been created.'
-echo '      Note that MAGIC is accretive, new runs can be integrated later in the same groups,'
+echo '      Note that MAGIC2 is accretive, new runs can be integrated later in the same groups,'
 echo '      allowing comparative studies and handling of Peta-bases projects with thousands of runs.'
 echo ' '
 echo 'The type of molecule: DNA or RNA indicated in the initialisation is stored in the file ./LIMITS'
@@ -1356,7 +1342,7 @@ if ($targets != "") echo "       currently:  $targets"
 echo '           You can modify the target list with a command  setenv targets in ./LIMITS'
 echo '           matching the files TARGET/Targets/*.fasta.gz'
 echo '      see the results in the directories RESULTS/Mapping, Mismatches and ATGC_sequence_profiles'
-echo '      The (huge) tables of best alignments, in the rich MAGIC format, may be found in tmp/COUNT*/*/*.hits.gz'
+echo '      The (huge) tables of best alignments, in the rich MAGIC2 format, may be found in tmp/COUNT*/*/*.hits.gz'
 echo '      The alignment statistics per run and group are queriable in the MetaDB acedb database.'
 echo '    WIGGLE: construct the density plots per run or group along the chromosomes.'
 echo '      The coverage density plots in Bed Fixed format, are constructed in tmp/WIGGLEGROUP/*/*.BF.gz'
@@ -1373,7 +1359,7 @@ echo '      Expression indexes and raw counts will appear in RESULTS/Gene_expres
 echo '    MRNA: counts the aligned reads, kb and sequences supporting the previously annotated transcripts.'
 echo '    INTRON: counts the reads supporting gene elements, exons and introns, in the selected gene annotations.'
 echo '      Expression indexes and raw counts will appear in  RESULTS/Introns_exons_polyA'
-# echo '    INTRON_VALIDATION: search for new introns supported by MAGIC spliced alignments, see RESULTS/Introns_exons_polyA'
+# echo '    INTRON_VALIDATION: search for new introns supported by MAGIC2 spliced alignments, see RESULTS/Introns_exons_polyA'
 echo '    polyA: search and report polyA addition sites, see RESULTS/Introns_exons_polyA.'
 echo '      Additional gene expression, polyA and intron details are accessible in the GeneIndexDB acedb database.'
 echo ' '
@@ -1382,7 +1368,7 @@ echo '      across all tested individuals. see the in RESULTS/SNV'
 echo '    REARRANGEMENTS:  search and report rearrangements (in development)'
 echo ' '
 echo 'Examples'
-echo '  MAGIC ALIGN GENE WIGGLE INTRON SNV SMALL_RNA'
+echo '  MAGIC2 ALIGN GENE WIGGLE INTRON SNV SMALL_RNA'
 echo '  '    
 echo ' '
 echo '      Some analyses imply others, for example ALIGN is implied in all cases'
@@ -1462,7 +1448,7 @@ echo '   cnv: Differential CNV analysis, using class compare: tag CNV'
 
 echo '   wgh: Export the histo of  genomic Wiggle '
 echo '   sponge1: manual only, analyze which new exons touch which gene, construct a heat-map'
-echo '   sponge2: count the tags in the shadow of the genes/transcripts/CDS see also wg4 '
+echo '   sponge2: count the tags in the shadow of the genes/transcripts2/CDS see also wg4 '
 echo '   sponge3: sponge statistics, construct RESULTS/Coverage_and_exons/sea_level.ace'
 
 echo '   wsig1: export pre run the signature wiggles (tissues and 3prime bias)'
@@ -1638,7 +1624,7 @@ echo "s13:   Find the SNP differential between runs"
 echo "s3:    Prepare an edited reference sequence for SNP confirmation"
 echo "s4:    Confirm the SNPs by realigning on the edited target"
 echo "s5:    Collate the confirmed counts in s590"
-echo "s6:    Analyse the confirmed counts in tmp/KL.$MAGIC (draft see scripts/MAGIC at s6:"
+echo "s6:    Analyse the confirmed counts in tmp/KL.$MAGIC (draft see scripts2/MAGIC2 at s6:"
 echo "s2old:  fingerprinting at say 80/20"
 echo "s2old:    Report seq error types"
 echo "s3old:    Report seq-errors per quality score"
@@ -2066,7 +2052,7 @@ dna2dna -i $ff.unsorted.gz -O raw -keepName  | gawk '{split($2,aa,"|") ;printf("
 
 set ff=human.Ensembl_encode.2013_01.Homo_sapiens.GRCh37.70
 set ff=Homo_sapiens.GRCh37.75
-# this awk script reorganizes the gene name according to MAGIC conventions and selects the main chromosomes 1,2,,,,X,Y
+# this awk script reorganizes the gene name according to MAGIC2 conventions and selects the main chromosomes 1,2,,,,X,Y
 gunzip -c $ff.cdna.all.fa.gz | gawk '/^>/{ok=0;split ($3,aa,":");c=aa[3];if(index(c,"GL")>0)next;if(index(c,"MHC_")>0)next;if(index(c,"LRC_")>0)next;if(index(c,"PATCH")>0)next;ok=1;}{if(ok>0)print;}'  |   gawk '/^>/{gsub(/gene:/,"|Gene|",$4);gsub(/:/,"|",$5);gsub(/chromosome:/,"Chromosome|",$3);printf("%s%s|%s|%s\n", $1,$4,$5,$3);next;}{print}' | gzip >   $ff.cdna.all.clean.fa.gz
 
 gunzip -c $ff.cdna.all.fa.gz | gawk '/^>/{gsub(/gene:/,"|Gene|",$4);printf("Gene %s\nTitle \"%s %s\"\nTranscript %s\n\n", substr($4,7),$2,$3,substr($1,2));next;}' | gzip > $ff.cdna.all.ace_possible_bad_schema.gz
@@ -2077,7 +2063,7 @@ gunzip -c  $ff.cdna.all.clean.fa.gz | gawk -F '|' '/^>/{n[$5]++}END{nn=0;for (k 
 foreach typ (miRNA snRNA snoRNA misc_RNA )
   gunzip -c $ff.ncrna.fa.gz | gawk '/^>/{ok=0;split ($3,aa,":");c=aa[3];if(index(c,"GL")>0)next;if(index(c,"_MHC_")>0)next;if(index(c,"LRC_")>0)next;if(index(c,"PATCH")>0)next;split($5,bb,":");if(bb[2]==typ)ok=1;}{if(ok>0)print;}' typ=$typ >> toto.fasta
 end
-# sort the gene name according to MAGIC conventions
+# sort the gene name according to MAGIC2 conventions
 cat toto.fasta | gawk '/^>/{gsub(/gene:/,"|Gene|",$4);gsub(/:/,"|",$2);gsub(/chromosome:/,"Chromosome|",$3);printf("%s%s|%s|%s\n", $1,$4,$2,$3);next;}{print}' | gzip >   $ff.smallRNA.clean.fa.gz  
 gunzip -c  $ff.smallRNA.clean.fa.gz   | gawk -F '|' '/^>/{n[$5]++}END{nn=0;for (k in n){print  n[k] "\t" k ;nn+=n[k];}print nn,"\ttotal",nn;}' | $tab_sort -k 1n 
 
@@ -2085,7 +2071,7 @@ gunzip -c  $ff.smallRNA.clean.fa.gz   | gawk -F '|' '/^>/{n[$5]++}END{nn=0;for (
 
 gunzip -c $ff.ncrna.fa.gz | gawk '/^>/{ok=0;split ($3,aa,":");c=aa[3];if(index(c,"GL")>0)next;if(index(c,"_MHC_")>0)next;if(index(c,"LRC_")>0)next;if(index(c,"PATCH")>0)next;split($5,bb,":");if(bb[2]=="Mt_rRNA")next;if(bb[2]=="Mt_tRNA")next;if(bb[2]=="rRNA")next;}{print;}' typ=$typ >> toto2.fasta
 cat toto2.fasta | gawk '/^>/{n[$5]++}END{nn=0;for (k in n){print k, n[k];nn+=n[k];}print "total",nn;}' | $tab_sort
-# the gene name according to MAGIC conventions
+# the gene name according to MAGIC2 conventions
 cat toto2.fasta | gawk '/^>/{gsub(/gene:/,"|Gene|",$4);gsub(/:/,"|",$2);gsub(/chromosome:/,"Chromosome|",$3);printf("%s%s|%s|%s\n", $1,$4,$2,$3);next;}{print}' | gzip >  $ff.encode_ncRNA.clean.fa.gz  
 
   
@@ -2246,7 +2232,7 @@ phaseSRR:
 echo -n "phaseSRR : Create the fastc files for the Runs declared in the MetaDataBase "
 date
 
-echo "OBSOLETE see scripts/SRX_import.tcsh, 2015_10_02"
+echo "OBSOLETE see scripts2/SRX_import.tcsh, 2015_10_02"
 
 goto phaseLoop
 
@@ -2334,8 +2320,8 @@ foreach run (`cat MetaDB/$MAGIC/Run2File | cut -f 1 | sort -u`)
       endif
     else
       if (! -d  Fastc/$run) mkdir Fastc/$run
-      scripts/submit Fastc/$run/a0 "scripts/makeFastc $run $format $files Fastc $isLong $UMI" 32G 
-      echo                         "scripts/makeFastc $run $format $files Fastc $isLong $UMI"
+      scripts2/submit Fastc/$run/a0 "scripts2/makeFastc $run $format $files Fastc $isLong $UMI" 32G 
+      echo                         "scripts2/makeFastc $run $format $files Fastc $isLong $UMI"
       @ nMakeFastc = $nMakeFastc  + 1
     endif
   endif
@@ -2344,7 +2330,7 @@ end
 
 if ($nMakeFastc > 0) then
   echo "Fastc conversion launched, waiting for completion"
-  scripts/submit wait5
+  scripts2/submit wait5
 endif
 
 goto phaseLoop
@@ -2374,7 +2360,7 @@ date
 if (-e TARGET/Targets/$species.genome.fasta.gz && ! -e $wordFrequency) then
   echo -n "Construct $wordFrequency :"
   date
-  bin/clipalign -t TARGET/Targets/$species.genome.fasta.gz -wordFrequencyConstructTable $wordFrequency -wfSize 15
+  bin/sortalign -t TARGET/Targets/$species.genome.fasta.gz -wordFrequencyConstructTable $wordFrequency -wfSize 15
   echo -n " done :"
   date
 endif
@@ -2382,7 +2368,7 @@ endif
 set ok=1
 foreach run (`cat MetaDB/$MAGIC/RunList`)
    if (! -e Fastc/$run/fastc.count) then
-     scripts/submit scripts/a0C.lengthDistrib.tcsh $run
+     scripts2/submit scripts2/a0C.lengthDistrib.tcsh $run
    endif
    foreach lane (`gawk '{i=index($1,"/");if(run == substr($1,1,i-1))print $1;}' run=$run MetaDB/$MAGIC/LaneList`)
 
@@ -2396,7 +2382,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
        end
 
 # echo "$run $v2"
-       scripts/submit Fastc/$lane.count "bin/dna2dna -i Fastc/$lane.$fastctype.gz -I $fastctype -gzi -O count -minEntropy $minEntropy  -minLength $minLength  -clipN $clipN  -o Fastc/$lane" 
+       scripts2/submit Fastc/$lane.count "bin/dna2dna -i Fastc/$lane.$fastctype.gz -I $fastctype -gzi -O count -minEntropy $minEntropy  -minLength $minLength  -clipN $clipN  -o Fastc/$lane" 
      endif
    end
 end
@@ -2448,12 +2434,12 @@ foreach run (`cat MetaDB/$MAGIC/RunNoCountList`)
       endif
       if ($n < 3) then
         if (-e Fastc/$run/fastc_counts.ace) \rm  Fastc/$run/fastc_counts.ace
-        scripts/submit Fastc/$run/a0C.length_distrib    "scripts/a0C.lengthDistrib.tcsh $run"
+        scripts2/submit Fastc/$run/a0C.length_distrib    "scripts2/a0C.lengthDistrib.tcsh $run"
       endif
       set ok=1    
     endif 
 end
-if ($ok == 1) scripts/submit wait
+if ($ok == 1) scripts2/submit wait
 
 
 foreach run (`cat MetaDB/$MAGIC/RunList`)
@@ -2517,11 +2503,11 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (-e  tmp/Adaptors/$run/$run.2.walk) mv  tmp/Adaptors/$run/$run.2.walk  tmp/Adaptors/$run/r.2.walk
   if (-e  tmp/Adaptors/$run/r.1.walk) continue 
 
-  scripts/submit  tmp/Adaptors/$run/a0W.1 "scripts/dnawalk.findAdaptors.tcsh $run 1"
+  scripts2/submit  tmp/Adaptors/$run/a0W.1 "scripts2/dnawalk.findAdaptors.tcsh $run 1"
   if (-e  tmp/Adaptors/$MAGIC.adaptors.ace) \rm tmp/Adaptors/$MAGIC.adaptors.ace
   foreach run2 (`cat MetaDB/$MAGIC/RunPairedList`)
     if ($run == $run2) then
-     scripts/submit  tmp/Adaptors/$run/a0W.2 "scripts/dnawalk.findAdaptors.tcsh $run 2"
+     scripts2/submit  tmp/Adaptors/$run/a0W.2 "scripts2/dnawalk.findAdaptors.tcsh $run 2"
     endif
   end
 end
@@ -2579,7 +2565,7 @@ set ok=0
 
 foreach run ( `cat MetaDB/$MAGIC/RunSmallRnaList ` ) 
   if (! -d tmp/ClippedFastc/$run) mkDir ClippedFastc/$run
-  scripts/submit tmp/ClippedFastc/$run/mi3a "bin/mir -m TARGET/GENES/known_micro_18_35.tc -i Fastc/$run/f2.1.fastc.gz -I fastc -o tmp/ClippedFastc/$run/mi3a --run $run "
+  scripts2/submit tmp/ClippedFastc/$run/mi3a "bin/mir -m TARGET/GENES/known_micro_18_35.tc -i Fastc/$run/f2.1.fastc.gz -I fastc -o tmp/ClippedFastc/$run/mi3a --run $run "
 end
 
 foreach run ( `cat MetaDB/$MAGIC/RunSmallRnaList ` ) 
@@ -2609,7 +2595,7 @@ EOF
   end
 
   if ($v1 != "X" && ! -e tmp/ClippedFastc/$run/f.stats.ace) then
-    scripts/submit  tmp/ClippedFastc/$run/mi3 "scripts/miRNA.tcsh clip $run $v1 $v2"
+    scripts2/submit  tmp/ClippedFastc/$run/mi3 "scripts2/miRNA.tcsh clip $run $v1 $v2"
   endif
 end
  
@@ -2699,7 +2685,7 @@ if (! -e tmp/ClippedMap/mi4.$MAGIC.1000.hits) then
 
   set ff=tmp/ClippedFastc/mi4.$MAGIC.1000.fastc
   foreach target (genome RefSeq mito rrna)
-    bin/clipalign -i $ff -t TARGET/Targets/$species.$target.fasta.gz -o  tmp/ClippedMap/mi4.$MAGIC.1000.$target -maxHit 500 -minAli 18
+    bin/sortalign -i $ff -t TARGET/Targets/$species.$target.fasta.gz -o  tmp/ClippedMap/mi4.$MAGIC.1000.$target -maxHit 500 -minAli 18
   end
   if (-e toto876) \rm toto876
   foreach target (rrna mito RefSeq genome)
@@ -2712,7 +2698,7 @@ if (! -e tmp/ClippedMap/mi4.$MAGIC.1000.hits) then
   if (-e leming.s1.fasta) then
     set ff=leming.s1.fasta
     foreach target (genome RefSeq mito rrna)
-      bin/clipalign -i $ff -t TARGET/Targets/$species.$target.fasta.gz -o  leming.s1.$target -maxHit 500 -minAli 18
+      bin/sortalign -i $ff -t TARGET/Targets/$species.$target.fasta.gz -o  leming.s1.$target -maxHit 500 -minAli 18
     end
     if (-e toto876) \rm toto876
     foreach target (rrna mito RefSeq genome)
@@ -2730,7 +2716,7 @@ if (! -e tmp/ClippedMap/mi4.$MAGIC.1000.hits) then
 
 
   if (! -e TARGET/GENES/known_micro_18_35__genome.list) then
-    bin/clipalign -i TARGET/GENES/known_micro_18_35.fasta -t TARGET/Targets/$species.genome.fasta.gz -o  TARGET/GENES/known_micro_18_35__genome -maxHit 500 -minAli 18
+    bin/sortalign -i TARGET/GENES/known_micro_18_35.fasta -t TARGET/Targets/$species.genome.fasta.gz -o  TARGET/GENES/known_micro_18_35__genome -maxHit 500 -minAli 18
     cat TARGET/GENES/known_micro_18_35__genome.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)print $1}' | sort -u > TARGET/GENES/known_micro_18_35__genome.list
   endif
 
@@ -2766,8 +2752,8 @@ if (! -d tmp/ClippedMap)  mkdir tmp/ClippedMap
 if (-e TARGET/GENES/known_micro.fasta) then
   dna2dna -i TARGET/GENES/known_micro.fasta -minLength 18 -maxLength 35 -o TARGET/GENES/known_micro_18_35
 
-  bin/clipalign -i TARGET/GENES/known_micro_18_35.fasta -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc  -o  tmp/ClippedMap/mi5.$MAGIC.known21000 -minAli 18
-  bin/clipalign -t TARGET/GENES/known_micro.fasta -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc  -o  tmp/ClippedMap/mi5.$MAGIC.10002known -minAli 18
+  bin/sortalign -i TARGET/GENES/known_micro_18_35.fasta -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc  -o  tmp/ClippedMap/mi5.$MAGIC.known21000 -minAli 18
+  bin/sortalign -t TARGET/GENES/known_micro.fasta -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc  -o  tmp/ClippedMap/mi5.$MAGIC.10002known -minAli 18
 
   cat tmp/ClippedMap/mi5.$MAGIC.10002known.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)printf ("%s\t%s\n",$1,$11)}' | sort -u  > tmp/ClippedMap/mi5.$MAGIC.10002known.list
   cat tmp/ClippedMap/mi5.$MAGIC.known21000.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)printf ("%s\t%s\n",$11,$1)}' | sort -u  > tmp/ClippedMap/mi5.$MAGIC.known21000.list
@@ -2886,10 +2872,10 @@ ln -s /home/mieg/AW/Rat_DATA/20211107_GSE172269_List_novel_miRNA_candidates.txt 
 cat leming.candidates.txt | gawk '{printf(">%s\n%s\n",$1,$3);}'  | tail -n +3 | dna2dna -I fasta -O fasta -o leming.s1
 cat leming.candidates.txt | gawk '{printf(">%s\n%s\n",$1,$4);}'  | tail -n +3 | dna2dna -I fasta -O fasta -o leming.s2
 
-  bin/clipalign -i TARGET/GENES/known_micro_18_35.fasta -t leming.s1.fasta  -o  knwn_ls1 -minAli 18
-  bin/clipalign -t TARGET/GENES/known_micro_18_35.fasta -i leming.s1.fasta  -o  ls1_knwn -minAli 18 
-  bin/clipalign -i TARGET/GENES/known_micro_18_35.fasta -t leming.s2.fasta  -o  knwn_ls2 -minAli 18
-  bin/clipalign -t TARGET/GENES/known_micro_18_35.fasta -i leming.s2.fasta  -o  ls2_knwn -minAli 18
+  bin/sortalign -i TARGET/GENES/known_micro_18_35.fasta -t leming.s1.fasta  -o  knwn_ls1 -minAli 18
+  bin/sortalign -t TARGET/GENES/known_micro_18_35.fasta -i leming.s1.fasta  -o  ls1_knwn -minAli 18 
+  bin/sortalign -i TARGET/GENES/known_micro_18_35.fasta -t leming.s2.fasta  -o  knwn_ls2 -minAli 18
+  bin/sortalign -t TARGET/GENES/known_micro_18_35.fasta -i leming.s2.fasta  -o  ls2_knwn -minAli 18
 
 
   cat ls1_knwn.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)print $1}' | sort -u  > ls1_knwn.prelist
@@ -2905,23 +2891,23 @@ cat leming.candidates.txt | gawk '{printf(">%s\n%s\n",$1,$4);}'  | tail -n +3 | 
   dna2dna -i tmp/ClippedFastc/mi4.$MAGIC.100.tc -o tmp/ClippedFastc/mi4.$MAGIC.100 -I tc -O fastc
   dna2dna -i tmp/ClippedFastc/mi4.$MAGIC.10.tc -o tmp/ClippedFastc/mi4.$MAGIC.10 -I tc -O fastc
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -t leming.s1.fasta  -o  R1000_ls1 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -i leming.s1.fasta  -o  ls1_R1000 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -t leming.s1.fasta  -o  R1000_ls1 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -i leming.s1.fasta  -o  ls1_R1000 -minAli 18
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.100.fastc -t leming.s1.fasta  -o  R100_ls1 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.100.fastc -i leming.s1.fasta  -o  ls1_R100 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.100.fastc -t leming.s1.fasta  -o  R100_ls1 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.100.fastc -i leming.s1.fasta  -o  ls1_R100 -minAli 18
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.10.fastc -t leming.s1.fasta  -o  R10_ls1 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.10.fastc -i leming.s1.fasta  -o  ls1_R10 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.10.fastc -t leming.s1.fasta  -o  R10_ls1 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.10.fastc -i leming.s1.fasta  -o  ls1_R10 -minAli 18
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -t leming.s2.fasta  -o  R1000_ls2 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -i leming.s2.fasta  -o  ls2_R1000 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -t leming.s2.fasta  -o  R1000_ls2 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.1000.fastc -i leming.s2.fasta  -o  ls2_R1000 -minAli 18
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.100.fastc -t leming.s2.fasta  -o  R100_ls2 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.100.fastc -i leming.s2.fasta  -o  ls2_R100 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.100.fastc -t leming.s2.fasta  -o  R100_ls2 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.100.fastc -i leming.s2.fasta  -o  ls2_R100 -minAli 18
 
-  bin/clipalign -i tmp/ClippedFastc/mi4.$MAGIC.10.fastc -t leming.s2.fasta  -o  R10_ls2 -minAli 18
-  bin/clipalign -t tmp/ClippedFastc/mi4.$MAGIC.10.fastc -i leming.s2.fasta  -o  ls2_R10 -minAli 18
+  bin/sortalign -i tmp/ClippedFastc/mi4.$MAGIC.10.fastc -t leming.s2.fasta  -o  R10_ls2 -minAli 18
+  bin/sortalign -t tmp/ClippedFastc/mi4.$MAGIC.10.fastc -i leming.s2.fasta  -o  ls2_R10 -minAli 18
 
   cat ls1_R1000.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)print $1}' | sort -u  > ls1_R1000.prelist
   cat R1000_ls1.hits | gawk '/^#/{next;}{gsub(/>/,"",$1);if($5>=$4-3)print $11}' | sort -u  >> ls1_R1000.prelist
@@ -2978,7 +2964,7 @@ if (! -d tmp/Bloom) mkdir tmp/Bloom
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/Bloom/$run) $mkDir Bloom $run
   if (! -e tmp/Bloom/$run/a0B.telomere_distribution.txt ) then
-     scripts/submit tmp/Bloom/$run/a0B.any  "scripts/a0B.Bloom.tcsh telomere $run any" UGE4
+     scripts2/submit tmp/Bloom/$run/a0B.any  "scripts2/a0B.Bloom.tcsh telomere $run any" UGE4
   endif
 end
 
@@ -2992,7 +2978,7 @@ if (! -d tmp/Bloom) mkdir tmp/Bloom
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/Bloom/$run) $mkDir Bloom $run
   if (! -e tmp/Bloom/$run/a0B.unaligned.telomere_distribution.txt) then
-    scripts/submit tmp/Bloom/$run/a0B.unaligned  "scripts/a0B.Bloom.tcsh telomere $run unaligned"
+    scripts2/submit tmp/Bloom/$run/a0B.unaligned  "scripts2/a0B.Bloom.tcsh telomere $run unaligned"
   endif
 end
 
@@ -3005,7 +2991,7 @@ phasea0Br:
 echo "phasea0Br start : "
 date
 if (! -d RESULTS/Mapping) mkdir RESULTS/Mapping
-scripts/a0B.Bloom.tcsh telomereReport anyRun any
+scripts2/a0B.Bloom.tcsh telomereReport anyRun any
 
 goto phaseLoop
 
@@ -3013,7 +2999,7 @@ phasea0Bur:
 echo "phasea0Br start : "
 date
 if (! -d RESULTS/Mapping) mkdir RESULTS/Mapping
-scripts/a0B.Bloom.tcsh telomereReport anyRun  unaligned
+scripts2/a0B.Bloom.tcsh telomereReport anyRun  unaligned
 
 goto phaseLoop
 
@@ -3024,12 +3010,12 @@ phasea0Bm:
 echo "phasea0Bm start : "
 date
 if (! -d RESULTS/Mapping) mkdir RESULTS/Mapping
-scripts/a0B.Bloom.tcsh telomereReport anyRun any
+scripts2/a0B.Bloom.tcsh telomereReport anyRun any
 
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (-e tmp/Bloom/$run/a0Bm.err) continue    
   if (! -e tmp/Bloom/$run/a0B.telomere_hits.txt) continue     
-  scripts/submit tmp/Bloom/$run/a0Bm "scripts/a0B.Bloom.tcsh telomereRemap $run any"
+  scripts2/submit tmp/Bloom/$run/a0Bm "scripts2/a0B.Bloom.tcsh telomereRemap $run any"
 end
 
 goto phaseLoop
@@ -3051,7 +3037,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
     set n=`cat Fastc/$run/LaneList | sed -e "s/$run\///" | gawk "/$prefix\./{n++}END{print n+0}"`
     if ($n == 0) continue
     if ( ! -e tmp/Profiles/$run/$prefix.readsBeforeAlignment.1.profile.txt) then
-	scripts/submit tmp/Profiles/$run/a0P  "scripts/a0P.profile.tcsh $run $prefix"
+	scripts2/submit tmp/Profiles/$run/a0P  "scripts2/a0P.profile.tcsh $run $prefix"
     endif
   end
   
@@ -3110,8 +3096,8 @@ set xMillion=800000
 if ($2 != "") then
   set n1=`echo $2 | gawk '{printf("%d",0+$1);}'`
   if ($n1 < 1 || $n1 > 10) then
-    echo "MAGIC createTestSet <n> expects n to be a number of millions between 1 and 10 and will create 6n million reads"
-    echo "Invalid <n> parameter: MAGIC createTestSet $2"
+    echo "MAGIC2 createTestSet <n> expects n to be a number of millions between 1 and 10 and will create 6n million reads"
+    echo "Invalid <n> parameter: MAGIC2 createTestSet $2"
     exit 1
   endif
   @ xMillion = 1000000 * $n1
@@ -3327,7 +3313,7 @@ foreach run (`cat MetaDB/$MAGIC/RunPairedList`)
   if (! -d tmp/ShortFragments/$run) $mkDir ShortFragments $run
   foreach lane (`cat Fastc/$run/LaneList`)
     if (! -e tmp/ShortFragments/$lane.fragments) then
-      scripts/submit tmp/ShortFragments/$lane "scripts/a0S.stitch.tcsh $lane"
+      scripts2/submit tmp/ShortFragments/$lane "scripts2/a0S.stitch.tcsh $lane"
     endif
   end
 end
@@ -3358,8 +3344,8 @@ if ($USEMAGICBLAST == 1) then
   endif
 endif
 
-if ($USEMAGICBLAST == 1) scripts/a123M.magicblast.tcsh makeDB
-# if ($USEMAGICBLAST == 2) scripts/a123MH.matchhits.tcsh makeDB
+if ($USEMAGICBLAST == 1) scripts2/a123M.magicblast.tcsh makeDB
+# if ($USEMAGICBLAST == 2) scripts2/a123MH.matchhits.tcsh makeDB
 
 if (! -d tmp/$MAGIC_COUNT_DIR) mkdir tmp/$MAGIC_COUNT_DIR
 if (! -d tmp/Unaligned) mkdir tmp/Unaligned
@@ -3380,13 +3366,13 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
  
   if (! -d tmp/$MAGIC_COUNT_DIR/$run) then
     $mkDir $MAGIC_COUNT_DIR $run
-    bin/clipalign --hits_file_caption -o  tmp/$MAGIC_COUNT_DIR/$run/README
+    bin/sortalign --hits_file_caption -o  tmp/$MAGIC_COUNT_DIR/$run/README
   endif
   set ok=1
   foreach lane (`cat Fastc/$run/LaneList`)
     if ($USEMAGICBLAST == 1) then
         if (! -e  tmp/MAGICBLAST/$lane.done) then
-          scripts/submit tmp/MAGICBLAST/$lane.a123 "scripts/a123M.magicblast.tcsh ALIGN $run $lane" 32G
+          scripts2/submit tmp/MAGICBLAST/$lane.a123 "scripts2/a123M.magicblast.tcsh ALIGN $run $lane" 32G
         endif
       continue 
     endif
@@ -3394,7 +3380,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
         if (! -d tmp/MATCHHITS) mkdir tmp/MATCHHITS
         if (! -d tmp/MATCHHITS/$run) $mkDir MATCHHITS $run
         if (! -e tmp/MATCHHITS/$lane.done) then
-          scripts/submit tmp/MATCHHITS/$lane.a123 "scripts/a123MH.matchhits.tcsh ALIGN $run $lane" 32G
+          scripts2/submit tmp/MATCHHITS/$lane.a123 "scripts2/a123MH.matchhits.tcsh ALIGN $run $lane" 32G
         endif
       continue 
     endif
@@ -3411,7 +3397,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
       if (-e tmp/Profiles/$run/c5.profile.done) \rm  tmp/Profiles/c5.*
       if (-e RESULTS/Mapping/$MAGIC.job_statistics.txt) \rm RESULTS/Mapping/$MAGIC.job_statistics.txt
       if ( -e tmp/PLEASE_UPDATE) touch  tmp/$MAGIC_COUNT_DIR/$lane.update.done
-      scripts/submit tmp/COUNT/$lane.a123 "scripts/alignAndSelectBest.tcsh $run $lane $minInsertLength $USEMAGICBLAST"    32G
+      scripts2/submit tmp/COUNT/$lane.a123 "scripts2/alignAndSelectBest.tcsh $run $lane $minInsertLength $USEMAGICBLAST"    32G
       set ok=0
     endif
   end
@@ -3427,7 +3413,7 @@ phased6:
 
 foreach target (introns)
 
-  source scripts/target2target_class.txt
+  source scripts2/target2target_class.txt
   set targetFasta=$target
 
   set showOverhang=""
@@ -3547,9 +3533,9 @@ echo $run
 
 set targetMask=""
 if (-e TARGET/Targets/$species.$target.mask.txt) set targetMask="-targetMask TARGET/Targets/$species.$target.mask.txt"
-  echo "bin/clipalign -i Fastc/$lane.fastc.gz -gzo  $isSolid -t TARGET/Targets/$species.$targetFasta.fasta.gz  -maxHit $maxHit $clipPolyA  $clipPolyT -minEntropy $minEntropy4 -seedLength $seedLength -probeMinLength $minAli  -clipN $clipN -minAli $minAli $isSplice $slBonus  $targetBonus  $Xintrons $isStranded -seedOffset $off3 -intronMaxLength  $intronMaxLength -o tmp/PHITS_$target/$lane -showTargetPrefix -target_class $target_class $t2g $v2 $prevScore -showOverhang $targetMask" >  tmp/PHITS_$target/$lane.out
+  echo "bin/sortalign -i Fastc/$lane.fastc.gz -gzo  $isSolid -t TARGET/Targets/$species.$targetFasta.fasta.gz  -maxHit $maxHit $clipPolyA  $clipPolyT -minEntropy $minEntropy4 -seedLength $seedLength -probeMinLength $minAli  -clipN $clipN -minAli $minAli $isSplice $slBonus  $targetBonus  $Xintrons $isStranded -seedOffset $off3 -intronMaxLength  $intronMaxLength -o tmp/PHITS_$target/$lane -showTargetPrefix -target_class $target_class $t2g $v2 $prevScore -showOverhang $targetMask" >  tmp/PHITS_$target/$lane.out
    
-  scripts/submit tmp/PHITS_$target/$lane "bin/clipalign -i Fastc/$lane.fastc.gz  $isSolid -t TARGET/Targets/$species.$targetFasta.fasta.gz  -maxHit $maxHit $clipPolyA  $clipPolyT -minEntropy $minEntropy4 -seedLength $seedLength -probeMinLength $minAli  -clipN $clipN -minAli $minAli $isSplice $slBonus  $targetBonus  $Xintrons $isStranded -seedOffset $off3 -intronMaxLength  $intronMaxLength -gzo -o tmp/PHITS_$target/$lane -showTargetPrefix -target_class $target_class $t2g $v2 $prevScore $showOverhang -strategy $Strategy $targetMask" 
+  scripts2/submit tmp/PHITS_$target/$lane "bin/sortalign -i Fastc/$lane.fastc.gz  $isSolid -t TARGET/Targets/$species.$targetFasta.fasta.gz  -maxHit $maxHit $clipPolyA  $clipPolyT -minEntropy $minEntropy4 -seedLength $seedLength -probeMinLength $minAli  -clipN $clipN -minAli $minAli $isSplice $slBonus  $targetBonus  $Xintrons $isStranded -seedOffset $off3 -intronMaxLength  $intronMaxLength -gzo -o tmp/PHITS_$target/$lane -showTargetPrefix -target_class $target_class $t2g $v2 $prevScore $showOverhang -strategy $Strategy $targetMask" 
 
     end
   end
@@ -3628,7 +3614,7 @@ foreach run (Rhs472 Rhs478 Rhs485 Rhs488)
 
 # ALIa countains the renaming, 
   if (-d tmp/ALIa/$run) then
-    scripts/submit tmp/QUAL/$run "gunzip -c tmp/ALIa/$run/*.hits.gz | bin/bestali -fastqAnalysis $ff -run $run -o tmp/QUAL/$run"
+    scripts2/submit tmp/QUAL/$run "gunzip -c tmp/ALIa/$run/*.hits.gz | bin/bestali -fastqAnalysis $ff -run $run -o tmp/QUAL/$run"
     continue
   endif
 
@@ -3720,7 +3706,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
 
   if (-e tmp/SortAlign/$run/sali.done)  continue
     
-  scripts/sortali.tcsh $tConfig $run
+  scripts2/sortali.tcsh $tConfig $run
  end
  goto phaseLoop
 
@@ -3750,8 +3736,8 @@ mv  worm.av.transcript2gene.txt.gz /home/mieg/ykdeep/MRNAS
 
 ## try to align the complete jensen on the mrnas using the AceView aligner
 foreach off (16)
-  bsub -q unified "bin/clipalign  -i J1/JensenInfoA/est.dna -t MRNAS/AceView.main_mrnas.fasta -minAli 30 -errRateMax 6 -minEntropy 16 -probeMinLength 100 -clipPolyA -errPosMax 100 -seedLength 16 -seedOffset $off >! tmp/PHITS_roche/UHR.$off.hits"
-  bsub -q unified "bin/clipalign  -i J1/JensenInfoB/est.dna -t MRNAS/AceView.main_mrnas.fasta -minAli 30 -errRateMax 6 -minEntropy 16 -probeMinLength 100 -clipPolyA -errPosMax 100 -seedLength 16 -seedOffset $off >! tmp/PHITS_roche/Brain.$off.hits"
+  bsub -q unified "bin/sortalign  -i J1/JensenInfoA/est.dna -t MRNAS/AceView.main_mrnas.fasta -minAli 30 -errRateMax 6 -minEntropy 16 -probeMinLength 100 -clipPolyA -errPosMax 100 -seedLength 16 -seedOffset $off >! tmp/PHITS_roche/UHR.$off.hits"
+  bsub -q unified "bin/sortalign  -i J1/JensenInfoB/est.dna -t MRNAS/AceView.main_mrnas.fasta -minAli 30 -errRateMax 6 -minEntropy 16 -probeMinLength 100 -clipPolyA -errPosMax 100 -seedLength 16 -seedOffset $off >! tmp/PHITS_roche/Brain.$off.hits"
 end
 
 ###
@@ -3762,7 +3748,7 @@ echo toto | gawk '/END/{for (i=1;i<=10;i++)printf("tail -n +%d Fastc/LIF_S/UHR/f
 source _k
 
 foreach ii (1 2 3 4 5 6 7 8 9 10)
-  scripts/submit tmp/TEST/$ii.out "bin/clipalign -t MRNAS/RefSeq.fasta.gz -i tmp/TEST/toto.$ii.fastc.gz -gzo  -solidC -maxHit 10 -minAli 30 -errRateMax 6 -clipPolyA  -clipPolyT -minEntropy 16  -seedLength 16 -seedOffset 11 > tmp/TEST/RefSeq.$ii.hits.gz"
+  scripts2/submit tmp/TEST/$ii.out "bin/sortalign -t MRNAS/RefSeq.fasta.gz -i tmp/TEST/toto.$ii.fastc.gz -gzo  -solidC -maxHit 10 -minAli 30 -errRateMax 6 -clipPolyA  -clipPolyT -minEntropy 16  -seedLength 16 -seedOffset 11 > tmp/TEST/RefSeq.$ii.hits.gz"
 end
 
 ###################################################################################
@@ -3780,7 +3766,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach lane (`cat Fastc/$run/LaneList`)
     if (! -e tmp/COUNT/$lane.hits.gz) continue
     if (-e  tmp/RNA_editing/$lane.r1.done) continue
-    scripts/submit tmp/RNA_editing/$lane.r1 "scripts/r1.rna_realign.tcsh $run $lane"
+    scripts2/submit tmp/RNA_editing/$lane.r1 "scripts2/r1.rna_realign.tcsh $run $lane"
   end
 end
 
@@ -3795,7 +3781,7 @@ phaser2g4:
  
   if ($Strategy != RNA_seq) goto phaseLoop
   if (! -d tmp/RNA_editing) goto phaseLoop
-  scripts/geneindex.tcsh r2g4
+  scripts2/geneindex.tcsh r2g4
 
 goto phaseLoop
 
@@ -3818,7 +3804,7 @@ foreach lane (`cat MetaDB/$MAGIC/LaneList | $tab_sort -u`)
     endif
     if (-e  tmp/COUNT/$lane.ok.gz) \rm tmp/COUNT/$lane.ok.gz
     gzip  tmp/COUNT/$lane.ok
-    scripts/submit  tmp/Unaligned/$lane  "bin/dna2dna -I fastc -i Fastc/$lane.fastc.gz -gzi -gzo  -minEntropy $minEntropy -reject  tmp/COUNT/$lane.ok.gz  -count -O fastc -o tmp/Unaligned/$lane"
+    scripts2/submit  tmp/Unaligned/$lane  "bin/dna2dna -I fastc -i Fastc/$lane.fastc.gz -gzi -gzo  -minEntropy $minEntropy -reject  tmp/COUNT/$lane.ok.gz  -count -O fastc -o tmp/Unaligned/$lane"
 
   endif
 end
@@ -3855,7 +3841,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (-e tmp/Unaligned/$run/gi.list) continue
   foreach lane (`cat Fastc/$run/LaneList`)
     if (-e  tmp/Unaligned/$lane.fastc.gz && ! -e  tmp/Unaligned/$lane.gi.list) then
-      scripts/submit tmp/Unaligned/p2.megablast "scripts/p2.megablast.tcsh $run $lane"
+      scripts2/submit tmp/Unaligned/p2.megablast "scripts2/p2.megablast.tcsh $run $lane"
     endif
   end
 end
@@ -3920,17 +3906,17 @@ if (! -e PARASITES/patric.gb) then
     cat tyty3 >> patric.fasta
   end
   setenv want_import NNM
-  perl ../scripts/genbank_import.pl < patric.gb > patric.ace    
+  perl ../scripts2/genbank_import.pl < patric.gb > patric.ace    
   cat patric.fasta | gawk '/^>/{printf("%s\t%s %s\n",$1,$2,$3);}' > patric.gi2title
 
  popd
 endif
 
 setenv want_import NM
-perl scripts/genbank_import.pl < tmp/Unaligned/gi.gb > tmp/Unaligned/gi.ace
+perl scripts2/genbank_import.pl < tmp/Unaligned/gi.gb > tmp/Unaligned/gi.ace
 setenv want_import NNM
 setenv accept_join 1
-perl scripts/genbank_import.pl < tmp/Unaligned/gi.gb > tmp/Unaligned/gi.nnm.ace
+perl scripts2/genbank_import.pl < tmp/Unaligned/gi.gb > tmp/Unaligned/gi.nnm.ace
 
 pushd tmp/Unaligned
 
@@ -3997,7 +3983,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (-e tmp/PHITS_$target/$run/$target.count) \rm  tmp/PHITS_$target/$run/$target.count 
   if (-e tmp/PHITS_$target/p5.stats.ace) \rm tmp/PHITS_$target/p5.stats.ace
   foreach lane (`cat fastc/$run/LaneList`)
-    scripts/submit  tmp/PHITS_$target/$run/p4  "scripts/p4.parasite_align.tcsh $run $lane $target"
+    scripts2/submit  tmp/PHITS_$target/$run/p4  "scripts2/p4.parasite_align.tcsh $run $lane $target"
   end
 end
 
@@ -4009,7 +3995,7 @@ phasep5:
 
 set target=bacteria
 set target2=parasites
-source scripts/target2target_class.txt
+source scripts2/target2target_class.txt
 
 if (! -e  tmp/PHITS_$target/p5.stats.ace) then
   foreach run (`cat MetaDB/$MAGIC/RunList`)
@@ -4074,10 +4060,10 @@ phaseg1:
 
 if ($Strategy == RNA_seq && ! -e GeneIndexDB/ii1.done) then
   echo "phase g1: parse the aceview and refseq genes basic annotations and the MAQC results"
-  scripts/geneindex.tcsh g1a   # create the GeneIndexDB database
-  scripts/geneindex.tcsh g1b   # import known genes metadata
-  scripts/geneindex.tcsh g1c   # Import ERCC and MAQC metadada
-  scripts/geneindex.tcsh ii1   # Import the introns annotated in RefSeq and aceview
+  scripts2/geneindex.tcsh g1a   # create the GeneIndexDB database
+  scripts2/geneindex.tcsh g1b   # import known genes metadata
+  scripts2/geneindex.tcsh g1c   # Import ERCC and MAQC metadada
+  scripts2/geneindex.tcsh ii1   # Import the introns annotated in RefSeq and aceview
 endif
 
 goto phaseLoop
@@ -4101,7 +4087,7 @@ EOF
     exit 1
   endif
   echo "phase g2a: Centralization des comptages en genes unique $MAGIC par lane, all runs have an assigned strand "
-  scripts/geneindex.tcsh g2a
+  scripts2/geneindex.tcsh g2a
 goto phaseLoop
 
 phasem2a:
@@ -4123,37 +4109,37 @@ EOF
   set ok=1
   foreach lane (`cat MetaDB/$MAGIC/LaneList`)
    if ((-e  tmp/COUNT/$lane.hits.gz || -e  tmp/COUNT/$lane.hits.gz.mrnaOrder.gz) && ! -e tmp/COUNT/$lane.mrnaOrder.done) then
-      scripts/submit  tmp/COUNT/$lane.mrnaOrder "scripts/count.global.tcsh $lane"
+      scripts2/submit  tmp/COUNT/$lane.mrnaOrder "scripts2/count.global.tcsh $lane"
       set ok=0
     endif
   end
   if ($ok == 0) then
     echo "waiting on mrnaReordering"
-    scripts/qusage 1
+    scripts2/qusage 1
   endif
 
   if ($phase == m2a) then
     echo "phase m2a: Centralization des comptages en mRNAs unique $MAGIC par lane "
-    scripts/geneindex.tcsh m2a
+    scripts2/geneindex.tcsh m2a
   else
     echo "phase m2aH: Hierarchic Centralization des comptages en mRNAs unique $MAGIC par lane "
-    scripts/geneindex.tcsh m2aH
+    scripts2/geneindex.tcsh m2aH
   endif
 goto phaseLoop
 
 phaseg3a:
   echo "phase g3a: Centralization des comptages quasi-unique $MAGIC par lane "
-  scripts/geneindex.tcsh g3a
+  scripts2/geneindex.tcsh g3a
 goto phaseLoop
 
 phasem3a:
   echo "phase m3a: Centralization des comptages mRNA quasi-unique $MAGIC par lane "
-  scripts/geneindex.tcsh m3a
+  scripts2/geneindex.tcsh m3a
 goto phaseLoop
 
 phasem3aH:
   echo "phase m3aH: Hierarchic centralization des comptages mRNA quasi-unique $MAGIC par lane "
-  scripts/geneindex.tcsh m3aH
+  scripts2/geneindex.tcsh m3aH
 goto phaseLoop
 
 ###################################################################################
@@ -4162,32 +4148,32 @@ goto phaseLoop
 
 phaseii2a:
   echo "phase ii2a: Known_intron counts per lane"
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii2a
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii2a
 goto phaseLoop
 
 phaseii3a:
   echo "phase ii3a: Known_intron counts per lane in (non) unique alignments"
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii3a
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii3a
 goto phaseLoop
 
 phaseii2b:
   echo "phase ii2b: Known_intron counts per run"
-  scripts/geneindex.tcsh ii2b
+  scripts2/geneindex.tcsh ii2b
 goto phaseLoop
 
 phaseii3b:
   echo "phase ii3b: Known_intron counts per run in non unique alignments"
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii3b
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii3b
 goto phaseLoop
 
 phaseii2c:
   echo "phase ii2c: Known_intron counts per run with sublibraries"
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii2c
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii2c
 goto phaseLoop
 
 phaseii2d:
   echo "phase ii2d: Histogram of the cumulated support of annotated exon junctions"
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii2c
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii2c
 goto phaseLoop
 
 
@@ -4197,7 +4183,7 @@ phaseg2b:
   echo "phase g2b: Gene centralization des comptages unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh g2b
+  scripts2/geneindex.tcsh g2b
 
 goto phaseLoop
 
@@ -4205,7 +4191,7 @@ phasem2b:
   echo "phase m2b: mRNA centralization des comptages unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh m2b
+  scripts2/geneindex.tcsh m2b
 
 goto phaseLoop
 
@@ -4213,7 +4199,7 @@ phasem2bH:
   echo "phase m2bH: Hierarchique mRNA centralization des comptages unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh m2bH
+  scripts2/geneindex.tcsh m2bH
 
 goto phaseLoop
 
@@ -4221,7 +4207,7 @@ phaseg3b:
   echo "phase g3b: Centralization des comptages quasi-unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh g3b
+  scripts2/geneindex.tcsh g3b
 
 goto phaseLoop
 
@@ -4229,13 +4215,13 @@ phasem3b:
   echo "phase m3b: Hierarchique Centralization des comptages quasi-unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh m3b
+  scripts2/geneindex.tcsh m3b
 
 phasem3bH: 
   echo "phase m3bH: Hierarchique Centralization des comptages quasi-unique $MAGIC par run "
 
   # parse the aceview and refseq genes basic annotations and the MAQC results
-  scripts/geneindex.tcsh m3bH
+  scripts2/geneindex.tcsh m3bH
 
 goto phaseLoop
 
@@ -4245,7 +4231,7 @@ goto phaseLoop
 
 phaseg4:
   echo "phase g4: Export gene expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
-  scripts/geneindex.tcsh g4
+  scripts2/geneindex.tcsh g4
 
 goto phaseLoop
 
@@ -4256,7 +4242,7 @@ phaseii4:
   cat MetaDB/$MAGIC/GroupIntronList MetaDB/$MAGIC/RunsIntronList | sort -u >   tmp/INTRON_DB/$MAGIC.RunList
 
   foreach chrom ($chromSetAll)
-    scripts/geneindex.tcsh ii4 $chrom
+    scripts2/geneindex.tcsh ii4 $chrom
     break
   end
 
@@ -4355,7 +4341,7 @@ goto phaseLoop
 phaseg4sp:
 phaseg4spx:
   echo "phase g4: Export gene_sponge expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
-  scripts/geneindex.tcsh $phase
+  scripts2/geneindex.tcsh $phase
 
 goto phaseLoop
 
@@ -4363,9 +4349,9 @@ phasegsnp4:
    echo "phase gsnp4: Export genes differing by the number of protein coding SNPs they contain"
   if (-e tmp/GENEINDEX/$MAGIC.snp_per_gene.protein.ace) then 
     if (! -d  tmp/GENEINDEX/Results) mkdir  tmp/GENEINDEX/Results
-    scripts/geneindex.tcsh gsnp4
+    scripts2/geneindex.tcsh gsnp4
   else
-    echo "Phase gsnp4 is part of MAGIC SNP "
+    echo "Phase gsnp4 is part of MAGIC2 SNP "
   endif
 
 goto phaseLoop
@@ -4373,7 +4359,7 @@ goto phaseLoop
 phasem4:
   echo "phase m4: Export mRNA expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
 
-  scripts/geneindex.tcsh ma4
+  scripts2/geneindex.tcsh ma4
 
 goto phaseLoop
 
@@ -4457,12 +4443,12 @@ EOF
     endif
   end
   echo toto | gawk '{printf("#\t# Run\tAverage coverage of the first %s",kb);for(i=0;i<=xMax-200;i+=50)printf("\t%d bp",i);printf("\n");}' xMax=$xMax kb=$kb > $toto.2
-  cat $toto.2 $toto.1 |  scripts/transpose  >>  $toto
-  cat $toto.1 |  gawk -F '\t' '{printf("%s\t%s",$1,$2); for(i=8;i<NF;i+=10){n=0;for(j=-4;j<5;j++){k=i+j;n+=$k/9;}$i=n;}for(i=13;i<NF-10;i+=10){$i=($(i-5)+$(i+5))/2;$3=2*$13-$23;for(i=3;i<=NF;i+=5)printf("\t%d",$i);}printf("\n");}' | scripts/transpose  >>  $toto
+  cat $toto.2 $toto.1 |  scripts2/transpose  >>  $toto
+  cat $toto.1 |  gawk -F '\t' '{printf("%s\t%s",$1,$2); for(i=8;i<NF;i+=10){n=0;for(j=-4;j<5;j++){k=i+j;n+=$k/9;}$i=n;}for(i=13;i<NF-10;i+=10){$i=($(i-5)+$(i+5))/2;$3=2*$13-$23;for(i=3;i<=NF;i+=5)printf("\t%d",$i);}printf("\n");}' | scripts2/transpose  >>  $toto
   if ($?CAPTURES) then
     echo toto | gawk '{printf("#\t# Run\tAverage coverage of the first %s",kb);for(i=0;i<=xMax-200;i+=50)printf("\t%d bp",i);printf("\n");}' xMax=$xMax kb=$kb > $toto.2.captured
-    cat $toto.2.captured $toto.1.captured |  scripts/transpose  >>  $toto.captured
-    cat $toto.1.captured |  gawk -F '\t' '{printf("%s\t%s",$1,$2); for(i=8;i<NF;i+=10){n=0;for(j=-4;j<5;j++){k=i+j;n+=$k/9;}$i=n;}for(i=13;i<NF-10;i+=10){$i=($(i-5)+$(i+5))/2;$3=2*$13-$23;for(i=3;i<=NF;i+=5)printf("\t%d",$i);}printf("\n");}' | scripts/transpose  >>  $toto.captured
+    cat $toto.2.captured $toto.1.captured |  scripts2/transpose  >>  $toto.captured
+    cat $toto.1.captured |  gawk -F '\t' '{printf("%s\t%s",$1,$2); for(i=8;i<NF;i+=10){n=0;for(j=-4;j<5;j++){k=i+j;n+=$k/9;}$i=n;}for(i=13;i<NF-10;i+=10){$i=($(i-5)+$(i+5))/2;$3=2*$13-$23;for(i=3;i<=NF;i+=5)printf("\t%d",$i);}printf("\n");}' | scripts2/transpose  >>  $toto.captured
   endif
   #if (-e $toto.1) \rm $toto.1 $toto.2 
 
@@ -4476,10 +4462,10 @@ EOF
 EOF
     
   if ($?CAPTURES && -e $toto.captured) then
-    cat $toto.captured | gawk -F '\t' '/^##/{next}/^# Run/{for(i=2;i<=NF;i++)rr[i]=$i;next;}/^Average/{for(i=2;i<=NF;i++)cover[i]=$i;next;}/^#/{if(substr($2,1,5)=="Kept "){for(i=2;i<=NF;i++){split($i,aa," ");split(aa[2],bb,"/");nKept[i]=bb[1];nCandidates[i]=bb[2];}}next;}/^#/{next}/ bp/{x=$1;gsub(" bp","",x);x=x+0;if(x<=8000)for(i=2;i<=NF;i++){rrx[i,x]=$i;rt[i]+=$i;}next;}END{printf("#Run\tKept\tCandidates\tCover\tH 30p%\tH 25p%\tH 20p%\tH 10%\tSurface 30%\tSurface 40%\tSurface 50%\tSurface 60%\tSurface 70%\tSurface 75%\tSurface 80%\tSurface 90%\tSurface 95%\tSurface 98%\tSurface 100%\n");for(r in rr){tt=rt[r];h=rrx[r,100];t=0;h10=0;h20=0;h25=0;h30=0;a30=0;a40=0;a50=0;a60=0;a70=0;a75=0;a80=0;a90=0;a95=0;a98=0;for(x=0;x<=8000;x+=50){y=rrx[r,x];t+=y;if(h10==0 && 10*y < h){h10=x;}if(h20==0 && 5*y < h)h20=x;if(h25==0 && 4*y < h)h25=x;if(h30==0 && 3.33*y < h)h30=x;if(a30==0 && 100*t > 30*tt)a30=x;if(a40==0 && 100*t > 40*tt)a40=x;if(a50==0 && 100*t > 50*tt)a50=x;if(a60==0 && 100*t > 60*tt)a60=x;if(a70==0 && 100*t > 70*tt)a70=x;if(a75==0 && 100*t > 75*tt)a75=x;if(a80==0 && 100*t > 80*tt)a80=x;if(a90==0 && 100*t > 90*tt)a90=x;if(a95==0 && 100*t > 95*tt)a95=x;if(a98==0 && 100*t > 98*tt)a98=x;if(a100==0 && 100*t >= 100*tt)a100=x;}if (h10==0)h10=8000;if (h20==0)h20=8000;if (h25==0)h25=8000;if (h30==0)h30=8000;if (nKept[r] >= 1){printf("%s\t%d\t%d\t%d",rr[r],nKept[r],nCandidates[r],cover[r]) ; printf("\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",h30,h25,h20,h10,a30,a40,a50,a60,a70,a75,a80,a90,a95,a98,a100);}}}' | scripts/tab_sort -k 3n  >>  $toto4.captured.txt
+    cat $toto.captured | gawk -F '\t' '/^##/{next}/^# Run/{for(i=2;i<=NF;i++)rr[i]=$i;next;}/^Average/{for(i=2;i<=NF;i++)cover[i]=$i;next;}/^#/{if(substr($2,1,5)=="Kept "){for(i=2;i<=NF;i++){split($i,aa," ");split(aa[2],bb,"/");nKept[i]=bb[1];nCandidates[i]=bb[2];}}next;}/^#/{next}/ bp/{x=$1;gsub(" bp","",x);x=x+0;if(x<=8000)for(i=2;i<=NF;i++){rrx[i,x]=$i;rt[i]+=$i;}next;}END{printf("#Run\tKept\tCandidates\tCover\tH 30p%\tH 25p%\tH 20p%\tH 10%\tSurface 30%\tSurface 40%\tSurface 50%\tSurface 60%\tSurface 70%\tSurface 75%\tSurface 80%\tSurface 90%\tSurface 95%\tSurface 98%\tSurface 100%\n");for(r in rr){tt=rt[r];h=rrx[r,100];t=0;h10=0;h20=0;h25=0;h30=0;a30=0;a40=0;a50=0;a60=0;a70=0;a75=0;a80=0;a90=0;a95=0;a98=0;for(x=0;x<=8000;x+=50){y=rrx[r,x];t+=y;if(h10==0 && 10*y < h){h10=x;}if(h20==0 && 5*y < h)h20=x;if(h25==0 && 4*y < h)h25=x;if(h30==0 && 3.33*y < h)h30=x;if(a30==0 && 100*t > 30*tt)a30=x;if(a40==0 && 100*t > 40*tt)a40=x;if(a50==0 && 100*t > 50*tt)a50=x;if(a60==0 && 100*t > 60*tt)a60=x;if(a70==0 && 100*t > 70*tt)a70=x;if(a75==0 && 100*t > 75*tt)a75=x;if(a80==0 && 100*t > 80*tt)a80=x;if(a90==0 && 100*t > 90*tt)a90=x;if(a95==0 && 100*t > 95*tt)a95=x;if(a98==0 && 100*t > 98*tt)a98=x;if(a100==0 && 100*t >= 100*tt)a100=x;}if (h10==0)h10=8000;if (h20==0)h20=8000;if (h25==0)h25=8000;if (h30==0)h30=8000;if (nKept[r] >= 1){printf("%s\t%d\t%d\t%d",rr[r],nKept[r],nCandidates[r],cover[r]) ; printf("\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",h30,h25,h20,h10,a30,a40,a50,a60,a70,a75,a80,a90,a95,a98,a100);}}}' | scripts2/tab_sort -k 3n  >>  $toto4.captured.txt
   endif
   
-  cat $toto | gawk -F '\t' '/^##/{next}/^# Run/{for(i=2;i<=NF;i++)rr[i]=$i;next;}/^Average/{for(i=2;i<=NF;i++)cover[i]=$i;next;}/^#/{if(substr($2,1,5)=="Kept "){for(i=2;i<=NF;i++){split($i,aa," ");split(aa[2],bb,"/");nKept[i]=bb[1];nCandidates[i]=bb[2];}}next;}/^#/{next}/ bp/{x=$1;gsub(" bp","",x);x=x+0;if(x<=8000)for(i=2;i<=NF;i++){rrx[i,x]=$i;rt[i]+=$i;}next;}END{printf("#Run\tKept\tCandidates\tCover\tH 30p%\tH 25p%\tH 20p%\tH 10%\tSurface 30%\tSurface 40%\tSurface 50%\tSurface 60%\tSurface 70%\tSurface 75%\tSurface 80%\tSurface 90%\tSurface 95%\tSurface 98%\tSurface 100%\n");for(r in rr){tt=rt[r];h=rrx[r,100];t=0;h10=0;h20=0;h25=0;h30=0;a30=0;a40=0;a50=0;a60=0;a70=0;a75=0;a80=0;a90=0;a95=0;a98=0;for(x=0;x<=8000;x+=50){y=rrx[r,x];t+=y;if(h10==0 && 10*y < h){h10=x;}if(h20==0 && 5*y < h)h20=x;if(h25==0 && 4*y < h)h25=x;if(h30==0 && 3.33*y < h)h30=x;if(a30==0 && 100*t > 30*tt)a30=x;if(a40==0 && 100*t > 40*tt)a40=x;if(a50==0 && 100*t > 50*tt)a50=x;if(a60==0 && 100*t > 60*tt)a60=x;if(a70==0 && 100*t > 70*tt)a70=x;if(a75==0 && 100*t > 75*tt)a75=x;if(a80==0 && 100*t > 80*tt)a80=x;if(a90==0 && 100*t > 90*tt)a90=x;if(a95==0 && 100*t > 95*tt)a95=x;if(a98==0 && 100*t > 98*tt)a98=x;if(a100==0 && 100*t >= 100*tt)a100=x;}if (h10==0)h10=8000;if (h20==0)h20=8000;if (h25==0)h25=8000;if (h30==0)h30=8000;if (nKept[r] >= 1){printf("%s\t%d\t%d\t%d",rr[r],nKept[r],nCandidates[r],cover[r]) ; printf("\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",h30,h25,h20,h10,a30,a40,a50,a60,a70,a75,a80,a90,a95,a98,a100);}}}' | scripts/tab_sort -k 3n  >>  $toto4.txt
+  cat $toto | gawk -F '\t' '/^##/{next}/^# Run/{for(i=2;i<=NF;i++)rr[i]=$i;next;}/^Average/{for(i=2;i<=NF;i++)cover[i]=$i;next;}/^#/{if(substr($2,1,5)=="Kept "){for(i=2;i<=NF;i++){split($i,aa," ");split(aa[2],bb,"/");nKept[i]=bb[1];nCandidates[i]=bb[2];}}next;}/^#/{next}/ bp/{x=$1;gsub(" bp","",x);x=x+0;if(x<=8000)for(i=2;i<=NF;i++){rrx[i,x]=$i;rt[i]+=$i;}next;}END{printf("#Run\tKept\tCandidates\tCover\tH 30p%\tH 25p%\tH 20p%\tH 10%\tSurface 30%\tSurface 40%\tSurface 50%\tSurface 60%\tSurface 70%\tSurface 75%\tSurface 80%\tSurface 90%\tSurface 95%\tSurface 98%\tSurface 100%\n");for(r in rr){tt=rt[r];h=rrx[r,100];t=0;h10=0;h20=0;h25=0;h30=0;a30=0;a40=0;a50=0;a60=0;a70=0;a75=0;a80=0;a90=0;a95=0;a98=0;for(x=0;x<=8000;x+=50){y=rrx[r,x];t+=y;if(h10==0 && 10*y < h){h10=x;}if(h20==0 && 5*y < h)h20=x;if(h25==0 && 4*y < h)h25=x;if(h30==0 && 3.33*y < h)h30=x;if(a30==0 && 100*t > 30*tt)a30=x;if(a40==0 && 100*t > 40*tt)a40=x;if(a50==0 && 100*t > 50*tt)a50=x;if(a60==0 && 100*t > 60*tt)a60=x;if(a70==0 && 100*t > 70*tt)a70=x;if(a75==0 && 100*t > 75*tt)a75=x;if(a80==0 && 100*t > 80*tt)a80=x;if(a90==0 && 100*t > 90*tt)a90=x;if(a95==0 && 100*t > 95*tt)a95=x;if(a98==0 && 100*t > 98*tt)a98=x;if(a100==0 && 100*t >= 100*tt)a100=x;}if (h10==0)h10=8000;if (h20==0)h20=8000;if (h25==0)h25=8000;if (h30==0)h30=8000;if (nKept[r] >= 1){printf("%s\t%d\t%d\t%d",rr[r],nKept[r],nCandidates[r],cover[r]) ; printf("\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",h30,h25,h20,h10,a30,a40,a50,a60,a70,a75,a80,a90,a95,a98,a100);}}}' | scripts2/tab_sort -k 3n  >>  $toto4.txt
   # $15 =  accessible length = 80% of surface of 8kb crocodile
   # $13 =  accessible length = 70% of surface of 8kb crocodile
   cat   $toto4.txt | gawk -F '\t' '/^#/{next;}{x=$13;if(x==0)x=8000;printf("Ali %s\nAccessible_length_%s %s %s %s %s\n\n",$1,kb,x,$2,$3,$4);}' kb=$kb  > $toto4.ace
@@ -4504,20 +4490,20 @@ goto phaseLoop
 phasem4H:
   echo "phase m4H: Export hierarchic mRNA expression tables in RESULTS/Expression and analyse differential expression according to the Compare class"
 
-  scripts/geneindex.tcsh m4H
+  scripts2/geneindex.tcsh m4H
 
 goto phaseLoop
 
 phasema4:
   echo "phase ma4: Analyse the micro-array data declared in OTHER_PIPELINES as another RESULTS/Expression"
 
-  scripts/geneindex.tcsh ma4
+  scripts2/geneindex.tcsh ma4
 
 goto phaseLoop
 
 phaseSF4:
   echo "phase $phase : Export the sailfish Gene index counts and gene comparisons in RESULTS/Expression"
-  scripts/geneindex.tcsh $phase
+  scripts2/geneindex.tcsh $phase
 
 goto phaseLoop
 
@@ -4537,7 +4523,7 @@ foreach target ($Etargets)
     foreach GM (GENE MRNAH)
       foreach ccc (`cat  MetaDB/$MAGIC/ccc.list` anyComparison)
         if (! -e  tmp/Prevalence/$target.$GM.$ccc.done) then
-          scripts/submit tmp/Prevalence/$target.$GM "scripts/prevalence.tcsh $target $GM $ccc"
+          scripts2/submit tmp/Prevalence/$target.$GM "scripts2/prevalence.tcsh $target $GM $ccc"
         endif
       end
     end
@@ -4564,7 +4550,7 @@ if ($n > 0) then
       foreach GM (GENE MRNAH)
         foreach ccc (`cat  MetaDB/$MAGIC/ccc_pair.list` anyComparison)
           if (! -e  tmp/ChromDensity/$target.$GM.$ccc.done) then
-            scripts/submit tmp/ChromDensity/$target.$GM "scripts/chrom_density.tcsh $target $GM $ccc"
+            scripts2/submit tmp/ChromDensity/$target.$GM "scripts2/chrom_density.tcsh $target $GM $ccc"
           endif
         end
       end
@@ -4582,7 +4568,7 @@ echo "phase g12a: Prepare the histogram of all measured non-NA indexes in the di
 foreach GM (GENE MRNAH MA)
   foreach target ($Etargets $other_targets )
     if (-e  RESULTS/Expression/AceFiles/$MAGIC.$target.$GM.u.ace.gz && (! -e RESULTS/Expression/unique/$target/$MAGIC.index.$GM.distrib.txt || !  -e RESULTS/Expression/unique/$target/$MAGIC.cumulated_support_notNA.$GM.txt)) then
-      scripts/submit tmp/GENEINDEX/$MAGIC.$GM.$target.g12a "scripts/g12.expression_histos.tcsh $target $GM"
+      scripts2/submit tmp/GENEINDEX/$MAGIC.$GM.$target.g12a "scripts2/g12.expression_histos.tcsh $target $GM"
     endif
   end
 end
@@ -4594,7 +4580,7 @@ goto phaseLoop
 phaseg12b: 
 echo "phase g12b: Export the histogram of all measured non-NA indexes in the different targets"
 
-     scripts/g12.expression_histos.tcsh export
+     scripts2/g12.expression_histos.tcsh export
      echo RESULTS/Expression/unique/$MAGIC.expression_index.histo.txt
      echo RESULTS/Expression/unique/$MAGIC.cumulated_support_of_annotated_genes_and_transcripts.histo.txt
 goto phaseLoop
@@ -4636,7 +4622,7 @@ phaseklst1:
       if (! -d tmp/Kallisto/$run/$target) mkdir  tmp/Kallisto/$run/$target
       if (-e tmp/Kallisto/$run/$target/abundance.tsv) continue
       if (-e tmp/Kallisto/$run/$target/abundance.tsv.gz) continue
-      scripts/submit tmp/Kallisto/$run/$target/klst1  "scripts/kallisto.tcsh klst1 $species $target $run"
+      scripts2/submit tmp/Kallisto/$run/$target/klst1  "scripts2/kallisto.tcsh klst1 $species $target $run"
       
       set ok=1
     end
@@ -4689,7 +4675,7 @@ phaseklst4:
        endif
      end
   end
-  scripts/geneindex.tcsh klst4
+  scripts2/geneindex.tcsh klst4
 goto phaseLoop
  
 ###############################################
@@ -4702,7 +4688,7 @@ if (! -d tmp/Sailfish) mkdir  tmp/Sailfish
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/Sailfish/$run) $mkDir  Sailfish $run
   if (! -e tmp/Sailfish/$run/done) then
-    scripts/submit tmp/Sailfish/$run/sailfish.$run "scripts/sailfish.tcsh $run"
+    scripts2/submit tmp/Sailfish/$run/sailfish.$run "scripts2/sailfish.tcsh $run"
   endif
 end
 goto phaseLoop
@@ -4714,7 +4700,7 @@ phaseSF2:
 
 foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (-e tmp/Sailfish/$run/done && ! -e  tmp/Sailfish/$run/GENE.done) then
-      scripts/submit tmp/Sailfish/$run/sailfish.$run "scripts/sailfish.tcsh $run GENE"
+      scripts2/submit tmp/Sailfish/$run/sailfish.$run "scripts2/sailfish.tcsh $run GENE"
     endif
 end
 goto phaseLoop
@@ -4725,18 +4711,18 @@ goto phaseLoop
 phaseFDR1:
   echo "phase FDR1: For all Experiment with DEG tag export FDR table in RESULTS/Expression"
   
-  scripts/FDR.tcsh FDR1
+  scripts2/FDR.tcsh FDR1
 
 goto phaseLoop
 
 phaseFDR2:
   echo "phase FDR2: Export list of DEG at optimal FDR rate as .ace file"
 
-  scripts/FDR.tcsh FDREXPORT           
+  scripts2/FDR.tcsh FDREXPORT           
 
 goto phaseLoop
 
-gunzip -c RESULTS/Expression/unique/AGLuK/NB.AGLuK.MA.u.ace.gz |  gawk '/Run_/{gsub(/\"/,"",$2);r=$2;rr[r]=1;z=log(1+$4)/log(2);rrz[r,5*int((z+.24)/.5)]++;next;}END{printf("Index");for(r in rr)printf("\t%s",r);for(k=0;k<=300;k+=5){printf("\n%.1f",k/10);for(r in rr)printf("\t%d",rrz[r,k]);}printf("\n");}' | scripts/transpose | $tab_sort | scripts/transpose > RESULTS/Expression/unique/AGLuK/NB.index.histo.txt
+gunzip -c RESULTS/Expression/unique/AGLuK/NB.AGLuK.MA.u.ace.gz |  gawk '/Run_/{gsub(/\"/,"",$2);r=$2;rr[r]=1;z=log(1+$4)/log(2);rrz[r,5*int((z+.24)/.5)]++;next;}END{printf("Index");for(r in rr)printf("\t%s",r);for(k=0;k<=300;k+=5){printf("\n%.1f",k/10);for(r in rr)printf("\t%d",rrz[r,k]);}printf("\n");}' | scripts2/transpose | $tab_sort | scripts2/transpose > RESULTS/Expression/unique/AGLuK/NB.index.histo.txt
 
 
 
@@ -4747,7 +4733,7 @@ gunzip -c RESULTS/Expression/unique/AGLuK/NB.AGLuK.MA.u.ace.gz |  gawk '/Run_/{g
 phaseg5:
   echo "phase g5: Parse the geneindex in GeneindexDB"
 
-  scripts/geneindex.tcsh g5
+  scripts2/geneindex.tcsh g5
 
 goto phaseLoop
 
@@ -4758,7 +4744,7 @@ goto phaseLoop
 phaseii5old:
   echo "phase ii5: Recalcul des index, par run et par groupe"
 
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii5
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii5
 
 goto phaseLoop
 
@@ -4769,7 +4755,7 @@ goto phaseLoop
 phaseii6:
   echo "phase ii6: Intron index compute the intronIndex for each group"
 
-  if ($Strategy == RNA_seq) scripts/geneindex.tcsh ii6
+  if ($Strategy == RNA_seq) scripts2/geneindex.tcsh ii6
 
 goto phaseLoop
 
@@ -4780,7 +4766,7 @@ goto phaseLoop
 phaseg6:
   echo "phase g6: Exportation a partir de GeneIndexDB des tables d'index par genes annotes"
 
-  scripts/geneindex.tcsh g6
+  scripts2/geneindex.tcsh g6
 
   mv RESULTS/Expression/*ERCC*txt      RESULTS/Expression/ERCC
   mv RESULTS/Expression/*1000*.txt     RESULTS/Expression/1000genes_with_best_support
@@ -4796,7 +4782,7 @@ goto phaseLoop
 
 phaseg7:
   echo "phase g7: Most expressed genes"
-  scripts/geneindex.tcsh g7
+  scripts2/geneindex.tcsh g7
 goto phaseLoop
 
 ###################################################################################
@@ -4805,7 +4791,7 @@ goto phaseLoop
 
 phaseg8:
   echo "phase g8: Most differentially expressed genes"
-  scripts/geneindex.tcsh g8
+  scripts2/geneindex.tcsh g8
 goto phaseLoop
 
 ###################################################################################
@@ -4821,7 +4807,7 @@ phaseVir1:
       if (! -d  tmp/VIRUS/$run) $mkDir  VIRUS $run
       if (! -d  tmp/BACTERIA/$run) $mkDir  BACTERIA $run
       if (! -e  tmp/VIRUS/$run/vir1.virus.count || ! -e  tmp/BACTERIA/$run/vir1.bacteria.count) then
-        scripts/submit tmp/VIRUS/$run/vir1 "scripts/virus.tcsh vir1 $run " 32G
+        scripts2/submit tmp/VIRUS/$run/vir1 "scripts2/virus.tcsh vir1 $run " 32G
       endif
     end
 
@@ -4829,7 +4815,7 @@ goto phaseLoop
 
 phaseVir2: 
   if (-d  tmp/VIRUS) then
-    scripts/virus.tcsh vir2
+    scripts2/virus.tcsh vir2
   endif
 goto phaseLoop
 
@@ -4885,8 +4871,8 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   endif
 
   if (! -e tmp/SNP_BRS/$run/s1.done && ! ($justMito == 1 && -e tmp/SNP_BRS/$run/s1.justMito.done)) then
-    echo                               "scripts/s1.snp_accumulate.tcsh $run justMito=$justMito $geneSNPTarget minAli=$minAli"
-    scripts/submit tmp/SNP_BRS/$run/s1 "scripts/s1.snp_accumulate.tcsh $run $justMito $geneSNPTarget"
+    echo                               "scripts2/s1.snp_accumulate.tcsh $run justMito=$justMito $geneSNPTarget minAli=$minAli"
+    scripts2/submit tmp/SNP_BRS/$run/s1 "scripts2/s1.snp_accumulate.tcsh $run $justMito $geneSNPTarget"
   endif
 end
 
@@ -4942,11 +4928,11 @@ if ($NO_INTRON == 0 && $Strategy == RNA_seq) then
       if (-e tmp/SNP_ZONE/zoner.1.fasta) \rm tmp/SNP_ZONE/zoner.*.fasta
       foreach ff (`ls tmp/SNP_ZONE/zoner.*.txt`)
         set ff1=`echo $ff | sed -e 's/\.txt//'`
-        scripts/submit $ff1 "bin/dna2dna -i TARGET/Targets/$species.$target.fasta.gz -select $ff -I fasta -O fasta -gzo -o $ff1" MULTICORE
+        scripts2/submit $ff1 "bin/dna2dna -i TARGET/Targets/$species.$target.fasta.gz -select $ff -I fasta -O fasta -gzo -o $ff1" MULTICORE
       end
 
     endif
-    scripts/submit tmp/SNP_ZONE/wait_split_target  wait MULTICORE
+    scripts2/submit tmp/SNP_ZONE/wait_split_target  wait MULTICORE
 
     echo "mito" > tmp/SNP_ZONE/ZoneList
 
@@ -4959,7 +4945,7 @@ endif
 
 if ($NO_INTRON == 0 && $Strategy == RNA_seq && -e TARGET/GENES/av.gene.ace  && ! -e tmp/SNP_ZONE/zoneg.999.fasta.gz) then
   echo "collect the profiling gene set"
-  scripts/s1.CreateGeneSet.tcsh
+  scripts2/s1.CreateGeneSet.tcsh
 endif
 
 if ($Strategy == RNA_seq && ! -e tmp/TSNP_DB/Genes/tsnp0.parse.done) then
@@ -5097,7 +5083,7 @@ foreach run (`cat MetaDB/$MAGIC/RunsList`)
           set t2=`cat tmp/SNP_ZONE/_allG | gawk -F '\t' '{if("zoneG."$4==zone)n=$3;next;}END{print n+0;}' zone=$zone`
         endif
         if (! -e tmp/TSNP/$run/$zone/tsnp1.$MB.$part.deUno.tsf) then
-          scripts/submit tmp/TSNP/$run/$zone/tsnp1.$MB.$part "scripts/tsnp1.tcsh $run $zone $MB $Strategy tmp/SNP_ZONE/$zone.fasta.gz tricoteur $part $t1 $t2" 32G
+          scripts2/submit tmp/TSNP/$run/$zone/tsnp1.$MB.$part "scripts2/tsnp1.tcsh $run $zone $MB $Strategy tmp/SNP_ZONE/$zone.fasta.gz tricoteur $part $t1 $t2" 32G
         endif
       endif
     end
@@ -5134,7 +5120,7 @@ foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/r2sublib | cut -f 1 | sor
     if (-e  tmp/TSNP/$run/$zone/tsnp1.2.0.deUno.tsf)  then
        cat  tmp/TSNP/$run/$zone/tsnp1.2.0.deUno.tsf >>  tmp/TSNP/$run/$zone/_r
     endif
-    scripts/submit tmp/TSNP/$run/$zone/tsnp1b "scripts/tsnp1b.tcsh $run $zone $minSnpCount $minSnpCover $minSnpFrequency" 
+    scripts2/submit tmp/TSNP/$run/$zone/tsnp1b "scripts2/tsnp1b.tcsh $run $zone $minSnpCount $minSnpCover $minSnpFrequency" 
   end
 end
 
@@ -5158,14 +5144,14 @@ if (! -d tmp/TSNP_DB) mkdir tmp/TSNP_DB
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) mkdir tmp/TSNP_DB/$zone
   if (! -e tmp/TSNP_DB/$zone/$MAGIC.$phase.done2) then
-    scripts/submit tmp/TSNP_DB/$zone/$phase "scripts/tsnp2.tcsh $phase $zone"
+    scripts2/submit tmp/TSNP_DB/$zone/$phase "scripts2/tsnp2.tcsh $phase $zone"
   endif
 end
 
 goto phaseLoop
 
 # GGG is an analysis of 2020 for Josh Sherry to look for evolution in bacterial strains
-scripts/submit wait
+scripts2/submit wait
  
 phaseTSnp2g2:
 # merge in 2 steps, to avoid malloc failure
@@ -5213,7 +5199,7 @@ if (! -d tmp/TSNP_DB) mkdir tmp/TSNP_DB
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) continue
   if (! -e tmp/TSNP_DB/$zone/$MAGIC.tsnp10.done2) then
-    scripts/submit tmp/TSNP_DB/$zone/$phase "scripts/tsnp10.export.tcsh $zone"
+    scripts2/submit tmp/TSNP_DB/$zone/$phase "scripts2/tsnp10.export.tcsh $zone"
   endif
 end
 
@@ -5225,7 +5211,7 @@ phaseTSnp2b:
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -e tmp/TSNP_DB/$zone/tsnp2a.done) continue
   if (! -e tmp/TSNP_DB/$zone/tsnp2b.done) then
-    scripts/submit tmp/TSNP_DB/$zone/tsnp2b  "scripts/tsnp2.tcsh tsnp2b $zone"
+    scripts2/submit tmp/TSNP_DB/$zone/tsnp2b  "scripts2/tsnp2.tcsh tsnp2b $zone"
   endif
 end
 
@@ -5239,7 +5225,7 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -e tmp/TSNP_DB/$zone/tsnp2b.done) continue
     foreach run (`cat MetaDB/$MAGIC/RunsList`)
       if (-e tmp/TSNP_DB/$zone/tsnp2b.$MAGIC.w31.gz && -d tmp/TSNP/$run/$zone && ! -e  tmp/TSNP/$run/$zone/tsnp2c.$MAGIC.val.txt.gz) then
-        scripts/submit tmp/TSNP/$run/$zone/tsnp2c  "scripts/tsnp2.tcsh tsnp2c $zone $run"
+        scripts2/submit tmp/TSNP/$run/$zone/tsnp2c  "scripts2/tsnp2.tcsh tsnp2c $zone $run"
       endif
     end
   endif
@@ -5248,7 +5234,7 @@ end
 goto phaseLoop
 
 
-scripts/submit  tmp/TSNP/$run/tsnp2  "bin/tricoteur -count -wLn 31 -wordFile tmp/TSNP_DB/$zone/tsnp2.$MAGIC.w31.gz -run $run -gzo -o tmp/TSNP/$run/tsnp2.$MAGIC.$zone -antistrand" 32G
+scripts2/submit  tmp/TSNP/$run/tsnp2  "bin/tricoteur -count -wLn 31 -wordFile tmp/TSNP_DB/$zone/tsnp2.$MAGIC.w31.gz -run $run -gzo -o tmp/TSNP/$run/tsnp2.$MAGIC.$zone -antistrand" 32G
 ###################################################################################
 ## Report in ali the snp stats
 phaseTSnp3:
@@ -5257,11 +5243,11 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) goto phaseLoop
   if (-e tmp/TSNP_DB/$zone/$MAGIC.tsnp3.snp_profile.tsf.gz) continue
   set ok=0
-  scripts/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/$MAGIC.tsnp3 --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC" 
+  scripts2/submit tmp/TSNP_DB/$zone/tsnp3.snp_profile "bin/tsnp --db_snp_profile --db tmp/TSNP_DB/$zone --gzo -o tmp/TSNP_DB/$zone/$MAGIC.tsnp3 --minSnpCover $minSnpCover --minSnpCount $minSnpCount --minSnpFrequency 18 --project $MAGIC" 
   if (-e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) \rm  tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz  
 end
 if (! -e tmp/TSNP_DB/$MAGIC.tsnp3.snp_profile.ace.gz) then
-  if ($ok == 0) scripts/submit wait
+  if ($ok == 0) scripts2/submit wait
   gunzip -c tmp/TSNP_DB/zone*/$MAGIC.tsnp3.snp_profile.tsf.gz | bin/tsf -I tsf -O tsf | gawk -F '\t' '/^#/{next;}{print;}' | sort > tmp/TSNP_DB/toto.tsf.$$
   # add markers otherwise we lose the last object
   echo "TYPE__\nProtein_changing__\nGenomic__" >> tmp/TSNP_DB/toto.tsf.$$
@@ -5278,12 +5264,12 @@ endif
 goto phaseLoop
   
 ###################################################################################
-## Report some table, see also scripts/snp3.tch developped for SEQC2
+## Report some table, see also scripts2/snp3.tch developped for SEQC2
 
 phaseTSnp3b:
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone) continue
-  scripts/submit tmp/TSNP_DB/$zone/tsnp3 "scripts/tsnp3.tcsh  $Strategy $zone" 32G
+  scripts2/submit tmp/TSNP_DB/$zone/tsnp3 "scripts2/tsnp3.tcsh  $Strategy $zone" 32G
 end
 goto phaseLoop
   
@@ -5355,7 +5341,7 @@ if ($MAGIC_A2G == 1) then
   foreach run (`cat MetaDB/$MAGIC/RunList`) 
     foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
       if (-e  tmp/SNP_BRS/$run/$zone.BRS.u.gz && ! -e  tmp/SNP_BRS/$run/$zone.a2g.u.gz) then
-        scripts/submit  tmp/SNP_BRS/$run/$zone.a2g "scripts/s2r.a2g_collect.tcsh $run $zone"
+        scripts2/submit  tmp/SNP_BRS/$run/$zone.a2g "scripts2/s2r.a2g_collect.tcsh $run $zone"
       endif
     end
   end
@@ -5374,7 +5360,7 @@ if ($MAGIC_A2G == 1) then
     foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
       gunzip -c tmp/SNP_BRS/$run/$zone.a2g.u.gz | gawk -F '\t' '{if($5 > 10)print}' | sort -k 1,1 -k 2,2n >> tmp/SNP_BRS/$run.tati
     end
-    cat tmp/SNP_BRS/$run.tati | gawk -F '\t' -f scripts/s21.snpA2G.awk run=$run >>  tmp/SNP_BRS/$MAGIC.runs.A2G
+    cat tmp/SNP_BRS/$run.tati | gawk -F '\t' -f scripts2/s21.snpA2G.awk run=$run >>  tmp/SNP_BRS/$MAGIC.runs.A2G
     \rm tmp/SNP_BRS/$run.tati
   end
   echo "phase s2A2G done"
@@ -5405,8 +5391,8 @@ foreach group (`cat MetaDB/$MAGIC/RunHasSubLibList`)
         endif
       end
       if ($ok == 1) then
-       # echo "scripts/s2.mergeBRS $group $zone"
-        scripts/submit  tmp/SNP_BRS/$group/s2.$zone "scripts/s2.mergeBRS.tcsh $group $zone"
+       # echo "scripts2/s2.mergeBRS $group $zone"
+        scripts2/submit  tmp/SNP_BRS/$group/s2.$zone "scripts2/s2.mergeBRS.tcsh $group $zone"
       endif
     endif
  
@@ -5450,8 +5436,8 @@ echo ...$group
           endif
         end
         if ($ok == 1) then
-          echo "scripts/s2.mergeBRS $group $zone"
-          scripts/submit  tmp/SNP_BRS/$group/s2.$zone "scripts/s2.mergeBRS.tcsh $group $zone"
+          echo "scripts2/s2.mergeBRS $group $zone"
+          scripts2/submit  tmp/SNP_BRS/$group/s2.$zone "scripts2/s2.mergeBRS.tcsh $group $zone"
           set okk=1
         endif
       endif
@@ -5460,7 +5446,7 @@ echo ...$group
   end
   if ($okk == 1) then
     echo "Waiting for collation of BRS SNP files group-level $level"
-    scripts/submit wait
+    scripts2/submit wait
   endif
 end
 
@@ -5522,7 +5508,7 @@ foreach zone ($zones1 $zones2)
     echo >  tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new
     foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupSnpAdditiveList`) 
       echo $run >> tmp/SNP_LIST/$zone/$MAGIC.SnpRunList.new
-      if (! -e tmp/SNP/$run/$MAGIC2.snp.$collect.done) set ok=1
+      if (! -e tmp/SNP/$run/$MAGIC.snp.$collect.done) set ok=1
     end
     if ($ok == 0) goto phaseLoop
 
@@ -5644,7 +5630,7 @@ foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupSnpAdditiveList`)
       if ($run == $run2) set solid="solid"
     end
 
-    #echo "scripts/snp.collect.tcsh $run $justMito  $pool $solid $collect minFrequency=$minSnpFrequency"
+    #echo "scripts2/snp.collect.tcsh $run $justMito  $pool $solid $collect minFrequency=$minSnpFrequency"
     if (-e tmp/SNP/$MAGIC.candidate_variants_detected_by_BRS.txt) \rm tmp/SNP/$MAGIC.candidate_variants_detected_by_BRS.txt
 
 
@@ -5653,10 +5639,10 @@ foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupSnpAdditiveList`)
       if (! -e tmp/SNP_BRS/$run/$zone.BRS.u.gz) continue
       if ($justMito == 1 && -e tmp/SNP/$run/$zone.snp.$collect.$justMito.done) continue
       if ($collect == detect && -e tmp/SNP/$run/$zone.snp.$collect.done && -e tmp/SNP_LIST/$zone/Variant.$run.u.list) continue
-      if ($collect == count && -e tmp/SNP/$run/$MAGIC2.$zone.snp.$collect.done) continue 
+      if ($collect == count && -e tmp/SNP/$run/$MAGIC.$zone.snp.$collect.done) continue 
 
-      echo "submit scripts/snp.collect.tcsh $run $justMito $pool $solid $collect $zone "
-      scripts/submit tmp/SNP/$run/$zone.snp.$collect "scripts/snp.collect.tcsh $run $justMito $pool $solid $collect $zone "
+      echo "submit scripts2/snp.collect.tcsh $run $justMito $pool $solid $collect $zone "
+      scripts2/submit tmp/SNP/$run/$zone.snp.$collect "scripts2/snp.collect.tcsh $run $justMito $pool $solid $collect $zone "
     end
 end
 
@@ -5719,8 +5705,8 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
           ls tmp/COUNT/$run/*.hits.gz > tmp/SNP/$run/s2c.hits_file.list
         endif
 
-        echo "scripts/submit tmp/SNP/$run/$zone.extend  scripts/s2c.snp_extend.tcsh $run $zone $ff"
-              scripts/submit tmp/SNP/$run/$zone.extend "scripts/s2c.snp_extend.tcsh $run $zone $ff"
+        echo "scripts2/submit tmp/SNP/$run/$zone.extend  scripts2/s2c.snp_extend.tcsh $run $zone $ff"
+              scripts2/submit tmp/SNP/$run/$zone.extend "scripts2/s2c.snp_extend.tcsh $run $zone $ff"
       endif
     end
   end
@@ -5737,7 +5723,7 @@ echo -n " " > $toto
 date >> $toto
 
 \rm tmp/GENEINDEX/$MAGIC.snp.SNP.info.ace
-scripts/geneindex.tcsh snp4 000
+scripts2/geneindex.tcsh snp4 000
 
 # Ov Aspi Clopi Lipid Salt) 
 foreach XXX (HRD  NoLib3 atig) 
@@ -5874,7 +5860,7 @@ foreach minFreq (20 95)
       foreach run (`cat MetaDB/$MAGIC/RunListSorted MetaDB/$MAGIC/GroupAdditiveList`)
   
         set n1=`ls -ls tmp/SNP/$run/zone*.detect.u.snp.gz | wc -l`
-        set n2=`ls -ls tmp/SNP/$run/$MAGIC2.zone*.count.u.snp.gz | wc -l`
+        set n2=`ls -ls tmp/SNP/$run/$MAGIC.zone*.count.u.snp.gz | wc -l`
         if ($n1 != $n2) then
           echo "Run $run : $n1 zones $n2 $dce files, missing some, please rerun phase s3a/s3b"
         endif
@@ -5882,8 +5868,8 @@ foreach minFreq (20 95)
           gunzip -c tmp/SNP/$run/*.$dce.u.txt.gz | grep -v N_rich | grep -v Incompatible_strands >> $toto.tmp
         endif
       end
-      echo "cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.tmp | gawk -F '\t' -f scripts/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minFreq"
-            cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.tmp | gawk -F '\t' -f scripts/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minFreq >> $toto
+      echo "cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.tmp | gawk -F '\t' -f scripts2/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minFreq"
+            cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.tmp | gawk -F '\t' -f scripts2/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minFreq >> $toto
       # \rm $toto.tmp
     end
   
@@ -5948,7 +5934,7 @@ foreach type (snp.sorted snp.sorted.filtered)
       echo "# and selected by differential analysis in at least one comparative group." >> $toto  
       echo "# Only reads-pairs aligning uniquely over at least 90% of their length are considered." >> $toto
 
-     cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupSnpAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/SNPH/*/$MAGIC.$type | gawk -F '\t' -f scripts/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
+     cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupSnpAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/SNPH/*/$MAGIC.$type | gawk -F '\t' -f scripts2/snpSupportStat.awk  format=snpq minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
   endif
   # bin/rsync -ah  $toto RESULTS/SNV   toto is already in this dir
 end
@@ -5959,7 +5945,7 @@ echo -n "# File $toto " > $toto
 date >> $toto
 echo "# Histogram of the observed SNP frequency in project $MAGIC, by genotype category, homozygote reference or variant, heterozygote or intermediate, possibly corresponding to gene duplication or non diploid content" >> $toto
 cat tmp/SNPH/*/$MAGIC.snp.sorted.filtered | gawk -F '\t' '/^#/{next;}{t=10*$7;if(t!=10*int(t/10))t+=30;if(t<10)t="0" t; d=.5;if($8<30)d=.2;if($8>70)d=.8;f=int($8 + d);if(substr($3,2,1)!=">"){t1= "H" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;}else {t1= "B" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;} {t1= "A" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;}}END{for (t in tt){for(i=-2;i<=102;i++)nns[t,i]=(nn[t,i-2]+4*nn[t,i-1]+6*nn[t,i]+4*nn[t,i+1]+nn[t,i+2])/16;nns[t,0]+=nns[t,-1]+nns[t,-2];nns[t,100]+=nns[t,101]+nns[t,102];}ttt["A00"]="+/+";ttt["A33"]="~m/+/+";ttt["A35"]="+ or m/+";ttt["A10"]="m/+";ttt["A45"]="+ or m/m";ttt["A47"]="~m/m/+";ttt["A20"]="m/m";ttt["B00"]="Subst +/+";ttt["B33"]="Subst ~m/+/+";ttt["B35"]="Subst + or m/+";ttt["B10"]="Subst m/+";ttt["B45"]="Subst + or m/m";ttt["B47"]="Subst ~m/m/+";ttt["B20"]="Subst m/m";ttt["H00"]="InDel +/+";ttt["H33"]="InDel ~m/+/+";ttt["H35"]="InDel + or m/+";ttt["H10"]="InDel m/+";ttt["H45"]="InDel + or m/m";ttt["H47"]="InDel ~m/m/+";ttt["H20"]="InDel m/m";printf("\n0Type");for(t in tt)printf("\t%s",t);printf("\n0Observed frequency of the variant allele in SNPs");for(t in tt)printf("\t%s",ttt[t]);for(i=0;i<=100;i++){printf("\n%d",i);for (t in tt)printf("\t%d",nns[t,i]);}printf("\nTotal");for (t in tt)printf("\t%d",nnn[t]);printf("\n");}' > $toto.1
-cat $toto.1 | scripts/transpose | $tab_sort -k 1n | scripts/transpose >> $toto
+cat $toto.1 | scripts2/transpose | $tab_sort -k 1n | scripts2/transpose >> $toto
 \rm $toto.1
 
 set toto=RESULTS/SNV/$MAGIC.snp.sorted.VariantFrequency.histo.txt
@@ -5967,7 +5953,7 @@ echo -n "# File $toto  " > $toto
 date >> $toto
 echo "# Histogram of the observed SNP frequency in project $MAGIC, by genotype category, homozygote reference or variant, heterozygote or intermediate, possibly corresponding to gene duplication or non diploid content" >> $toto
 cat tmp/SNPH/*/$MAGIC.snp.sorted | gawk -F '\t' '/^#/{next;}{t=10*$7;if(t!=10*int(t/10))t+=30;if(t<10)t="0" t; d=.5;if($8<30)d=.2;if($8>70)d=.8;f=int($8 + d);if(substr($3,2,1)!=">"){t1= "H" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;}else {t1= "B" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;} {t1= "A" t; tt[t1]=1;nnn[t1]++;nn[t1,f]++;}}END{for (t in tt){for(i=-2;i<=102;i++)nns[t,i]=(nn[t,i-2]+4*nn[t,i-1]+6*nn[t,i]+4*nn[t,i+1]+nn[t,i+2])/16;nns[t,0]+=nns[t,-1]+nns[t,-2];nns[t,100]+=nns[t,101]+nns[t,102];}ttt["A00"]="+/+";ttt["A33"]="~m/+/+";ttt["A35"]="+ or m/+";ttt["A10"]="m/+";ttt["A45"]="+ or m/m";ttt["A47"]="~m/m/+";ttt["A20"]="m/m";ttt["B00"]="Subst +/+";ttt["B33"]="Subst ~m/+/+";ttt["B35"]="Subst + or m/+";ttt["B10"]="Subst m/+";ttt["B45"]="Subst + or m/m";ttt["B47"]="Subst ~m/m/+";ttt["B20"]="Subst m/m";ttt["H00"]="InDel +/+";ttt["H33"]="InDel ~m/+/+";ttt["H35"]="InDel + or m/+";ttt["H10"]="InDel m/+";ttt["H45"]="InDel + or m/m";ttt["H47"]="InDel intermidiate high";ttt["H20"]="InDel m/m";printf("\n0Type");for(t in tt)printf("\t%s",t);printf("\n0Observed frequency of the variant allele in SNPs");for(t in tt)printf("\t%s",ttt[t]);for(i=0;i<=100;i++){printf("\n%d",i);for (t in tt)printf("\t%d",nns[t,i]);}printf("\nTotal");for (t in tt)printf("\t%d",nnn[t]);printf("\n");}' > $toto.1
-cat $toto.1 | scripts/transpose | $tab_sort -k 1n | scripts/transpose >> $toto
+cat $toto.1 | scripts2/transpose | $tab_sort -k 1n | scripts2/transpose >> $toto
 \rm $toto.1
 
 goto phaseLoop
@@ -5997,7 +5983,7 @@ if ($n == 0) then
 endif
 cat  tmp/SNPH/_s13
 
-scripts/geneindex.tcsh snp4 000
+scripts2/geneindex.tcsh snp4 000
 cat  MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList | sed -e 's/\"//g' >   tmp/SNPH/s13.runs_groupsList
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (-e tmp/SNPH/$zone/$MAGIC.snp.sorted.filtered && ! -e tmp/SNPH/$zone/$MAGIC.snpCompare3) then
@@ -6020,10 +6006,10 @@ echo "phase snp4: Prediction using the SNPs"
 
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf) continue
-  scripts/submit tmp/TSNP_DB/$zone/s21 "scripts/snp3.tcsh G $zone"
+  scripts2/submit tmp/TSNP_DB/$zone/s21 "scripts2/snp3.tcsh G $zone"
 end
 
-scripts/submit wait
+scripts2/submit wait
 
 if (! -d tmp/GENEINDEX) mkdir tmp/GENEINDEX
 
@@ -6031,7 +6017,7 @@ cat  tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf | gzip > tmp/GENEINDEX/$MAGIC.char
 wc  tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf 
 ls -ls tmp/GENEINDEX/$MAGIC.characteristic_snps.tsf.gz
 
-scripts/geneindex.tcsh snp4
+scripts2/geneindex.tcsh snp4
 
 echo "phase snp4 done"
 goto phaseLoop
@@ -6060,7 +6046,7 @@ cat $run.raw.sorted | gawk '{if($1==old)next;old=$1;printf("%s\n%s\n",$1,$3);}' 
 
 # this does not work, rather i just add a -u in the sort command inside makeFastc 2023_09_19
 foreach run (`cat sx.list`)
-#   ../scripts/submit $run.makeUnique "bin/dna2dna -i $run.fasta.gz -o $run.unique -I fasta -O fasta -makeFastaUnique "
+#   ../scripts2/submit $run.makeUnique "bin/dna2dna -i $run.fasta.gz -o $run.unique -I fasta -O fasta -makeFastaUnique "
 end
  
 
@@ -6085,7 +6071,7 @@ echo -n "## $toto : " > $toto
 date >> $toto
 echo "## For each gene, we count all SNPs affecting this gene and report the number of observations as wild-type, low, mid, high, pure and the number of samples with at least 0 to 10 doses of any of these SNPs" >> $toto
 cat tmp/SNP_DB/zone*/$MAGIC.snp_prevalence_per_gene.txt | head -2 >> $toto
-cat tmp/SNP_DB/zone*/$MAGIC.snp_prevalence_per_gene.txt | gawk '/^#/{next;}{print}' | scripts/tab_sort -k  18,18nr -k 17,17nr >> $toto
+cat tmp/SNP_DB/zone*/$MAGIC.snp_prevalence_per_gene.txt | gawk '/^#/{next;}{print}' | scripts2/tab_sort -k  18,18nr -k 17,17nr >> $toto
 
 set toto=RESULTS/SNV/$MAGIC.differential_SNPs_per_gene.txt
 echo -n "## $toto : " > $toto
@@ -6133,10 +6119,10 @@ if (1) then
         set n=1
       endif
       cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_frequency_per_sample.txt | gawk -F '\t' '/^# /{next;}/^##/{if(NF > 5)print}'    >> $toto.2
-      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_frequency_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==1||substr($23,1,1)!="+"))print}' noDrop=$noDrop | scripts/tab_sort -V -k 1,1 -k 2,2   >> $toto.5
-      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_frequency_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==0&&substr($23,1,1)=="+"))print}' noDrop=$noDrop | scripts/tab_sort  -V -k 1,1 -k 2,2   >> $toto.5b
-      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_counts_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==1||substr($23,1,1)!="+"))print}' noDrop=$noDrop | scripts/tab_sort  -V -k 1,1 -k 2,2   >> $totoC.5
-      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_counts_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==0&&substr($23,1,1)=="+"))print}' noDrop=$noDrop| scripts/tab_sort  -V -k 1,1 -k 2,2  >> $totoC.5b
+      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_frequency_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==1||substr($23,1,1)!="+"))print}' noDrop=$noDrop | scripts2/tab_sort -V -k 1,1 -k 2,2   >> $toto.5
+      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_frequency_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==0&&substr($23,1,1)=="+"))print}' noDrop=$noDrop | scripts2/tab_sort  -V -k 1,1 -k 2,2   >> $toto.5b
+      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_counts_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==1||substr($23,1,1)!="+"))print}' noDrop=$noDrop | scripts2/tab_sort  -V -k 1,1 -k 2,2   >> $totoC.5
+      cat tmp/SNP_DB/$zone/$MAGICdiff.snp_list_with_allele_counts_per_sample.txt | gawk -F '\t' '/^#/{next;}{if(NF > 5 && $2 > 0 && $1 != "" && $19 != "" && (noDrop==0&&substr($23,1,1)=="+"))print}' noDrop=$noDrop| scripts2/tab_sort  -V -k 1,1 -k 2,2  >> $totoC.5b
     end
 
     cat $toto.2 | head -4 | gawk '{printf("##\t");print;}' > $toto.3
@@ -6150,9 +6136,9 @@ if (1) then
     cat $toto.4 >> $totoC
     cat $toto.1 >> $toto
     cat $toto.1 >> $totoC
-    cat $toto.5 | scripts/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $toto.6
+    cat $toto.5 | scripts2/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $toto.6
     cat $toto.6 >> $toto
-    cat $totoC.5 | scripts/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $totoC.6
+    cat $totoC.5 | scripts2/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $totoC.6
     cat $totoC.6 >> $totoC
     cat $toto.1 > $toto.b
     cat $toto.3 >> $toto.b
@@ -6160,15 +6146,15 @@ if (1) then
     cat $toto.1 > $totoC.b
     cat $toto.3 >> $totoC.b
     cat $toto.4 >> $totoC.b
-    cat $toto.5b | scripts/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $toto.6b
+    cat $toto.5b | scripts2/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $toto.6b
     cat $toto.6b >> $toto.b
-    cat $totoC.5b | scripts/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $totoC.6b
+    cat $totoC.5b | scripts2/tab_sort -V -k 1,1  -k 2,2n  -k 3,3 | gawk '{if($4) { n++; printf("%d\t", n);print;}}' > $totoC.6b
     cat $totoC.6b >> $totoC.b
     
     if ($MAGICdiff == $MAGIC) then
       cat $toto.1 $toto.4 | gawk -F '\t' '{printf("%s",$34);for (i=36;i<=NF;i++)printf("\t%s",$i);printf("\n");}' > $toto.preace
 
-     cat $toto.preace | gawk -F '\t' -f scripts/s21.snp2ace.awk > tmp/SNP_DB/$MAGIC.s21.stats.ace
+     cat $toto.preace | gawk -F '\t' -f scripts2/s21.snp2ace.awk > tmp/SNP_DB/$MAGIC.s21.stats.ace
       echo "pparse tmp/SNP_DB/$MAGIC.s21.stats.ace" | bin/tacembly MetaDB -noprompt
      \rm  $toto.preace
     endif
@@ -6176,12 +6162,12 @@ if (1) then
 endif
 
 
-cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | head -100 |  gawk -F '\t' '/^#/{print;}' | scripts/transpose | gawk -F '\t' '{k++;if(k==1)print $1;else if (k>2&&$7 != "") print;}'  | scripts/transpose  > RESULTS/SNV/$MAGIC.snp_stats_per_run.txt
+cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | head -100 |  gawk -F '\t' '/^#/{print;}' | scripts2/transpose | gawk -F '\t' '{k++;if(k==1)print $1;else if (k>2&&$7 != "") print;}'  | scripts2/transpose  > RESULTS/SNV/$MAGIC.snp_stats_per_run.txt
 echo "\n\n\n\n" >> RESULTS/SNV/$MAGIC.snp_stats_per_run.txt
-cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | head -100 |  gawk -F '\t' '/^#/{print;}' | scripts/transpose | gawk -F '\t' '{k++;if(k==1)print $1;else if (k>2&&$7 != "") print;}' >> RESULTS/SNV/$MAGIC.snp_stats_per_run.txt
+cat RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt | head -100 |  gawk -F '\t' '/^#/{print;}' | scripts2/transpose | gawk -F '\t' '{k++;if(k==1)print $1;else if (k>2&&$7 != "") print;}' >> RESULTS/SNV/$MAGIC.snp_stats_per_run.txt
 
 
-cat ZZZZZ RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt ZZZZZ RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt.b | gawk -F '\t' -f scripts/s21.snp_profile.awk magic=$MAGIC | scripts/tab_sort -V -k 1,1 -k 2,2nr  >  RESULTS/SNV/$MAGIC.snp_profile.preace
+cat ZZZZZ RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt ZZZZZ RESULTS/SNV/$MAGIC.snp_list_with_allele_frequency_per_sample.txt.b | gawk -F '\t' -f scripts2/s21.snp_profile.awk magic=$MAGIC | scripts2/tab_sort -V -k 1,1 -k 2,2nr  >  RESULTS/SNV/$MAGIC.snp_profile.preace
 cat RESULTS/SNV/$MAGIC.snp_profile.preace | gawk -F '\t' '{if($1 != old){printf("\nAli %s\n-D SNP_profile\n",$1);old=$1;}if($2+$4 >0)printf("SNP_profile any %s %s %s\n",$3,$2, $4);}END{printf("\n");}' > RESULTS/SNV/$MAGIC.snp_profile.ace
 
 echo "... pparse RESULTS/SNV/$MAGIC.snp_profile.ace"
@@ -6323,11 +6309,11 @@ set nRuns=`cat MetaDB/$MAGIC/RunsList | wc | gawk '{print $1}'`
 foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   # echo "#########... $zone"
   if (! -d tmp/TSNP_DB/$zone || -e tmp/TSNP_DB/$zone/snp3.$MAGIC.cmw20.good.tsf) continue
-#  scripts/submit tmp/SNP_DB/$zone/s21 "scripts/s21.select_characteristic_snps.tcsh $zone $nRuns $Strategy"
-  scripts/submit tmp/TSNP_DB/$zone/s21 "scripts/snp3.tcsh G $zone"
+#  scripts2/submit tmp/SNP_DB/$zone/s21 "scripts2/s21.select_characteristic_snps.tcsh $zone $nRuns $Strategy"
+  scripts2/submit tmp/TSNP_DB/$zone/s21 "scripts2/snp3.tcsh G $zone"
 end
 
-scripts/submit wait
+scripts2/submit wait
   cat tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf > tmp/TSNP_DB/*/snp3.$MAGIC.cmw20.good.tsf 
 gunzip -c tmp/SNP_DB/*/$MAGIC.characteristic.snp.gz > tmp/SNP_DB/$MAGIC.characteristic.pre_snp
 cat tmp/SNPH/zone*/$MAGIC.snp.sorted.homozygous | gzip > tmp/SNP_DB/$MAGIC.snp.sorted.homozygous.gz
@@ -6358,7 +6344,7 @@ foreach zone (`cat tmp/SNP_ZONE/ZoneList`)
   foreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/groupSnpList`)
     if (! -d tmp/SNP2/$run) $mkDir SNP2 $run
     if (-e tmp/SNP2/$run/s13.$run.$zone.extend_snp) continue
-    # scripts/submit tmp/SNP2/$run/s13.$zone "scripts/s13.aliextend.tcsh $run $zone"
+    # scripts2/submit tmp/SNP2/$run/s13.$zone "scripts2/s13.aliextend.tcsh $run $zone"
   end  
 end
 
@@ -6397,7 +6383,7 @@ foreach g (MYL12A.cAug10:69T2G HLA-BandHLA-C.bAug10:1388G2C HCG27.cAug10:807A2G 
   gunzip -c tmp/GENEINDEX/Results/$MAGIC.snp..u.reads_aligned_per_gene.txt.gz | grep $g >> $toto
 end
 
-cat  TSV/Main*/Main.*SQW_C_1_t1*.tsv | sed -e 's/Main\.//g' | scripts/aliqc.py --view html -o ~/MAC/Desktop/SQW
+cat  TSV/Main*/Main.*SQW_C_1_t1*.tsv | sed -e 's/Main\.//g' | scripts2/aliqc.py --view html -o ~/MAC/Desktop/SQW
 
 
 ######################################################################
@@ -6407,7 +6393,7 @@ cat  TSV/Main*/Main.*SQW_C_1_t1*.tsv | sed -e 's/Main\.//g' | scripts/aliqc.py -
 set toto=RESULTS/SNV/$MAGIC.snp_s590_counts.txt
 date > $toto
 echo "Number of variant per run after de Bruijn realignment seen at frequency at least $minSnpFrequency %, coverage at least $minSnpCover, with at least $minSnpCount sequences supporting the variant" >> $toto 
-cat  tmp/SNPH/s13.runs_groupsList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/NEWHITS_snp/*/s590.multi.countEdited  | gawk -F '\t' -f scripts/snpSupportStat.awk group=$group format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
+cat  tmp/SNPH/s13.runs_groupsList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/NEWHITS_snp/*/s590.multi.countEdited  | gawk -F '\t' -f scripts2/snpSupportStat.awk group=$group format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
 
 cat tmp/NEWHITS_snp/*/s590.multi.countEdited |  gawk -F '\t' '/^#/{next}{if ($8 > 10 && $9 >= minCover && $10 >= 0) print $9,$10;}' minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency | bin/histo -smooth  -colList MetaDB/$MAGIC/Run2Title.txt -plot -o RESULTS/SNV/$MAGIC.snp_s590_plot
 
@@ -6418,7 +6404,7 @@ date > $toto
 echo >> $toto
 echo "Number of variant per group, rejecting the low monomodals, after de Bruijn realignment seen at frequency at least $minSnpFrequency %, coverage at least $minSnpCover, with at least $minSnpCount sequences supporting the variant" >> $toto 
 
-  cat  tmp/SNPH/s13.runs_groupsList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' -f scripts/snpSupportStat.awk format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
+  cat  tmp/SNPH/s13.runs_groupsList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' -f scripts2/snpSupportStat.awk format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
 
 # export the corresponding histo
 cat tmp/KL.$MAGIC/*/selected.txt | gawk -F '\t' '/^#/{next}{if ($8 > 10 && $9 >= minCover && $10 >= 0) print $9,$10;}' minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency | bin/histo -smooth -plot -o RESULTS/SNV/$MAGIC.snp_selected_by_group_plot
@@ -6431,7 +6417,7 @@ echo "Density of selected SNV along the chromosomes, each SNV is counted once pe
 echo "Chromosome\tkb\tNUmber of SNP" >> $toto
 cat tmp/KL.$MAGIC/*/selected.txt | gawk -F '\t' '/^#/{next;}{if ($2 > 0 && $8 > minF && $9 >= minCover && $10 >= minMut) printf("%d\t%s\t%d\n",0+$1,$1,$2);}'  minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency |  $tab_sort -k 1,1n -k 2,2 -k 3,3n | gawk '{if($2 != old)n++;z=int($3/100000);if(z!=oldz)n++;old=$2;oldz=z;uu[n]=old "\t" 100*oldz;nn[n]++;}END{for(i=1;i<n;i++)if(uu[i])printf("%s\t%d\n",uu[i],nn[i]);}' >> $toto
 
-scripts/submit tmp/SNPH/$chrom/snp4 "scripts/geneindex.tcsh snp4 $chrom"
+scripts2/submit tmp/SNPH/$chrom/snp4 "scripts2/geneindex.tcsh snp4 $chrom"
 
 ###############################################################################################
 ## s3: prepare the edited sequence for confirmation
@@ -6463,7 +6449,7 @@ foreach zone (mito  SpikeIn rrna `ls tmp/SNP_ZONE/zone*.txt | sed -e 's/tmp\/SNP
   echo $zone
 
   if (! -e  tmp/SNP/$zone.edited_sequence.snp.fasta.gz) then
-    scripts/submit tmp/SNP/$zone.edited_sequence "scripts/snp.export_edited_sequence.tcsh $zone $minSnpCount $minSnpCover $minSnpFrequency"
+    scripts2/submit tmp/SNP/$zone.edited_sequence "scripts2/snp.export_edited_sequence.tcsh $zone $minSnpCount $minSnpCover $minSnpFrequency"
   endif
 
 end
@@ -6522,7 +6508,7 @@ cat toto.hits | bin/snp -aliExtend -snp_list toto.snpList -fasta TARGET/Targets/
 
 foreach lane (`cat MetaDB/$MAGIC/LaneList`)
   if (! -e tmp/COUNT/$lane.snp_extend.extend_snp) then
-    # scripts/submit tmp/COUNT/$lane.snp_extend "bin/snp  -aliExtend -snp_list tmp/SNP_DB/SpikeIn/Variant.list -fasta TARGET/Targets/hs.SpikeIn.fasta.gz -o tmp/COUNT/$lane.snp_extend -i tmp/COUNT/$lane.hits.gz"
+    # scripts2/submit tmp/COUNT/$lane.snp_extend "bin/snp  -aliExtend -snp_list tmp/SNP_DB/SpikeIn/Variant.list -fasta TARGET/Targets/hs.SpikeIn.fasta.gz -o tmp/COUNT/$lane.snp_extend -i tmp/COUNT/$lane.hits.gz"
   endif
 end
 
@@ -6624,7 +6610,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach lane (`cat Fastc/$run/LaneList`)
     if (! -e tmp/NEWHITS_snp/$lane.m.hits.gz) then
       if (-e tmp/NEWHITS_snp/$run/edited.countEdited) \rm tmp/NEWHITS_snp/$run/edited.*
-      scripts/submit tmp/NEWHITS_snp/$lane "scripts/snp.confirmation.tcsh $run $lane"
+      scripts2/submit tmp/NEWHITS_snp/$lane "scripts2/snp.confirmation.tcsh $run $lane"
     endif
   end
 end
@@ -6653,12 +6639,12 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -e tmp/NEWHITS_snp/$run/s590.multi.countEdited) then
     echo $run
     # position of edited base
-    scripts/submit tmp/NEWHITS_snp/$run/s5.multi "scripts/s5.countEdited.tcsh run $run $ln"
+    scripts2/submit tmp/NEWHITS_snp/$run/s5.multi "scripts2/s5.countEdited.tcsh run $run $ln"
   endif
 end
 
 ## look for multiply mapping SNPS
-   scripts/submit  tmp/NEWHITS_snp/ambiguities "scripts/s5.ambiguities.tcsh"
+   scripts2/submit  tmp/NEWHITS_snp/ambiguities "scripts2/s5.ambiguities.tcsh"
 
 goto phaseLoop
 
@@ -6691,10 +6677,10 @@ set ok=1
     if ($MAGIC == ERCC) set ercc=1
     echo hello
       set ok=0
-      scripts/submit tmp/KL.$MAGIC/$group/s6.ventilate "scripts/s6.ventilate.tcsh $MAGIC $group $minSnpCover $ercc "
+      scripts2/submit tmp/KL.$MAGIC/$group/s6.ventilate "scripts2/s6.ventilate.tcsh $MAGIC $group $minSnpCover $ercc "
   end
 
-if ($ok == 0) scripts/submit wait
+if ($ok == 0) scripts2/submit wait
 
 ## Mendel analysis of the modal type of the smoothed histo of the observed frequency accross the population
 ## limited in histo.c to snps at least one sample frequency >=20 && count >=10 && mutant >= 5
@@ -6704,11 +6690,11 @@ foreach group (`cat MetaDB/$MAGIC/GroupSnpList MetaDB/$MAGIC/RunSnpList`)
   if (! -d tmp/KL.$MAGIC/$group) continue
   if (! -e tmp/KL.$MAGIC/$group/_toto) then
     set ok=0
-    scripts/submit tmp/KL.$MAGIC/$group/s6.ventcount "ls tmp/KL.$MAGIC/$group/confirmed.*.gz > tmp/KL.$MAGIC/$group/_toto" MULTICORE
+    scripts2/submit tmp/KL.$MAGIC/$group/s6.ventcount "ls tmp/KL.$MAGIC/$group/confirmed.*.gz > tmp/KL.$MAGIC/$group/_toto" MULTICORE
   endif
 end
 
-if ($ok == 0) scripts/submit wait MULTICORE
+if ($ok == 0) scripts2/submit wait MULTICORE
 
 if (-e  tmp/KL.$MAGIC/_toto) \rm tmp/KL.$MAGIC/_toto
 foreach group (`cat MetaDB/$MAGIC/GroupSnpList MetaDB/$MAGIC/RunSnpList`)
@@ -6720,11 +6706,11 @@ cat tmp/KL.$MAGIC/_toto | gawk -F '/' '{gsub (/\.gz/,"",$4);print $4}' | $tab_so
 mkdir tmp/KL.$MAGIC/Histo
 foreach template (`cat  tmp/KL.$MAGIC/templateList`)
   if (! -e tmp/KL.$MAGIC/Histo/$template.smoothed_profiles.gz) then
-    scripts/submit $template "gunzip -c tmp/KL.$MAGIC/*/$template.gz | bin/histo -KL $minSnpFrequency -gzo -o  tmp/KL.$MAGIC/Histo/$template"  MULTICORE
+    scripts2/submit $template "gunzip -c tmp/KL.$MAGIC/*/$template.gz | bin/histo -KL $minSnpFrequency -gzo -o  tmp/KL.$MAGIC/Histo/$template"  MULTICORE
   endif
 end
 
-scripts/submit wait MULTICORE
+scripts2/submit wait MULTICORE
 if (! -d RESULTS/SNV) mkdir RESULTS/SNV
 # export the top of the piles
 foreach type (2 3 4 5 )
@@ -6752,7 +6738,7 @@ head -225 tmp/KL.$MAGIC/all.population_profiles.low_monomodal >>  RESULTS/SNV/$M
 gunzip -c tmp/KL.$MAGIC/Histo/confirmed.*.smoothed_profiles.gz | gawk '{if($2==1){split ($3,aa,":");if(aa[1]>=20 && aa[1]<90)print}}' >  tmp/KL.$MAGIC/all.population_profiles.mid_monomodal
 wc tmp/KL.$MAGIC/all.population_profiles.mid_monomodal
 date > RESULTS/SNV/$MAGIC.population_profiles.mid_monomodal.first225.txt
-echo "$# MAGIC all.population_profiles.mid_monomodal" >>  RESULTS/SNV/$MAGIC.population_profiles.mid_monomodal.first225.txt
+echo "$# MAGIC2 all.population_profiles.mid_monomodal" >>  RESULTS/SNV/$MAGIC.population_profiles.mid_monomodal.first225.txt
 head -225 tmp/KL.$MAGIC/all.population_profiles.mid_monomodal >>  RESULTS/SNV/$MAGIC.population_profiles.mid_monomodal.first225.txt
 
 set toto=RESULTS/SNV/$MAGIC.population_profiles.count_modes.txt
@@ -6794,11 +6780,11 @@ if (! -d tmp/KL.$MAGIC/s6) mkdir  tmp/KL.$MAGIC/s6
 
   set n=0
   while ($n < $n2)
-    scripts/submit tmp/KL.$MAGIC/s6/s6.selected.$n  "scripts/s6.all.template.tcsh selected $n $n1" 
+    scripts2/submit tmp/KL.$MAGIC/s6/s6.selected.$n  "scripts2/s6.all.template.tcsh selected $n $n1" 
     @ n = $n + $n1
   end
 
-scripts/submit wait
+scripts2/submit wait
 
 goto phaseLoop
 
@@ -6904,7 +6890,7 @@ end
 set toto=RESULTS/SNV/$MAGIC.snp_s590_counts.txt
 date > $toto
 echo "Number of variant per run after de Bruijn realignment seen at frequency at least $minSnpFrequency %, coverage at least $minSnpCover, with at least $minSnpCount sequences supporting the variant" >> $toto 
-cat MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/NEWHITS_snp/*/s590.multi.countEdited  | gawk -F '\t' -f scripts/snpSupportStat.awk group=$group format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
+cat MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/NEWHITS_snp/*/s590.multi.countEdited  | gawk -F '\t' -f scripts2/snpSupportStat.awk group=$group format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
 
 cat tmp/NEWHITS_snp/*/s590.multi.countEdited |  gawk -F '\t' '/^#/{next}{if ($8 > 10 && $9 >= minCover && $10 >= 0) print $9,$10;}' minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency | bin/histo -smooth -plot -o RESULTS/SNV/$MAGIC.snp_s590_plot
 
@@ -6915,7 +6901,7 @@ date > $toto
 echo >> $toto
 echo "Number of variant per group, rejecting the low monomodals, after de Bruijn realignment seen at frequency at least $minSnpFrequency %, coverage at least $minSnpCover, with at least $minSnpCount sequences supporting the variant" >> $toto 
 
-  cat MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' -f scripts/snpSupportStat.awk format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
+  cat MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' -f scripts2/snpSupportStat.awk format=txt minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency >> $toto
 
 # export the corresponding histo
 cat tmp/KL.$MAGIC/*/selected.txt | gawk -F '\t' '/^#/{next}{if ($8 > 10 && $9 >= minCover && $10 >= 0) print $9,$10;}' minMut=$minSnpCount minCover=$minSnpCover minF=$minSnpFrequency | bin/histo -smooth -plot -o RESULTS/SNV/$MAGIC.snp_selected_by_group_plot
@@ -6932,7 +6918,7 @@ cat tmp/KL.$MAGIC/*/selected.txt | gawk -F '\t' '/^#/{next;}{if ($2 > 0 && $8 > 
 # sort by variant and reexport in .ace format
 if (0) then
   foreach chrom (mito $chromSetAll)
-     cat tmp/KL.$MAGIC/all.visible.countEdited | gawk -F '\t' '{if($1==chrom)print}' chrom=$chrom | gawk -F '\t' -f scripts/snp2ace.awk format=txt targetType=IntMap > tmp/KL.$MAGIC/allVisible.chrom$chrom.ace 
+     cat tmp/KL.$MAGIC/all.visible.countEdited | gawk -F '\t' '{if($1==chrom)print}' chrom=$chrom | gawk -F '\t' -f scripts2/snp2ace.awk format=txt targetType=IntMap > tmp/KL.$MAGIC/allVisible.chrom$chrom.ace 
   end
 endif
 
@@ -6956,7 +6942,7 @@ cat   tmp/KL.$MAGIC/*/*selected.txt | bin/snp -db MetaDB -intersect -title "$MAG
 # sort by variant and reexport in .ace format
 mkdir tmp/KL.$MAGIC/ACE
 foreach chrom (mito $chromSetAll)
-  cat tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' '{if($1==chrom && $2 > 0)print}' chrom=$chrom | gawk -F '\t' -f scripts/snp2ace.awk format=txt targetType=IntMap > tmp/KL.$MAGIC/ACE/allSelected.chrom$chrom.ace
+  cat tmp/KL.$MAGIC/*/*selected.txt | gawk -F '\t' '{if($1==chrom && $2 > 0)print}' chrom=$chrom | gawk -F '\t' -f scripts2/snp2ace.awk format=txt targetType=IntMap > tmp/KL.$MAGIC/ACE/allSelected.chrom$chrom.ace
 end
 
 goto phaseLoop
@@ -6989,7 +6975,7 @@ end
 ## scan the table, memorize the last gene, find a variant, if we are inside we win
 # there is however a C method to do the samething in snp.parse_remap  : snp -remap2gene, -translate, -pheno
 foreach chrom ($chromSetAll)
-  cat tmp/KL.$MAGIC/totovv2.$chrom | gawk -F '\t' -f scripts/s6.variant2gene.awk > tmp/KL.$MAGIC/variant2gene.$chrom.txt1
+  cat tmp/KL.$MAGIC/totovv2.$chrom | gawk -F '\t' -f scripts2/s6.variant2gene.awk > tmp/KL.$MAGIC/variant2gene.$chrom.txt1
   cat tmp/KL.$MAGIC/variant2gene.$chrom.txt1 | sed -e 's/Gene/zGene/' | $tab_sort | sed -e 's/zGene/Gene/' | gawk -F '\t' '{v=$2;if(v==oldv)next;oldv=v;printf("Variant\t%s\t%s\t%s",$2,$3,$4); if ($3 == "mRNA")printf(":%s:%s",$5,$6);printf("\n");}' >  tmp/KL.$MAGIC/variant2gene.$chrom.txt
   cat tmp/KL.$MAGIC/variant2gene.$chrom.txt1 | sed -e 's/Gene/zGene/' | $tab_sort | sed -e 's/zGene/Gene/' | gawk -F '\t' '{v=$2;if(v==oldv)next;oldv=v;printf("Variant %s\n%s %s",$2,$3,$4); if ($3 == "mRNA")printf(" %s %s",$5,$6);printf("\n\n");}' >  tmp/KL.$MAGIC/variant2gene.$chrom.ace
 
@@ -7131,7 +7117,7 @@ foreach chrom ($chromSetAll)
   foreach pheno ($phenos)
     if (! -d PHENO2/$pheno) mkdir  PHENO2/$pheno
     echo "query find variant phenotype" >> _ccc.$chrom
-    echo "table -active -o PHENO2/$pheno/$pheno.chrom.$chrom.txt -f ../scripts/variant2map2pheno.def CATEG $pheno" >> _ccc.$chrom
+    echo "table -active -o PHENO2/$pheno/$pheno.chrom.$chrom.txt -f ../scripts2/variant2map2pheno.def CATEG $pheno" >> _ccc.$chrom
   end
   bin/tacembly tmp/VariantDB.$chrom < _ccc.$chrom &
 end
@@ -7218,16 +7204,16 @@ EOF
 
 # grep for SNP seens as m/m at least in one sample
 foreach run (`cat MetaDB/$MAGIC/RunList`)
-  scripts/submit tmp/KL.$MAGIC/$run/edited.mm  "cat tmp/KL.$MAGIC/$run/s590.multi.countEdited | gawk -F '\t' -f  tmp/KL.$MAGIC/mm.awk | $tab_sort -u > tmp/KL.$MAGIC/$run/edited.mm.list"
+  scripts2/submit tmp/KL.$MAGIC/$run/edited.mm  "cat tmp/KL.$MAGIC/$run/s590.multi.countEdited | gawk -F '\t' -f  tmp/KL.$MAGIC/mm.awk | $tab_sort -u > tmp/KL.$MAGIC/$run/edited.mm.list"
 end
 
 # grep for SNP seens as m/+ at least in one sample over at least 20 coverage
 foreach run (`cat MetaDB/$MAGIC/RunList`)
-  scripts/submit tmp/KL.$MAGIC/$run/edited.mm  "cat tmp/KL.$MAGIC/$run/s590.multi.countEdited | gawk -F '\t' -f tmp/KL.$MAGIC/mw.awk | $tab_sort -u > tmp/KL.$MAGIC/$run/edited.mw.list"
+  scripts2/submit tmp/KL.$MAGIC/$run/edited.mm  "cat tmp/KL.$MAGIC/$run/s590.multi.countEdited | gawk -F '\t' -f tmp/KL.$MAGIC/mw.awk | $tab_sort -u > tmp/KL.$MAGIC/$run/edited.mw.list"
 end
 
 # collate
-scripts/submit wait
+scripts2/submit wait
 cat tmp/KL.$MAGIC/*/edited.mm.list | $tab_sort -u > tmp/KL.$MAGIC/edited.mm.list
 cat tmp/KL.$MAGIC/*/edited.mw.list | $tab_sort -u > tmp/KL.$MAGIC/edited.mw.list
 wc  tmp/KL.$MAGIC/edited.m?.list
@@ -7424,7 +7410,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/$MAGIC_COUNT_DIR/$run) continue
   foreach lane (`cat Fastc/$run/LaneList`)
     if (! -e tmp/$MAGIC_COUNT_DIR/$lane.jobstats) then
-      scripts/jobstats.tcsh $run $lane 0 0
+      scripts2/jobstats.tcsh $run $lane 0 0
     endif
     set nx=`cat tmp/$MAGIC_COUNT_DIR/$lane.a123.err | gawk '/Exit Status/{n=$4;}END{print n;}'`
 #echo "$lane ALIGN exit-status=$nx"
@@ -7461,7 +7447,7 @@ phasec2hack:
   foreach run (`cat MetaDB/$MAGIC/RunList `)
    foreach lane (`cat Fastc/$run/LaneList`)
       if ( -e  tmp/COUNT/$lane.hits.gz && ! -e  tmp/COUNT/$lane.err.hack,done) then
-        scripts/submit tmp/COUNT/$lane.hack "scripts/c2.hack.tcsh $run $lane"
+        scripts2/submit tmp/COUNT/$lane.hack "scripts2/c2.hack.tcsh $run $lane"
       endif
     end
   end
@@ -7478,15 +7464,15 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach lane (`cat Fastc/$run/LaneList`)
     if ($USEMAGICBLAST == 0 && ! -e  tmp/$MAGIC_COUNT_DIR/$lane.count) then
       set ok=0
-      echo "Missing tmp/$MAGIC_COUNT_DIR/$lane.count, please rerun MAGIC ALIGN, only the missing lanes will be recomputed"
+      echo "Missing tmp/$MAGIC_COUNT_DIR/$lane.count, please rerun MAGIC2 ALIGN, only the missing lanes will be recomputed"
     endif
     if ($USEMAGICBLAST == 1 && ! -e  tmp/MAGICBLAST/$lane.stats.tsf.gz) then
       set ok=0
-      echo "Missing tmp/MAGICBLAST/$lane.stats.tsf, please rerun MAGIC ALIGN, only the missing lanes will be recomputed"
+      echo "Missing tmp/MAGICBLAST/$lane.stats.tsf, please rerun MAGIC2 ALIGN, only the missing lanes will be recomputed"
     endif
   end
   if ($ok == 1 && ! -e tmp/$MAGIC_COUNT_DIR/$run/c2.alistats.ace) then
-      scripts/submit tmp/$MAGIC_COUNT_DIR/$run/c2.alistats "scripts/c2.alistats.tcsh $run" 1G
+      scripts2/submit tmp/$MAGIC_COUNT_DIR/$run/c2.alistats "scripts2/c2.alistats.tcsh $run" 1G
   endif
 end
 
@@ -7506,7 +7492,7 @@ date
 # submit the before and after ali profiles
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -e  tmp/Profiles/$run/readsAfterAlignment.delta.txt) then
-    scripts/submit tmp/Profiles/$run/c3.delta "scripts/c3.delta.profile.tcsh $run"  
+    scripts2/submit tmp/Profiles/$run/c3.delta "scripts2/c3.delta.profile.tcsh $run"  
   endif
 end
 
@@ -7540,7 +7526,7 @@ end
     endif
 
     if (! -d tmp/COUNT/$run) continue
-    cat tmp/$MAGIC_COUNT_DIR/$run/*.Venn | gawk '{n[$2 "\t" $3]+= $1;}END{for (k in n) printf("%d\t%s\n",n[k],k);}' | scripts/tab_sort -k 2,2  -k 1,1nr >  tmp/$MAGIC_COUNT_DIR/$run/Venn.$run.txt
+    cat tmp/$MAGIC_COUNT_DIR/$run/*.Venn | gawk '{n[$2 "\t" $3]+= $1;}END{for (k in n) printf("%d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 2,2  -k 1,1nr >  tmp/$MAGIC_COUNT_DIR/$run/Venn.$run.txt
 
   end
 
@@ -7639,7 +7625,7 @@ if (! -d RESULTS/Mapping/Quality_profiles) mkdir RESULTS/Mapping/Quality_profile
 foreach group (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupList`)
 
   if (! -e tmp/$MAGIC_COUNT_DIR/AliProfiles/$group.ali_quality.txt) then
-    scripts/c3.ali_profiles.tcsh   $MAGIC.$group tmp/$MAGIC_COUNT_DIR/AliProfiles/$group.ace tmp/$MAGIC_COUNT_DIR/AliProfiles/$group
+    scripts2/c3.ali_profiles.tcsh   $MAGIC.$group tmp/$MAGIC_COUNT_DIR/AliProfiles/$group.ace tmp/$MAGIC_COUNT_DIR/AliProfiles/$group
   endif
   if (-e tmp/$MAGIC_COUNT_DIR/AliProfiles/$group.ali_quality.txt) then
     \cp tmp/$MAGIC_COUNT_DIR/AliProfiles/$group.ali_quality.txt RESULTS/Mapping/Quality_profiles/$MAGIC.$group.ali_quality.txt 
@@ -7652,7 +7638,7 @@ phasec3aaaa:
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach lane (`cat Fastc/$run/LaneList`)
     if (-e tmp/Unaligned/$lane.fastc.gz && ! -e tmp/Unaligned/$lane.count) then
-      scripts/submit  tmp/Unaligned/$lane "bin/dna2dna -i tmp/Unaligned/$lane.fastc.gz -I fastc -O count -o tmp/Unaligned/$lane" MULTICORE
+      scripts2/submit  tmp/Unaligned/$lane "bin/dna2dna -i tmp/Unaligned/$lane.fastc.gz -I fastc -O count -o tmp/Unaligned/$lane" MULTICORE
     endif
   end
 end
@@ -7665,7 +7651,7 @@ goto phaseLoop
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach lane (`cat Fastc/$run/LaneList`)
       if (-e tmp/$MAGIC_COUNT_DIR/$lane.hits.gz && ! -e tmp/$MAGIC_COUNT_DIR/$lane.seqc_by_target.done) then
-        scripts/submit tmp/$MAGIC_COUNT_DIR/$lane.seqc_by_target "scripts/c3.seqc_by_target.tcsh $run $lane"
+        scripts2/submit tmp/$MAGIC_COUNT_DIR/$lane.seqc_by_target "scripts2/c3.seqc_by_target.tcsh $run $lane"
       endif
   end
 end
@@ -7759,7 +7745,7 @@ set mytitle="Position of the mismatches, in read coordinates (i.e. in cycles) at
   echo -n "# $toto : " > $toto
   date >> $toto
 
-cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Error_position.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Quality_profile.txt | gawk  -F '\t' -f scripts/c4.Error_position.awk mydate="$mydate" mytitle="$mytitle" | sed -e 's/_/ /g' >> $toto
+cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Error_position.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Quality_profile.txt | gawk  -F '\t' -f scripts2/c4.Error_position.awk mydate="$mydate" mytitle="$mytitle" | sed -e 's/_/ /g' >> $toto
 
 if (! -d RESULTS/Mismatches) mkdir RESULTS/Mismatches
 
@@ -7781,7 +7767,7 @@ echo $toto
 
 
 echo  "Position of the ambiguous bases, N or error corrected transitions in SOLiD, in read coordinates at their best unique alignment in $MAGIC" >> $toto
-cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Ambiguous_position.txt | gawk  -F '\t' -f scripts/c4.Error_position.awk | sed -e 's/_/ /g' >> $toto
+cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Ambiguous_position.txt | gawk  -F '\t' -f scripts2/c4.Error_position.awk | sed -e 's/_/ /g' >> $toto
 
 \cp $toto RESULTS/Mismatches
 
@@ -7799,7 +7785,7 @@ set mytitle="Distribution of mismatches in best unique alignment in $MAGIC"
   echo -n "# $toto : " > $toto
   date >> $toto
 
-cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ  tmp/$MAGIC_COUNT_DIR/toto.c4.Error_type.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Cumulated_ambiguous.txt | gawk  -F '\t' -f scripts/c4.Error_type.awk mydate="$mydate" mytitle="$mytitle" | sed -e 's/_/ /g' >> $toto
+cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ  tmp/$MAGIC_COUNT_DIR/toto.c4.Error_type.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Cumulated_ambiguous.txt | gawk  -F '\t' -f scripts2/c4.Error_type.awk mydate="$mydate" mytitle="$mytitle" | sed -e 's/_/ /g' >> $toto
 
 set n=`cat MetaDB/$MAGIC/RunList | gawk '{n++}END{print n}'`
 if ($n>200) then
@@ -7835,7 +7821,7 @@ aligned length on this imperfect but useful target.
 EOF
 endif
 
-  cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.av_ali.txt | gawk  -F '\t' -f scripts/c4.av_ali.awk | sed -e 's/_/ /g' >> $toto
+  cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.av_ali.txt | gawk  -F '\t' -f scripts2/c4.av_ali.awk | sed -e 's/_/ /g' >> $toto
 
   \cp $toto RESULTS/Mapping
 endif
@@ -7856,7 +7842,7 @@ echo >> $toto
 
 echo  "Number of reads with exactly 1 to $maxHit alignments on best target at best score in $MAGIC" >> $toto
 echo  "Reads with $maxHit or more best alignments are discarded" >> $toto
-cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_any.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.any.txt | gawk  -F '\t' -f scripts/c4.unicity.awk  type=site tt="in best target" | sed -e 's/_/ /g' >> $toto
+cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_any.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.any.txt | gawk  -F '\t' -f scripts2/c4.unicity.awk  type=site tt="in best target" | sed -e 's/_/ /g' >> $toto
 
 \cp $toto RESULTS/Mapping
 
@@ -7871,7 +7857,7 @@ echo >> $toto
 set n="NA" ;
 echo  "Number of reads with exactly 1 to 9 alignments on the genome at best score in $MAGIC" >> $toto
 echo  "Reads with 10 or more best alignments are discarded" >> $toto
-cat   MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_genome.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.genome.txt | gawk  -F '\t' -f scripts/c4.unicity.awk type=site  tt="in genome" | sed -e 's/_/ /g' >> $toto
+cat   MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_genome.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.genome.txt | gawk  -F '\t' -f scripts2/c4.unicity.awk type=site  tt="in genome" | sed -e 's/_/ /g' >> $toto
 
   endif
 end
@@ -7886,7 +7872,7 @@ echo >> $toto
 
 echo  "Number of reads with exactly 1 to 9 alignments on AceView transcripts at best score in $MAGIC" >> $toto
 echo  "Reads with 10 or more best alignments are discarded" >> $toto
-cat  MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_av.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.av.txt | gawk  -F '\t' -f scripts/c4.unicity.awk  type=gene  tt="in aceview" | sed -e 's/_/ /g' >> $toto
+cat  MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.h_Ali_av.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Rejected.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.Unicity.av.txt | gawk  -F '\t' -f scripts2/c4.unicity.awk  type=gene  tt="in aceview" | sed -e 's/_/ /g' >> $toto
 
   endif
 end
@@ -7905,7 +7891,7 @@ echo  "This measures the frequency of errors in the first and last few bases" >>
 echo  "as any mismatch closer than 8 bases in RNA-seq or 4 in Genome seq from the edges"  >> $toto
 echo  "of the alignment is clipped." >> $toto
 
-cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.first_base.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.last_base.txt | gawk -f scripts/c4.first_last_base.awk | sed -e 's/_/ /g' >> $toto
+cat MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunsListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.first_base.txt ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c4.last_base.txt | gawk -f scripts2/c4.first_last_base.awk | sed -e 's/_/ /g' >> $toto
 
 \cp $toto RESULTS/Mapping
 
@@ -7931,14 +7917,14 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   cat tmp/$MAGIC_COUNT_DIR/$run/Venn.$run.txt >> $toto.1
 end
 
-cat MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -F '\t' -f scripts/c4.venn_target.awk >> $toto
+cat MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -F '\t' -f scripts2/c4.venn_target.awk >> $toto
 
 cat $toto | head -6 > $toto.2
-cat $toto | tail -n +7 | scripts/transpose > $toto.3
+cat $toto | tail -n +7 | scripts2/transpose > $toto.3
 head -5  $toto.3 > $toto.4
 tail -n +6 $toto.3 | $tab_sort -k 2,2nr >> $toto.4
 # tail -n +6 $toto.3  >> $toto.4
-cat $toto.4 | scripts/transpose >> $toto.2
+cat $toto.4 | scripts2/transpose >> $toto.2
 
 cat  $toto.2 | sed -e 's/_/ /g' >  $toto
 \rm $toto.[1234]
@@ -7978,7 +7964,7 @@ if (! -d tmp/Profiles) mkdir tmp/Profiles
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/Profiles/$run) $mkDir Profiles $run
   if (! -e tmp/Profiles/$run/c5.profile.done) then
-    scripts/submit tmp/Profiles/$run/c5.profile "scripts/c5.profiles.tcsh $run"
+    scripts2/submit tmp/Profiles/$run/c5.profile "scripts2/c5.profiles.tcsh $run"
   endif
 end
 
@@ -8039,7 +8025,7 @@ EOF
   if (-e $toto.2) \rm $toto.2
 
   cat $toto.1 > $toto
-  cat MetaDB/$MAGIC/RunListSorted  ZZZZZ  ZZZZZ MetaDB/$MAGIC/RunPrivateList  ZZZZZ MetaDB/$MAGIC/gtitle.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c5.Pair_fate.ace | sed -e 's/Aligned_pairs/Aligned_fragments/' | gawk -f  scripts/c5.pair_stats.awk  | sed -e 's/\tNULL/\t/g'  > $toto.1
+  cat MetaDB/$MAGIC/RunListSorted  ZZZZZ  ZZZZZ MetaDB/$MAGIC/RunPrivateList  ZZZZZ MetaDB/$MAGIC/gtitle.txt  ZZZZZ tmp/$MAGIC_COUNT_DIR/toto.c5.Pair_fate.ace | sed -e 's/Aligned_pairs/Aligned_fragments/' | gawk -f  scripts2/c5.pair_stats.awk  | sed -e 's/\tNULL/\t/g'  > $toto.1
   cat $toto.1 | gawk '/^#/{print}' | sed  -e 's/Orphans_Any/Single read aligned/g'  -e 's/Orphans_1/Single read uniquely aligned/g'   -e 's/Orphans.multi/Single read multiply aligned/g' -e 's/_/ /g' | sed -e 's/\tNULL/\t/g'  >> $toto
   cat $toto.1 | gawk '/^#/{next;}{print}' | sed  -e 's/mito/mitochondria/g'   -e 's/spikeIn/spike in/g'   -e 's/Orphans_Any/Single read aligned/g'  -e 's/Orphans_1/Pairs with a single read uniquely aligned/g'  -e 's/Orphans multi/Pairs with a single read alignedin 2 to 9 sites/g' -e 's/Too_distant_on_genome/Reads too distant on genome (> 1 Mb)/g'  -e 's/_/ /g' | sed -e 's/\tNULL/\t/g'   >> $toto
   \rm $toto.1
@@ -8063,7 +8049,7 @@ if (0 && -d tmp/ALIa) then
       cat tmp/ALIa/$run/a5.barcode.contami.stats | grep -v N >> $toto.1
     endif
   end
-  cat  MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -f  scripts/c5.barcode_stats.awk  | sed -e 's/\tNULL/\t/g' >> $toto
+  cat  MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -f  scripts2/c5.barcode_stats.awk  | sed -e 's/\tNULL/\t/g' >> $toto
   echo $toto
   \cp $toto RESULTS
 endif
@@ -8096,7 +8082,7 @@ if (-d tmp/$MAGIC_COUNT_DIR) then
   echo -n "### $toto : " > $toto
   date >>  $toto
   echo "## Histogram of insert length (bp) measured as the distance between the first aligned base of the /1 and /2 reads in  compatible pairs" >> $toto
-  cat  MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -f scripts/c5.pair_length_histo.awk  | sed -e 's/\tNULL/\t/g' >>  $toto
+  cat  MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto.1 | gawk -f scripts2/c5.pair_length_histo.awk  | sed -e 's/\tNULL/\t/g' >>  $toto
   \rm $toto.1
   echo $toto
   \cp $toto RESULTS/Mapping
@@ -8106,7 +8092,7 @@ echo "// " > tmp/$MAGIC_COUNT_DIR/$MAGIC.Fragment_length.ace
 foreach run (`cat MetaDB/$MAGIC/RunPairedList`)
   if (! -e  tmp/$MAGIC_COUNT_DIR/$run/runPairHisto.txt || -e tmp/$MAGIC_COUNT_DIR/$run/Fragment_length.fixed) continue
   echo "$run ZZZZZ ZZZZZ" > toto.$$
-  cat toto.$$ ZZZZZ tmp/$MAGIC_COUNT_DIR/$run/runPairHisto.txt |  gawk -f scripts/c5.pair_length_histo.awk | head -100 | gawk -F '\t' '/^Run/{run=$2;next;}/^Average/{av=$2;next;}/^Median/{median=$2;next;}/^Position/{mode=$2;next;}/^Low 1/{z1=$2;next;}/^Low 5/{z5=$2;next;}/^High 95/{z95=$2;next;}/^High 99/{z99=$2;next;}END{printf("Ali %s\nFragment_length_1 %s\nFragment_length_5 %s\nFragment_length_mode %s\nFragment_length_median %s\nFragment_length_average %s\nFragment_length_95 %s\nFragment_length_99 %s\n\n",run,z1,z5,mode,median,av,z95,z99);}' >> tmp/$MAGIC_COUNT_DIR/$MAGIC.Fragment_length.ace
+  cat toto.$$ ZZZZZ tmp/$MAGIC_COUNT_DIR/$run/runPairHisto.txt |  gawk -f scripts2/c5.pair_length_histo.awk | head -100 | gawk -F '\t' '/^Run/{run=$2;next;}/^Average/{av=$2;next;}/^Median/{median=$2;next;}/^Position/{mode=$2;next;}/^Low 1/{z1=$2;next;}/^Low 5/{z5=$2;next;}/^High 95/{z95=$2;next;}/^High 99/{z99=$2;next;}END{printf("Ali %s\nFragment_length_1 %s\nFragment_length_5 %s\nFragment_length_mode %s\nFragment_length_median %s\nFragment_length_average %s\nFragment_length_95 %s\nFragment_length_99 %s\n\n",run,z1,z5,mode,median,av,z95,z99);}' >> tmp/$MAGIC_COUNT_DIR/$MAGIC.Fragment_length.ace
   \rm toto.$$
 end
 bin/tacembly MetaDB <<EOF
@@ -8280,7 +8266,7 @@ foreach delta (1 30 100)
   echo "\n\n\n\n\n\n\n\n\n" >> $toto
 end
 
-cat $toto | scripts/transpose > $toto.1
+cat $toto | scripts2/transpose > $toto.1
 echo -n "### $MAGIC.Aligned_length.histo : " > $toto
 date >> $toto
 echo "\n\n" >> $toto
@@ -8299,7 +8285,7 @@ goto phaseLoop
 
 foreach lane (`cat MetaDB/$MAGIC/LaneList`)
   if (! -e  Fastc/$lane.illumina_redundancy_geometry.txt) then
-    scripts/submit Fastc/$lane "gunzip -c Fastc/$lane.id.gz | gawk -F '\t' -f scripts/illumina_redundancy_geometry.awk lane=$lane > Fastc/$lane.illumina_redundancy_geometry.txt"
+    scripts2/submit Fastc/$lane "gunzip -c Fastc/$lane.id.gz | gawk -F '\t' -f scripts2/illumina_redundancy_geometry.awk lane=$lane > Fastc/$lane.illumina_redundancy_geometry.txt"
   endif
 end
 cat Fastc/*/*.illumina_redundancy_geometry.txt | gawk -F '\t' '/radial/{n=0;next;}{n++;if(n==2){for(i=1;i<=32;i++)rr[i]+=$i;}}END{for(i=1;i<=32;i++)printf("\t%d",rr[i]);printf("\n");}'
@@ -8404,7 +8390,7 @@ if (1 || ! -e $toto) then
   # foooreach run (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupAdditiveList`)
   #  cat MetaDB/$MAGIC/Error_type.txt | gawk '{ r=$1;gsub(/\"/,"",r); if(r == run)print;}' run=$run >> $toto.tmp
   # ennnd
-  cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ  MetaDB/$MAGIC/Error_type.txt  | gawk -F '\t' -f scripts/snpSupportStat.awk  format=Error_type minMut=1 minCover=1 minF=0 >> $toto
+  cat MetaDB/$MAGIC/RunListSorted  MetaDB/$MAGIC/GroupAdditiveList ZZZZZ  MetaDB/$MAGIC/gtitle.txt ZZZZZ  MetaDB/$MAGIC/Error_type.txt  | gawk -F '\t' -f scripts2/snpSupportStat.awk  format=Error_type minMut=1 minCover=1 minF=0 >> $toto
 
   # \rm $toto.tmp
   \cp  $toto RESULTS/SNV
@@ -8441,7 +8427,7 @@ if (! -d MicroArray/Hits) mkdir MicroArray/Hits
 
 foreach pp (`cat MicroArray/MaList`)
   if (! -e  MicroArray/Hits/$pp.hits.gz) then
-    scripts/submit MicroArray/Hits/$pp "scripts/ma1.align.tcsh $pp"
+    scripts2/submit MicroArray/Hits/$pp "scripts2/ma1.align.tcsh $pp"
   endif
 end
 
@@ -8481,7 +8467,7 @@ foreach pp (`cat MicroArray/MaList`)
       foreach fr (f r)
         if (! -e tmp/WIGGLERUN/$run/$chrom/R.chrom.u.$fr.BF.gz) continue
         if (! -e MicroArray/Sponge/$pp/$run/$chrom.u.f.sponged.txt) then
-          scripts/submit MicroArray/Sponge/$pp/$run/$run.$chrom.u.$fr.sponged "bin/geneelements -sponge 1 -spongeFile MicroArray/Sponge/$pp/sponge.gz  -wiggle tmp/WIGGLERUN/$run/$chrom/R.chrom.u.$fr.BF.gz  -sxxChromosome $chrom  -run $run -o MicroArray/Sponge/$pp/$run/$run.$chrom.u.$fr.sponged.txt"
+          scripts2/submit MicroArray/Sponge/$pp/$run/$run.$chrom.u.$fr.sponged "bin/geneelements -sponge 1 -spongeFile MicroArray/Sponge/$pp/sponge.gz  -wiggle tmp/WIGGLERUN/$run/$chrom/R.chrom.u.$fr.BF.gz  -sxxChromosome $chrom  -run $run -o MicroArray/Sponge/$pp/$run/$run.$chrom.u.$fr.sponged.txt"
         endif
       end
     end
@@ -8509,7 +8495,7 @@ phasema3:
 if (! -d  MicroArray/ProbeCount) mkdir  MicroArray/ProbeCount
 
  if (! -d tmp/GENEINDEX) mkdir tmp/GENEINDEX
- scripts/geneindex.tcsh snp4 000
+ scripts2/geneindex.tcsh snp4 000
 
  foreach pp (`cat MicroArray/MaList`)
    if (-e MicroArray/Sponge/$pp/sponge.gz) then
@@ -8567,9 +8553,9 @@ end
 foreach th1 (12)
   foreach th2 (0 8 10 12)
     foreach rsc (80)
-      if (1) scripts/ma4.MOA_analysis.tcsh av_newindex_$th1 AGLuK_rescaled$rsc.newindex_$th2 &
+      if (1) scripts2/ma4.MOA_analysis.tcsh av_newindex_$th1 AGLuK_rescaled$rsc.newindex_$th2 &
     end
-    if (1) scripts/ma4.MOA_analysis.tcsh av_newindex_$th1 AGLuK_at_newindex_$th2 &
+    if (1) scripts2/ma4.MOA_analysis.tcsh av_newindex_$th1 AGLuK_at_newindex_$th2 &
   end
 end
  
@@ -8694,11 +8680,11 @@ set Target2=AGLuK_at
 set Target1=av
 set Target2=AGLuK
 
-# scripts/ma4.MOA_analysis.tcsh $Target1 $Target2 GENE
-# scripts/ma4.MOA_analysis.tcsh $Target1 $Target2 MRNAH
+# scripts2/ma4.MOA_analysis.tcsh $Target1 $Target2 GENE
+# scripts2/ma4.MOA_analysis.tcsh $Target1 $Target2 MRNAH
 
 # in 2015, the experiment class has been superseded by the compare class
- scripts/ma4.MOA_compare_analysis.tcsh $Target1 $Target2 MRNAH
+ scripts2/ma4.MOA_compare_analysis.tcsh $Target1 $Target2 MRNAH
 
 #############
 
@@ -8893,8 +8879,8 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (! -d tmp/WIGGLELANE/$lane) mkdir tmp/WIGGLELANE/$lane 
     if (-e tmp/WIGGLERUN/$run/wg2a.u.done && -e tmp/WIGGLERUN/$run/wg2a.nu.done) continue
     if (! -e tmp/WIGGLELANE/$lane/wg1.done) then
-      echo "scripts/wigglerun.tcsh $run $lane $stranded"
-      scripts/submit tmp/WIGGLELANE/$lane.wg1  "scripts/wg1.wigglelane.tcsh $run $lane $stranded $paired"
+      echo "scripts2/wigglerun.tcsh $run $lane $stranded"
+      scripts2/submit tmp/WIGGLELANE/$lane.wg1  "scripts2/wg1.wigglelane.tcsh $run $lane $stranded $paired"
     endif
   end
 end
@@ -8927,7 +8913,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   foreach uu (u nu pp)
     if (-e tmp/WIGGLERUN/$run/wg2a.$uu.done) continue
     if (-d tmp/SPONGE/$run) \rm -rf tmp/SPONGE/$run
-    scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run $uu lane2run"
+    scripts2/submit "tmp/WIGGLERUN/$run/wg2a" "scripts2/wg2a.wiggleLane2Run.tcsh $run $uu lane2run"
   end
 end
 
@@ -8960,7 +8946,7 @@ if ($Strategy == RNA_seq) then
     end
     if ($ok == 0) continue
     if (-e tmp/WIGGLERUN/$run/wg2a.restrand.done) continue
-    scripts/submit "tmp/WIGGLERUN/$run/wg2a" "scripts/wg2a.wiggleLane2Run.tcsh $run u restrand"
+    scripts2/submit "tmp/WIGGLERUN/$run/wg2a" "scripts2/wg2a.wiggleLane2Run.tcsh $run u restrand"
   end
 endif
 
@@ -9033,7 +9019,7 @@ cat MetaDB/$MAGIC/runs.ace | gawk 'BEGIN{x=-1;}/^Run[ \t]/{gsub(/\"/,"",$2);ok=0
 
 foreach level (`seq 1 1 $groupLevelMax`)
   # wait so that subgroups are already computed
-  scripts/submit wait
+  scripts2/submit wait
   echo "$phase level=$level"
   set okk=0
   foreach group (`cat $WRGG`)
@@ -9081,17 +9067,17 @@ echo "XXXXX Modification of group $group ...  $n new runs"
       if (-e tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome.u.done) then
         \rm  tmp/WIGGLEGROUP/$group/$chrom/wg3a.*
       endif
-      echo "scripts/wg2.group_wiggles.tcsh $group $chrom $justMito "
+      echo "scripts2/wg2.group_wiggles.tcsh $group $chrom $justMito "
       if (-e tmp/WIGGLEGROUP/$group/$chrom/wg2b.out) \rm  tmp/WIGGLEGROUP/$group/$chrom/wg2b.out
       set okk=1
       \cp tmp/WIGGLEGROUP/$group/RunList tmp/WIGGLEGROUP/$group/$chrom
       if (-d tmp/SPONGE/$run) \rm -rf tmp/SPONGE/$group
-      scripts/submit "tmp/WIGGLEGROUP/$group/$chrom/wg2b" "scripts/wg2b.group_wiggles.tcsh $group $chrom $justMito " 
+      scripts2/submit "tmp/WIGGLEGROUP/$group/$chrom/wg2b" "scripts2/wg2b.group_wiggles.tcsh $group $chrom $justMito " 
     end
     touch tmp/WIGGLEGROUP/$group/$phase.done
   end 
   if ($phase == wg2bb && $okk == 1) then
-    scripts/submit wait
+    scripts2/submit wait
   endif
 end
 
@@ -9118,9 +9104,9 @@ foreach group (`cat MetaDB/$MAGIC/GroupWiggleList`)
       continue
     endif
    if (! -d tmp/WIGGLEGROUP/$group) mkdir tmp/WIGGLEGROUP/$group
-    scripts/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts/wg3a.coverome.tcsh $group $chrom $minCoveron u"
-    scripts/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts/wg3a.coverome.tcsh $group $chrom $minCoveron nu"
-    scripts/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts/wg3a.coverome.tcsh $group $chrom $minCoveron pp"
+    scripts2/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts2/wg3a.coverome.tcsh $group $chrom $minCoveron u"
+    scripts2/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts2/wg3a.coverome.tcsh $group $chrom $minCoveron nu"
+    scripts2/submit tmp/WIGGLEGROUP/$group/$chrom/wg3a.coverome  "scripts2/wg3a.coverome.tcsh $group $chrom $minCoveron pp"
   if (-e $toto1) \rm $toto1
   end
 end
@@ -9144,7 +9130,7 @@ EOF
       list -a -f $MagicRootDir/tmp/WIGGLE/SpikeIn/ERCC2.runs.list
       quit
 EOF
-    scripts/wg3a.ERCC.multiwiggle.tcsh
+    scripts2/wg3a.ERCC.multiwiggle.tcsh
   endif
 
 goto phaseLoop
@@ -9324,12 +9310,12 @@ foreach group (`cat MetaDB/$MAGIC/GroupListSorted`)
   $tab_sort -k 2n -k 1n  $toto.1 | gawk -F '\t' '{x=$1;c=$2;y=$3;bp=$4;ic=c2i[c];if(ic==0){icmax++;c2i[c]=icmax;i2c[icmax]=c;ic=icmax;}if(c==0)next;zyy[ic]+=x*y;zbp[ic]+=bp;if(x>10000)x=10000;if(x>xmax)xmax=x;yy[x,ic]+=y;yyy[ic]+=y;}END{printf("# Coveron or exon length");for(ic=1;ic<=icmax;ic++)if(yyy[ic]>0)printf("\t%d fold %s",i2c[ic],group);for(x=10;x<=xmax;x+=10){printf("\n%d",x);for(ic=1;ic<=icmax;ic++)if(yyy[ic]>0)printf("\t%d",yy[x,ic]);}printf("\n# Number of segments");for(ic=1;ic<=icmax;ic++)if(yyy[ic]>0)printf("\t%d",yyy[ic]);printf("\n# Genomic length covered (Mb)");for(ic=1;ic<=icmax;ic++)if(yyy[ic]>0)printf("\t%d",zyy[ic]/1000000);printf("\n# Aligned (Mb)");for(ic=1;ic<=icmax;ic++)if(yyy[ic]>0)printf("\t%d",zbp[ic]/1000000);printf("\n");}' group=$group | sed -e 's/^10000/>=10000/' >>  $toto
   wc $toto
   cat $toto | gawk '/^#/{print}' >> $toto5
-  cat $toto | scripts/transpose >> $toto4.1
+  cat $toto | scripts2/transpose >> $toto4.1
   echo "\n\n" >> $toto4.1
   \rm $toto.1
 
 end
-  cat $toto4.1 |  scripts/transpose > $toto4
+  cat $toto4.1 |  scripts2/transpose > $toto4
   set n=`cat $toto4 | wc -l`
   if ($n > 0) then
     \cp $toto4 RESULTS/Coverage_and_exons
@@ -9361,7 +9347,7 @@ foreach group (`cat MetaDB/$MAGIC/GroupWiggleList`)
   end
 end
 
-cat $toto.1 | gawk -f scripts/s4.autocorrel.awk >> $toto
+cat $toto.1 | gawk -f scripts2/s4.autocorrel.awk >> $toto
 
 \cp $toto RESULTS/Coverage_and_exons
 wc $toto
@@ -9490,7 +9476,7 @@ phasewg4b:
 	  set n=`wc $tt | gawk '{print $1;}'`
 	  if ($n > 10) continue
 	endif
-        scripts/submit tmp/WIGGLERUN/$run/wg4b "scripts/wg4b.gene_sponge.tcsh $capture $WG $run $target"
+        scripts2/submit tmp/WIGGLERUN/$run/wg4b "scripts2/wg4b.gene_sponge.tcsh $capture $WG $run $target"
       end
     end
   end
@@ -9506,7 +9492,7 @@ phasewg4c:
  echo -n "Phase wg4c gene_sponge capture Cumul "
  date
 goto phaseLoop
-scripts/submit tmp/WIGGLERUN/wg4b.$MAGIC  "scripts/wg4b.gene_sponge.tcsh Cumul"
+scripts2/submit tmp/WIGGLERUN/wg4b.$MAGIC  "scripts2/wg4b.gene_sponge.tcsh Cumul"
 goto phaseLoop
 
 ###############################################################
@@ -9517,7 +9503,7 @@ phasewg4d:
  echo -n "Phase wgc gene_sponge capture Parse "
  date
 goto phaseLoop
-scripts/wg4b.gene_sponge.tcsh Parse
+scripts2/wg4b.gene_sponge.tcsh Parse
 goto phaseLoop
 
 ###############################################################
@@ -9552,7 +9538,7 @@ foreach group (`cat MetaDB/$MAGIC/RunWiggleList  MetaDB/$MAGIC/GroupWiggleList`)
         if (! -e tmp/WIGGLEGROUP/$group/$chrom/R.chrom.$unique.f.BF.gz && ! -e tmp/WIGGLERUN/$group/$chrom/R.chrom.$unique.f.BF.gz) continue
         if (-e  tmp/TABIX/$group/$chrom.$unique.tabix.done) continue
           # last parm could be C_$chrom
-          scripts/submit  tmp/TABIX/$group/$chrom.$unique.tabix  "scripts/wiggle2tabix.tcsh $group $chrom $unique $chrom"
+          scripts2/submit  tmp/TABIX/$group/$chrom.$unique.tabix  "scripts2/wiggle2tabix.tcsh $group $chrom $unique $chrom"
     end
   end
 end
@@ -9598,7 +9584,7 @@ phasewg7:
 # setenv UCSCgenomeRelease wuhCor1  NC_045512v2
 
 if (! -d tmp/WIGGLE) mkdir  tmp/WIGGLE
-scripts/fetchChromSizes $UCSCgenomeRelease > tmp/WIGGLE/$species.chrom.sizes
+scripts2/fetchChromSizes $UCSCgenomeRelease > tmp/WIGGLE/$species.chrom.sizes
 if (! -d  ~/ftp/$species) mkdir  ~/ftp/$species
 if (! -d  ~/ftp/$species/bigwig.$UCSCgenomeRelease) mkdir  ~/ftp/$species/bigwig.$UCSCgenomeRelease
 if (! -d  ~/ftp/$species/bigwig.$UCSCgenomeRelease/$MAGIC) mkdir  ~/ftp/$species/bigwig.$UCSCgenomeRelease/$MAGIC
@@ -9610,12 +9596,12 @@ if (! -d  ~/ftp/$species/bigwig.$UCSCgenomeRelease/$MAGIC) mkdir  ~/ftp/$species
 
 # submit local, because not all farm machines see the ftp disc
      if (-d tmp/WIGGLEGROUP/$rg && ! -e tmp/WIGGLEGROUP/$rg/any.$fr.wig2 && ! -e ~/ftp/$species/bigwig.$UCSCgenomeRelease/$MAGIC/$rg/any.$fr.bw3) then
-       echo "scripts/submit tmp/WIGGLEGROUP/$rg/wg7.make_bigwig.$fr  scripts/wg7.make_bigwig.tcsh GROUP $rg $fr"
-       scripts/submit tmp/WIGGLEGROUP/$rg/wg7.make_bigwig.$fr "scripts/wg7.make_bigwig.tcsh GROUP $rg $fr"  local
+       echo "scripts2/submit tmp/WIGGLEGROUP/$rg/wg7.make_bigwig.$fr  scripts2/wg7.make_bigwig.tcsh GROUP $rg $fr"
+       scripts2/submit tmp/WIGGLEGROUP/$rg/wg7.make_bigwig.$fr "scripts2/wg7.make_bigwig.tcsh GROUP $rg $fr"  local
      endif
      if (-d tmp/WIGGLERUN/$rg && ! -e tmp/WIGGLERUN/$rg/any.$fr.wig2 && ! -e ~/ftp/$species/bigwig.$UCSCgenomeRelease/$MAGIC/$rg/any.$fr.bw) then
-       echo "scripts/submit tmp/WIGGLERUN/$rg/wg7.make_bigwig.$fr  scripts/wg7.make_bigwig.tcsh RUN $rg $fr"
-             scripts/submit tmp/WIGGLERUN/$rg/wg7.make_bigwig.$fr "scripts/wg7.make_bigwig.tcsh RUN $rg $fr" local
+       echo "scripts2/submit tmp/WIGGLERUN/$rg/wg7.make_bigwig.$fr  scripts2/wg7.make_bigwig.tcsh RUN $rg $fr"
+             scripts2/submit tmp/WIGGLERUN/$rg/wg7.make_bigwig.$fr "scripts2/wg7.make_bigwig.tcsh RUN $rg $fr" local
      endif
 
    end
@@ -9632,7 +9618,7 @@ phasewgh:
 foreach tissue (BodyMapSEQC)
   foreach chrom ($chromSetAll mito)
     if (! -e tmp/WIGGLE/$chrom/$tissue.ns.histo) then
-      scripts/wiggleHisto.tcsh $chrom $tissue u
+      scripts2/wiggleHisto.tcsh $chrom $tissue u
     endif
   end
 end
@@ -9735,7 +9721,7 @@ foreach compare (`cat  tmp/WIGGLE_CNV/c2runs.txt | cut -f 1 | sort -u`)
 
 # echo NB_exome_tumor >  tmp/WIGGLE_CNV/cnv.runsc
 # add tmp/WIGGLE_CNV/cnv.runs[abc] in the netx line if you want the groups in the table
-# cat tmp/WIGGLE_CNV/cnv.runs1a ZZZZZ tmp/WIGGLE_CNV/cnv.runs2 | gawk '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]<1)print;}' | scripts/tab_sort -u  > tmp/WIGGLE_CNV/cnv.runs1a
+# cat tmp/WIGGLE_CNV/cnv.runs1a ZZZZZ tmp/WIGGLE_CNV/cnv.runs2 | gawk '/^ZZZZZ/{zz++;next;}{if(zz<1){ok[$1]=1;next;}if(ok[$1]<1)print;}' | scripts2/tab_sort -u  > tmp/WIGGLE_CNV/cnv.runs1a
 
 # the script is passed runsa runsb explicitlely, i.e. the names of the 2 groups, but also reads the files runs1 runs2 i.e. the full list of individuals in either group
 
@@ -9744,14 +9730,14 @@ foreach compare (`cat  tmp/WIGGLE_CNV/c2runs.txt | cut -f 1 | sort -u`)
   touch tmp/WIGGLE_CNV/c2runs.txt  tmp/WIGGLE_CNV/cnv.runs1a
   \rm  tmp/WIGGLE_CNV/c2runs.txt  tmp/WIGGLE_CNV/cnv.runs1a
 
-  scripts/submit tmp/WIGGLE_CNV/cnv.$compare "scripts/cnv.compare_coverons.tcsh $compare $bigGroup $bigCover $controlGroup "
+  scripts2/submit tmp/WIGGLE_CNV/cnv.$compare "scripts2/cnv.compare_coverons.tcsh $compare $bigGroup $bigCover $controlGroup "
 end
 
 goto phaseLoop
 
 foreach chrom ($chromSetAll)
   if (! -d tmp/WIGGLE_CNV/$chrom) mkdir tmp/WIGGLE_CNV/$chrom
-  scripts/submit tmp/WIGGLE_CNV/$chrom/cnv.$compare "scripts/cnv.compare_coverons.tcsh $chrom $bigGroup $bigCover $controlGroup"
+  scripts2/submit tmp/WIGGLE_CNV/$chrom/cnv.$compare "scripts2/cnv.compare_coverons.tcsh $chrom $bigGroup $bigCover $controlGroup"
 end
 
 ###############################################################
@@ -9760,7 +9746,7 @@ phasesponge1:
 goto phaseLoop
 
 
-#  look in scripts/sex.tcsh towards the end for what to do next
+#  look in scripts2/sex.tcsh towards the end for what to do next
 
 
 goto phaseLoop
@@ -9837,8 +9823,8 @@ if (-e tmp/METADATA/genome.ns.sponge)       set mask=$mask",Genome:tmp/METADATA/
 
     foreach limit (1 2 5 10 20 50 100 1000 10000)
       if (-e tmp/SPONGE/$run/sponge2.gene.$limit.done5) continue
-      echo "scripts/sponge2.tcsh $run $limit $mask $mainTarget"
-      scripts/submit  "tmp/SPONGE/$run/sponge2.$limit" "scripts/sponge2.tcsh $run $limit $mask $mainTarget"
+      echo "scripts2/sponge2.tcsh $run $limit $mask $mainTarget"
+      scripts2/submit  "tmp/SPONGE/$run/sponge2.$limit" "scripts2/sponge2.tcsh $run $limit $mask $mainTarget"
     end
   end
 
@@ -9897,18 +9883,18 @@ foreach limit (1 2 5 10 20 50 100 200 500 1000 2000 5000 10000)
   foreach rg (`cat MetaDB/$MAGIC/RunsList MetaDB/$MAGIC/GroupWiggleList`)
     ls  tmp/SPONGE/$rg/Total.*.u.frns.$limit.txt >>  $toto.list
   end
-  cat  MetaDB/$MAGIC/RunSublibrary_ofList ZZZZZ MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/GroupListSorted ZZZZZ  MetaDB/$MAGIC/RunsList ZZZZZ MetaDB/$MAGIC/GroupWiggleList   ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ  `cat $toto.list`  | gawk -F '\t' -f scripts/sponge3.awk limit=$limit > $toto.1
+  cat  MetaDB/$MAGIC/RunSublibrary_ofList ZZZZZ MetaDB/$MAGIC/RunListSorted ZZZZZ  MetaDB/$MAGIC/GroupListSorted ZZZZZ  MetaDB/$MAGIC/RunsList ZZZZZ MetaDB/$MAGIC/GroupWiggleList   ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ  `cat $toto.list`  | gawk -F '\t' -f scripts2/sponge3.awk limit=$limit > $toto.1
 
   cat $toto.1 | gawk '/^#/{print}' > $toto.2
   cat $toto.1 | gawk '/^#/{next;}{if($2 < 1) next; print}'  >> $toto.2
-  cat $toto.2 | scripts/transpose | scripts/tab_sort -k 1n >> $toto
+  cat $toto.2 | scripts2/transpose | scripts2/tab_sort -k 1n >> $toto
   \rm $toto.[12] $toto.list
   if ($limit == 1) then
      cat $toto | head -2 | tail -1 |  gawk -F '\t' '{printf("#Type\tType\tCoverage threshold\t"); for (i = 2 ; i <= NF; i++)printf("\t%s",$i);printf("\n");}' >> $totoA
   endif
   cat $toto | gawk -F '\t' '/#/{next}{x=0+substr($1,4,3);type="";if(x==1)type="intergenic";printf("%s\t%s\t%d\t",$1,type,limit); for (i = 2 ; i <= NF; i++)printf("\t%s",$i);printf("\n");}' limit=$limit >> $totoA.1
 end
-cat $totoA.1 | scripts/tab_sort -k 1n -k 3n | gawk -F '\t' '{split($1,aa," ");if(0+$1<=10 && $3>1)next;}/^00[148]/{if($3>1)next;}{print}' >>  $totoA
+cat $totoA.1 | scripts2/tab_sort -k 1n -k 3n | gawk -F '\t' '{split($1,aa," ");if(0+$1<=10 && $3>1)next;}/^00[148]/{if($3>1)next;}{print}' >>  $totoA
 \rm $totoA.1
 
 if (0) then
@@ -9920,7 +9906,7 @@ bruit = 30001
 endif
 
 # echo "ZZZZZ\nRprim286\nZZZZZ\nZZZZZ\nRprim286\nZZZZZ\nZZZZZ " > titi
-# cat titi tmp/SPONGE/Rprim286/Total.1.1.ns.$CDS.txt   | gawk -F '\t' -f scripts/sponge3.awk
+# cat titi tmp/SPONGE/Rprim286/Total.1.1.ns.$CDS.txt   | gawk -F '\t' -f scripts2/sponge3.awk
 # \rm titi tutu toto
 
 cat tmp/SPONGE/$MAGIC.sponge.1.txt | gawk -F '\t' '/^#Run/{print ;}'   > tutu
@@ -9935,7 +9921,7 @@ set toto=tmp/SPONGE/$MAGIC.intergenicKb.ace
 echo -n "// $toto " > $toto
 date >> $toto
 echo "// Number of kb or RNAseq mapping outside the gene boxes, exported by sponge3"  >> $toto
-cat tutu | scripts/transpose | gawk '/^#Run/{ok=1;next;}{if(ok==1 && $2>0)printf("Ali %s\nIntergenic %d kb\nIntergenic_density %.4f \n\n",$1,($3-$4)/1000,($3 - (0 + $4))/(1 + $2));}' >> $toto
+cat tutu | scripts2/transpose | gawk '/^#Run/{ok=1;next;}{if(ok==1 && $2>0)printf("Ali %s\nIntergenic %d kb\nIntergenic_density %.4f \n\n",$1,($3-$4)/1000,($3 - (0 + $4))/(1 + $2));}' >> $toto
 \rm tutu
 
 echo $toto
@@ -9983,7 +9969,7 @@ goto phaseLoop
        end
        if ($err == 0 && ! -e tmp/WIGGLESIG/$run/sig.BV.gz) then
          if (! -d tmp/WIGGLESIG/$run) $mkDir WIGGLESIG $run
-         scripts/submit tmp/WIGGLESIG/$run/wsig "scripts/wsig.signature_wiggle.tcsh RUN $target $run"
+         scripts2/submit tmp/WIGGLESIG/$run/wsig "scripts2/wsig.signature_wiggle.tcsh RUN $target $run"
        endif
      end
    endif
@@ -10018,7 +10004,7 @@ goto phaseLoop
      foreach group (`cat MetaDB/$MAGIC/GroupList`)
        if ($err == 0 && ! -e  tmp/WIGGLESIG/$group/sig.BV.gz) then
          if (! -d tmp/WIGGLESIG/$group) mkdir tmp/WIGGLESIG/$group
-         scripts/submit   tmp/WIGGLESIG/$group/wsig "scripts/wsig.signature_wiggle.tcsh GROUP $target $group"
+         scripts2/submit   tmp/WIGGLESIG/$group/wsig "scripts2/wsig.signature_wiggle.tcsh GROUP $target $group"
        endif
      end
    endif
@@ -10046,7 +10032,7 @@ date >> $toto.txt
 echo -n "# Run\tGene" > $toto.txt
 echo toto | gawk '{for(i=0;i<=20000;i+=step)printf("\t%d",i);printf("\n");}' step=200 >> $toto.txt
 foreach run (`cat MetaDB/$MAGIC/RunListSorted MetaDB/$MAGIC/GroupListSorted`)
-  gunzip -c  tmp/WIGGLESIG/$run/sig.BV.gz | gawk '/variableStep/{split($2,aa,"=");gene=aa[2];next;}/^#/{next}/^track/{next}{x=0+$1;if(x>0 && x>gln[gene]){gln[gene]=x;gx[gene,x]=$2;if($2>mx[gene])mx[gene]=$2;next;}}END{for(gene in gln) {gln[gene]=gln[gene]-(gln[gene]%step);printf("%s\t%s",run,gene);ok=0;dy=0;for(i=0;i<=20000 && i<= gln[gene];i+=step){y=gln[gene]-i;if(20*gx[gene,y]>mx[gene])ok=1;if(ok==0)dy+=step;else {printf("\t%d",gx[gene,y]);cumul[y-dy]+=gx[gene,y];}}printf("\n");}printf("%s\tzCumul",run,gene);for(i=0;i<=20000;i+=step)printf("\t%d",cumul[i]);printf("\n");}' step=200 run=$run | scripts/tab_sort | sed -e 's/zCumul/Cumul/'  >> $toto.txt
+  gunzip -c  tmp/WIGGLESIG/$run/sig.BV.gz | gawk '/variableStep/{split($2,aa,"=");gene=aa[2];next;}/^#/{next}/^track/{next}{x=0+$1;if(x>0 && x>gln[gene]){gln[gene]=x;gx[gene,x]=$2;if($2>mx[gene])mx[gene]=$2;next;}}END{for(gene in gln) {gln[gene]=gln[gene]-(gln[gene]%step);printf("%s\t%s",run,gene);ok=0;dy=0;for(i=0;i<=20000 && i<= gln[gene];i+=step){y=gln[gene]-i;if(20*gx[gene,y]>mx[gene])ok=1;if(ok==0)dy+=step;else {printf("\t%d",gx[gene,y]);cumul[y-dy]+=gx[gene,y];}}printf("\n");}printf("%s\tzCumul",run,gene);for(i=0;i<=20000;i+=step)printf("\t%d",cumul[i]);printf("\n");}' step=200 run=$run | scripts2/tab_sort | sed -e 's/zCumul/Cumul/'  >> $toto.txt
 end
 
 head -3 $toto.txt > $toto.cumul.txt
@@ -10090,7 +10076,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -d tmp/MRNAWIGGLELANE$H/$run) $mkDir  MRNAWIGGLELANE$H $run
   foreach lane (`cat Fastc/$run/LaneList `)
     if (! -e tmp/$MAGIC_COUNT_DIR/$lane.hits.gz || -e tmp/MRNAWIGGLELANE$H/$lane.done) continue
-    scripts/submit  tmp/MRNAWIGGLELANE$H/$lane  " scripts/wiggle.mrna.tcsh lane $lane $H"
+    scripts2/submit  tmp/MRNAWIGGLELANE$H/$lane  " scripts2/wiggle.mrna.tcsh lane $lane $H"
   end
 end
 
@@ -10115,7 +10101,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList  `)
     if (! -e tmp/MRNAWIGGLELANE$H/$lane.done) set ok=0
   end
   if ($ok == 0) continue
-  scripts/submit  tmp/MRNAWIGGLERUN$H/$run  " scripts/wiggle.mrna.tcsh run $run $H"
+  scripts2/submit  tmp/MRNAWIGGLERUN$H/$run  " scripts2/wiggle.mrna.tcsh run $run $H"
 end
 
 goto phaseLoop
@@ -10138,7 +10124,7 @@ foreach group (`cat MetaDB/$MAGIC/GroupWiggleList  `)
     if (! -e tmp/MRNAWIGGLERUN$H/$run/run.done) set ok=0
   end
   if ($ok == 0) continue
-  scripts/submit  tmp/MRNAWIGGLEGROUP$H/$group  " scripts/wiggle.mrna.tcsh group $group $H"
+  scripts2/submit  tmp/MRNAWIGGLEGROUP$H/$group  " scripts2/wiggle.mrna.tcsh group $group $H"
 end
 
 goto phaseLoop
@@ -10148,16 +10134,16 @@ echo -n "# " > RESULTS/mrna.fr.groupwiggles.H.txt
 date >> RESULTS/mrna.fr.groupwiggles.H.txt
 echo -n "Transcriptlength\tPlot\tLength\tSupporting bp\tGroup\tTranscrit\tPosition" >> RESULTS/mrna.fr.groupwiggles.H.txt
 echo toto | gawk '{for(i=10;i<=40000;i+=10)printf("\t%d",i);printf("\n");}' >>  RESULTS/mrna.fr.groupwiggles.H.txt
-cat tmp/MRNAWIGGLEGROUPH/*/mrna.?.wiggles.txt | scripts/tab_sort -k 5,5 -k 4,4 | grep Group | grep -v LibBatchZ | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
-cat tmp/MRNAWIGGLEGROUPH/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.fr.groupwiggles.H.txt
+cat tmp/MRNAWIGGLEGROUPH/*/mrna.?.wiggles.txt | scripts2/tab_sort -k 5,5 -k 4,4 | grep Group | grep -v LibBatchZ | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
+cat tmp/MRNAWIGGLEGROUPH/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts2/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.fr.groupwiggles.H.txt
 
 gunzip -c TARGET/MRNAS/hs.RefSeq.tr2ln2gene.ace.gz TARGET/MRNAS/hs.av.tr2ln2gene.ace.gz | gawk '{gsub(/\"/,"",$0);}/Transcript/{t=$2;}/Length/{print t "\t",$2;}' > tmp/MRNAWIGGLEGROUP/tr2ln.txt
 echo -n "# " > RESULTS/mrna.fr.groupwiggles.txt
 date >> RESULTS/mrna.fr.groupwiggles.txt
 echo -n "Transcriptlength\tPlot\tLength\tSupporting bp\tGroup\tTranscrit\tPosition" >> RESULTS/mrna.fr.groupwiggles.txt
 echo toto | gawk '{for(i=10;i<=40000;i+=10)printf("\t%d",i);printf("\n");}' >>  RESULTS/mrna.fr.groupwiggles.txt
-cat tmp/MRNAWIGGLEGROUP/*/mrna.?.wiggles.txt | scripts/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
-cat tmp/MRNAWIGGLEGROUP/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.fr.groupwiggles.txt
+cat tmp/MRNAWIGGLEGROUP/*/mrna.?.wiggles.txt | scripts2/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
+cat tmp/MRNAWIGGLEGROUP/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts2/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.fr.groupwiggles.txt
 
 
 gunzip -c TARGET/MRNAS/hs.RefSeq.tr2ln2gene.ace.gz TARGET/MRNAS/hs.av.tr2ln2gene.ace.gz | gawk '{gsub(/\"/,"",$0);}/Transcript/{t=$2;}/Length/{print t "\t",$2;}' > tmp/MRNAWIGGLEGROUPH/tr2ln.txt
@@ -10165,26 +10151,26 @@ echo -n "# " > RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
 date >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
 echo -n "Transcriptlength\tPlot\tLength\tSupporting bp\tGroup\tTranscrit\tPosition" >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
 echo toto | gawk '{for(i=10;i<=40000;i+=10)printf("\t%d",i);printf("\n");}' >>  RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
-cat tmp/MRNAWIGGLEGROUPH/*/mrna.LengthCoverage.?.wiggles.txt | scripts/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
-cat tmp/MRNAWIGGLEGROUPH/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
+cat tmp/MRNAWIGGLEGROUPH/*/mrna.LengthCoverage.?.wiggles.txt | scripts2/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
+cat tmp/MRNAWIGGLEGROUPH/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts2/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.H.txt
 
 gunzip -c TARGET/MRNAS/hs.RefSeq.tr2ln2gene.ace.gz TARGET/MRNAS/hs.av.tr2ln2gene.ace.gz | gawk '{gsub(/\"/,"",$0);}/Transcript/{t=$2;}/Length/{print t "\t",$2;}' > tmp/MRNAWIGGLEGROUP/tr2ln.txt
 echo -n "# " > RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
 date >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
 echo -n "Transcriptlength\tPlot\tLength\tSupporting bp\tGroup\tTranscrit\tPosition" >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
 echo toto | gawk '{for(i=10;i<=40000;i+=10)printf("\t%d",i);printf("\n");}' >>  RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
-cat tmp/MRNAWIGGLEGROUP/*/mrna.LengthCoverage.?.wiggles.txt | scripts/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
-cat tmp/MRNAWIGGLEGROUP/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
+cat tmp/MRNAWIGGLEGROUP/*/mrna.LengthCoverage.?.wiggles.txt | scripts2/tab_sort -k 5,5 -k 4,4 | grep Chronic | grep -v LibBatch | grep -v ChronicFatigueAndControls_199| grep -v FC  > toto
+cat tmp/MRNAWIGGLEGROUP/tr2ln.txt ZZZZZ toto | gawk -F '\t' '/ZZZZZ/{zz++;next;}{if(zz<1){ln[$1]=$2;next}}{printf("%d\t",ln[$5]+0);print;}'  | scripts2/tab_sort -k 1,1nr -k 6,6 -k 5,5 >> RESULTS/mrna.LengthCoverage.fr.groupwiggles.txt
 
 
 
 
-cat RESULTS/mrna.groupwiggles.txt | grep Chronic | gawk -F '\t' '{m=0;for(i=5;i<=NF;i++)m+=$i;printf("%s\t%s\t%d\n",$1,$2,m);}' | scripts/tab_sort -k 2 | grep .gAu
+cat RESULTS/mrna.groupwiggles.txt | grep Chronic | gawk -F '\t' '{m=0;for(i=5;i<=NF;i++)m+=$i;printf("%s\t%s\t%d\n",$1,$2,m);}' | scripts2/tab_sort -k 2 | grep .gAu
 
 # collate all the runs and regularize the location of the most 3' hit (all lines for given mRNA must have same value in col 3
 
 cat tmp/MRNAWIGGLERUN/Rhs*/mrna.f.wiggles | gawk '/^#/{next}{nn++;z[nn]=$0;if($3>LL[$2]){LL[$2]=$3;if($3>LMax)LMax=$3;}k=0;for(i=5;i<=NF;i++)k+=$i;kk[nn]=k;kkk+=k;next;}END{printf("Run\tmRNA\tLength\tBegin");for(i=0;i<=LMax;i+=50)printf("\t%d",i);for(i=1;i<=nn;i++){n=split(z[i],aa,"\t");L=LL[aa[2]];printf("\n%s\tU%s\t%d\t%d",aa[1],aa[2],L,aa[4]);for(j=aa[3];j<L;j+=50)printf("\t0");a=10*kkk/(nn*(1+kk[i]));for(j=5;j<=n;j++)printf("\t%d",aa[j]*a);}printf("\n");}' > RESULTS/mrna.wiggles.txt
-cat tmp/MRNAWIGGLERUN/Rhs*/mrna.f.wiggles | scripts/tab_sort -k 2,2 |  gawk '/^#/{next}{nn++;z[nn]=$0;if($3>LL[$2]){LL[$2]=$3;if($3>LMax)LMax=$3;}k=0;for(i=5;i<=NF;i++)k+=$i;kk[nn]=k;kkk+=k;next;}END{printf("Run\tmRNA\tLength\tBegin");for(i=0;i<=LMax;i+=50)printf("\t%d",i);for(i=1;i<=nn;i++){n=split(z[i],aa,"\t");L=LL[aa[2]];printf("\n%s\tU%s\t%d\t%d",aa[1],aa[2],L,aa[4]);for(j=aa[3];j<L;j+=50)printf("\t0");a=10*kkk/(nn*(1+kk[i]));for(j=5;j<=n;j++)printf("\t%d",aa[j]*a);}printf("\n");}'  > RESULTS/mrna.wiggles2.txt
+cat tmp/MRNAWIGGLERUN/Rhs*/mrna.f.wiggles | scripts2/tab_sort -k 2,2 |  gawk '/^#/{next}{nn++;z[nn]=$0;if($3>LL[$2]){LL[$2]=$3;if($3>LMax)LMax=$3;}k=0;for(i=5;i<=NF;i++)k+=$i;kk[nn]=k;kkk+=k;next;}END{printf("Run\tmRNA\tLength\tBegin");for(i=0;i<=LMax;i+=50)printf("\t%d",i);for(i=1;i<=nn;i++){n=split(z[i],aa,"\t");L=LL[aa[2]];printf("\n%s\tU%s\t%d\t%d",aa[1],aa[2],L,aa[4]);for(j=aa[3];j<L;j+=50)printf("\t0");a=10*kkk/(nn*(1+kk[i]));for(j=5;j<=n;j++)printf("\t%d",aa[j]*a);}printf("\n");}'  > RESULTS/mrna.wiggles2.txt
 
 ###############################################################
 ## phase wpA:
@@ -10207,7 +10193,7 @@ cat tmp/pA/pA.1.*.ace  > toto.ace
 cat toto.ace | gawk '/^Feature/{ns[$6]++ ; nt[$6]+=$5;}END{for(t in ns)printf("%s\t%d\t%d\n",t,ns[t],nt[t]);}'
 
 echo "query find sequence feature" > _bob
-cat toto.ace | grep Feature | gawk '{printf ("edit -D Feature %s\n", $2)}' | scripts/tab_sort -u  >> _bob
+cat toto.ace | grep Feature | gawk '{printf ("edit -D Feature %s\n", $2)}' | scripts2/tab_sort -u  >> _bob
 echo parse toto.ace >> _bob
 echo save >> _bob
 echo quit >> _bob
@@ -10233,7 +10219,7 @@ goto phaseLoop
 # histo de ce qui traine as right wall
 
 # polyA vu en 3' chez Fraser/Mixed
-gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 20 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts/tab_sort -k 2
+gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 20 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 2
 00015
 267498  A
 56975   AA
@@ -10255,7 +10241,7 @@ gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 20 | grep -v '-' | gawk 
 00084   AAAAAAAAAAAAAAAAA
 
 # polyA vu en 5' chez Fraser/Mixed
-gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 17 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts/tab_sort -k 2
+gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 17 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 2
 00015
 722355  A
 183720  AA
@@ -10268,7 +10254,7 @@ gunzip -c tmp/PHITS_av/Fraser1/Mixed/*.hits.gz | cut -f 17 | grep -v '-' | gawk 
 16634   AAAAAAAAA
 08737   AAAAAAAAAA
 02133   AAAAAAAAAAA
-gunzip -c tmp/PHITS_av/Fraser1/L4/*.hits.gz | cut -f 17 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts/tab_sort -k 2
+gunzip -c tmp/PHITS_av/Fraser1/L4/*.hits.gz | cut -f 17 | grep -v '-' | gawk '{n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 2
 173309  A
 70360   AA
 56628   AAA
@@ -10282,7 +10268,7 @@ gunzip -c tmp/PHITS_av/Fraser1/L4/*.hits.gz | cut -f 17 | grep -v '-' | gawk '{n
 03001   AAAAAAAAAAA
 
 # 5' prefix in Fraser
-gunzip -c tmp/PHITS_genome/Fraser1/Mixed/*.hits.gz | grep HIT | cut -f 17 | grep -v '-' | gawk '{if(length($1)>5)n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts/tab_sort -k 1nr | more
+gunzip -c tmp/PHITS_genome/Fraser1/Mixed/*.hits.gz | grep HIT | cut -f 17 | grep -v '-' | gawk '{if(length($1)>5)n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 1nr | more
 165599  caaacttg
 68728   caaact
 66041   caaactt
@@ -10295,7 +10281,7 @@ gunzip -c tmp/PHITS_genome/Fraser1/Mixed/*.hits.gz | grep HIT | cut -f 17 | grep
 04433   AAAAAAAAAA
 
 # in Bob
- gunzip -c tmp/PHITS_genome/BOB3/L1/*.hits.gz | grep HIT | cut -f 17 | grep -v '-' | gawk '{if(length($1)>5)n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts/tab_sort -k 1nr | more326816  caaacttg
+ gunzip -c tmp/PHITS_genome/BOB3/L1/*.hits.gz | grep HIT | cut -f 17 | grep -v '-' | gawk '{if(length($1)>5)n[$1]++}END{for(k in n)printf("%05d\t%s\n",n[k],k);}' | scripts2/tab_sort -k 1nr | more326816  caaacttg
 131773  caaacttgg
 81772   caaact
 61800   caaactt
@@ -10325,7 +10311,7 @@ foreach delta (1)
     foreach run (`cat MetaDB/$MAGIC/RunList`) 
         if ($manip != any && $tissue != any && ! -d tmp/PHITS_mito/$run) continue
         if (! -e tmp/mito_wiggle/pA/$manip.$tissue.tag.double) then
-          scripts/submit tmp/mito_wiggle/pA/$manip.$tissue "scripts/mito_wiggle.tcsh $manip $tissue"
+          scripts2/submit tmp/mito_wiggle/pA/$manip.$tissue "scripts2/mito_wiggle.tcsh $manip $tissue"
         endif
     end
   end
@@ -10384,7 +10370,7 @@ cat tmp/mito_wiggle/pA/pA.1.*.ace  > toto.ace
 cat toto.ace | gawk '/^Feature/{ns[$6]++ ; nt[$6]+=$5;}END{for(t in ns)printf("%s\t%d\t%d\n",t,ns[t],nt[t]);}'
 
 echo "query find sequence feature" > _bob
-cat toto.ace | grep Feature | gawk '{printf ("edit -D Feature %s\n", $2)}' | scripts/tab_sort -u  >> _bob
+cat toto.ace | grep Feature | gawk '{printf ("edit -D Feature %s\n", $2)}' | scripts2/tab_sort -u  >> _bob
 echo parse toto.ace >> _bob
 echo save >> _bob
 echo quit >> _bob
@@ -10419,7 +10405,7 @@ foreach target (av)
         touch $toto
         foreach lane (`cat Fast[ac]/lanes | $tab_sort -u`)
           if (-e tmp/$MAGIC_COUNT_DIR/$run/$lane.bestg.gz) then
-            scripts/lnAliErr.count.tcsh bestg $manip $tissue $lane E_av >> $toto
+            scripts2/lnAliErr.count.tcsh bestg $manip $tissue $lane E_av >> $toto
           endif
         end
         cat $toto | gawk -F '\t' '{p=$1;if(p==oldp) next; i=index(p,"/");if(i==0)next;clo=substr(p,1,i-1);st=substr(p,i,2);mrna=$5; if(mm[clo]>=3)next;if(mm[clo]>0 && mmr[clo]!=mrna)next;mmr[clo]=mrna;a1=$9;a2=$10;mult=$8;if(mult==0)mult=1;if(st=="/1"){if(mm[clo]==1)next;mm[clo]++;ma1[clo]=a1;}else {if(mm[clo]==2)next;mm[clo]+=2;mb1[clo]=a1;}if(mm[clo]==3){dx=mb1[clo]-ma1[clo]+1;if(dx<0)dx=-dx;if(dx>1000)dx=1000;nn[dx]+=mult;}}END{for(dx=0;dx<=1000;dx++)if(nn[dx]>0)printf("%d\t%d\n",dx,nn[dx]);}' >  tmp/Double/$run/length.histo.txt
@@ -10500,7 +10486,7 @@ ls -ls Fasta/$manip/$lane.fastq
           end
         endif
           if (-e tmp/Transplicing/$target/$tissue/$lane.hits) continue
-            scripts/submit tmp/LOGS/$manip.$tissue.$lane.$off.$target  "bin/clipalign -$qq -i Fasta/$manip/$lane.fastq $isSolid -t TARGET/Targets/$species.$target.fasta.gz  -maxHit 10 -clipPolyA  $clipPolyT -minEntropy $minEntropy -seedLength $seedLength -minAli $minAli $isSplice  $targetBonus   -seedOffset $off -silent > tmp/Transplicing/$target/$tissue/$lane.hits"
+            scripts2/submit tmp/LOGS/$manip.$tissue.$lane.$off.$target  "bin/sortalign -$qq -i Fasta/$manip/$lane.fastq $isSolid -t TARGET/Targets/$species.$target.fasta.gz  -maxHit 10 -clipPolyA  $clipPolyT -minEntropy $minEntropy -seedLength $seedLength -minAli $minAli $isSplice  $targetBonus   -seedOffset $off -silent > tmp/Transplicing/$target/$tissue/$lane.hits"
         end
 
     end
@@ -10634,7 +10620,7 @@ if (! -e tmp/pA/$MAGIC.pApT) then
   end
 endif
 foreach zz (1 2 5 10 20 50 100 1000 10000)
-  cat tmp/pA/$MAGIC.pApT | gawk '{z=$2 "\t" $3 "\t" int((0+$4)/zz);if($1=="pA")nAT[z,1]+= $7;if($1=="pT")nAT[z,2]+= $7;nAT[z,0]+=$7;n[z]+= $7;}END{for(k in n)for (i=0;i<3;i++){x=nAT[k,i];nn[x]++;nnAT[x,i]++;n1AT[i]+=x;if(x>0)npaAT[i]++;}for(x in nn)for (i=0;i<3;i++){for(z=1;z<=1000000;z=10*z){for(a=1;a<=5;a++)if ((a==1 || a==2 || a==5) && 0+x>= a*z){nnz[a*z]=1;nnzAT[a*z,i]+=nnAT[x,i];}}}for(z in nnz)printf("%d\t%d\t%d\t%d\t%d\n",zz,z,nnzAT[z,0],nnzAT[z,1],nnzAT[z,2]);printf("%d\tTotal\t%d\tin %d pA/T %d pA %d pT %d both\n",zz,n1,npaAT[0],npaAT[1],npaAT[2],npaAT[1]+npaAT[2]-npaAT[0]);}' zz=$zz | scripts/tab_sort -k 1nr -k 2nr >> $toto
+  cat tmp/pA/$MAGIC.pApT | gawk '{z=$2 "\t" $3 "\t" int((0+$4)/zz);if($1=="pA")nAT[z,1]+= $7;if($1=="pT")nAT[z,2]+= $7;nAT[z,0]+=$7;n[z]+= $7;}END{for(k in n)for (i=0;i<3;i++){x=nAT[k,i];nn[x]++;nnAT[x,i]++;n1AT[i]+=x;if(x>0)npaAT[i]++;}for(x in nn)for (i=0;i<3;i++){for(z=1;z<=1000000;z=10*z){for(a=1;a<=5;a++)if ((a==1 || a==2 || a==5) && 0+x>= a*z){nnz[a*z]=1;nnzAT[a*z,i]+=nnAT[x,i];}}}for(z in nnz)printf("%d\t%d\t%d\t%d\t%d\n",zz,z,nnzAT[z,0],nnzAT[z,1],nnzAT[z,2]);printf("%d\tTotal\t%d\tin %d pA/T %d pA %d pT %d both\n",zz,n1,npaAT[0],npaAT[1],npaAT[2],npaAT[1]+npaAT[2]-npaAT[0]);}' zz=$zz | scripts2/tab_sort -k 1nr -k 2nr >> $toto
 end
 
 echo $toto
@@ -10647,14 +10633,14 @@ foreach chrom ($chromSetAll)
   date >> $toto
   echo "# Position and total support of polyA addition sites" >> $toto
   echo "# Chromosome\tPosition\tStrand\tSupport\tpA\tpT" >> $toto
-  cat tmp/pA/$MAGIC.pApT |  gawk -F '\t'  '{if($3 == chrom)print;}' chrom=$chrom | scripts/tab_sort -k 1,1 -k 4,4n |  gawk -F '\t' '{z=$3 "\t" int($4) "\t" $2;if($1=="pA")nA[z]+= $7;if($1=="pT")nT[z]+= $7;n[z]+= $7;}END{for(k in n)if(n[k]>=5)printf("%s\t%d\t%d\t%d\n",k,n[k],nA[k],nT[k]);}'  chrom=$chrom  | scripts/tab_sort -k 1,1n -k 2,2n >> $toto
+  cat tmp/pA/$MAGIC.pApT |  gawk -F '\t'  '{if($3 == chrom)print;}' chrom=$chrom | scripts2/tab_sort -k 1,1 -k 4,4n |  gawk -F '\t' '{z=$3 "\t" int($4) "\t" $2;if($1=="pA")nA[z]+= $7;if($1=="pT")nT[z]+= $7;n[z]+= $7;}END{for(k in n)if(n[k]>=5)printf("%s\t%d\t%d\t%d\n",k,n[k],nA[k],nT[k]);}'  chrom=$chrom  | scripts2/tab_sort -k 1,1n -k 2,2n >> $toto
 
   echo $toto
   \cp $toto  RESULTS/Introns_exons_polyA
 
 
   echo "$chrom\t$chrom\t1\t500000000" >  tmp/pA/$chrom/titi2
-  cat tmp/pA/$MAGIC.pApT | gawk -F '\t'  '{if($3 == chrom)print;}' chrom=$chrom | scripts/tab_sort -k 1,1 -k 4,4n |  gawk -F '\t' '{if($3 != chrom)next;z=$3 "\t" int($4) "\t" $5;if($1=="pA")nA[z]+= $7;if($1=="pT")nT[z]+= $7;n[z]+= $7;}END{for(k in n)if(n[k]>=8)for(i=1;i<=n[k];i++)printf("%s\t%d\t%d\t%d\n",k,n[k],nA[k],nT[k]);}' chrom=$chrom > tmp/pA/$chrom/pA.coord
+  cat tmp/pA/$MAGIC.pApT | gawk -F '\t'  '{if($3 == chrom)print;}' chrom=$chrom | scripts2/tab_sort -k 1,1 -k 4,4n |  gawk -F '\t' '{if($3 != chrom)next;z=$3 "\t" int($4) "\t" $5;if($1=="pA")nA[z]+= $7;if($1=="pT")nT[z]+= $7;n[z]+= $7;}END{for(k in n)if(n[k]>=8)for(i=1;i<=n[k];i++)printf("%s\t%d\t%d\t%d\n",k,n[k],nA[k],nT[k]);}' chrom=$chrom > tmp/pA/$chrom/pA.coord
 
   bin/geneelements -stranded -cosmidWiggle tmp/pA/$chrom/titi2 -hitFile tmp/pA/$chrom/pA.coord -trackName $MAGIC -feature AAA_Sx_$MAGIC >  tmp/pA/$chrom/$MAGIC.pA.$chrom.feature.preace
   echo "Method AAA_Sx_$MAGIC\nScore_by_width\nScore_bounds 1 2\n\n" >  tmp/pA/$chrom/$MAGIC.pA.$chrom.feature.ace
@@ -10685,7 +10671,7 @@ if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
 foreach chrom ($chromSetAll)
   if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
   if (-e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-  scripts/submit tmp/INTRON_DB/$chrom/I1.parse "scripts/I1.intronDB.tcsh $chrom 'chromDB parseGenome parseTargetIntrons setFeet'"
+  scripts2/submit tmp/INTRON_DB/$chrom/I1.parse "scripts2/I1.intronDB.tcsh $chrom 'chromDB parseGenome parseTargetIntrons setFeet'"
 end
 
 goto phaseLoop
@@ -10713,7 +10699,7 @@ foreach chrom ($chromSetAll)
   if ($ok == 0) then
     touch tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
   else
-    scripts/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts/I1.intronDB.tcsh $chrom 'deUno deMrna setFeet setDA'"
+    scripts2/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts2/I1.intronDB.tcsh $chrom 'deUno deMrna setFeet setDA'"
   endif
 end
 
@@ -10731,7 +10717,7 @@ phaseI3:
 if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
   if (-e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) continue
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts/I1.intronDB.tcsh $chrom setDAsupport"
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts2/I1.intronDB.tcsh $chrom setDAsupport"
 end
 
 goto phaseLoop
@@ -10764,7 +10750,7 @@ foreach chrom ($chromSetAll)
   end
   if ($ok2 >= 10) continue
   if ($ok1 > 0 && $ok2 > 0) continue
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts/I1.intronDB.tcsh $chrom setSponge" 32G
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts2/I1.intronDB.tcsh $chrom setSponge" 32G
 end
 
 goto phaseLoop
@@ -10783,7 +10769,7 @@ if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
   if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I4.setSponge.done) continue
   if (-e  tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done) continue
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups "scripts/I1.intronDB.tcsh $chrom 'setGroups'"
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups "scripts2/I1.intronDB.tcsh $chrom 'setGroups'"
 end
 
 goto phaseLoop
@@ -10806,9 +10792,9 @@ foreach chrom ($chromSetAll)
     edit aceview
     save
 EOF
-  scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts "scripts/I1.intronDB.tcsh $chrom intronCounts"
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts "scripts2/I1.intronDB.tcsh $chrom intronCounts"
 end
-scripts/submit wait
+scripts2/submit wait
 set ff=tmp/INTRON_DB/$MAGIC.I6.intronCounts
 cat tmp/INTRON_DB/*/$MAGIC.I6.intron_counts.tsf | bin/tsf -I tsf -O tsf -o $ff
 cat $ff.tsf | sort -V | gawk -F '\t' '/^#/{next;}{run=$1;if(run != old) printf("\nAli %s\n", run); old=run;av=$2;nAv=$4;if (nAv==0)nAv=1;nIn=$5;nOut=$6;newG=$7;sp=100.0*nIn/(nIn+nOut);sn=100.0*nIn/nAv;sIn=$8;sOut=$9;printf("Candidate_introns %s %d In_%s %d Not_in_%s %d New_gt_ag %d Sensitivity %.2f Specificity %.2f Known_support %d New_support %d New_minS 3\n", av,nAv,av,nIn,av,nOut,newG,sn,sp,sIn,sOut);}END{printf("\n");}' > $ff.ace
@@ -10829,7 +10815,7 @@ if ($Strategy != RNA_seq) goto phaseLoop
 foreach chrom ( $chromSetAll )
    if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
    if (-e tmp/INTRON_DB/$chrom/$MAGIC.I7.altIntrons.done) continue
-   scripts/submit tmp/INTRON_DB/$chrom/$MAGIC.I7.de_uno "scripts/I1.intronDB.tcsh $chrom altIntrons"
+   scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I7.de_uno "scripts2/I1.intronDB.tcsh $chrom altIntrons"
 end
 qusage 1
 
@@ -11081,7 +11067,7 @@ if (1 || $Strategy == RNA_seq) then
   foreach run (`cat MetaDB/$MAGIC/RunList`) 
       if ((-d tmp/MAGICBLAST/$run ||-d tmp/PHITS_genome/$run || -d tmp/PHITS_SpikeIn/$run)  && ! -e tmp/OR/$run/d1.de_uno.done) then
         if (! -d  tmp/OR/$run) $mkDir OR $run
-        scripts/submit tmp/OR/$run/d1.de_uno  "scripts/d1.de_uno.tcsh $run"
+        scripts2/submit tmp/OR/$run/d1.de_uno  "scripts2/d1.de_uno.tcsh $run"
       endif
   end 
 endif
@@ -11095,7 +11081,7 @@ phaseSLpA1:
 if (! -d tmp/SLpA) mkdir tmp/SLpA
 foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (! -e tmp/SLpA/$run.SLpA.gz) then
-    scripts/submit "tmp/SLpA/$run.SLpA1" "scripts/SLpA.tcsh collect $run"
+    scripts2/submit "tmp/SLpA/$run.SLpA1" "scripts2/SLpA.tcsh collect $run"
   endif
 end
 
@@ -11111,13 +11097,13 @@ set groupLevelMax=`cat  MetaDB/$MAGIC/g2r | cut -f 3 | sort -k 1n | tail -1`
 foreach level (0)
   echo level=$level
   foreach group (`cat MetaDB/$MAGIC/r2sublib | gawk '{print $1;}' | sort -u`)
-    scripts/SLpA.tcsh merge $group
+    scripts2/SLpA.tcsh merge $group
   end
 end
 foreach level (`seq 1 1 $groupLevelMax`)
   echo level=$level
   foreach group (`cat MetaDB/$MAGIC/g2r | gawk '{if($3==level)print $1;}' level=$level | sort -u`)
-    scripts/SLpA.tcsh merge $group
+    scripts2/SLpA.tcsh merge $group
   end
 end
 
@@ -11152,7 +11138,7 @@ set target=av
 foreach run (`cat MetaDB/$MAGIC/RunsList`)
    if (! -d RESULTS/GeneFusion/$run) $mkDir GeneFusion $run
    if (! -e tmp/GeneFusion/$run/t1.gene_fusion.av.txt.gz) then
-    scripts/submit tmp/GeneFusion/$run/t1 "scripts/t1.gene_fusion.tcsh t1 $run $target"
+    scripts2/submit tmp/GeneFusion/$run/t1 "scripts2/t1.gene_fusion.tcsh t1 $run $target"
   endif
 end
 
@@ -11160,7 +11146,7 @@ set target=genome
 foreach run (`cat MetaDB/$MAGIC/RunsList`)
    if (! -d RESULTS/ChromFusion/$run) $mkDir ChromFusion $run
    if (! -e tmp/ChromFusion/$run/t1.chrom_fusion.genome.tsf.gz) then
-    scripts/submit tmp/ChromFusion/$run/t1 "scripts/t1.chrom_fusion.tcsh t1 $run $target"
+    scripts2/submit tmp/ChromFusion/$run/t1 "scripts2/t1.chrom_fusion.tcsh t1 $run $target"
    endif
 end
 
@@ -11169,7 +11155,7 @@ goto phaseLoop
 #######################################################################################
 ## phase tgf2:   report the RNA-seq gene-fusions
 
-# ATTENTION scripts/GeneFusion.tcsh draft  has lots of stuff on geneLinks developped at the time of the NB project
+# ATTENTION scripts2/GeneFusion.tcsh draft  has lots of stuff on geneLinks developped at the time of the NB project
 
 phasetgf2: 
 if ($Strategy != RNA_seq) goto phaseLoop
@@ -11183,18 +11169,18 @@ foreach level (1 2 3 4 5 6 7 8 9)
       if ($ok == 0) continue 
       if (! -d  tmp/GeneFusion/$group) mkdir  tmp/GeneFusion/$group
       if (! -e tmp/GeneFusion/$group/t1.gene_fusion.$target.txt.gz) then 
-        scripts/submit tmp/GeneFusion/$group/t2 "scripts/t1.gene_fusion.tcsh t2 $group $target"
+        scripts2/submit tmp/GeneFusion/$group/t2 "scripts2/t1.gene_fusion.tcsh t2 $group $target"
       endif
     end
   end
   echo "tgf2 $level done"
-  scripts/submit wait
+  scripts2/submit wait
 end
 
 goto phaseLoop
 
 phasetgf3: 
-   scripts/t1.gene_fusion.tcsh t3 
+   scripts2/t1.gene_fusion.tcsh t3 
 goto phaseLoop
 
 #######################################################################################
@@ -11212,7 +11198,7 @@ if ($Strategy == RNA_seq) set target=av
 foreach run (`cat MetaDB/$MAGIC/RunsList`)
   if (! -d RESULTS/Transloc/$run) $mkDir Transloc $run
   if (! -e tmp/Transloc/$run/t1.transloc.$target.txt.gz) then
-    scripts/submit tmp/Transloc/$run/t1 "scripts/t1.transloc.tcsh t1 $run $target"
+    scripts2/submit tmp/Transloc/$run/t1 "scripts2/t1.transloc.tcsh t1 $run $target"
   endif
 end
 
@@ -11221,7 +11207,7 @@ goto phaseLoop
 #######################################################################################
 ## phase t2:   report the RNA-seq gene-fusions
 
-# ATTENTION scripts/Transloc.tcsh draft  has lots of stuff on geneLinks developped at the time of the NB project
+# ATTENTION scripts2/Transloc.tcsh draft  has lots of stuff on geneLinks developped at the time of the NB project
 
 phaset2: 
 goto phaseLoop
@@ -11239,18 +11225,18 @@ foreach level (1 2 3 4 5 6 7 8 9)
       if ($ok == 0) continue 
       if (! -d  tmp/Transloc/$group) mkdir  tmp/Transloc/$group
       if (! -e tmp/Transloc/$group/t1.transloc.$target.txt.gz) then 
-        scripts/submit tmp/Transloc/$group/t2 "scripts/t1.transloc.tcsh t2 $group $target"
+        scripts2/submit tmp/Transloc/$group/t2 "scripts2/t1.transloc.tcsh t2 $group $target"
       endif
     end
   end
   echo "t2 $level done"
-  scripts/submit wait
+  scripts2/submit wait
 end
 
 goto phaseLoop
 
 phaset3: 
-   scripts/t1.transloc.tcsh t3 
+   scripts2/t1.transloc.tcsh t3 
 goto phaseLoop
 
 #######################################################################################
@@ -11264,7 +11250,7 @@ if ($Strategy != RNA_seq || $USEMAGICBLAST == 1) goto phaseLoop
   if (! -d tmp/OR) mkdir tmp/OR
   foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (! -e tmp/OR/$run/d2.$run.ventilate.err ) then
-      scripts/submit "tmp/OR/$run/d2.$run.ventilate" "scripts/d2.ventilate.tcsh $run"
+      scripts2/submit "tmp/OR/$run/d2.$run.ventilate" "scripts2/d2.ventilate.tcsh $run"
     endif
   end
 
@@ -11314,7 +11300,7 @@ if ($Strategy == Exome) then
   foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (! -d  tmp/Transloc/$run) $mkDir  Transloc $run
     if (! -e  tmp/Transloc/$run/d3.$run.de_duo.txt) then
-      scripts/submit tmp/Transloc/$run/d3.$run "scripts/d3.transloc.tcsh $run"
+      scripts2/submit tmp/Transloc/$run/d3.$run "scripts2/d3.transloc.tcsh $run"
     endif
   end
 
@@ -11346,7 +11332,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
       if (! -d tmp/OR/$run/$chrom) continue
       if (-e tmp/OR/$run/$chrom/d3.de_duo_loop.$run.$section.all.done) continue
       echo "d3.de_duo_loop.tcsh $chrom $run $section  $minX $maxX $Strategy "
-      scripts/submit tmp/OR/$run/$chrom/d3.de_duo_loop.$run.$section "scripts/d3.de_duo_loop.tcsh $chrom $run $section  $minX $maxX $Strategy"
+      scripts2/submit tmp/OR/$run/$chrom/d3.de_duo_loop.$run.$section "scripts2/d3.de_duo_loop.tcsh $chrom $run $section  $minX $maxX $Strategy"
     end
   end
 
@@ -11441,7 +11427,7 @@ set ok=0
 foreach run (`cat MetaDB/$MAGIC/RunsList`)
    if (! -e  tmp/OR/$run/d4.candidate_introns.ace || ! -e tmp/OR/$run/d4.known.txt.gz) then 
       if (! -d  tmp/OR/$run)  mkdir tmp/OR/$run
-      scripts/submit tmp/OR/$run/d4.candidate_introns "scripts/d4.candidate_introns.tcsh $run"
+      scripts2/submit tmp/OR/$run/d4.candidate_introns "scripts2/d4.candidate_introns.tcsh $run"
       echo $run
       set ok=1
    else
@@ -11459,8 +11445,8 @@ echo level=$level
     if ($gLevel != $level) continue
     if (! -e  tmp/OR/$group/d4.candidate_introns.ace) then
       if (! -d  tmp/OR/$group)  mkdir  tmp/OR/$group
-      echo "scripts/d4.candidate_introns.tcsh $group"
-      scripts/d4.candidate_introns.tcsh $group
+      echo "scripts2/d4.candidate_introns.tcsh $group"
+      scripts2/d4.candidate_introns.tcsh $group
     endif 
     cat tmp/OR/$group/d4.candidate_introns.ace >> $toto
   end
@@ -11476,7 +11462,7 @@ goto phaseLoop
 set ok=1
 foreach group (`cat MetaDB/$MAGIC/RunList MetaDB/$MAGIC/GroupDeDuoList ` )
   if (! -e tmp/introns/$group/d4.discovery.counts) then
-    scripts/submit tmp/introns/$group/d4.discovery.counts "scripts/d4.discovery.counts.tcsh $group  $all_counts"
+    scripts2/submit tmp/introns/$group/d4.discovery.counts "scripts2/d4.discovery.counts.tcsh $group  $all_counts"
     set ok=0
   endif
 end
@@ -11554,7 +11540,7 @@ endif
 
 foreach chrom ($chromSetAll)
   if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
-  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes  deDuo collate donorAcceptor'"
+  scripts2/submit tmp/INTRON_DB/$chrom/d5.parse "scripts2/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes  deDuo collate donorAcceptor'"
 end
 
 goto phaseLoop
@@ -11576,28 +11562,28 @@ cat $toto
 
 
 
-  scripts/submit tmp/INTRON_DB/$chrom/d5.parse "scripts/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
+  scripts2/submit tmp/INTRON_DB/$chrom/d5.parse "scripts2/d5.intronDB.tcsh $MAGIC $chrom 'chromDB parseGenome parseGenes deDuo collate donorAcceptor'"
 foreach chrom ($chromSetAll)
   if (! -d tmp/INTRON_DB/$chrom/database) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom chromDB 
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom chromDB 
   endif
   if (! -e tmp/INTRON_DB/$chrom/d5.parse_genome.done) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom parseGenome
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom parseGenome
   endif
   if (! -e tmp/INTRON_DB/$chrom/d5.parse_genes.done) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom parseGenes
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom parseGenes
   endif
   if (! -e tmp/introns/d5.$MAGIC.deDuo.done) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom deDuo 
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom deDuo 
   endif
   if (! -e tmp/introns/d5.$MAGIC.collate.done) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom collate
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom collate
   endif
   if (! -e  tmp/INTRON_DB/d5.$MAGIC.introns.donorAcceptor.done) then
-    scripts/d5.intronDB.tcsh  $MAGIC $chrom donorAcceptor
+    scripts2/d5.intronDB.tcsh  $MAGIC $chrom donorAcceptor
   endif
   if ($?CAPTURES && ! -e  tmp/INTRON_DB/$chrom/d5.$MAGIC.capture.done) then
-    scripts/d5.intronDB.tcsh $MAGIC $chrom capture 
+    scripts2/d5.intronDB.tcsh $MAGIC $chrom capture 
   endif 
 end
 
@@ -11720,7 +11706,7 @@ foreach chrom ($chromSetAll)
    #    cat tutu1s | gawk -F '\t' '{if($1>=10)print $4;}' 
 
     cat tmp/introns/introns.candidates.count  | gawk '{gsub(/\"/,"",$1);split ($1,aa,"__");split(aa[1],cc,"|");split(aa[2],bb,"_");if(chrom != cc[1])next;a1=bb[1];a2=bb[2];if (a1<a2){c1=a1-100;c2 =a2+100;a1--;a2++;}else{c1=a1+100;c2=a2-100;a1++;a2--;}printf("ZI_Dicer_%s\t%d\t%d\t%s\t%d\t%d\n",$1,1,100,aa[1],c1,a1);printf("ZI_Dicer_%s\t%d\t%d\t%s\t%d\t%d\n",$1,101,200,aa[1],a2,c2);}' chrom=$chrom >  tmp/introns/introns.candidates/$chrom/shadow
-    scripts/submit  tmp/introns/introns.candidates/$chrom/shadow  "bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow tmp/introns/introns.candidates/$chrom/shadow -O fasta -gzo -o tmp/introns/introns.candidates/$chrom/introns"
+    scripts2/submit  tmp/introns/introns.candidates/$chrom/shadow  "bin/dna2dna -i TARGET/CHROMS/$species.chrom_$chrom.fasta.gz -shadow tmp/introns/introns.candidates/$chrom/shadow -O fasta -gzo -o tmp/introns/introns.candidates/$chrom/introns"
 
 end
 
@@ -11748,7 +11734,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (! -e tmp/PHITS_introns/$lane.hits.gz) set ok=0
   end
   if ($ok == 1 && ! -e tmp/PHITS_introns/$run/introns_validated.txt) then
-    scripts/submit tmp/PHITS_introns/$run/introns_validated "gunzip -c tmp/PHITS_introns/$run/*.hits.gz | gawk -f scripts/d7.introns_validated.awk run=$run >  tmp/PHITS_introns/$run/introns_validated.txt"
+    scripts2/submit tmp/PHITS_introns/$run/introns_validated "gunzip -c tmp/PHITS_introns/$run/*.hits.gz | gawk -f scripts2/d7.introns_validated.awk run=$run >  tmp/PHITS_introns/$run/introns_validated.txt"
   endif
 end
 
@@ -11790,7 +11776,7 @@ echo "Intron" > tmp/PHITS_introns/ZZZZZi
 set toto=tmp/PHITS_introns/d8.introns_with_support.txt
 echo -n "# " > $toto
 date >> $toto
-cat MetaDB/$MAGIC/GroupList ZZZZZMetaDB/$MAGIC/RunList ZZZZZ  tmp/PHITS_introns/d8.introns_with_support.ace  tmp/PHITS_introns/ZZZZZi | gawk -f scripts/d8.introns2table.awk uu=u RG="$Reference_genome" >> $toto
+cat MetaDB/$MAGIC/GroupList ZZZZZMetaDB/$MAGIC/RunList ZZZZZ  tmp/PHITS_introns/d8.introns_with_support.ace  tmp/PHITS_introns/ZZZZZi | gawk -f scripts2/d8.introns2table.awk uu=u RG="$Reference_genome" >> $toto
 
 \cp $toto  RESULTS/Introns_exons_polyA
 
@@ -11802,8 +11788,8 @@ mv tyty.txt RESULTS/Introns_exons_polyA/IntronSupportedInNruns.orphans.histo.txt
 # number of introns in a gene
 cat $toto | gawk -F '\t' '{g=$7;if(g == "-")n0++;else n1++;{g2i[g]++;if(g2i[g]==1)ng++;}}END{printf("%d introns in %d genes, %d orphan introns\n",n1,ng,n0);}'
 # distrib
-cat $toto | gawk -F '\t' '{if ($7 == "-")next ; print;}'  | gawk -F '\t' -f scripts/d8.intronsTableStats.awk > RESULTS/Introns_exons_polyA/IntronInNruns.in_gene.histo.txt
-cat $toto | gawk -F '\t' '{if ($7 == "-") print;}'  | gawk -F '\t' -f scripts/d8.intronsTableStats.awk > RESULTS/Introns_exons_polyA/IntronInNruns.orphans.histo.txt
+cat $toto | gawk -F '\t' '{if ($7 == "-")next ; print;}'  | gawk -F '\t' -f scripts2/d8.intronsTableStats.awk > RESULTS/Introns_exons_polyA/IntronInNruns.in_gene.histo.txt
+cat $toto | gawk -F '\t' '{if ($7 == "-") print;}'  | gawk -F '\t' -f scripts2/d8.intronsTableStats.awk > RESULTS/Introns_exons_polyA/IntronInNruns.orphans.histo.txt
 
 
 # restrict to introns with at least 5/1000 of most abundant intron of that gene 
@@ -11842,7 +11828,7 @@ cat  TARGET/Targets/$species.av.mask.txt ZZZZZ  toto766 | gawk -F '\t' '/ZZZZZ/{
 set toto2=tmp/PHITS_introns/d8.introns_with_support.juncs.txt
 echo -n "# " > $toto2
 date >> $toto2
-echo "# MAGIC Intron and support, project $MAGIC" >> $toto2
+echo "# MAGIC2 Intron and support, project $MAGIC" >> $toto2
 echo "# .juncs format, coordinates are zero based and mark the extreme bases of the bordering exons" >> $toto2
 echo "# Chromosome\tLast base of upstream exon\tFirst base of down strean exon\tStrand\tType\tLength\tGene\tTotal support" >> $toto2
 cat $toto | gawk -F '\t' '/^#/{next;}{chrom=$1;a1=$2;a2=$3;s=$4;type=$5;ln=$6;gene=$7;total=$9;if(a1<a2){a1-=2;s="+";}else{x=a1;a1=a2-2;a2=x;s="-";}if (total > 0)printf("%s\t%d\t%d\t%s\t%s\t%d\t%s\t%d\n", chrom,a1,a2,s,type,ln,gene,total);}' >> $toto2
@@ -11858,7 +11844,7 @@ set toto3=tmp/PHITS_introns/d8.introns_support_statistics_per_run.txt
 echo -n "# " > $toto3
 date >> $toto3
 echo "# Number of introns with at given number of supporting reads per run" >> $toto3
-cat  MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto  | gawk -F '\t' -f scripts/d8.introns_support_statistics.awk  >> $toto3
+cat  MetaDB/$MAGIC/GroupListSorted MetaDB/$MAGIC/RunListSorted ZZZZZ MetaDB/$MAGIC/gtitle.txt ZZZZZ $toto  | gawk -F '\t' -f scripts2/d8.introns_support_statistics.awk  >> $toto3
 
 \cp $toto3  RESULTS/Introns_exons_polyA
 
@@ -12101,7 +12087,7 @@ goto phaseloop
 
 phasef0:
 
-echo -n "Phase f0: Obsolete Ventilate the genome alignments : scripts/f0.ventilate.tcsh"
+echo -n "Phase f0: Obsolete Ventilate the genome alignments : scripts2/f0.ventilate.tcsh"
 date
 
 # 2019-05-15: surprisingly i notice that this code never worked in the MiniTest system
@@ -12111,7 +12097,7 @@ goto phaseLoop
 foreach lane (`cat MetaDB/$MAGIC/LaneList`)
   if (-e tmp/PHITS_genome/$lane.hits.gz && ! -e tmp/PHITS_genome/$lane.BG.err) then
      if (1) then  
-        scripts/submit tmp/PHITS_genome/$lane.BG "scripts/f0.ventilate.tcsh $lane"
+        scripts2/submit tmp/PHITS_genome/$lane.BG "scripts2/f0.ventilate.tcsh $lane"
         set ok=0
      endif
   endif
@@ -12184,8 +12170,8 @@ foreach chrom ($chromSetAll)
   endif
 
   if (! -e tmp/X.$MAGIC/$chrom/f1.done) then
-    echo "scripts/submit tmp/X.$MAGIC/$chrom/f1"
-    scripts/submit "tmp/X.$MAGIC/$chrom/f1" "scripts/f1.double_collect_by_section.tcsh $MAGIC $chrom" 
+    echo "scripts2/submit tmp/X.$MAGIC/$chrom/f1"
+    scripts2/submit "tmp/X.$MAGIC/$chrom/f1" "scripts2/f1.double_collect_by_section.tcsh $MAGIC $chrom" 
   endif
 
 end
@@ -12236,7 +12222,7 @@ endif
 foreach chrom ($chromSetAll)
   ls -ls tmp/X.$MAGIC/$chrom/f1.done
   if (-e tmp/X.$MAGIC/$chrom/f2.done) continue
-  scripts/submit "tmp/X.$MAGIC/$chrom/f2" "scripts/f2.doubleIntrons.tcsh $chrom"
+  scripts2/submit "tmp/X.$MAGIC/$chrom/f2" "scripts2/f2.doubleIntrons.tcsh $chrom"
 end
 
 
@@ -12255,7 +12241,7 @@ if (0 && $Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
   if (! -d tmp/X.$MAGIC/$chrom)  mkdir tmp/X.$MAGIC/$chrom
   if (-e tmp/X.$MAGIC/$chrom/f1.done && -e tmp/X.$MAGIC/$chrom/f2.done && ! -e tmp/X.$MAGIC/$chrom/f3.parse.done ) then
-    scripts/submit tmp/X.$MAGIC/$chrom/f3.parse "scripts/f3.parse.tcsh $chrom"
+    scripts2/submit tmp/X.$MAGIC/$chrom/f3.parse "scripts2/f3.parse.tcsh $chrom"
   endif
 end
 
@@ -12275,7 +12261,7 @@ if (0 && $Strategy != RNA_seq) goto phaseLoop
 foreach chrom ($chromSetAll)
   if (! -d tmp/X.$MAGIC/$chrom)  continue 
   if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done && ! -e tmp/X.$MAGIC/$chrom/f4.assemble.done) then
-    scripts/submit tmp/X.$MAGIC/$chrom/f4 "scripts/f4.assemble.tcsh $chrom" 
+    scripts2/submit tmp/X.$MAGIC/$chrom/f4 "scripts2/f4.assemble.tcsh $chrom" 
   endif
 end
 
@@ -12294,7 +12280,7 @@ if ($Strategy != RNA_seq) goto phaseLoop
 
 foreach chrom ($chromSetAll)
   if (0 || (-e tmp/X.$MAGIC/$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/$chrom/f5.dump.done)) then
-    scripts/submit tmp/X.$MAGIC/$chrom/f5.export  "scripts/f5.export_new_genes.tcsh  $chrom"
+    scripts2/submit tmp/X.$MAGIC/$chrom/f5.export  "scripts2/f5.export_new_genes.tcsh  $chrom"
   endif
 end
 
@@ -12362,8 +12348,8 @@ echo "##### rm k1.done chr=$chrom"
     echo "####------------#####"
     ls -ls  $fDB/$phase.done
     if (! -e $fDB/$phase.done && ! -e $fDB/$phase.start) then
-      echo "submit scripts/Kantor.tcsh $phase $chrom $fDB"
-      scripts/submit $fDB/$phase  "scripts/Kantor.tcsh $phase $chrom $fDB"
+      echo "submit scripts2/Kantor.tcsh $phase $chrom $fDB"
+      scripts2/submit $fDB/$phase  "scripts2/Kantor.tcsh $phase $chrom $fDB"
       touch $fDB/$phase.start
     endif
   end
@@ -12388,7 +12374,7 @@ foreach chrom ($chromSetAll)
   if (! -d tmp/$XYH$chrom) mkdir tmp/$XYH$chrom
   if (-e tmp/$XYH$chrom/ff1.done) continue
 
-  scripts/submit tmp/$XYH$chrom/ff1 "scripts/ff1.multi_project.parse.tcsh $chrom"
+  scripts2/submit tmp/$XYH$chrom/ff1 "scripts2/ff1.multi_project.parse.tcsh $chrom"
 end
 
 goto phaseLoop
@@ -12407,7 +12393,7 @@ if ($Strategy != RNA_seq) goto phaseLoop
 
 foreach chrom ($chromSetAll)
   if (-e tmp/$XYH$chrom/ff1.done && (! -e tmp/YH$chrom/f5.mrna.done || ! -e tmp/$XYH$chrom/f5.cds.done || ! -e f5.unspliced.done || ! -e tmp/$XYH$chrom/f5.dump.done) ) then
-    scripts/submit tmp/$XYH$chrom/f5.export  "scripts/f5.export_new_genes.tcsh $XYH $chrom"
+    scripts2/submit tmp/$XYH$chrom/f5.export  "scripts2/f5.export_new_genes.tcsh $XYH $chrom"
   endif
 end
 
@@ -13063,7 +13049,7 @@ tabix TABX/Mixed.gonly.f.gz II:90668-195700 | wc
 ######################################################################
 
 phaseWait:
-  scripts/submit wait
+  scripts2/submit wait
 
 goto phaseLoop
 
@@ -13075,10 +13061,10 @@ date
 cd $MagicRootDir 
 
 # for parasol launch now the registered jobs
-scripts/submit run
+scripts2/submit run
 
 end
-echo "MAGIC $MAGIC done "
+echo "MAGIC2 $MAGIC done "
 
 
 exit 0
@@ -13234,8 +13220,8 @@ bin/tacembly MetaDB <<EOF
 EOF
 
 cd B$bb
-setenv MAGIC B$bb
-MAGIC a0C aoD
+setenv MAGIC2 B$bb
+MAGIC2 a0C aoD
 
 # verify that all reads have strandedness, platform, paired end, etc
 
@@ -13255,7 +13241,7 @@ cat toto2_1 ZZZZZ toto2_2 ZZZZZ toto1 | gawk '/ZZZZZ/{zz++;next;}{if(zz<2){n=len
 cat toto2_1 ZZZZZ toto2_2 ZZZZZ titi6.txt ZZZZZ RESULTS/RatToDeposit.txt | gawk -F '\t' '/ZZZZZ/{zz++ ; next ; }{if ( zz < 2 ) {n=length ( $1 ) ; a=substr ( $1,1,n-8 ) ; ff[zz+1,a]=$1 ; fff[a]=1 ; next ; }if ( zz < 3 ) {gsub ( /\"/,"",$0 ) ; data["COH_WANG_" $2]=$0 ; next;}printf ( "%s\t%s\t%s\t%s\t",data[$2],$2,ff[1,$2],ff[2,$2] ) ; print ; }' > RESULTS/RatToDeposit.bigger.txt
 
 
-cat RESULTS/RatToDeposit.txt | sed -e 's/\r//g' | scripts/transpose | gawk -F '\t' 'function dd(x){printf("%s\t%s\t%s",$1,$2,$3);for(i=4;i<=NF;i++){x1=x;if(x==-1)x1=ali[i]/100;printf("\t%.2f",$i/x1);}printf("\n");}{if(index($3,"Read multiplicity")==1){dd(100);next;}}{if(index($3,"Number of mismatches per megabase aligned")==1){dd(1000);next;}}{if(index($3,"Per thousand GC in the reads")==1){dd(10);next;}}{if(index($1,"transform")==1){dd(-1);next;}}{if(index($3,"Reads aligned on any target")==1){for(i=4;i<=NF;i++)ali[i]=$i;}}{print}' | scripts/transpose >  RESULTS/RatToDeposit.modified.txt 
+cat RESULTS/RatToDeposit.txt | sed -e 's/\r//g' | scripts2/transpose | gawk -F '\t' 'function dd(x){printf("%s\t%s\t%s",$1,$2,$3);for(i=4;i<=NF;i++){x1=x;if(x==-1)x1=ali[i]/100;printf("\t%.2f",$i/x1);}printf("\n");}{if(index($3,"Read multiplicity")==1){dd(100);next;}}{if(index($3,"Number of mismatches per megabase aligned")==1){dd(1000);next;}}{if(index($3,"Per thousand GC in the reads")==1){dd(10);next;}}{if(index($1,"transform")==1){dd(-1);next;}}{if(index($3,"Reads aligned on any target")==1){for(i=4;i<=NF;i++)ali[i]=$i;}}{print}' | scripts2/transpose >  RESULTS/RatToDeposit.modified.txt 
 
 # rat submission consolidation with Charles
 cat RESULTS/Charles_details.txt | sed -e 's/\r//g' | gawk -F '\t' '{n++;if(n<16){next;}cell=$12;split(cell,aa,"_");print $12,aa[4],$15;}' | head

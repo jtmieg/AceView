@@ -821,15 +821,13 @@ static void sortAlignTableCaption (const PP *pp, ACEOUT ao)
   aceOutf (ao, "\t5' overhang read backwards, i.e complementary to the unaligned 5' part of the read, max %d bp", pp->OVLN) ;
   aceOutf (ao, "\t3' overhang read forward, i.e. identical to the unaligned 3' part of the read, max %d bp", pp->OVLN) ;
   
-  aceOutf (ao, "\tTarget sequence immediately upstream of the alignment") ;
-  aceOutf (ao, "\tTarget sequence immediately downstream of the alignment") ;
-  aceOutf (ao, "\tFragment length as measured on target in case of paired end sequencing or 0 if not available at this stage of the program") ;
+  aceOutf (ao, "\tChain\tFragment length as measured on target in case of paired end sequencing or 0 if not available at this stage of the program") ;
   aceOutf (ao, "\n") ;
   
   aceOutf (ao, "#Run/Read\tScore\tRead multiplicity\tLength to align\tAligned length\tfrom base\tto base in read") ;
   aceOutf (ao, "\tTarget class\tGene (X__name for RefSeq)\tTarget multiplicity\tTarget name (_name for RefSeq)\tfrom base\tto base on target") ;
   
-  aceOutf (ao, "\tNumber of %s bases\tNumber of mismatches\tPosition:type in read\tPosition:type in target\t5'overhang (reverse-complemented)\t3'Overhang\tTarget prefix\tTarget suffix\tPair length", pp->solid ? "corrected" : "N") ;
+  aceOutf (ao, "\tNumber of %s bases\tNumber of mismatches\tPosition:type in read\tPosition:type in target\t5'overhang (reverse-complemented)\t3'Overhang\tchain\\tPair length", pp->solid ? "corrected" : "N") ;
   
   aceOutf (ao, "\n") ;
 } /* sortAlignTableCaption */
@@ -846,7 +844,7 @@ static void exportDo (const PP *pp, BB *bb)
   BOOL pairedEnd = bb->rc.pairedEnd ;
   const char *run = dictName (pp->runDict, bb->run) ;
   AC_HANDLE h = ac_new_handle () ;
-  char *runNam = hprintf (h, ".%s.%d.hits", run, bb->lane) ;
+  char *runNam = hprintf (h, "hits/%s.%d.hits", run, bb->lane) ;
   ACEOUT ao = aceOutCreate (pp->outFileName, runNam, pp->gzo, h) ;
   aceOutDate (ao, "###", "sortaling hits") ;
   
@@ -1204,6 +1202,13 @@ void saUsage (char *message, int argc, const char **argv)
 	       "// --gzo : the output files will be gziped\n"      
 	       "// --sam : export the alignment in sam format (default is self documented .hits format)\n"
 	       "//\n"
+	       "// DATA FILTERS:\n"
+	       "// --minReadLength  <int> : [default 20 (or max read lenght)]\n"
+	       "//     Drop reads shorter than this limit\n"
+	       "//     The default 20 is lowered to max-read-length if shorter, simplifying short-RNA analysis\n"
+	       "// --minEntropy  <int> : [default 20 (or max read lenght/2)]\n"
+	       "//     Drop reads withg base-4 entropy shorter than this limit\n"
+	       "//     The default 20 is lowered to max-read-length/2 if shorter, simplifying short-RNA analysis\n"
 	       "// REQUEST\n"
 	       "// --align : [default] Extend the seed alignments hopefully to full read length\n"
 	       "// --do_not_align : do not align, just test the validity of the index directory\n"
@@ -1623,7 +1628,7 @@ int main (int argc, const char *argv[])
   p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
 
-  if (0) { p.wiggle = p.wiggleEnds = TRUE ; }
+  if (1) { p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
@@ -1720,6 +1725,12 @@ int main (int argc, const char *argv[])
   getCmdLineLong (&argc, argv, "--nRawBases", &(p.nRawBases)) ;
 
   /*****************  Aligner filters  ************************/
+
+  p.minLength = -20 ;  /* use a negative default to differentiate from a user's values */
+  p.minEntropy = -20 ;
+  getCmdLineInt (&argc, argv, "--minLength", &(p.minLength)) ;
+  getCmdLineInt (&argc, argv, "--minEntropy", &(p.minEntropy)) ;
+
   p.minAli = p.minAliPerCent = p.minScore = -1 ;
   p.errMax = 1000000 ; /* on negative values, extendHits stops on first error */
   p.errRateMax = 10 ;
@@ -1760,7 +1771,8 @@ int main (int argc, const char *argv[])
 
   /* check that the output directoy is writable */
   saConfigIsOutDirWritable (&p) ;   
-
+  oligoEntropy (0, 0, 0) ; /* inialize the logs */
+  
   /*****************  Start working ***********************************************/
   t0 = timeNow () ;
   printf ("%s: Start\n", timeBufShowNow (tBuf0)) ;
@@ -1957,6 +1969,7 @@ int main (int argc, const char *argv[])
 	}
     }
 
+  p.confirmedPolyAs  = arrayHandleCreate (1000, POLYA, p.h) ;
   p.confirmedIntrons  = arrayHandleCreate (1000, INTRON, p.h) ;
   p.doubleIntrons  = arrayHandleCreate (1000, DOUBLEINTRON, p.h) ;
   int chromMax = dictMax (p.bbG.dict) + 1 ;
@@ -2024,6 +2037,7 @@ int main (int argc, const char *argv[])
 	
       if (bb.run)
 	{
+	  saPolyAsCumulate (&p, &bb) ;
 	  saIntronsCumulate (&p, &bb) ;
 	  saDoubleIntronsCumulate (&p, &bb) ;
 	  saRunStatsCumulate (0, &p, &bb) ;
@@ -2084,11 +2098,15 @@ int main (int argc, const char *argv[])
   if (p.wiggle)
     saWiggleExport (&p, nAgents) ;
   saCpuStatExport (&p, cpuStats) ;
-  p.runStranding = halloc (sizeof(float) * (1+dictMax (p.runDict)), p.h) ;
-  memset (&p.runStranding, 0, sizeof (p.runStranding)) ;
+  {{
+      int n = sizeof(float) * (1+dictMax (p.runDict)) ;
+      p.runStranding = halloc (n, p.h) ;
+      memset (p.runStranding, 0, n) ;
+    }}
+  saPolyAsExport (&p, p.confirmedPolyAs) ;
   saIntronsExport (&p, p.confirmedIntrons) ;
   saDoubleIntronsExport (&p, p.doubleIntrons) ;
-  saRunStatExport (&p, p.runStats) ;
+  saRunStatExport (&p, p.runStats) ; /* must come afer PolyAsExport and IntronsExport */
   
   wego_log ("Done") ;
   wego_flush () ; /* flush the wego logs to stderr */

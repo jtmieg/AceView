@@ -27,10 +27,9 @@
 /* Examples:  sortalign -h */
 
 /***********************************************************************************/
-/*  Greg: uncomment this lines and edit the code at the very bottom of sa.sort.c and recompile sa.*.c */
-/* #define GREGGPU  */
+#define YANN
 
-#ifdef GREGGPU 
+#ifdef USEGPU
   #define NAGENTS 12
   #define NBLOCKS 12
 #else
@@ -47,7 +46,7 @@
 #include <zlib.h>
 #include <stdatomic.h>
 #include "../wsra/sra_read.h"
-
+#include "sa.common.h"
 
 
 
@@ -75,34 +74,45 @@ typedef struct runClassStruct {
   atomic_int laneDone ;
   ACEOUT aoSam ;
 } RC ;
-		  
+
+#define LETTERMAX 1000
 typedef struct runStatStruct {
   int run ;   /* index in p.runDict */
   int nFiles ;
   long int nPairs, nReads ;
+  long int lowEntropy, tooShort ;
+  long int lowEntropyBases, tooShortBases ;
   long int nCompatiblePairs, nIncompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
   long int nBase1, nBase2 ;
   long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
-  long int intergenic, intronic, exonic ;
+  long int intergenic, intronic, exonic, cds, utr ;
   long int nMultiAligned[11] ;
-  long int nAlignedPerTargetClass[256] ;
+  long int nReadsAlignedPerTargetClass[256] ;
+  long int nBasesAlignedPerTargetClass[256] ;
   long int nPerfectReads ;
   long int nAlignments ;
   long int nClippedPolyA ;
   long int nClippedVectors ;
+  long int nPolyASites ;
+  long int polyASupport ;
+  long int nTello[12] ;
+  long int nTelloRead ;
+  long int nAAA[12] ;
+  long int nAAARead ;
   long int nSupportedIntrons ;
-  long int nSupportedPolyA ;
-  float intronStranding ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
+  float intronStranding ;
   long int wiggleCumul ; /* in million bases */
   long int wiggleLCumul ; /* in million bases */
   long int wiggleRCumul ; /* in million bases */
-
+  Array lengthDistribution ;
   int minReadLength, maxReadLength ;
   char *adaptor1, *adaptor2 ;
   long int nN, nErr ;
-  long int NATGC[5] ;
+  long int letterProfile1[5 * LETTERMAX] ;
+  long int letterProfile2[5 * LETTERMAX] ;
+  long int ATGCN[5] ;
   int GF[256], GR[256] ; /* number of reads aligned per target_class on Forward/Reverse strand */
   Array errors ;  /* substitutions, insertions, deletions counts */
   /* coverage of long transcripts ? */
@@ -141,11 +151,11 @@ typedef struct bStruct {
   Array wigglesR ;
   Array wigglesP ;
   Array wigglesNU ;
+  Array confirmedPolyAs ;
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL isGenome ;
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
-  long int nPolyASuppor ;
   long int nPolyASupport ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;    
@@ -221,9 +231,12 @@ typedef struct pStruct {
   Array wiggleRCumuls ;
   Array wigglesP ;
   Array wigglesNU ;
+  Array cdss ;
+  Array utrs ;
   Array exonics ;
   Array intronics ;
   Array intergenics ;
+  Array confirmedPolyAs ;
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
@@ -252,16 +265,21 @@ typedef struct pStruct {
   int errCost ;
   int errMax ;       /* (--align case) max number of errors in seed extension */
   int minScore, minAli, minAliPerCent ;
+  int minLength, minEntropy ;
   int errRateMax ;       /* (--align case) max number of errors in seed extension */
   int OVLN ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   long int wiggleCumul ; /* in million bases */
-  long int exonic, intronic, intergenic ;
+  long int cds, utr, exonic, intronic, intergenic ;
   BOOL splice ;
   long int nRawReads, nRawBases ;
   int wiggle_step ;
   float *runStranding ;
 } PP ;
+
+#ifdef JUNKINCOMMON
+
+#define NSHIFTEDTARGETREPEATBITS 8
 
 typedef struct codeWordsStruct {
   unsigned int seed ; /* 32 bits = 16 bases, 2 bits per base */
@@ -276,7 +294,7 @@ typedef struct hitStruct {
   unsigned int a1 ;  /* bio coordinates on chrom (base 1) */
   unsigned int x1 ;  /* bio coordinate on read */
 } __attribute__((aligned(16))) HIT ;
-
+#endif
 typedef struct countChromStruct {
   float weight ;
   int seeds, chrom ;
@@ -347,8 +365,9 @@ typedef struct exonStruct {
 		  
 
 typedef struct polyAStruct {
-  int chrom ;
-  int a1, a2 ; 
+  int chrom ;  /* chrom indicates the strand */
+  int run ;
+  int a1 ; /* first A in the orientation of the chrom */
   int n ;
 } __attribute__((aligned(32))) POLYA ;
 		  
@@ -368,7 +387,7 @@ typedef struct cpuStatStruct {
 /* was 256 1024 4096 16384 */
 
 #define NTARGETREPEATBITS 5
-#define NSHIFTEDTARGETREPEATBITS 8
+
 
 #define mstep1 255
 #define mstep2 510
@@ -400,7 +419,7 @@ long int saIntronParser (PP *pp, TC *tc) ;
 /* sa.sort.c */
 void saSort (BigArray aa, int type) ;
 /* sa.gpusort.c */
-void saGPUSort (char *cp, long int number_of_records, int size_of_record, int (*cmp)(const void *va, const void *vb)) ;
+
 
 /* sa.sam.c */
 int saSamExport (ACEOUT ao, const PP *pp, BB *bb) ;       
@@ -408,6 +427,8 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h) ;
 
 /* sa.introns.c */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 
+void saPolyAsExport (PP *pp, Array aaa) ;
+void saPolyAsCumulate (PP *pp, BB *bb) ;
 void saIntronsExport (PP *pp, Array aaa) ;
 void saDoubleIntronsExport (PP *pp, Array aaa) ;
 void saIntronsCumulate (PP *pp, BB *bb) ;

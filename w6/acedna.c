@@ -1992,39 +1992,40 @@ static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy)
   int cc, bb[16] ;
   BOOL complement = FALSE ;
 
-  if (! dna)
-    return 0 ;
-  /* count all non N dimers */
-  
-  /* if (dx > 1000) dx = 1000 ; */
-  if (dx < 0) dx = 0 ;
   memset (bb, 0, sizeof(bb)) ;
-  for (n = nn = 0, cc = 0, ccp = dna ; dx ; dx--, ccp++)
-    {
-      cc = (cc << 2) & 0xf ; n++ ;
-      switch ((int)(*ccp))
-	{
-	case A_: case 'a': if ( complement) cc |= 0x1 ; break ;
-	case T_: case 't': if (!complement) cc |= 0x1 ; break ;
-	case G_: case 'g': if ( complement) cc |= 0x3 ; else cc |= 0x2 ; break ;
-	case C_: case 'c': if ( complement) cc |= 0x2 ; else cc |= 0x3 ; break ;
-	case FS_: if (ccp[1] == RS_) complement = TRUE ; n = 0 ; break ;
-	default: n = 0 ; break ;
-	}
-      if (n >= 2) { nn++ ; bb[cc]++ ;}
-    }
-  if (minEntropy && nn < minEntropy)
-    return FALSE ;
 
+  if (dna)
+    {
+      /* count all non N dimers */
+      
+      /* if (dx > 1000) dx = 1000 ; */
+      if (dx < 0) dx = 0 ;
+      for (n = nn = 0, cc = 0, ccp = dna ; dx ; dx--, ccp++)
+	{
+	  cc = (cc << 2) & 0xf ; n++ ;
+	  switch ((int)(*ccp))
+	    {
+	    case A_: case 'a': if ( complement) cc |= 0x1 ; break ;
+	    case T_: case 't': if (!complement) cc |= 0x1 ; break ;
+	    case G_: case 'g': if ( complement) cc |= 0x3 ; else cc |= 0x2 ; break ;
+	    case C_: case 'c': if ( complement) cc |= 0x2 ; else cc |= 0x3 ; break ;
+	    case FS_: if (ccp[1] == RS_) complement = TRUE ; n = 0 ; break ;
+	    default: n = 0 ; break ;
+	    }
+	  if (n >= 2) { nn++ ; bb[cc]++ ;}
+	}
+      if (minEntropy && nn < minEntropy)
+	return FALSE ;
+    }
   /* lazy calculation of all the logs */
-  if (nn < 1000)
+  if (nn < 128)
     {
       double s1 = 0 ;
       if (! ee || nn * nn + nn  >= arrayMax(ee))
 	{
 	  double s = 0, log16 = log(16.0) ; /* divide by log16 to be in base equivalent */ 
 	  int n, j, n2 ;
-	  
+	  nn = 128 ;	  
 	  ee = arrayReCreate (ee, nn*nn + nn, int) ;
 	  for (n2 = 1 ; n2 < nn ; n2 <<= 1) ;
 	  for (n = 1 ; n <= n2 ; n++)
@@ -2035,7 +2036,7 @@ static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy)
 	    }
 	}
       
-      for (s1 = 0, n = 0 ; n < 16 ; n++)
+      for (s1 = 0, n = 0 ; dna && n < 16 ; n++)
 	{ 
 	  s1 += arr (ee, nn * nn + bb[n], int) ; 
 	  /* fprintf (stderr,  "   %d\t%d\t%.2f\n", n, bb[n], s1) ;  */
@@ -2047,7 +2048,7 @@ static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy)
     { 
       double s = 0, s1 = 0, log16 = log(16.0) ; /* divide by log16 to be in base equivalent */ 
       ss = 0 ;
-      for (ss = 0, n = 0 ; n < 16 ; n++)
+      for (ss = 0, n = 0 ; dna && n < 16 ; n++)
 	if (bb[n])
 	  { 
 	    s = bb[n] ; s1 -=  (1000.0 * s * log(s/nn)/log16 ) ; 
@@ -2063,6 +2064,7 @@ static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy)
 } /* oligoEntropy16 */
 
 /********************************************************************/
+
 
 int oligoEntropy (unsigned const char *dna, int ln, int minEntropy) 
 {

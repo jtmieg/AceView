@@ -106,7 +106,11 @@ long int saGffParser (PP *pp, TC *tc)
 
   if (! pp->geneBoxes) pp->geneBoxes = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
   if (! pp->geneExons) pp->geneExons = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
-  
+
+  if (! pp->wiggle)
+    {
+      ac_free (h) ; return 0 ;
+    }
   if (1)
     {
       const char *cp = tc->fileName ;
@@ -384,7 +388,7 @@ long int saGffParser (PP *pp, TC *tc)
 	  fprintf (stderr, "Exon %ld : %d %d\n", ii, up->a1, up->a2) ;
     }
 
-  fprintf (stderr, "+++++++ Found %ld exons %ld introns in file %s\n", nnE, nnI, aceInFileName (ai)) ;
+  fprintf (stderr, "+++++++ Found %ld exons %ld introns in file %s\n", nnE, nnI, tc->fileName) ;
   ac_free (h) ;
 
   return nnE + nnI ;

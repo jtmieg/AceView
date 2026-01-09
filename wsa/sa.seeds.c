@@ -355,9 +355,22 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   long int icwx = 0, icwxMax = pp->knownExons ? bigArrayMax (pp->knownExons) : 0 ;
   EXONINTRON *cwX = pp->knownExons ? bigArrp (pp->knownExons, 0, EXONINTRON) : 0 ;
   const int seedLength = pp->seedLength ;
+  int minEntropy = pp->minEntropy ;
+  int minLength = pp->minLength ;
   
   memset (cwsN, 0, sizeof (cwsN)) ;
-  
+  if (minEntropy < 0) /* default value */
+    {
+      minEntropy = -minEntropy ;
+      if (minEntropy > bb->runStat.maxReadLength / 2)
+	minEntropy = bb->runStat.maxReadLength / 2 ;
+    }
+  if (minLength < 0) /* default value */
+    {
+      minLength = -minLength ;
+      if (minLength > bb->runStat.maxReadLength / 2)
+	minLength = bb->runStat.maxReadLength / 2 ;
+    }
   if (step < 1)
     messcrash ("codeWordsDo received step = %d < 1", step) ;
   if (dMax >> 31)
@@ -379,7 +392,18 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
       long unsigned int w, wr ;
       const int nShift = 62 ;
       if (1) step = iMax < 60 ? 1 : bb->step ;
-      
+      if (iMax < minLength)
+	{
+	  bb->runStat.tooShort++ ;
+	  bb->runStat.tooShortBases += iMax ;
+	  continue ;
+	}
+      if (minEntropy > 0 && oligoEntropy (arrp (dna, 0, unsigned char), iMax, minEntropy) < minEntropy)
+	{
+	  bb->runStat.lowEntropy++ ;
+	  bb->runStat.lowEntropyBases += iMax ;
+	  continue ;
+	}
       w = wr = 0 ;
       /* each q vector is used round-robin style, so no copying is needed */
       BOOL qminus[step] ;

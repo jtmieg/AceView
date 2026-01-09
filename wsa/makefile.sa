@@ -98,14 +98,32 @@ COMPILE.c = $(COMPILER) $(USEROPTS) $(IDIR) -DAC_TEST -D$(NAME) -D_FILE_OFFSET_B
 
 SA_OBJS = sa.main.o sa.sort.o sa.sam.o sa.config.o \
 	sa.introns.o sa.wiggle.o sa.gff.o sa.targetIndex.o \
-	sa.seeds.o sa.sequenceParser.o sa.stats.o sa.align.o \
-	sa.gpusort.o
-	
-SA_SOURCES =  $(SA_OBJS:.o=.c) 
+	sa.seeds.o sa.sequenceParser.o sa.stats.o sa.align.o
 
+
+SA_SOURCES =  $(SA_OBJS:.o=.c)
 
 $(SA_SOURCES)  :
 	$(TEST) -L $@ || ln -s ../wsa/$@ . 
+
+sa.gpusort.cu:
+	$(TEST) -L $@ || ln -s ../wsa/$@
+
+
+CCCL_INCLUDES=
+# if Nvidia Thrust library is not installed, clone https://github.com/NVIDIA/cccl.git,
+# uncomment the lines below and set CCCL to the path to the cloned repository
+#CCCL =
+#CCCL_INCLUDES = -I$(CCCL)/thrust -I$(CCCL)/libcudacxx/include -I$(CCCL)/cub
+
+sa.gpusort.o: sa.gpusort.cu
+	nvcc -c $(CCCL_INCLUDES) -I ../wsa --std=c++17 -o $@ $<
+
+GPU_OBJS=
+ifneq (,$(findstring GPU,${ACEDB_MACHINE}))
+    GPU_OBJS = sa.gpusort.o
+endif
+
 
 # "all" should always be the first target so that it is the default make action.
 all: sortalign
@@ -113,8 +131,8 @@ all: sortalign
 libsraread.a:
 	$(MAKE) -C ../wsra
 	ln -s ../wsra/libsraread.a .
-sortalign: $(SA_OBJS)  libsraread.a 
-	$(LINKER) -o $@  $(SA_OBJS)  $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
+sortalign: $(SA_OBJS) libsraread.a $(GPU_OBJS)
+	$(LINKER) -o $@  $(GPU_OBJS) $(SA_OBJS) $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
 
 ###########################################################
 ########### end of     acedb makefile.sa  ################

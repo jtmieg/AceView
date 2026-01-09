@@ -38,6 +38,23 @@ static void showIntrons (Array aa)
 
 /**************************************************************/
 
+static int confirmedPolyAOrder (const void *va, const void *vb)
+{
+  const POLYA *up = va ;
+  const POLYA *vp = vb ;
+  int n ;
+
+  /* chrom order */
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  /* pos order */
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  /* run order */
+  n = up->run - vp->run ; if (n) return n ;
+  return 0 ;
+} /* confirmedPolyAOrder */
+
+/**************************************************************/
+
 static int confirmedIntronsOrder (const void *va, const void *vb)
 {
   const INTRON *up = va ;
@@ -77,6 +94,31 @@ static int doubleIntronsOrder (const void *va, const void *vb)
   n = up->feet1[0] - vp->feet1[0] ; if (n) return -n ;
   return 0 ;
 } /* doubleIntronOrder */
+
+/**************************************************************/
+
+static int confirmedPolyAsCompress (Array aaa) 
+{
+  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  arraySort (aaa, confirmedPolyAOrder) ;
+  POLYA *up, *vp, *wp ;
+
+  if (iMax)
+    for (ii = 0,  jj = 0, up = arrp (aaa, 0, POLYA), vp = up ; ii < iMax ; ii += kk, up += kk)
+      {
+	for (wp = up + 1, kk = 1 ; ii + kk < iMax ; kk++, wp++)
+	  if (up->a1 == wp->a1 && up->chrom == wp->chrom && up->run == wp->run)
+	    {
+	      up->n += wp->n ; wp->n = 0 ;
+	    }
+	  else
+	    break ;
+	if (vp < up) *vp = *up ;
+	vp++ ; jj++ ;
+      }
+  arrayMax (aaa) = jj ;
+  return jj ;
+} /* confirmedPolyAsCompress */
 
 /**************************************************************/
 
@@ -135,6 +177,23 @@ static int doubleIntronsCompress (Array aaa)
   arrayMax (aaa) = jj ;
   return jj ;
 } /* doubleIntronsCompress */
+
+/**************************************************************/
+
+void saPolyAsCumulate (PP *pp, BB *bb) 
+{
+  Array aaa = pp->confirmedPolyAs, aa = bb->confirmedPolyAs ;
+  int iMax = arrayMax (aa) ;
+  
+  if (iMax)
+    {
+      int jj = arrayMax (aaa) ;
+      arrayp (aaa, jj + iMax - 1, POLYA)->n = 0 ; /*  make room */
+      memcpy (arrp (aaa, jj, POLYA), arrp (aa, 0, POLYA), iMax * sizeof (POLYA)) ;
+      confirmedPolyAsCompress (aaa) ;
+    }
+  return ;
+} /* saPolyAsCumulate */
 
 /**************************************************************/
 
@@ -598,6 +657,42 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 /**************************************************************/
 /**************************************************************/
 
+void saPolyAsExport (PP *pp, Array aaa)
+{
+  int iMax = aaa ? confirmedPolyAsCompress (aaa) : 0 ;
+  
+  if (iMax)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (pp->outFileName, ".polyA.tsf", 0, h) ;
+      POLYA *up ;
+      long int ii ;
+      
+      aceOutf (ao, "### PolyAd support in tsf format: chrom__a1,  run, i, strand, nb of reads supportingt the polyA\n") ;
+      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
+	       aceOutFileName (ao)
+	       ) ;
+      aceOutf (ao, "PolyA\tRun\tti\tStrand\tn\n") ;
+      for (ii = 0, up = arrp (aaa, ii, POLYA) ; ii < iMax ; ii++, up++)
+	{
+	  int min = 1 ;
+	  if (up->n >= min)
+	    aceOutf (ao, "%s__%d\t%s\tti\t%s\t%d\n"
+		     , dictName (pp->bbG.dict, up->chrom >> 1) 
+		     , up->a1
+		     , dictName (pp->runDict, up->run)
+		     , up->chrom & 0x1 ? "-" : "+"
+		     , up->n
+		     ) ;
+	}
+      
+      ac_free (h) ;
+    }
+} /* saPolyAsExport */
+
+/**************************************************************/
+/**************************************************************/
+
 static char *flipFeet (char *feet)
 {
   char buf[6] ;
@@ -716,7 +811,7 @@ void saIntronsExport (PP *pp, Array aaa)
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
 	       ) ;
-      aceOutf (ao, "Inron\tRun\tiit\rn\tnA\tfeet\n") ;
+      aceOutf (ao, "Inron\tRun\tiit\tn\tnR\tfeet\n") ;
       for (ii = 0, up = arrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
 	{
 	  int min = 3 ;
@@ -726,7 +821,7 @@ void saIntronsExport (PP *pp, Array aaa)
 	   min = 1 ;
 	  else if (!strcmp (up->feet, "gc_ag"))
 	    min = 2 ;
-	  if (up->n >= min || up->nR >= min)
+	  if (up->n + up->nR >= min)
 	    aceOutf (ao, "%s__%d_%d\t%s\tiit\t%d\t%d\t%s\n"
 		     , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2
 		     , dictName (pp->runDict, up->run)
@@ -754,11 +849,11 @@ void saDoubleIntronsExport (PP *pp, Array aaa)
       long int ii ;
       
 
-      aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2__b1_b2,  run, iitt (format for 2 integers 2 texts), nb of reads supportingt the intron, number antistrand, intron feet\n") ;
+      aceOutf (ao, "### Double_intron support in tsf format: chrom__a1_a2__b1_b2,  run, iitt (format for 2 integers 2 texts), nb of reads supportingt the intron, number antistrand, intron feet\n") ;
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
 	       ) ;
-      aceOutf (ao, "Inron\tRun\tiit\rn\tnA\tfeet\n") ;
+      aceOutf (ao, "Double_intron\tRun\tiit\tn\tnR\tfeet1\tfeet2\n") ;
       for (ii = 0, up = arrp (aaa, ii, DOUBLEINTRON) ; ii < iMax ; ii++, up++)
 	{
 	  int min = 2 ;

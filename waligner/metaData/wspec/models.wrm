@@ -66,7 +66,8 @@
 		Fax Text
  	Notes ?Text
 
-?Run  Ali ?Ali XREF Run  // Contains all results calculated automatically
+?Run  Ali ?Ali XREF Run    // Contains all clipalign/MAGIC  results calculated automatically
+      Ali ?Ali2 XREF Run2  // Contains all sortalign/MAGIC2 results calculated automatically
       Project  ?Project XREF Run // Runs with projec=$CALI are considered by CALI
       tmp_directory UNIQUE Text   // sticky, inherited from project the first time the run is considered, results go to tmp.$tmp_directory
       Titles  Title UNIQUE ?Text   // The other tags in the run object are to be documented by the user
@@ -311,7 +312,8 @@
             FBtc  // tissue/cell culture
 
   
-?Ali  Run ?Run XREF Ali @Title
+?Ali  Run ?Run XREF Ali @Title   // clipalign MAGIC  results
+      Run2 ?Run XREF Ali2 @Title // sortalign MAGIC2 results
       Counts Raw_data  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Accepted  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Rejected  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
@@ -475,6 +477,7 @@
                               Links_to_spike_in UNIQUE Float
                               Links_to_rRNA  UNIQUE Float
                               Links_to_mito  UNIQUE Float
+                              Circle_pairs     UNIQUE Float			      
                 Orphans Text UNIQUE Float UNIQUE Text  // type-number, count, type-title
       Errors Error_position Int UNIQUE Float UNIQUE Float UNIQUE Float UNIQUE Float
              Error_profile Text Text UNIQUE Float UNIQUE Float UNIQUE Float   // f1  a>g number Mb n/Mb             
@@ -494,6 +497,7 @@
                             P_support UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
             SNP_profile Text Text UNIQUE Float UNIQUE Float UNIQUE Float   // f1  type(a>g ++a...)  number  rejectedNumber number of supporting_accpeted_reads 
       Computer_ressource CPU  Text  UNIQUE Int  UNIQUE Text
+                         Elapsed  Text  UNIQUE Int  UNIQUE Text
                          Max_memory  Text  UNIQUE Int  UNIQUE Text
                          Number_of_lanes UNIQUE Int
 

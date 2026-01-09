@@ -56,15 +56,19 @@ setenv SV v47.dec9        # no wiggle, no sam, removd enhanced exon seds, comple
 setenv SVlast v47.dec9
 setenv SV v48.dec10        # same with wiggle
 setenv SVlast v48.dec10
-setenv SV v50.jan1
+setenv SV v50.jan1         # use the gff to assess the introns while createIndex (do not parse the gff while aligning since we do not set -wiggle)
 setenv SVlast v50.jan1
+setenv SV v51.jan4         # same as v50 plus --wiggle and gene expression
+setenv SVlast v51.jan4
+setenv SV v52.jan7         # same as v50 no --wiggle modified run naming
+setenv SVlast v52.jan7
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
   touch bin/wsa.$SV.toto
   \rm -rf bin/wsa.$SV*
   mkdir bin/wsa.$SV
-  cp ~/ace/wsa/sa.[ch] bin/wsa.$SV
+  cp ~/ace/wsa/sa.*[ch] bin/wsa.$SV
 endif
 
 setenv NOINTRONSEEDS 0
@@ -116,10 +120,8 @@ setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_Magi
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
 
-set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2"
-
-
+set createIndex=1
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2 31_STARlong"
 
 #############################################################################
 ## Datasets
@@ -140,83 +142,19 @@ setenv PFAL_r2_runs "PFALt1r2 PFALt2r2 PFALt3r2"
 setenv PFAL_r3_runs "PFALt1r3 PFALt2r3 PFALt3r3"
 setenv PFAL_runs "$PFAL_r1_runs $PFAL_r2_runs $PFAL_r3_runs"
 
-setenv runs "$main_runs $HG19_runs  $PFAL_runs"
 
-# Additional PacBio runs from Brain and Testis
-setenv pacbio_runs "SRR5189652 SRR5189667"
-# Additional long paired end Illumina reads 
-# 250_250 (from metastatic melanoma)  and 300+300 from MCF7 cells)
-setenv long_illumina_runs "SRR5438850 SRR5437876"
-setenv split_illumina_runs "SRR5438850_120 SRR5438850_150"
-# setenv runs "$main_runs $HG19_runs  $PFAL_runs $pacbio_runs $long_illumina_runs"
-# setenv runs "$long_illumina_runs"
-# setenv runs "$pacbio_runs"
-# setenv runs "PacBio Illumina"
-# setenv runs "Roche PacBio iRefSeq "
-# setenv runs "$runs PFALt1r1S HG19t1r1_50 $pacbio_runs"
-# setenv runs "HG19t1r1_50"
-# setenv runs "PFALt1r1S"
-# setenv runs "$pacbio_runs"
-# setenv runs "$runs HG19t1r1_50 PFALt1r1S"
-setenv runs "$main_runs $HG19_runs  $PFAL_runs $pacbio_runs  ONG ONG2 ONG3 ONG4 $long_illumina_runs PFALt1r1S HG19t1r1_50  $split_illumina_runs"
-setenv runs "iRefSeq PacBio SRR5189652 SRR5189667 ONG ONG2 ONG3 ONG4 ONG5 Roche SRR5437876 SRR5438850 SRR5438850_150 SRR5438850_120 Illumina $HG19_runs  $PFAL_runs  HG19t1r1_50"
+setenv allRuns "iRefSeq38 iRefSeq ChipSeq1 ChipSeq2 B_ROCR2_Illumina_DNA RNA_PolyA_A_1_2Gb RNA_PolyA_B_1_2Gb A_WTS_PacBio A_ROCR3_PacBio-F3 B_ROCR3_PacBio-F3 A_ROCR3_Nanopore-F3 B_ROCR3_Nanopore-F3 Roche"
 
-# setenv runs "iRefSeq PacBio SRR5189667 ONG4 Roche SRR5437876"
+setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_BAB_Baboon FrontalCortex_CMC_Macaque TemporalLobe_PTM_Macaque BrainRight_MST_Marmoset TemporalLobe_MLM_MouseLemur TemporalLobe_SQM_SquirrelMonkey"
 
-# setenv runs "$main_runs $HG19_runs  $PFAL_runs $pacbio_runs $long_illumina_runs PFALt1r1S HG19t1r1_50  $split_illumina_runs"
-# setenv runs "$split_illumina_runs"
-# setenv runs "SRR5438850_150"
-# setenv runs " $HG19_runs  $PFAL_runs "
-# setenv runs "iRefSeq PFALt1r1 PFALt2r1 PFALt3r1"
-# setenv runs "iRefSeq PacBio Roche HG19t1r1"
-# setenv runs "iRefSeq PFALt1r1 PFALt2r1 PFALt3r1 PacBio Roche"
-# setenv runs "iRefSeq PacBio Roche $PFAL_runs $HG19_runs $pacbio_runs $long_illumina_runs $split_illumina_runs"
-# setenv runs "PFALt1r1"
-# setenv runs "iRefSeq"
-# setenv runs "Illumina"
-# setenv runs "PacBio"
-# setenv runs "Roche"
-# setenv runs "ONG2 $PFAL_runs iRefSeq PacBio"
-# setenv runs "HG19t1r1"
-# setenv runs "PFALt1r1"
-# setenv runs "ONG3"
-# setenv runs "ONG3 ONG4 ONG5"
+setenv moreRuns "HG19t1r1 HG19t2r1 HG19t3r1 WormSRR548309 RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb"
 
-setenv nanoRuns "pilot1_A_ION_f2e5b881_noCap_capA_RNA  pilot1_A_ION_b6cfebf0_noCap_RNA AGLR2_A_MinION_FAK4078_1xCAP_RNA"
-setenv runs "$nanoRuns"
-setenv runs "iRefSeq  RS5pcSNV_100_0 RS5pcSNV_95_5 RS5pcSNV_60_40 RS5pcSNV_0_100  RS10pcSNV_100_0 RS10pcSNV_95_5 RS10pcSNV_60_40 RS10pcSNV_0_100 RS15pcSNV_100_0 RS15pcSNV_95_5 RS15pcSNV_60_40 RS15pcSNV_0_100 RS20pcSNV_100_0 RS20pcSNV_95_5 RS20pcSNV_60_40 RS20pcSNV_0_100 "
-
-setenv runs "iRefSeq $HG19_r1_runs"
-setenv runs "Roche HG19t1r1"
-setenv runs  "iRefSeq RNA_PolyA_A_1"
-setenv runs "Roche HG19t1r1 HG19t2r1 HG19t3r1"
-setenv runs "RNA_PolyA_B_1"
-setenv runs "HG19t1r1 HG19t2r1"
-setenv runs "iRefSeq"
-setenv runs "Roche"
-setenv runs "iRefSeq Roche"
-setenv runs "HG19t1r1 iRefSeq"
-setenv runs "HG19t1r1 HG19t2r1 HG19t3r1"
-setenv allRuns "iRefSeq iRefSeq38 Roche HG19t1r1 HG19t2r1 HG19t3r1 RNA_PolyA_A_1 RNA_PolyA_B_1  ChipSeq1 ChipSeq2  B_ROCR2_Illumina_DNA "
-setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_PTM_Macaque FrontalCortex_CMC_Macaque TemporalLobe_BAB_Baboon BrainRight_MST_Marmoset  TemporalLobe_SQM_SquirrelMonkey TemporalLobe_MLM_MouseLemur  WormSRR548309 A_WTS_PacBio A_ROCR3_Nanopore-F3 A_ROCR3_PacBio-F3 B_ROCR3_Nanopore-F3 B_ROCR3_PacBio-F3"
-
-
-
-
-# setenv runs "iRefSeq Roche HG19t1r1 HG19t2r1 HG19t3r1"
-setenv runs "$allRuns  $monkeyRuns"
+setenv runs "$allRuns  $monkeyRuns $moreRuns"
 # setenv runs "Roche"
 # setenv runs "iRefSeq38"
-# setenv runs Nanopore
-# setenv runs "B_ROCR3_PacBio-F3"
 
 # to create all IDX use these runs
-if ($createIndex == 1)  setenv runs "iRefSeq38 HG19t1r1 ChipSeq1 RNA_PolyA_A_1 WormSRR548309 "
-# setenv runs "RNA_PolyA_B_1"
-# setenv runs "ChipSeq1 ChipSeq2"
-# setenv runs "ChipSeq1"
-#setenv runs "WormSRR548309"
-#setenv runs "FrontalCortex_CHP_Chimpanzee"
+if ($createIndex == 1)  setenv runs "iRefSeq iRefSeq38 HG19t1r1  WormSRR548309 "
 
 echo "### S.tcsh SV=$SV"
 echo "$methods"
@@ -296,25 +234,8 @@ if (1) then
       echo PFAL > target
     popd
   end
-  foreach run ($main_runs)
-    if (! -d Fasta/$run || -e Fasta/$run/target) continue
-    pushd Fasta/$run
-      ln -s ../../Reference_genome/GRCh38.genome.fasta.gz genome.gz
-      echo GRCh38 > target
-    popd
-  end
-  foreach run ($pacbio_runs $long_illumina_runs)
-    if (! -d Fasta/$run || -e Fasta/$run/target) continue
-    pushd Fasta/$run
-      ln -s ../../Reference_genome/GRCh38.genome.fasta.gz genome.gz
-      echo GRCh38 > target
-    popd
-  end
   touch Fasta/genomes_are_assigned
 
-  foreach run ($pacbio_runs iRefSeq PacBio)
-    if (-d  Fasta/$run) touch Fasta/$run/isLongRun
-  end
 endif
 
 #############################################################################
@@ -392,12 +313,12 @@ goto phaseLoop
 
 phase_Help:
 
-echo "\nusage  scripts/SortAlignPaperMasterScipt.tcsh, where command is one of:"
+echo "\nusage  scripts/SortAlignPaperMasterScipt.tcsh command, where command is one of:"
 echo 'help   : This online help'
 echo 'init   : in tcsh, "source README init" will set the variables $runs, $methods which may be convenient'
 echo 'download  : Automatic download of the fastq files, please monitor carefully the results'
 echo 'Make_iRefSeq : create the iRefSeq fasta file and intron file from the gff and the genome file'
-echo 'count  : Count the reads in each fasta/fastq file'
+echo 'countFasta  : Count the reads in each fasta/fastq file'
 echo 'sam    : Automatically download the sam files from NCBI (rather that running the aligners locally)'
 echo 'align  : run for all runs all aligners for which the script Aligners/$method/align.tcsh is defined'
 echo 'aliqc : count reads and errors in all the sam files'
@@ -906,7 +827,7 @@ foreach species (any)
  endif
  setenv speciesRuns "$allRuns $monkeyRuns"
  foreach mm ($allMethods)
-  foreach run ($speciesRuns)
+  foreach run ($runs)
 
     if (! -e RESULTS/$mm/$run/align.done) continue
 
@@ -927,12 +848,13 @@ foreach species (any)
       set multiP=`cat _t | gawk -F '\t' '{print $14}'`
    endif
 
+    set nRun=`echo "$run ZZZZZ $runs" | gawk '{r=$1;for (i=3;i<=NF;i++)if(r==$i)k=i-2;}END{printf ("%2d", k);}'`
    
     if (! -e RESULTS/$mm/$run/align.done) continue 
-    echo "$run\t$mm\tt\t$wallT" >> $out.wallT.tsf
-    echo "$run\t$mm\tt\t$cpu" >> $out.cpu.tsf
-    echo "$run\t$mm\tt\t$maxMem" >> $out.maxMem.tsf
-    echo "$run\t$mm\tt\t$multiP" >> $out.parallel.tsf
+    echo "$nRun.$run\t$mm\tt\t$wallT" >> $out.wallT.tsf
+    echo "$nRun.$run\t$mm\tt\t$cpu" >> $out.cpu.tsf
+    echo "$nRun.$run\t$mm\tt\t$maxMem" >> $out.maxMem.tsf
+    echo "$nRun.$run\t$mm\tt\t$multiP" >> $out.parallel.tsf
   end
 end
 
@@ -983,7 +905,7 @@ phase_aliqc:
 echo -n "phase_aliqc :"
 date
 
- foreach run ($allRuns $monkeyRuns)
+ foreach run ($runs)
   set nRawReads=`cat Fasta/$run/$run*.count | gawk '/^Sequence_kept/{n+=$2;}END{print n+0}'`
   set nRawBases=`cat Fasta/$run/$run*.count | gawk '/^Bases_seq_kept/{n+=$2;}END{print n+0}'`
   foreach mm ($allMethods)
@@ -1008,8 +930,11 @@ date
       set exportitr=""
       if ($run == iRefSeq || $run == iRefSeq38) set exportitr="--exportIntronSupport"
 
-      samtools stat $sam | awk -f scripts/sam_stats.awk 
+      set exportitr="--exportIntronSupport"
 
+      if (! -e RESULTS/$mm/$run/s2g.samTools.txt) then
+        samtools stats $sam | awk -f scripts/sam_stats.awk RESULTS/$mm/$run/s2g.samTools.txt
+      endif
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr" > 	RESULTS/$mm/$run/s2g.cmd
@@ -1035,11 +960,22 @@ date  >> COMPARE/samStats.$SV.txt
 echo "### True error rates in Baruzzo datasets:   t1=0.543,  t2=1.186, t3=6.024" >> COMPARE/samStats.$SV.txt
 cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 's/nMultiAligned 1 times/nAlignedOnce/g' -e 's/nMultiAligned 2 times/nMultiAligned_2_sites/g' > RESULTS/allSamStats
 
-foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlignedOnce nMultiAligned)
+\mv RESULTS/allSamStats RESULTS/allSamStats.old
+cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerfectReads/Perfect_reads/' -e 's/nRawBases/RawBases/' -e 's/nRawReads/RawReads/' -e 's/nReads/Reads/' > RESULTS/allSamStats
+
+mv RESULTS/allSamStats RESULTS/allSamStats.1
+foreach run ($runs)
+    set nRun=`echo "$run ZZZZZ $runs" | gawk '{r=$1;for (i=3;i<=NF;i++)if(r==$i)k=i-2;}END{printf ("%2d", k);}'`
+    cat RESULTS/allSamStats.1 | gawk -F '\t' '{if($1 == run){printf("%2d_",k);print;}}' k=$nRun run=$run >> RESULTS/allSamStats
+end
+
+setenv runsN `echo "$runs" | gawk '{for(k=1;k<=NF;k++)printf("%2d_%s ",k,$k);}'`
+
+foreach tag (AlignedReads nAlignedBases nErrors  Perfect_reads nUnaligned nAlignedOnce nMultiAligned)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
   if (-e  toto.tag) \rm toto.tag
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tt\t0" >> toto.tag
     end
@@ -1048,11 +984,11 @@ foreach tag (nAlignedReads nAlignedBases nErrors  nPerfectReads nUnaligned nAlig
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nAlignedReads nAlignedBases nErrors nPerfectReads nRawBases nRawReads nUnaligned nAlignedOnce nMultiAligned nAlignments)
+foreach tag (AlignedReads nAlignedBases nErrors Perfect_reads RawBases RawReads nUnaligned nAlignedOnce nMultiAligned)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\ti\t0" >> toto.tag
     end
@@ -1066,7 +1002,7 @@ foreach tag (nAlignments)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
@@ -1082,7 +1018,7 @@ foreach tag (nMultiAligned)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
@@ -1093,13 +1029,13 @@ foreach tag (nMultiAligned)
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nSupportedIntrons)
+foreach tag (Supported_introns)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
-      echo "$run\t$mm\tf\t0" >> toto.tag
+      echo "$run\t$mm\ti\t0" >> toto.tag
     end
   end
   echo "\nSupported introns\t$SV" >> COMPARE/samStats.$SV.txt
@@ -1109,13 +1045,13 @@ foreach tag (nSupportedIntrons)
 end
 
 
-foreach tag (nIntronSupports)
+foreach tag (Intron_supports)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
-      echo "$run\t$mm\tf\t0" >> toto.tag
+      echo "$run\t$mm\ti\t0" >> toto.tag
     end
   end
   echo "\nIntron supports\t$SV" >> COMPARE/samStats.$SV.txt
@@ -1123,11 +1059,11 @@ foreach tag (nIntronSupports)
    cat toto.tag | bin/tsf  -I tsf -O table --title "Intron supports" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
-foreach tag (nIntronSupports)
+foreach tag (Intron_supports)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
@@ -1138,11 +1074,11 @@ foreach tag (nIntronSupports)
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nCompatiblePairs)
+foreach tag (Non_compatible_pairs)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
@@ -1153,22 +1089,22 @@ foreach tag (nCompatiblePairs)
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (nIncompatiblePairs)
+foreach tag (Non_compatible_pairs)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
-  foreach run ($allRuns)
+  foreach run ($runsN)
     foreach mm ($allMethods)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
   end
-  echo "\nIncompatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  echo "\nNon_compatible_pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
    cat toto.tag | bin/tsf  -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-\cp ~/ace/wacext/sortalign.c COMPARE/sortalign.$SV.c
+# \cp ~/ace/wacext/sortalign.c COMPARE/sortalign.$SV.c
 \cp bin/sortalign COMPARE/sortalign.$SV.exe
 
 goto phaseLoop
@@ -1866,6 +1802,10 @@ goto phaseLoop
 
 phase_introns:
 
+setenv iRuns "$allRuns $moreRuns"
+
+set iMethods="011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 23_HISAT2_16threads 31_STARlong 53_Minimap2_16threads"
+
 echo "Creating the INTRON_DB databases"
 foreach target (T2T GRCh38)
   set IDB=$target.INTRON_DB
@@ -1902,21 +1842,26 @@ foreach target (T2T GRCh38)
 EOF
     touch  $IDB/genome.done
   endif
+end
 
-  set runs3="iRefSeq iRefSeq38"
-  if (! -e $IDB/introns.ace) then
+echo "Creating the intron counts"
+foreach target (T2T GRCh38)
+  set IDB=$target.INTRON_DB
+  if (-e $IDB/introns.aceZ) continue
     echo '#' > $IDB/introns.tsf
-    foreach mm ($methods)
-      foreach run ($runs3)
+    foreach mm ($iMethods)
+      foreach run ($iRuns)
         set target2=`cat Fasta/$run/target`
         echo "$run $target $target2"
         if ($target != $target2) continue
+	# sortalign -> introns.trsf
         set ff=RESULTS/$mm/$run/$run/introns.tsf
         if (-e $ff) then
           wc $ff
           cat $ff | gawk '/^#/{next;}{printf("%s\t",mm);print;}' mm=$mm   >> $IDB/introns.tsf
 	  continue
 	endif
+	# other methods -> s2g.Introns
         set ff=RESULTS/$mm/$run/s2g.Introns
         if (-e $ff) then
           wc $ff
@@ -1935,14 +1880,36 @@ EOF
       save
       quit
 EOF
-
-  endif
-
 end
 
- cat T2T.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("T2T\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort
- cat GRCh38.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("GRCh38\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort
+ cat T2T.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("T2T\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort > _a
+ cat GRCh38.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("GRCh38\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort > _b
 
+echo -n "# Introns $SV : " > _c
+date >> _c
+echo -n "#Run\tMethod" >> _c
+
+foreach mm ($iMethods)
+    echo $mm | gawk '{printf("\t%s",$1);}' >> _c
+end
+foreach run ($iRuns)
+  echo -n "\n$run\tKnown Intron" >> _c
+  foreach mm ($iMethods)
+    cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$4;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
+  end
+  echo -n "\n$run\tNew Intron" >> _c
+  foreach mm ($iMethods)
+    cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$5;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
+  end
+end
+echo >> _c
+
+
+# ROC curve, truth = gt_ag  , not useful when we align the iRefSeq38
+ cat GRCh38.INTRON_DB/introns.tsf | gawk '{if($1==m){print $7;}}' m=011_SortAlignG5R5 | tags | sort -k 2nr | head -8
+ cat GRCh38.INTRON_DB/introns.tsf | gawk '{if($1==m){print $5, $7;}}' m=011_SortAlignG5R5 | sort -k 1nr | gawk '{if($2=="gt_ag")y++;else x++;if(y%1000 == 0)printf("%d\t%d\n",x,y);}END{printf("%d\t%d\n", x,y)}'
+
+ 
 goto phaseLoop
 # iRefSeq38 NR_024540.1 is aligned but has no produced intron
 set mm=013_SortAlignG3R1

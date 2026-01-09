@@ -56,7 +56,11 @@ void saConfigIsOutDirWritable (PP *pp)
       
       if (buf[0])
 	{
-	  char *cmd = hprintf (h, "mkdir -p %s", buf) ;
+	  char *cmd ;
+	  if (pp->wiggle)
+	    cmd = hprintf (h, "mkdir -p %s  %s/hits %s/wiggles", buf, buf, buf) ;
+	  else
+	    cmd = hprintf (h, "mkdir -p %s %s/hits", buf, buf) ;
 	  system (cmd) ;
 	}
       pp->outFileName = hprintf (pp->h, "%s/", buf) ;

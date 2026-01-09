@@ -20,10 +20,17 @@
 
 #include "sa.h"
 
+#ifdef USEGPU
+#include <time.h>
+#include "sa.gpusort.h"
+#else
+
 #ifdef __SSE2__
 #define VECTORIZED_MEM_CPY
 #include <emmintrin.h> // SSE2
-#endif
+#endif /* __SSE2__ */
+
+#endif /* USEGPU */
 
 /**************************************************************/
 
@@ -106,7 +113,7 @@ static BOOL newInsertionSort (char *b, mysize_t n, int s, int (*cmp)(const void 
   return clean ;
 } /* insertionSort */
 
-#ifndef GREGGPU
+#ifndef USEGPU
 /* recursivelly split the table
  * the partially sorted data oscillate between b and buf
  * they end up correctly in b because for small n
@@ -259,14 +266,25 @@ void saSort (BigArray aa, int type)
     newInsertionSort (cp, N, s, cmp) ;
   else
     {
-#ifdef GREGGPU
-      saGPUSort (cp, N, s, cmp) ;
+
+        struct timespec start, end;
+        double ellapsed;
+        timespec_get(&start, TIME_UTC);
+
+
+#ifdef USEGPU
+        saGPUSort (cp, N, type) ;
 #else
       char *buf = malloc (N * s) ;
       memcpy (buf, cp, N * s) ;
       saSortDo (cp, N, s, buf, TRUE, cmp) ;
       free (buf) ;
 #endif
+
+      timespec_get(&end, TIME_UTC);
+      ellapsed = (double)(end.tv_sec - start.tv_sec) +
+          (double)(end.tv_nsec - start.tv_nsec) / 1000000000.0;
+      fprintf(stderr, "Sorted %ld elements in %f seconds (type: %d)\n", N, ellapsed, type);
     }
 }/* saSsort */
 

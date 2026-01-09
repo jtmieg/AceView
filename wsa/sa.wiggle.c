@@ -251,7 +251,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
   char strand = ( nw & 0x1) ? 'r' : 'f' ;
   long int ii, iMax = 0 ;
   long int cumul = 0, cumulGeneB = 0, cumulGeneC = 0 ;
-  long int exonic = 0, intronic = 0, intergenic = 0 ;
+  long int exonic = 0, intronic = 0, intergenic = 0, cds = 0, utr = 0 ;
   unsigned int pos0 ;
   Array geneExons = 0 ;
   Array geneBoxes = 0 ;
@@ -331,7 +331,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	{
 	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
 	  const char *runNam = dictMax (pp->runDict) == 1 ? "runX" : dictName (pp->runDict, run) ;
-	  char *fNam = hprintf (h, "/%s.%s.%s.BF", runNam, chromNam, typeNam) ;
+	  char *fNam = hprintf (h, "/wiggles/%s.%s.%s.BF", runNam, chromNam, typeNam) ;
 	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, 1 || pp->gzo, h) ;
 	  aceOutDate (ao, "##", "wiggle") ;
 	  aceOutf (ao, "track type=wiggle_0\n") ;
@@ -418,6 +418,8 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
     }
   array (pp->wiggleCumuls, nw, long int) = cumul ;
   array (pp->exonics, nw, long int) = exonic ;
+  array (pp->cdss, nw, long int) = cds ;
+  array (pp->utrs, nw, long int) = utr ;
   array (pp->intronics, nw, long int) = intronic ;
   array (pp->intergenics, nw, long int) = intergenic ;
   return ;
@@ -562,6 +564,8 @@ static void wiggleExportWiggleStats (PP *pp)
       int chrom = (nw % (2 * chromMax)) ;
       char strand = ( nw & 0x1) ? 'r' : 'f' ;
       long int cumul = array (pp->wiggleCumuls, nw, long int) ;
+      long int cds = array (pp->cdss, nw, long int) ;
+      long int utr = array (pp->utrs, nw, long int) ;
       long int exonic = array (pp->exonics, nw, long int) ;
       long int intronic = array (pp->intronics, nw, long int) ;
       long int intergenic = array (pp->intergenics, nw, long int) ;
@@ -573,21 +577,25 @@ static void wiggleExportWiggleStats (PP *pp)
 
 	  RunSTAT *rc = arrayp (pp->runStats, run, RunSTAT) ;
 	  rc->wiggleCumul += cumul ;
+	  rc->cds += cds ;
+	  rc->utr += utr ;
 	  rc->exonic += exonic ;
 	  rc->intronic += intronic ;
 	  rc->intergenic += intergenic ;
 	  nnn += cumul ;
-	  aceOutf (ao, "%s.%c\t%s\tiiii\t%ld\t%ld\t%ld\t%ld\n"
+	  aceOutf (ao, "%s.%c\t%s\tiiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n"
 		   , chromNam, strand
 		   , runNam
 		   , cumul / n720 
-		   , exonic / n720 , intronic / n720 , intergenic / n720 
+		   , cds/n720, utr/n720, exonic / n720 , intronic / n720 , intergenic / n720 
 		   ) ;	       
 	}
     }
 
   /* export the cumul per run and globally */
   pp->wiggleCumul = 0 ;
+  pp->cds = 0 ;
+  pp->utr = 0 ;
   pp->exonic = 0 ;
   pp->intronic = 0 ;
   pp->intergenic = 0 ;
@@ -596,21 +604,27 @@ static void wiggleExportWiggleStats (PP *pp)
       RunSTAT *rc = arrayp (pp->runStats, run, RunSTAT) ;
 
       rc->wiggleCumul /= n720 ;
+      rc->utr /= n720 ;
+      rc->cds /= n720 ;
       rc->exonic /= n720 ;
       rc->intronic /= n720 ;
       rc->intergenic /= n720 ;
       
       pp->wiggleCumul += rc->wiggleCumul ;
+      pp->cds += rc->cds ;
+      pp->utr += rc->utr ;
       pp->exonic += rc->exonic ;
       pp->intronic += rc->intronic ;
       pp->intergenic += rc->intergenic ;
 
       const char *runNam = dictName (pp->runDict, run) ;
       
-      aceOutf (ao, "%s\t%s\tiiii\t%ld\t%ld\t%ld\t%ld\n"
+      aceOutf (ao, "%s\t%s\tiiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n"
 	       , "Any"
 	       , runNam
 	       , rc->wiggleCumul
+	       , rc->cds
+	       , rc->utr
 	       , rc->exonic
 	       , rc->intronic
 	       , rc->intergenic
@@ -632,6 +646,8 @@ void saWiggleExport (PP *pp, int nAgents)
   char tBuf[25] ;
 
   pp->wiggleCumuls = arrayHandleCreate (wMax, long int, h) ;
+  pp->cdss = arrayHandleCreate (wMax, long int, h) ;
+  pp->utrs = arrayHandleCreate (wMax, long int, h) ;
   pp->exonics = arrayHandleCreate (wMax, long int, h) ;
   pp->intronics = arrayHandleCreate (wMax, long int, h) ;
   pp->intergenics = arrayHandleCreate (wMax, long int, h) ;

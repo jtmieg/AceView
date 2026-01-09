@@ -310,12 +310,28 @@ static void alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 
   if (x1 > 1)
     {
+      int nT = 0 ;
       int dx = x1 - 1 ;
+      int Dx = dx ;
       char buf[dx + 1] ;
-      if (dx > 30) dx = 30 ;
+      if (dx > 30) { dx = 30 ; Dx = 0 ; }
       memcpy (buf, arrp (dna, x1 - 1 - dx, char), dx) ; buf[dx] = 0 ;
       for (int i = 0 ; i < dx ; i++)
-	buf[i] = dnaDecodeChar[(int)buf[i]] ;
+	{
+	  if (Dx && buf[i] == T_ && i < 8)
+	    nT++ ;
+	  buf[i] = dnaDecodeChar[(int)complementBase[(int)buf[i]]] ;
+	}
+      if (nT >= 7)
+	{
+	  POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
+	  zp->chrom = up->chrom ^ 0x1 ;
+	  zp->a1 = up->a1 - (up->chrom & 0x1 ? -1 : 1) ;
+	  zp->run = bb->run ;
+	  zp->n = 1 ;
+	  bufferToUpper (buf) ;
+	  bb->runStat.polyASupport++ ;
+	}
       dictAdd (bb->dict, buf, &up->leftOverhang) ;
     }
   return ;
@@ -330,12 +346,28 @@ static void alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna
 
   if (x2 < ln)
     {
+      int nA = 0 ;
       int dx = ln - x2 ;
+      int Dx = dx ;
       char buf[dx + 1] ;
-      if (dx > 30) dx = 30 ;
+      if (dx > 30) { dx = 30 ; Dx = 0 ; }
       memcpy (buf, arrp (dna, x2, char), dx) ; buf[dx] = 0 ;
       for (int i = 0 ; i < dx ; i++)
-	buf[i] = dnaDecodeChar[(int)buf[i]] ;
+	{
+	  if (Dx && buf[i] == A_ && i < 8)
+	    nA++ ;
+	  buf[i] = dnaDecodeChar[(int)buf[i]] ;
+	}
+      if (nA >= 7)
+	{ /* found one polyA */
+	  POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
+	  zp->chrom = up->chrom ;
+	  zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
+	  zp->n = 1 ;
+	  zp->run = bb->run ;
+	  bufferToUpper (buf) ;
+	  bb->runStat.polyASupport++ ;
+	}
       dictAdd (bb->dict, buf, &up->rightOverhang) ;
     }
   return ;
@@ -1641,7 +1673,8 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	  else
 	    bb->runStat.GR[tc]++ ;
 	  
-	  bb->runStat.nAlignedPerTargetClass[tc]++ ;
+	  bb->runStat.nReadsAlignedPerTargetClass[tc]++ ;
+	  bb->runStat.nBasesAlignedPerTargetClass[tc]+=ap->chainX2 - ap->chainX1 + 1 ;
 	}
     }
   /* increase the block stats */
@@ -1664,11 +1697,12 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  ap = vp ;
 		  tc0 = ap->targetClass ;
 		  bb->nAli++ ;
-		  bb->runStat.nAlignedPerTargetClass[0]++ ;
+		  bb->runStat.nReadsAlignedPerTargetClass[0]++ ;
+		  bb->runStat.nBasesAlignedPerTargetClass[0]+=ap->chainX2 - ap->chainX1 + 1 ;
 		  bb->runStat.nMultiAligned[0]++ ;
 		  bb->runStat.nErr += ap->chainErr ;
 		  nChains = 1 ;
-		  
+		  bb->runStat.nAlignments++ ;
 		  if (ap->chainErr == 0 && ap->chainAli == ap->readLength)
 		    bb->runStat.nPerfectReads++ ;
 		}
@@ -1854,8 +1888,48 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
 	  zp1->n = 1 ;
 	}
+
+
+      /* register the overHangs */
+#ifdef JUNK   /* done in formatRightOverhangs */
+      /* register the polyA */
+      ap = arrp (aa, 0, ALIGN) ;
+      /*   bitSet (bb->isAligned, ap->read) ; */
+      for (ii = 0 ; ii < iMax ; ii++, ap++)
+	if (read == ap->read)
+	  {
+	    dna = ap->read & 0x1 ? dna2 : dna1 ;
+	    for (jj = ii + 1, bp = ap + 1 ; jj < iMax && bp->read == read && bp->chain == ap->chain && bp->x1 == ap->x2 + 1 ; jj++, bp++)
+	      ;
+	                   /* ii ap is first exon of this chain in x orientation */
+	    bp-- ; jj-- ;  /* jj bp is last  exon of this chain in x orientation */
+	    
+	    if (bp->a1 < bp->a2) /* plus orientation, look for terminal polyA */
+	      {
+		int nA = 0 ;
+		char *cr = dna && bp->x2 < arrayMax (dna) ? arrp (dna, bp->x2, char) : 0 ;
+		for (int i = bp->x2 ; i < arrayMax (dna) && i < 8 ; i++, cr++)
+		  if (*cr == A_) nA++ ;
+		if (nA >= 7)
+		  {
+		    bb->runStat.polyA++ ;
+		  }
+	      }
+	    else /* look for intitial polyT */
+	      {
+		int nT = 0 ;
+		char *cr = dna && ap->x1 > 1 ? arrp (dna, ap->x1 - 2, char) : 0 ;
+		for (int i = ap->x1 - 2 ; i >= 0 && i >= ap->x1 - 9 ; i--, cr--)
+		  if (*cr == T_) nT++ ;
+		if (nT >= 7)
+		  {
+		    bb->runStat.polyT++ ;
+		  }
+	      }
+	    ap = bp ; ii = jj ; /* skip to next chain */
+	  }
+#endif
     }
-  
   return ;
   
 } /* alignDoRegisterOnePair */
@@ -2239,6 +2313,7 @@ void saAlignDo (const PP *pp, BB *bb)
   int n = NTARGETREPEATBITS ;
   int mask = (1 << n) - 1 ;
   
+  bb->confirmedPolyAs = arrayHandleCreate (64000, POLYA, bb->h) ;
   bb->confirmedIntrons = arrayHandleCreate (64000, INTRON, bb->h) ;
   bb->doubleIntrons = arrayHandleCreate (64000, DOUBLEINTRON, bb->h) ;
   /*
