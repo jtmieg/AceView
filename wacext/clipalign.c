@@ -1267,7 +1267,7 @@ static void slInit (CLIPALIGN *pp)
 	  while (*++cp)
 	    {
 	      *cq = dnaEncodeChar [(int)*cp] ;
-	      *cr-- = complementBase [(int)*cq++] ;
+	      *cr-- = complementBase(*cq++) ;
 	    }
 	}      
       pp->sl = sl ; pp->slR = slR ;
@@ -1970,8 +1970,8 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 
 		    sprintf(cp,"%d:%c%c>oo"
 			    , isUp ? xLong - 1 : xLong - 1
-			    , isUp ? dnaDecodeChar[(int)complementBase[(int)cc1a]] : dnaDecodeChar[(int)cc1a]
-			    , isUp ? dnaDecodeChar[(int)complementBase[(int)cc2a]] : dnaDecodeChar[(int)cc2a]
+			    , isUp ? dnaDecodeChar[(int)complementBase(cc1a)] : dnaDecodeChar[(int)cc1a]
+			    , isUp ? dnaDecodeChar[(int)complementBase(cc2a)] : dnaDecodeChar[(int)cc2a]
 			    ) ;
 		    
 		    sprintf(cr,"%d:%c%c>oo"
@@ -2065,8 +2065,8 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			  }
 		      }
 
-		    cc2o = isUp ? complementBase[(int)cc1o] : cc1o ; 
-		    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
+		    cc2o = isUp ? complementBase(cc1o) : cc1o ; 
+		    cc2a = isUp ? complementBase(cc1a) : cc1a ; 
 		    cc1oc = dnaDecodeChar[(int)cc1o] ;
 		    cc2oc = dnaDecodeChar[(int)cc2o] ;
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
@@ -2109,7 +2109,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			if (cc1a == R_ || cc1a == M_) cc1a = A_ ;
 			if (cc1a == Y_ || cc1a == K_) cc1a = T_ ;
 		      }
-		    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
+		    cc2a = isUp ? complementBase(cc1a) : cc1a ; 
 		    
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc2ac = dnaDecodeChar[(int)cc2a] ;
@@ -2166,8 +2166,8 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			if (cc1b == Y_ || cc1b == K_) cc1b = T_ ;
 		      }
 
-		    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
-		    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
+		    cc2a = isUp ? complementBase(cc1b) : cc1a ; 
+		    cc2b = isUp ? complementBase(cc1a) : cc1b ; 
 
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc1bc = dnaDecodeChar[(int)cc1b] ;
@@ -2223,9 +2223,9 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 			if (cc1c == Y_ || cc1c == K_) cc1c = T_ ;
 		      }
 
-		    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
-		    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
-		    cc2c = isUp ? complementBase[(int)cc1a] : cc1c ; 
+		    cc2a = isUp ? complementBase(cc1c) : cc1a ; 
+		    cc2b = isUp ? complementBase(cc1b) : cc1b ; 
+		    cc2c = isUp ? complementBase(cc1a) : cc1c ; 
 
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc1bc = dnaDecodeChar[(int)cc1b] ;
@@ -2273,7 +2273,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 		      }
 
 
-		    cc2a = isUp ? complementBase[(int)cc1a] : cc1a ; 
+		    cc2a = isUp ? complementBase(cc1a) : cc1a ; 
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc2ac = dnaDecodeChar[(int)cc2a] ;
 
@@ -2323,8 +2323,8 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 		      }
 
 
-		    cc2a = isUp ? complementBase[(int)cc1b] : cc1a ; 
-		    cc2b = isUp ? complementBase[(int)cc1a] : cc1b ; 
+		    cc2a = isUp ? complementBase(cc1b) : cc1a ; 
+		    cc2b = isUp ? complementBase(cc1a) : cc1b ; 
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc1bc = dnaDecodeChar[(int)cc1b] ;
 		    cc2ac = dnaDecodeChar[(int)cc2a] ;
@@ -2380,9 +2380,9 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 		      }
 
 
-		    cc2a = isUp ? complementBase[(int)cc1c] : cc1a ; 
-		    cc2b = isUp ? complementBase[(int)cc1b] : cc1b ; 
-		    cc2c = isUp ? complementBase[(int)cc1a] : cc1c ; 
+		    cc2a = isUp ? complementBase(cc1c) : cc1a ; 
+		    cc2b = isUp ? complementBase(cc1b) : cc1b ; 
+		    cc2c = isUp ? complementBase(cc1a) : cc1c ; 
 		    cc1ac = dnaDecodeChar[(int)cc1a] ;
 		    cc1bc = dnaDecodeChar[(int)cc1b] ;
 		    cc1cc = dnaDecodeChar[(int)cc1c] ;
@@ -2444,7 +2444,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 	  for (cp = buf, i = x1 - 2, ccp = probeDna + i ;
 	       i > 0 ; i--, cp++, ccp--)
 	    {
-	      *cp = complementBase[(int)*ccp] ;
+	      *cp = complementBase(*ccp) ;
 	    }
 	  *cp = 0 ;
 	}
@@ -2600,7 +2600,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 		  if (! pp->solid && n1 > 1)
 		    {
 		      for (i = 0 ; i < n1 - 1 ; i++)
-			if (probeDna[ x1 - 2 - i] != complementBase[(int) ccp[ - i-1]])
+			if (probeDna[ x1 - 2 - i] != complementBase( ccp[ - i-1]))
 			  n1 = 0 ;
 		    }
 		  /* check that the prefix 
@@ -3098,7 +3098,7 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 	      i = x2 + 1 ;
 	      ccp = probeDna + i - 1 ;
 	      while (j < OVLN && *ccp)
-		{ *cp++ = dnaDecodeChar[(int)complementBase[(int)*ccp++]] ; j++ ; }
+		{ *cp++ = dnaDecodeChar[(int)complementBase(*ccp++)] ; j++ ; }
 	    }
 	}
 
@@ -3113,13 +3113,13 @@ BOOL clipAlignVerifyProbeHit (CLIPALIGN *pp, MM *mm, Array dna, Array dnaR, int 
 	    { *cp++ = '-' ; i-- ; j++ ; }
 	  ccp = arrp (pp->dna0, i - 1, unsigned char) ;
 	  while (j < OVLN && i >= 1)
-	    { *cp++ = dnaDecodeChar[(int)complementBase[(int)*ccp--]] ; i-- ; j++ ; }
+	    { *cp++ = dnaDecodeChar[(int)complementBase(*ccp--)] ; i-- ; j++ ; }
 	  if (j < OVLN && ! pp->solid) /* continue on the tag itself */
 	    {
 	      i = x1 - 1 ;
 	      ccp = probeDna + i - 1 ;
 	      while (j < OVLN && i >= 1)
-		{ *cp++ = dnaDecodeChar[(int)complementBase[(int)*ccp--]] ; i-- ; j++ ; }
+		{ *cp++ = dnaDecodeChar[(int)complementBase(*ccp--)] ; i-- ; j++ ; }
 	    }
 	}
 
@@ -4801,8 +4801,8 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		    k1 = k2 = 0 ; 
 		    ccp = exon1 + i  ; ccq = ccp+1 ;
 		    f2[3] = *ccp ; f2[4] = *ccq ; 
-		    c2 = f1[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
-		    c1 = f1[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
+		    c2 = f1[1] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccp])] ;
+		    c1 = f1[0] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccq])] ;
 
 		    if (c1 == 'g' && c2 == 't')        /*    d1 == "gt"  */
 		      { k1 += 5 ; k2 += 3 ; } 
@@ -4816,8 +4816,8 @@ static int clipAlignConstructIntrons (CLIPALIGN *pp, int isDown, BOOL singleTarg
 		    ccp = exon2 + dx1 - i - 2 ; ccq = ccp+1 ;
 		    c1 = f1[3] = *ccp ; c2 = f1[4] = *ccq ;
 
-		      f2[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
-		      f2[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
+		    f2[1] = complementLetter(*ccp) ;
+		    f2[0] = complementLetter(*ccq) ;
 
 		    if (c1 == 'a' && c2 == 'g')        /*    d1 == "ag"  */
 		      { k1 += 4 ; k2 += 3 ; } 

@@ -799,7 +799,7 @@ static void dnaAddPiece(Array mydna, Array dnasup, Array erreur, int sens,
   else /* dnasup dans le sens reverse */
     { cq = arrp(dnasup, taille - 1, char) + 1 ;
       while(i--)
-	base[i] = complementBase[(int)bu[i]] ;
+	base[i] = complementBase(bu[i]) ;
     }
   fin = debut + taille + 2 * nerrmax ;
   if (fin >= arrayMax(mydna))

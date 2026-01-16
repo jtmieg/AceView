@@ -1010,20 +1010,31 @@ static int gxSetSponge (GX *gx)
 	  ac_free (h1) ;
 	  h1 = ac_new_handle () ;
 
-	  char *fNam = hprintf(h1, "tmp/WIGGLERUN/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
+	  char *fNam1 = hprintf(h1, "tmp/WIGGLERUN/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
+	  char *fNam2 = hprintf(h1, "tmp/SA/%s/wiggles/%s.%s.u.%c.BF.gz"
+				, dictName(gx->runDict, run)
+				, dictName(gx->runDict, run)
+				, gx->chrom
+				, pass/2 == 0 ? 'f' : 'r') ;
 	  WIGGLE sx ;
 	  memset (&sx, 0, sizeof (WIGGLE)) ;
 	  sx.h = h1 ;
-	  if (filCheckName(fNam, 0, "r"))
-	    sx.ai = aceInCreate (fNam, 0, h1) ;
+	  if (filCheckName(fNam2, 0, "r"))
+	    sx.ai = aceInCreate (fNam2, 0, h1) ;
+	  else if (filCheckName(fNam1, 0, "r"))
+	    sx.ai = aceInCreate (fNam1, 0, h1) ;
 	  if (! sx.ai)
 	    {
-	      fNam = hprintf(h1, "tmp/WIGGLEGROUP/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
+	      char *fNam = hprintf(h1, "tmp/WIGGLEGROUP/%s/%s/R.chrom.u.%c.BF.gz", dictName(gx->runDict, run), gx->chrom, pass/2 == 0 ? 'f' : 'r') ;
 	      if (filCheckName(fNam, 0, "r"))
 		sx.ai = aceInCreate (fNam, 0, h1) ;
 	    }
 	  if (! sx.ai)
-	    continue ;
+	    {
+	      fprintf (stderr, "Could not find wiggle %s\n", fNam2) ;
+	      continue ;
+	    }
+	  fprintf (stderr, "Found wiggle %s\n", aceInFileName(sx.ai)) ;
 	  keySet (runs, run) = 1 ;
 	  sx.noRemap = TRUE ;
 	  sx.out_step = 10 ;

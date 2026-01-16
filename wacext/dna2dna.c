@@ -1070,8 +1070,8 @@ static void complementSequence (SX *sx)
   for (cp = dna, cq = dna + n - 1 ; cp <= cq ; cp++, cq--)
     {
       cc = *cp ;
-      *cp = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*cq]]] ;
-      *cq = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+      *cp = complementLetter (*cq) ;
+      *cq = complementLetter (cc) ;
     }
 } /* complementSequence */
 
@@ -1265,7 +1265,7 @@ static void sxPolymerAccumulate (SX *sx)
       /* we have localized n repeats of base cc */
       cc = dnaEncodeChar[cc] ;
       if (!  isForward)
-	cc = complementBase[cc] ;
+	cc = complementBase(cc) ;
       switch (cc)
 	{
 	case A_: cc = 0 ; break ;
@@ -1739,10 +1739,10 @@ static void makeTestWithSNP (SX *sx, BOOL isExact, BOOL forward)
 	  int i ;
 	  char *cp, *cq ;
 	  for (i = 0, cp = buf2 + LN2 - 1, cq = buf ; i < LN2 ; i++, cp--, cq++) 
-	    *cp =  dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*cq]]] ;
+	    *cp =  complementLetter (*cq) ;
 	  buf2[LN2] = 0 ;
 	  for (i = 0, cp = eBuf2 + LN2 - 1, cq = eBuf ; i < LN2 ; i++, cp--, cq++) 
-	    *cp = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*cq]]] ; 
+	    *cp = complementLetter (*cq) ;
 	  eBuf2[LN2] = 0 ;
 	  for (i = 0, cp = qBuf2 + LN2 - 1, cq = qBuf ; cq < cp ; i++, cp--, cq++) 
 	    *cp = *cq ; 
@@ -1778,7 +1778,7 @@ static void makeTestWithSNP (SX *sx, BOOL isExact, BOOL forward)
 		  *cp = cc ;
 
 		  for (i = 0, cp = bufP, cq = eBuf2 + LN2 - 1 ; i < LN ; cp++, cq--, i++)
-		    *cp = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*cq]]] ;
+		    *cp = complementLetter (*cq) ;
 		  *cp = 0 ;
 		  aceOutf (ao, "%s\n",  bufP) ;
 		}
@@ -1810,7 +1810,7 @@ static void makeTestWithSNP (SX *sx, BOOL isExact, BOOL forward)
 		   *cp = cc ;
 		   
 		   for (i = 0, cp = bufP, cq = buf2 + LN2 - 1 ; i < LN ; cp++, cq--, i++)
-		     *cp = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*cq]]] ;
+		     *cp = complementLetter (*cq) ;
 		   *cp = 0 ;
 		   aceOutf (ao, "%s\n",  bufP) ;
 		 }
@@ -2182,10 +2182,14 @@ static int parseShadowFile (SX *sx, int type)
 	continue ;
       a1 = a2 = x1 = x2 = 0 ;
       dictAdd (sx->shadowDict, ccp, &mrna) ;
-      aceInStep (ai, '\t') ; aceInInt (ai, &x1) ;
+      aceInStep (ai, '\t') ;
+      if (! aceInInt (ai, &x1))
+	continue ;
       if (type == 1) { aceInStep (ai, '\t') ; aceInInt (ai, &x2) ;  }
       else { x2 = x1 + 1 ; }
       aceInStep (ai, '\t') ; ccp = aceInWordCut (ai, "\t", &cutter) ;
+      if (! ccp)
+	continue ;
       dictAdd (sx->selectDict, ccp, &target) ;
       if (strchr (ccp, ' '))
 	sx->selectDictHasSpace = TRUE ;

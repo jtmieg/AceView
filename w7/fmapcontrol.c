@@ -4692,7 +4692,7 @@ static void fMapSelectBox (LOOK look, int box, double x, double y)
 	    {
 	       *cq++ =
 		doComplementSurPlace ?
-		dnaDecodeChar[ (int)complementBase [ (int)*cq1++]] :
+		 dnaDecodeChar[ (int)complementBase(*cq1++)] :
 		dnaDecodeChar[ (int)*cq1++] ;
 	      if ( ! ((imax - i) % 50) ) 
 		*cq++ = '\n' ;
@@ -5128,8 +5128,8 @@ void fMapRC (LOOK look)
       cj = arrp (look->dna, top, char) ;
       while (ci <= cj)
 	{ ctmp = *ci ;
-	*ci++ = complementBase[ (int)*cj] ;
-	*cj-- = complementBase[ (int)ctmp] ;
+	  *ci++ = complementBase(*cj) ;
+	  *cj-- = complementBase(ctmp) ;
 	}
     }
 

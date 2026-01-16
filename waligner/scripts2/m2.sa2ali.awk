@@ -141,9 +141,26 @@ BEGIN {
     {
 	A = $4 ; T = $5 ; G = $6 ; C = $7 ; N= $8 ; t = A + T + G + C + N ;
 	if (t > 0) printf ("ATGC_kb %d %d %d %d %d    %d %d %d %d %d\n", 1000*A/t, 1000*T/t, 1000*G/t, 1000*C/t, 1000*N/t,A/1000, T/1000, G/1000, C/1000, N/1000) ;
-	next ;
     }
-    
+    if (tag == "Length_distribution_1_5_50_95_99_mode_av")
+    {
+	printf ("%s %s %s %s %s %s %s %s \n", tag, $4,$5,$6,$7,$8,$9,$10) ;
+    }
+    if (tag == "Exonic_intronic_intergenic_Bases")
+    {
+	x = int (($8+0)/1000) ;
+	if (x > 0)
+	    printf ("Intergenic %d kb\n", x) ;
+    }
+    if (tag == "Intron_supports")
+    {
+
+    }
+    if (tag == "Supported_introns")
+    {
+	printf ("Candidate_introns any %d\n", $4) ;
+    }
+
 }
 END {
     if (reads + 0 > 0)

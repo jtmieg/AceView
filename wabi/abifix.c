@@ -1158,7 +1158,7 @@ void trackContig (LOOK look, int z1, int z2, BOOL whole)
 	      cp1 = cp + sens * ( jp->dcp - 1) ; cq1 = cq + jp->dcq ;
 	      while (cp1 += sens, i--)
 		{ cc1 = (*cp1 & 0x0F) ;
-		  if (sens == -1) cc1 = complementBase[(int)(cc1)] ;
+		  if (sens == -1) cc1 = complementBase((cc1)) ;
 		  if (cc1 != (*cq1++ & 0x0F))
 		    goto nextjp1 ;
 		}
@@ -1166,7 +1166,7 @@ void trackContig (LOOK look, int z1, int z2, BOOL whole)
 	      cp1 = cp + sens * (jp->dcp - 1) ; cq1 = cq + jp->dcq ;
 	      while (cp1 += sens, i--)
 		{ cc1 = (*cp1 & 0x0F) ;
-		  if (sens == -1) cc1 = complementBase[(int)(cc1)] ;
+		  if (sens == -1) cc1 = complementBase((cc1)) ;
 		  if (cc1 != (*cq1++ & 0x0F))
 		    if (++n >= jp->ok)
 		      goto nextjp1 ;
@@ -1208,7 +1208,7 @@ void trackContig (LOOK look, int z1, int z2, BOOL whole)
 	  rr->jp = 0 ;
 	  cp = rr->cp ;
 	  cc1 = *cp & 0x0f ; if (cc1 == N_) { cc1 = 0 ; nr -= 7000 ; }  /* N_ counts like 1/3 */
-	  if (rr->up) cc1 = complementBase[(int)cc1] ;
+	  if (rr->up) cc1 = complementBase(cc1) ;
 	  nn[(int)cc1] += nr ; /* this favors good quality i hope */
 	  nrtot += nr ;
 	  if (cc1 & ccq)  /* see the N_ */
@@ -1228,7 +1228,7 @@ void trackContig (LOOK look, int z1, int z2, BOOL whole)
 	      cp1 = cp + sens * ( jp->dcp - 1) ; cq1 = cq + jp->dcq ;
 	      while (cp1 += sens, i--)
 		{ cc2 = (*cp1 & 0x0F) ;
-		  if (sens == -1) cc2 = complementBase[(int)(cc2)] ;
+		  if (sens == -1) cc2 = complementBase(cc2) ;
 		    if (cc2 != (*cq1++ & 0x0F))
 		      goto nextjp ;
 		}
@@ -1236,7 +1236,7 @@ void trackContig (LOOK look, int z1, int z2, BOOL whole)
 	      cp1 = cp + sens * (jp->dcp - 1) ; cq1 = cq + jp->dcq ;
 	      while (cp1 += sens, i--)
 		{ cc2 = (*cp1 & 0x0F) ;
-		  if (sens == -1) cc2 = complementBase[(int)(cc2)] ;
+		  if (sens == -1) cc2 = complementBase(cc2) ;
 		  if (cc2 != (*cq1++ & 0x0F))
 		    if (++n > jp->ok)
 		      goto nextjp ;
@@ -2494,7 +2494,7 @@ BOOL baseCallTrackBout (Array dna1, Array dna2, int *x1p, int *x2p, int *sensp)
       cq = arrp (dna2, j, char) ;
       
       while (i++ < max1 && j--)
-	{ c = *cp++ & complementBase [*cq-- & 0x0f] ;
+	{ c = *cp++ & complementBase(*cq-- & 0x0f) ;
 	  if (c == N_) continue ;
 	  else if (c) p++ ;
 	  else 
@@ -2515,7 +2515,7 @@ BOOL baseCallTrackBout (Array dna1, Array dna2, int *x1p, int *x2p, int *sensp)
       cq = arrp (dna2, j, char) ;
       
       while (i++ < max1 && j--)
-	{ c = *cp++ & complementBase [*cq-- & 0x0f] ;
+	{ c = *cp++ & complementBase (*cq-- & 0x0f) ;
 	  if (c == N_) continue ;
 	  else if (c) p++ ;
 	  else 
@@ -3368,7 +3368,7 @@ static int abiFixHasPolyASignal (AAA *ap, Array gDna)
       if (-ap->a2 + MXLN > arrayMax (gDna))
 	return 0 ;
       for (i = 0, cp = arrp (gDna, -ap->a2 + MXLN, unsigned char) ; i < MXLN ; cp--, i++)
-	buf [i] = complementBase[(int)*cp] ;
+	buf [i] = complementBase(*cp) ;
     }
   buf[MXLN] = 0 ;
 

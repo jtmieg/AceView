@@ -353,7 +353,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   const long unsigned int mask32 = 0xffffffff ; /* 4 bytes integer */
   const long unsigned int maskSeedLn = (1L << 2*wLen) - 1 ;
   long int icwx = 0, icwxMax = pp->knownExons ? bigArrayMax (pp->knownExons) : 0 ;
-  EXONINTRON *cwX = pp->knownExons ? bigArrp (pp->knownExons, 0, EXONINTRON) : 0 ;
+  EXONINTRON *cwX = pp->knownExons && bigArrayMax (pp->knownExons) ? bigArrp (pp->knownExons, 0, EXONINTRON) : 0 ;
   const int seedLength = pp->seedLength ;
   int minEntropy = pp->minEntropy ;
   int minLength = pp->minLength ;

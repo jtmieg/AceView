@@ -62,9 +62,12 @@ setenv SV v51.jan4         # same as v50 plus --wiggle and gene expression
 setenv SVlast v51.jan4
 setenv SV v52.jan7         # same as v50 no --wiggle modified run naming
 setenv SVlast v52.jan7
+#setenv SV v53.jan7         # same as v50 no --wiggle modified run naming   bin.LINUX_NATIVE
+#setenv SVlast v53.jan7
 
 if ($SV == $SVlast) then
   \cp bin/sortalign bin/sortalign.$SV
+  if (-e bin.nativeZZZ/sortalign) \cp bin.native/sortalign bin/sortalign.$SV
   touch bin/wsa.$SV.toto
   \rm -rf bin/wsa.$SV*
   mkdir bin/wsa.$SV
@@ -120,7 +123,7 @@ setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_Magi
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
 
-set createIndex=1
+set createIndex=0
 if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2 31_STARlong"
 
 #############################################################################
@@ -159,7 +162,6 @@ if ($createIndex == 1)  setenv runs "iRefSeq iRefSeq38 HG19t1r1  WormSRR548309 "
 echo "### S.tcsh SV=$SV"
 echo "$methods"
 echo "$runs"
-
 
 
 # This adapter is present in the PacBio SRR runs and gives a peak at 32 aligned bases = polyA + first 8 bp of adaptor
@@ -933,7 +935,7 @@ date
       set exportitr="--exportIntronSupport"
 
       if (! -e RESULTS/$mm/$run/s2g.samTools.txt) then
-        samtools stats $sam | awk -f scripts/sam_stats.awk RESULTS/$mm/$run/s2g.samTools.txt
+        samtools stats $sam | gawk -f scripts/sam_stats.awk > RESULTS/$mm/$run/s2g.samTools.txt &
       endif
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"

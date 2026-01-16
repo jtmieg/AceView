@@ -27,7 +27,7 @@ mysize_t stackused (void) ;
 /************* Array package ********/
 
 typedef struct BigArrayStruct
-  { char* base ;    /* char* since need to do pointer arithmetic in bytes */
+  { char* base ;    /* char* since need to do pointer arithmetic in bytes, always aligned on 64bytes boundary */
     unsigned long int dim ;     /* length of alloc'ed space */
     int   size ;            /* length of a cell */
     long int  max ;     /* largest element accessed via array() */
@@ -36,6 +36,7 @@ typedef struct BigArrayStruct
     BOOL lock ; /* a locked array cannot be destroyed or reallocated */
     long int readOnly ; /* original size, cannot be modified */
     void *map ;         /* address to be unmapped */
+    char *trueBase ;    /* true unaligned alloc, can be freed */
     const char *fName ;
     int fd ; /* file descriptor */
   } *BigArray ;

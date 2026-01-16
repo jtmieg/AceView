@@ -3605,8 +3605,8 @@ static int sxNewIntrons (SX *sx)
 			k1 = k2 = 0 ; 
 			ccp = exon1 + i  ; ccq = ccp+1 ;
 			f2[3] = *ccp ; f2[4] = *ccq ;
-			f1[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
-			f1[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
+			f1[1] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccp])] ;
+			f1[0] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccq])] ;
 			if (
 			    (*ccp == 'a' && *ccq == 'c')   /*    d1 == "gt"  */
 			    )
@@ -3623,8 +3623,8 @@ static int sxNewIntrons (SX *sx)
 			
 			ccp = exon2 + dx1 - i - 2 ; ccq = ccp+1 ;
 			f1[3] = *ccp ; f1[4] = *ccq ;
-			f2[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccp]]] ;
-			f2[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)*ccq]]] ;
+			f2[1] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccp])] ;
+			f2[0] = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)*ccq])] ;
 			if (*ccp == 'a' && *ccq == 'g')   /*    d1 == "ag"  */
 			  k1+=2 ;
 			else if (!stranded)

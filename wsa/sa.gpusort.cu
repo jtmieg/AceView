@@ -75,25 +75,25 @@ void saGPUSort(T* cp, long int number_of_records)
         h_vec.push_back(cp[i]);
     }
     auto end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Copy data to a vector: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    // std::cerr << "Copy data to a vector: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     // copy data to a GPU
     thrust::device_vector<T> d_vec = h_vec;
     end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Copy data to GPU: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    // std::cerr << "Copy data to GPU: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     // sort
     thrust::sort(d_vec.begin(), d_vec.end(), CMP());
     end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Sort: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    // std::cerr << "Sort: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     // copy sorted data back to the host
     thrust::copy(d_vec.begin(), d_vec.end(), h_vec.begin());
     end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Copy sorted data to back: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    // std::cerr << "Copy sorted data to back: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 
     start = std::chrono::high_resolution_clock::now();
     // copy sorted data back to data structure used by sortalign
@@ -101,7 +101,7 @@ void saGPUSort(T* cp, long int number_of_records)
         cp[i] = h_vec[i];
     }
     end = std::chrono::high_resolution_clock::now();
-    std::cerr << "Copy sorted data to back to a sortalign struct: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+    // std::cerr << "Copy sorted data to back to a sortalign struct: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
 }
 
 // the sort function callable from C

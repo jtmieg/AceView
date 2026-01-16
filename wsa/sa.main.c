@@ -915,15 +915,14 @@ static void export (const void *vp)
       if (bb.aligns && bigArrayMax (bb.aligns))
 	{
 	  bigArraySort (bb.aligns, saAlignOrder) ;
-	  if (! pp->sam)
-	    exportDo (pp, &bb) ;
-	  else
+	  if (pp->sam)
 	    {
 	      ACEOUT ao = aos[bb.run] ;
 	      if (! ao)
 		ao = aos[bb.run] = saSamCreateFile (pp, &bb, h) ;
 	      saSamExport (ao, pp, &bb) ;
 	    }
+	  exportDo (pp, &bb) ;
 	  t2 = clock () ;
 	  saCpuStatRegister ("8.Export_ali", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
 	  n = channelCount (pp->plChan) ;
@@ -1123,7 +1122,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "// -T <target_configuration_fileName>\n"
 	       "//    A tab delimited file describing a more complex protocol\n"
 	       "//    Each line describes a target class, in a class specific format:\n"
-	       "//      Column 1: one of G, M, R, C, A, I, T, B, V : target class.\n"
+	       "//      Column 1: one of G, M, C, R, E, A, I, B, V : target class.\n"
 	       "//         G: Genome fasta files, RNA will be aligned on the genome jumping introns\n"
 	       "//         M: Mitochondial fasta file\n"
 	       "//         C: Chloroplast fasta file\n"
@@ -1628,7 +1627,7 @@ int main (int argc, const char *argv[])
   p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
 
-  if (1) { p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
+  if (0) { p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
@@ -1816,6 +1815,9 @@ int main (int argc, const char *argv[])
   p.bonus['C'] = 4 ; /* chloroplast */
   p.bonus['R'] = 8 ; /* rRNA */
   p.bonus['E'] = 8 ; /* ERCC spikeIns */
+  p.bonus['A'] = 8 ; /* Adaptors */
+  p.bonus['B'] = -12 ; /* Bacteria */
+  p.bonus['V'] = -12 ; /* Virus */
 
 
   /******************** launch the multiprocessing ***************************************/

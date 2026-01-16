@@ -4690,7 +4690,7 @@ static BOOL bqlExpandDNA (BQL *bql, NODE *node, NODE *coma)
 		  dna = var->dnaD ;
 		  for (i = 0, cp = arrp (dnaPiece, 0, unsigned char), cq = arrp (dna, dna1 - 1, unsigned char) ;
 		       i < d2 - d1 + 1 ; cp++, cq--, i++)
-		    *cp = dnaDecodeChar [(int)complementBase[(int)*cq]] ;
+		    *cp = dnaDecodeChar [(int)complementBase(*cq)] ;
 		}
 	      var->dnaStack = stackCreate (0) ;
 	      pushText (var->dnaStack, arrp (dnaPiece, 0, char)) ;

@@ -179,7 +179,7 @@ static int confirmedPolyAsCountSites (const PP *pp, int run)
 
 /*************************************************************************************/
 
-static void samStatsExports (const PP *pp, Array runStats)
+static void s2gSamStatsExports (const PP *pp, Array runStats)
 {
   AC_HANDLE h = ac_new_handle () ;
   const char *METHOD = pp->method ? pp->method : "01_SortAlign" ;
@@ -241,7 +241,7 @@ static void samStatsExports (const PP *pp, Array runStats)
 
   ac_free (h) ;
   return ;
-} /* saSamStatsExport */
+} /* s2gSamStatsExport */
 
 /**************************************************************/
 /**************************************************************/
@@ -309,6 +309,15 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
     {
       for (int i = 0 ; i < arrayMax (vp->lengthDistribution) ; i++)
 	array (up->lengthDistribution, i , long int) += array (vp->lengthDistribution, i , long int) ;
+    }
+  if (!up->insertLengthDistribution)
+    {
+      up->insertLengthDistribution = arrayHandleCopy (vp->insertLengthDistribution, pp->h) ;
+    }
+  else
+    {
+      for (int i = 0 ; i < arrayMax (vp->insertLengthDistribution) ; i++)
+	array (up->insertLengthDistribution, i , long int) += array (vp->insertLengthDistribution, i , long int) ;
     }
   return ;
 } /* saRunStatsCumulate */
@@ -502,7 +511,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 	      for (i = 0 ; i < iMax ; i++, xp++)
 		{
 		  j += *xp ;
-		  LD[7] += i * (*xp) ;
+		  LD[6] += i * (*xp) ;
 		  if (*xp > LD[5])
 		    { LD[5] = *xp ; mode = i ; }
 		}
@@ -520,6 +529,40 @@ void saRunStatExport (const PP *pp, Array runStats)
 		  if (! LD[4] && *xp >= 99*j/100) LD[4] = i ;
 		}
 	      aceOutf (ao, "%s\tLength_distribution_1_5_50_95_99_mode_av\tiiiiiii", runNam) ;
+	      for (i=0;i<7;i++)
+		aceOutf (ao, "\t%ld", LD[i]) ;
+	      aceOutf (ao, "\n") ;
+	    }
+
+	  if (up->insertLengthDistribution && arrayMax (up->insertLengthDistribution))
+	    {
+	      long int j = 0 ;
+	      int mode = 0 ;
+	      int i, iMax = arrayMax (up->insertLengthDistribution) ;
+	      long int *xp = arrp (up->insertLengthDistribution, 0, long int) ;
+
+	      memset (LD, 0, sizeof(LD)) ;
+	      for (i = 0 ; i < iMax ; i++, xp++)
+		{
+		  j += *xp ;
+		  LD[6] += i * (*xp) ;
+		  if (*xp > LD[5])
+		    { LD[5] = *xp ; mode = i ; }
+		}
+	      LD[5] = mode ;
+	      LD[6] /= j ; /* average */
+	      /* construct the cumulated distrib */
+	      xp = arrp (up->lengthDistribution, 0, long int) ;
+	      for (i = 1 ; i < iMax ; i++, xp++)
+		{
+		  xp[0] += xp[-1] ;
+		  if (! LD[0] && *xp >= j/100) LD[0] = i ;
+		  if (! LD[1] && *xp >= 5*j/100) LD[1] = i ;
+		  if (! LD[2] && *xp >= 50*j/100) LD[2] = i ;
+		  if (! LD[3] && *xp >= 95*j/100) LD[3] = i ;
+		  if (! LD[4] && *xp >= 99*j/100) LD[4] = i ;
+		}
+	      aceOutf (ao, "%s\tInsertLength_distribution_1_5_50_95_99_mode_av\tiiiiiii", runNam) ;
 	      for (i=0;i<7;i++)
 		aceOutf (ao, "\t%ld", LD[i]) ;
 	      aceOutf (ao, "\n") ;
@@ -574,7 +617,7 @@ void saRunStatExport (const PP *pp, Array runStats)
     }
   ac_free (h) ;
 
-  samStatsExports (pp, runStats) ;
+  s2gSamStatsExports (pp, runStats) ;
 
   return ;    
 } /* saRunStatExport */

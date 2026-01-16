@@ -74,8 +74,8 @@ Array saTargetParseConfig (PP *pp)
 		       , line
 		       , pp->tConfigFileName
 		       ) ;
-	  if (! strchr ("GMCREAIBV", cc))
-	    messcrash ("\n\nThe target class must be specified as a single character [GMCREAIBV], not %c,  at line %d of -T target config file %s\n Please try sortalign --help\n"
+	  if (! strchr ("GMCREATIBV", cc))
+	    messcrash ("\n\nThe target class must be specified as a single character [GMCREATIBV], not %c,  at line %d of -T target config file %s\n Please try sortalign --help\n"
 		       , cc
 		       , line
 		       , pp->tConfigFileName
@@ -126,18 +126,6 @@ Array saTargetParseConfig (PP *pp)
 		*cq++ = 0 ;
 	      if (! strcasecmp (cp, "fasta")) tc->format = FASTA ;
 	      if (! strcasecmp (cp, "raw")) tc->format = RAW ;
-	      if (!strncasecmp (cp, "bonus=", 6))
-		{
-		  int bonus = atoi(cp+6) ;
-		  if (bonus > -50 && bonus < 50)
-		    tc->bonus = bonus ;
-		  else
-		    messcrash ("\nBonus %d too large at line %d of file -T %s\n try sortalign --help\n"
-			       , bonus
-			       , line
-			       , pp->tConfigFileName
-			       ) ;
-		}
 	      cp = cq ;
 	    }
 	} 
@@ -585,7 +573,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
       bbG->cwsN[k] = bigArrayMapRead (fNam, CW, READONLY, bbG->h) ; /* memory map the seed index */
       nn += bigArrayMax (bbG->cwsN[k]) ;
     }
-  
+
   fNam = pp->tFileBinaryDnaName ;
   bbG->globalDna = bigArrayMapRead (fNam, unsigned char, READONLY, bbG->h) ; /* memory map the DNA */
 
@@ -596,10 +584,12 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
   bbG->dnaCoords = bigArrayMapRead (fNam, unsigned int, READONLY, bbG->h) ; /* memory map the shared coordinates of the individual chromosomes in the globalDna/globalDnaR arrays */
 
   fNam = pp->tFileBinaryIdsName ;
-   seqIds = bigArrayMapRead (fNam, char, FALSE, h) ; /* memory map the words */
+  seqIds = bigArrayMapRead (fNam, char, FALSE, h) ; /* memory map the words */
 
   /* seqids is a char array, we need to transfer it to a dict */
   iMax = bigArrayMax (bbG->dnaCoords)/2 - 2 ;
+
+
   char *cp = bigArrp (seqIds, 0, char) ;
   int tStep = bigArr (seqIds, 255, char) ;
   /* check for common divisors */
@@ -643,6 +633,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
    * their memory is shared with the globalDna array
    * the coordinate of the seeds refer to the globalDna array
    */
+  
   bbG->length = 0 ;
   bbG->nSeqs = iMax - 1 ;
   bbG->dnas = arrayHandleCreate (iMax + 1, Array, bbG->h) ;
@@ -671,6 +662,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
       dnaR->base = bigArrp(bbG->globalDnaR, x1, char) ; 
       dnaR->max = dnaR->dim = x2 - x1 ;
     }
+  
 #ifdef JUNK
   if (pp->wiggle)
     {
@@ -690,7 +682,6 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
   /*  Get thread CPU time at end */
   t2 = clock () ;
   saCpuStatRegister ("1.memMapTargets" , pp->agent, bbG->cpuStats, t1, t2, nn) ; 
- 
   ac_free (h) ;
   return nn ; 
 } /* genomeParseBinary */

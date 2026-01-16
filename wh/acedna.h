@@ -142,9 +142,17 @@ extern char dnaDecodeChar[] ;	/* this is the mapping used to decode a single bas
 extern char dnaDecodeExtendedChar[] ;	/* this is the mapping used to decode a single base */
 extern char dnaEncodeChar[] ;	/* this is the mapping used to encode a single base */
 extern char rnaDecodeChar[] ;
-extern char complementBase[] ;	/* complement of single base A_ T_ G_ ... */
+
+#if defined(ARRAY_CHECK)
+char checkComplementBase (char cc) ;
+#define complementBase(_x) checkComplementBase(_x)
+#else
+extern char hardComplementBase[] ;	/* complement of single base A_ T_ G_ ... */
+#define complementBase(_x) hardComplementBase[(int)(_x)]
+#endif
+
                                 /* complement a decoded letter   a t g c */
-#define complementLetter(_x) ace_upper(dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)(_x)]]]) 
+#define complementLetter(_x) ace_upper(dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)(_x)])]) 
 #define complementRnaLetter(_x) ace_upper(rnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)(_x)]]]) 
 extern char *aaName[] ;		/* maps single letter code to full name */
 char *dnaDecodeString(char *cp) ; /* Decodes up to 255 char in a static buffer */

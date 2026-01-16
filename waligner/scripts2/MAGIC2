@@ -495,7 +495,7 @@ cat <<EOF > _x.awk
   if (Strategy == "ChIP") C = 1 ;    
 
   qc = index(z, "QC") ;
-  a  = index(z, "ALIGN") ;
+  a2  = index(z, "ALIGN") ;
   w  = index(z, "WIGGLE") ;
   gx = index(z, "GENE") ;
   mx = index(z, "MRNA") ;
@@ -512,6 +512,7 @@ cat <<EOF > _x.awk
   ph = " " ;
   if (a0 > 0) ph = ph " a0 " ;
   if (a0 > 0 && a > 0)  ph = ph " wait " ;
+  if (a2 > 0 && a > 0)  ph = ph " wait sortali " ;
   if (small + a > 0) ph = ph " a0C wait a0D wait "
   if (small > 0) ph = ph " mi1 mi2 mi3 mi4 mi5 mi6 "
   if (a > 0) ph = ph " a0W wait a1W wait a123 a0P a0Ba mi3 wait a0Br a0Bua c1 c2 wsig1 vir1 mi4 wait c3 c4 c5 wsig2 vir2 wait a0Bur c6 wsig3  " ;
@@ -1038,6 +1039,18 @@ if ($n < 1) then
   echo "       Please edit the MetaDB database and/or setenv MAGIC2 to a correct value"
   exit 1
 endif
+
+if ($phase == sortali) goto phaseSortali
+if ($phase == sortali2) goto phaseSortali2
+
+if ($phase == I1) goto phaseI1
+if ($phase == I2) goto phaseI2
+if ($phase == I3) goto phaseI3
+if ($phase == I4) goto phaseI4
+if ($phase == I5) goto phaseI5
+if ($phase == I6) goto phaseI6
+if ($phase == I7) goto phaseI7
+
 if ($phase == a0C) goto phasea0C
 if ($phase == a0D) goto phasea0D
 if ($phase == a0P) goto phasea0P
@@ -1125,14 +1138,6 @@ if ($phase == SLpA1) goto phaseSLpA1
 if ($phase == SLpA2) goto phaseSLpA2
 if ($phase == SLpA3) goto phaseSLpA3
 
-if ($phase == I1) goto phaseI1
-if ($phase == I2) goto phaseI2
-if ($phase == I3) goto phaseI3
-if ($phase == I4) goto phaseI4
-if ($phase == I5) goto phaseI5
-if ($phase == I6) goto phaseI6
-if ($phase == I7) goto phaseI7
-
 if ($phase == d0) goto phased0
 if ($phase == d1) goto phased1
 if ($phase == d2) goto phased2
@@ -1153,6 +1158,7 @@ if ($phase == f3) goto phasef3
 if ($phase == f4) goto phasef4
 if ($phase == f5) goto phasef5
 if ($phase == f6) goto phasef6
+if ($phase == f7) goto phasef7
 
 if ($phase == k0) goto phasek0
 if ($phase == k1) goto phasek1
@@ -1515,10 +1521,11 @@ echo "tgf2:    report the gene fusions per group and per project"
 echo "f0:    Ventilate the genome alignments"
 echo "f1:    Construct the yellow quasi EST from the ali->INTRONS"
 echo "f2:    Collate the double introns"
-echo "f3:    Parse the yellow/green pseudo est in the XH database"
-echo "f4:    Assemble the yellow/green pseudo est in the XH databases"
-echo "f5:    Export the new transcriptome mrna.dna and structure"
-echo "f6:    Collate the new mrna structure and fasta sequence"
+echo "f3:    Collate the exons"
+echo "f4:    Parse the data"
+echo "f5:    Assemble the yellow/green pseudo est in the XH databases"
+echo "f6:    Export the new transcriptome mrna.dna and structure"
+echo "f7:    Collate the new mrna structure and fasta sequence"
 
 
 echo "k0:    initialize Kantor"
@@ -2351,6 +2358,467 @@ goto phaseLoop
 
 ###################################################################################
 ###################################################################################
+## phase sortali :
+
+phaseSortali: 
+echo -n "phaseaSortali : new parallelized aligner "
+date
+
+set sortalign=bin/sortalign
+
+if (! -d TARGET/IDX/IDX.$species) then
+  mkdir TARGET/IDX
+  if (-e TARGET/Targets/$species.genome.fasta.gz) echo "G\tTARGET/Targets/$species.genome.fasta.gz" > TARGET/IDX/tConfig
+  if (-e TARGET/Targets/$species.mito.fasta.gz) echo "M\tTARGET/Targets/$species.mito.fasta.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/Targets/$species.rrna.fasta.gz) echo "R\tTARGET/Targets/$species.rrna.fasta.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/Targets/$species.SpikeIn.fasta.gz) echo "E\tTARGET/Targets/$species.SpikeIn.fasta.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/Targets/$species.magic.fasta.gzZZZ) echo "T\tTARGET/Targets/$species.magic.fasta.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/Targets/$species.DNASpikeIn.fasta.gz) echo "E\tTARGET/Targets/$species.DNASpikeIn.fasta.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/GTF/$species.magic.gtf.gz) echo "I\tTARGET/GTF/$species.magic.gtf.gz" >> TARGET/IDX/tConfig
+
+  $sortalign --createIndex TARGET/IDX/IDX.$species -T TARGET/IDX/tConfig
+endif
+
+if (! -d tmp/SA) mkdir tmp/SA
+
+foreach run (`cat MetaDB/$MAGIC/RunList`)
+  if (-e tmp/SA/$run/runStats.tsf) continue
+  if (-d tmp/SA/$run) \rm -rf tmp/SA/$run
+  mkdir tmp/SA/$run
+  if (-e Fastc/$run/LaneList && ! -e tmp/SA/$run/iConfig) then
+    cat Fastc/$run/LaneList  | gawk '{printf("Fastc/%s.fastc.gz\t%s\n", $1, run);}' run=$run > tmp/SA/$run/iConfig
+  endif
+  if (-e tmp/SA/$run/iConfig) then
+    date > tmp/SA/$run/salign.out
+    date > tmp/SA/$run/salign.err
+    echo "$sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggle --wiggleEnds" >> tmp/SA/$run/salign.out
+    scripts/submit  tmp/SA/$run/salign "/usr/bin/time -f 'TIMING\tE\t%E\tU\t%U\tS\t%S\tM\t%M\tP\t%P' $sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggle --wiggleEnds" 64G
+  endif
+end
+
+goto phaseLoop
+
+###################################################################################
+###################################################################################
+## phase sa2ali2
+
+phaseSortali2:
+echo -n "phaseSa2ali2 : report the sortalign  results in MetaDB-> Ali2"
+date
+
+set sortalign=bin/sortalign
+
+echo > tmp/SA/$MAGIC.ali2.ace
+foreach run (`cat MetaDB/$MAGIC/RunList`)
+  if (-e tmp/SA/$run/runStats.tsf) then
+    scripts2/m2.sa2ali.tcsh $run 
+  endif
+  if (-e tmp/SA/$run/sa2ali.ace) cat tmp/SA/$run/sa2ali.ace >>  tmp/SA/$MAGIC.ali2.ace
+end
+
+
+echo "pparse  tmp/SA/$MAGIC.ali2.ace" | bin/tacembly MetaDB --no_prompt
+
+goto phaseLoop
+
+
+#######################################################################################
+#######################################################################################
+#######################################################################################
+##  I1 : create the IntronDB databases
+
+phaseI1:
+
+ echo -n "Phase I1 create the IntronDB databases, using the gff files "
+ date
+
+if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
+foreach chrom ($chromSetAll)
+  if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
+  if (-e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
+  scripts2/submit tmp/INTRON_DB/$chrom/I1.parse "scripts2/m2.I1.intronDB.tcsh $chrom 'chromDB parseGenome parseTargetIntrons setFeet'"
+end
+
+goto phaseLoop
+
+#######################################################################################
+##  I2 : parse the de_uno intron supports, report the counts
+
+phaseI2:
+
+ echo -n "Phase I2 parse the de_uno introns"
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+foreach chrom ($chromSetAll)
+  if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
+  set ok=0
+  foreach run (`cat MetaDB/$MAGIC/RunsList`) 
+    if (-e tmp/INTRON_DB/$chrom/I2.$run.deUno.gz) continue
+    set ok=1
+  end
+  foreach run (`cat MetaDB/$MAGIC/RunsList`) 
+    if (1 || -e tmp/INTRON_DB/$chrom/I2.$run.deMrna.gz) continue
+    set ok=1
+  end
+  if ($ok == 0) then
+    touch tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
+  else
+    scripts2/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts2/m2.I1.intronDB.tcsh $chrom 'deUno setFeet setDA'"
+  endif
+end
+
+goto phaseLoop
+
+
+#######################################################################################
+##  I3: INTRON_DB donor/acceptor de_uno supports
+
+phaseI3:
+
+ echo -n "Phase I3 donor/acceptor de_uno supports "
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+foreach chrom ($chromSetAll)
+  if (-e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) continue
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts2/m2.I1.intronDB.tcsh $chrom setDAsupport"
+end
+
+goto phaseLoop
+
+#######################################################################################
+##  I4: parse the intron flat sponge counts
+
+phaseI4:
+
+ echo -n "Phase I4 parse the introns flat sponge counts: "
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+foreach chrom ($chromSetAll)
+  if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
+  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done) continue
+  set ok1=0
+  set ok2=0
+  foreach run (`cat MetaDB/$MAGIC/RunsList`)
+    set dd=tmp/SA/$run/wiggles
+    set f1=$dd/
+  end
+  if ($ok2 >= 10) continue
+  if ($ok1 > 0 && $ok2 > 0) continue
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts2/m2.I1.intronDB.tcsh $chrom setSponge" 32G
+end
+
+goto phaseLoop
+
+usage 1
+
+#######################################################################################
+##  I5: INTRON_DB group counts
+
+phaseI5:
+
+ echo -n "Phase I5 intron group counts"
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+foreach chrom ($chromSetAll)
+  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I4.setSponge.done) continue
+  if (-e  tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done2) continue
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups "scripts2/m2.I1.intronDB.tcsh $chrom 'setGroups'"
+end
+
+goto phaseLoop
+
+#####################################################################################
+##  I6: INTRON_DB intron counts
+
+phaseI6:
+
+ echo -n "Phase I6 intron counts"
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+
+foreach chrom ($chromSetAll)
+  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done) continue
+  bin/tacembly tmp/INTRON_DB/$chrom <<EOF
+    read-models
+    query find intron av && ! aceview
+    edit aceview
+    save
+EOF
+  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts "scripts2/m2.I1.intronDB.tcsh $chrom intronCounts"
+end
+scripts2/submit wait
+set ff=tmp/INTRON_DB/$MAGIC.I6.intronCounts
+cat tmp/INTRON_DB/*/$MAGIC.I6.intron_counts.tsf | bin/tsf -I tsf -O tsf -o $ff
+cat $ff.tsf | sort -V | gawk -F '\t' '/^#/{next;}{run=$1;if(run != old) printf("\nAli %s\n", run); old=run;av=$2;nAv=$4;if (nAv==0)nAv=1;nIn=$5;nOut=$6;newG=$7;sp=100.0*nIn/(nIn+nOut);sn=100.0*nIn/nAv;sIn=$8;sOut=$9;printf("Candidate_introns %s %d In_%s %d Not_in_%s %d New_gt_ag %d Sensitivity %.2f Specificity %.2f Known_support %d New_support %d New_minS 3\n", av,nAv,av,nIn,av,nOut,newG,sn,sp,sIn,sOut);}END{printf("\n");}' > $ff.ace
+echo "pparse $ff.ace " | bin/tacembly MetaDB -noprompt
+# touch tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts.done
+
+goto phaseLoop
+
+###################################################################################
+## I7: Alternative intron report
+
+phaseI7:
+  echo -n "phase I7: Alternative introns"
+  date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+foreach chrom ( $chromSetAll )
+   if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
+   if (-e tmp/INTRON_DB/$chrom/$MAGIC.I7.altIntrons.done) continue
+   scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I7.de_uno "scripts2/m2.I1.intronDB.tcsh $chrom altIntrons"
+end
+qusage 1
+
+if (! -d RESULTS/Introns_exons_polyA) mkdir RESULTS/Introns_exons_polyA
+set toto=RESULTS/Introns_exons_polyA/$MAGIC.AlternativeIntrons.support.tsf 
+echo -n "### $toto :" > $toto
+date >> $toto
+echo "## Number of introns suppported by at least  1, 2, 4, 8.... reads (log scale) in selected groups" >> $toto
+cat tmp/INTRON_DB/*/AlternativeIntrons.*.support.tsf | tsf -g ALL --sumAll | gawk '/^#/{next;}{print}' >> $toto
+
+cat tmp/INTRON_DB/*/AlternativeIntrons.*.altPairs.txt | gawk '/^#/{n++;if(n>2)next;}{print}' > RESULTS/Introns_exons_polyA/AlternativeBranchingRatios.txt
+cat tmp/INTRON_DB/*/AlternativeIntrons.*.altIntrons.txt | gawk '/^#/{n++;if(n>2)next;}{print}' > RESULTS/Introns_exons_polyA/DifferentiallyExpressedIntrons.txt
+
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f1: Construct the yellow XI.introns
+
+phasef1:
+ date
+echo $chromSetAll
+echo $MAGIC
+
+
+if ($Strategy != RNA_seq) goto phaseLoop
+
+if (! -e tmp/f1.strategy.ace) then
+  cat << EOF >  tmp/f1.strategy.ace
+Clone R
+Main_Clone
+Name_by_section
+useLeucine
+MinIntronSize 40
+MaxGapSize 100 kb
+MultipleORF  // look for several orfs 
+MarkDoubleFuzzy
+
+EOF
+endif
+
+echo -n "Phase f1: Construct the doubleintrons, start:"
+ date
+
+# Create a directory for each chromosome
+if (! -e TARGET/CHROMS) then
+  echo "f1: missing TARGET/CHROMS dir"
+  goto phaseLoop
+endif
+
+if (! -d tmp/X.$MAGIC) mkdir tmp/X.$MAGIC
+
+# Import and reformat the introns supported in the sequencing project
+foreach chrom ($chromSetAll)
+  echo $chrom  tmp/X.$MAGIC/$chrom
+  if ( -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  if (! -d tmp/X.$MAGIC/$chrom) mkdir tmp/X.$MAGIC/$chrom
+  if (! -e TARGET/CHROMS/$species.chrom_$chrom.fasta.gz) then
+    echo "Missing file  TARGET/CHROMS/$species.chrom_$chrom.fasta.gz"
+    continue 
+  endif
+  echo "scripts2/submit tmp/X.$MAGIC/$chrom/m2.f1"
+  scripts2/submit "tmp/X.$MAGIC/$chrom/f1" "scripts2/m2.f1.introns.tcsh $MAGIC $chrom" 
+end
+
+
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f2: Construct the double_introns
+
+phasef2:   
+echo -n "Phase f2: collate the double introns : "
+date
+if (! -d tmp/X.$MAGIC) goto phaseLoop
+if ($Strategy != RNA_seq) goto phaseLoop
+
+# Import and reformat the double_introns supported in the sequencing project
+foreach chrom ($chromSetAll)
+  if (! -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  if (-e tmp/X.$MAGIC/$chrom/f2.done) continue
+  scripts2/submit "tmp/X.$MAGIC/$chrom/f2" "scripts2/m2.f2.double_introns.tcsh $MAGIC $chrom" 
+end
+
+
+
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f3: Parse the yellow/green pseudo est in the XH databases
+
+phasef3:
+ echo -n "Parse the yellow/green pseudo est  in the XH databases"
+ date
+
+if (0 && $Strategy != RNA_seq) goto phaseLoop
+ 
+if (! -d tmp/TABIX) mkdir tmp/TABIX
+
+
+foreach chrom ($chromSetAll)
+  if (! -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f2.done) continue
+  if (-e tmp/X.$MAGIC/$chrom/f3.done) continue
+  scripts2/submit tmp/X.$MAGIC/$chrom/f3 "scripts2/m2.f3.exons.tcsh $chrom "
+end
+
+date
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f4: parse the data
+
+phasef4:   
+echo -n "Phase f4: parse the data : "
+date
+
+# Import the data
+foreach chrom ($chromSetAll)
+  if (! -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f2.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f3.done) continue
+  if (-e tmp/X.$MAGIC/$chrom/f4.done) continue
+  scripts2/submit "tmp/X.$MAGIC/$chrom/f4" "scripts2/m2.f4.parse.tcsh $chrom" 
+end
+
+date
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f4: Assemble the yellow/green pseudo est in the XH databases
+
+phasef5:
+ echo -n "Assemble the yellow/green pseudo est in the XH databases"
+ date
+
+foreach chrom ($chromSetAll)
+  if (! -e tmp/X.$MAGIC/$chrom/f1.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f2.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f3.done) continue
+  if (! -e tmp/X.$MAGIC/$chrom/f4.done) continue
+  if (-e tmp/X.$MAGIC/$chrom/f5.done) continue
+  scripts2/submit tmp/X.$MAGIC/$chrom/f5 "scripts2/m2.f5.assemble.tcsh $chrom" 
+end
+
+date
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f5: Reexport the new transcriptome
+
+phasef5:
+ echo -n "Export the new transcriptome "
+ date
+
+if ($Strategy != RNA_seq) goto phaseLoop
+
+foreach chrom ($chromSetAll)
+  if (0 || (-e tmp/X.$MAGIC/$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/$chrom/f5.dump.done)) then
+    scripts2/submit tmp/X.$MAGIC/$chrom/f5.export  "scripts2/f5.export_new_genes.tcsh  $chrom"
+  endif
+end
+
+echo done 
+
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f6: Collate the new mrna structure and fasta sequence
+
+phasef6:
+ echo -n "Export the new transcriptome "
+ date
+# YH is in SEQC_2013/tmp/OK
+
+set XYH=X.$MAGIC
+
+if ($Strategy != RNA_seq) goto phaseLoop
+
+if (! -d TARGET/GTF) mkdir TARGET/GTF
+zcat tmp/$XYH/*/f5.genes.gtf.gz         | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.gtf.gz
+ # zcat tmp/$XYH/*/f5.mrnas.fasta.gz    | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
+zcat tmp/$XYH/*/f5.goodMrnas.fasta.gz   | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
+zcat tmp/$XYH/*/f5.good_product.ace.gz  | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.good_product.ace.gz
+
+  if (-e tmp/METADATA/gtf.magic.done) \rm  tmp/METADATA/*magic*
+  if (-e TARGET/Targets/$species.magic.mask.txt) \rm TARGET/Targets/$species.magic.mask.txt
+
+goto phaseLoop
+
+###########################################################################
+###########################################################################
+## phase f7: Export import the Kantor
+
+phasek0:
+ #  initialize
+phasek1:
+ # shop for Kantor data in KantorDB
+phasek2:
+ # kantorize the products given the Kantor data
+phasek9:
+ # launch kantor search in external DB
+setenv ici `pwd`
+if ($Strategy != RNA_seq) goto phaseLoop
+
+echo -n "Export/Import the Kantor phase $phase : start "
+ date
+
+if (! -d ~/MEGA3) then
+  echo "Kantorizing the proteins only works inside ncbi"
+else
+
+  if (! -d Kantor) mkdir Kantor
+  foreach chrom ($chromSetAll)
+    set fDB=tmp/X.$MAGIC/$chrom
+    if (! -e $fDB/f4.assemble.done) continue
+    if (! -d Kantor/$chrom || ! -d Kantor/$chrom/done) \rm $fDB/k?.done
+    #if ( -d Kantor/$chrom/done && ! -e $fDB/k0.done) touch $fDB/k0.done
+    if (! -d Kantor/$chrom) mkdir Kantor/$chrom
+    if (! -d Kantor/$chrom/tmp) mkdir Kantor/$chrom/tmp
+echo "##### rm k1.done chr=$chrom"
+    if ($phase == k2 && ! -e $fDB/k1.done) continue
+    if ($phase == k9 && ! -e $fDB/k2.done) continue
+    echo "####------------#####"
+    ls -ls  $fDB/$phase.done
+    if (! -e $fDB/$phase.done && ! -e $fDB/$phase.start) then
+      echo "submit scripts2/Kantor.tcsh $phase $chrom $fDB"
+      scripts2/submit $fDB/$phase  "scripts2/Kantor.tcsh $phase $chrom $fDB"
+      touch $fDB/$phase.start
+    endif
+  end
+
+endif
+
+goto phaseLoop
+
+###########################################################################
+
+################################################################################### 
+###################################################################################
+
 ## phase a0C: counts
 
 phasea0C: 
@@ -10659,181 +11127,6 @@ goto phaseLoop
 
 #######################################################################################
 #######################################################################################
-#######################################################################################
-##  I1 : create the IntronDB databases
-
-phaseI1:
-
- echo -n "Phase I1 create the IntronDB databases, using the gff files "
- date
-
-if (! -d tmp/INTRON_DB) mkdir tmp/INTRON_DB
-foreach chrom ($chromSetAll)
-  if (! -d tmp/INTRON_DB/$chrom) mkdir tmp/INTRON_DB/$chrom
-  if (-e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-  scripts2/submit tmp/INTRON_DB/$chrom/I1.parse "scripts2/I1.intronDB.tcsh $chrom 'chromDB parseGenome parseTargetIntrons setFeet'"
-end
-
-goto phaseLoop
-
-#######################################################################################
-##  I2 : parse the de_uno intron supports, report the counts
-
-phaseI2:
-
- echo -n "Phase I2 parse the de_uno introns"
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-foreach chrom ($chromSetAll)
-  if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-  set ok=0
-  foreach run (`cat MetaDB/$MAGIC/RunsList`) 
-    if (-e tmp/INTRON_DB/$chrom/I2.$run.deUno.gz) continue
-    set ok=1
-  end
-  foreach run (`cat MetaDB/$MAGIC/RunsList`) 
-    if (-e tmp/INTRON_DB/$chrom/I2.$run.deMrna.gz) continue
-    set ok=1
-  end
-  if ($ok == 0) then
-    touch tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done
-  else
-    scripts2/submit tmp/INTRON_DB/$chrom/I2.de_uno "scripts2/I1.intronDB.tcsh $chrom 'deUno deMrna setFeet setDA'"
-  endif
-end
-
-goto phaseLoop
-
-
-#######################################################################################
-##  I3: INTRON_DB donor/acceptor de_uno supports
-
-phaseI3:
-
- echo -n "Phase I3 donor/acceptor de_uno supports "
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-foreach chrom ($chromSetAll)
-  if (-e tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport.done) continue
-  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I3.setDAsupport "scripts2/I1.intronDB.tcsh $chrom setDAsupport"
-end
-
-goto phaseLoop
-
-#######################################################################################
-##  I4: parse the intron flat sponge counts
-
-phaseI4:
-
- echo -n "Phase I4 parse the introns flat sponge counts: "
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-foreach chrom ($chromSetAll)
-  if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I2.setDA.done) continue
-  set ok1=0
-  set ok2=0
-  foreach run (`cat MetaDB/$MAGIC/RunsList`) 
-    if (! -d tmp/WIGGLERUN/$run) set ok=2
-    if (! -e tmp/INTRON_DB/$chrom/I2.$run.deUno.gz) set ok2=1
-    if (! -e tmp/INTRON_DB/$chrom/I2.$run.deMrna.gz) set ok2=1
-    if ( -e tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge.err) set ok2=1
-    if (! -e tmp/WIGGLERUN/$run/$chrom/R.chrom.u.f.BF.gz && ! -e tmp/WIGGLEGROUP/$run/$chrom/R.chrom.u.f.BF.gz) set ok1=1
-    if (! -e tmp/WIGGLERUN/$run/$chrom/R.chrom.u.r.BF.gz && ! -e tmp/WIGGLEGROUP/$run/$chrom/R.chrom.u.r.BF.gz) set ok1=1
-    if ($ok1 >= 1) then
-      ls -ls tmp/INTRON_DB/$chrom/I2.$run.deUno.gz tmp/INTRON_DB/$chrom/I2.$run.deMrna.gz tmp/WIGGLERUN/$run/$chrom/R.chrom.u.f.BF.gz tmp/WIGGLERUN/$run/$chrom/R.chrom.u.r.BF.gz
-    endif
-    if ($ok2 >= 10) break
-  end
-  if ($ok2 >= 10) continue
-  if ($ok1 > 0 && $ok2 > 0) continue
-  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I4.sponge  "scripts2/I1.intronDB.tcsh $chrom setSponge" 32G
-end
-
-goto phaseLoop
-
-usage 1
-
-#######################################################################################
-##  I5: INTRON_DB group counts
-
-phaseI5:
-
- echo -n "Phase I5 intron group counts"
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-foreach chrom ($chromSetAll)
-  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I4.setSponge.done) continue
-  if (-e  tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done) continue
-  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups "scripts2/I1.intronDB.tcsh $chrom 'setGroups'"
-end
-
-goto phaseLoop
-
-#####################################################################################
-##  I6: INTRON_DB intron counts
-
-phaseI6:
-
- echo -n "Phase I6 intron counts"
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-
-foreach chrom ($chromSetAll)
-  if (! -e tmp/INTRON_DB/$chrom/$MAGIC.I5.setGroups.done) continue
-  bin/tacembly tmp/INTRON_DB/$chrom <<EOF
-    read-models
-    query find intron av && ! aceview
-    edit aceview
-    save
-EOF
-  scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts "scripts2/I1.intronDB.tcsh $chrom intronCounts"
-end
-scripts2/submit wait
-set ff=tmp/INTRON_DB/$MAGIC.I6.intronCounts
-cat tmp/INTRON_DB/*/$MAGIC.I6.intron_counts.tsf | bin/tsf -I tsf -O tsf -o $ff
-cat $ff.tsf | sort -V | gawk -F '\t' '/^#/{next;}{run=$1;if(run != old) printf("\nAli %s\n", run); old=run;av=$2;nAv=$4;if (nAv==0)nAv=1;nIn=$5;nOut=$6;newG=$7;sp=100.0*nIn/(nIn+nOut);sn=100.0*nIn/nAv;sIn=$8;sOut=$9;printf("Candidate_introns %s %d In_%s %d Not_in_%s %d New_gt_ag %d Sensitivity %.2f Specificity %.2f Known_support %d New_support %d New_minS 3\n", av,nAv,av,nIn,av,nOut,newG,sn,sp,sIn,sOut);}END{printf("\n");}' > $ff.ace
-echo "pparse $ff.ace " | bin/tacembly MetaDB -noprompt
-# touch tmp/INTRON_DB/$chrom/$MAGIC.I6.intronCounts.done
-
-goto phaseLoop
-
-###################################################################################
-## Gene Expression index
-## I7: Alternative intron report
-
-phaseI7:
-  echo -n "phase I7: Alternative introns"
-  date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-foreach chrom ( $chromSetAll )
-   if (! -e tmp/INTRON_DB/$chrom/I1.parseTargetIntrons.done) continue
-   if (-e tmp/INTRON_DB/$chrom/$MAGIC.I7.altIntrons.done) continue
-   scripts2/submit tmp/INTRON_DB/$chrom/$MAGIC.I7.de_uno "scripts2/I1.intronDB.tcsh $chrom altIntrons"
-end
-qusage 1
-
-if (! -d RESULTS/Introns_exons_polyA) mkdir RESULTS/Introns_exons_polyA
-set toto=RESULTS/Introns_exons_polyA/$MAGIC.AlternativeIntrons.support.tsf 
-echo -n "### $toto :" > $toto
-date >> $toto
-echo "## Number of introns suppported by at least  1, 2, 4, 8.... reads (log scale) in selected groups" >> $toto
-cat tmp/INTRON_DB/*/AlternativeIntrons.*.support.tsf | tsf -g ALL --sumAll | gawk '/^#/{next;}{print}' >> $toto
-
-cat tmp/INTRON_DB/*/AlternativeIntrons.*.altPairs.txt | gawk '/^#/{n++;if(n>2)next;}{print}' > RESULTS/Introns_exons_polyA/AlternativeBranchingRatios.txt
-cat tmp/INTRON_DB/*/AlternativeIntrons.*.altIntrons.txt | gawk '/^#/{n++;if(n>2)next;}{print}' > RESULTS/Introns_exons_polyA/DifferentiallyExpressedIntrons.txt
-
-goto phaseLoop
-
-
-#######################################################################################
-#######################################################################################
 ##  d0 collect aceview annotations 
 
 phased0:
@@ -12105,260 +12398,6 @@ end
 
 goto phaseLoop
 
-###########################################################################
-## phase f1: Construct the yellow quasi EST from the ali->INTRONS
-
-phasef1:
- date
-echo $chromSetAll
-echo $MAGIC
-
-
-if (0 && $Strategy != RNA_seq) goto phaseLoop
-
-if (! -e tmp/f1.strategy.ace) then
-  cat << EOF >  tmp/f1.strategy.ace
-Clone R
-Main_Clone
-Name_by_section
-useLeucine
-MinIntronSize 40
-MaxGapSize 100 kb
-MultipleORF  // look for several orfs 
-MarkDoubleFuzzy
-
-EOF
-endif
-
-echo -n "Phase f1: Construct the doubleintrons, start:"
- date
-
-pushd TARGET/CHROMS
-  if (! -e NC2chrom.done) then
-    touch NC2chrom.done
-    if (-e toto) \rm toto
-    foreach ff (`ls $species.chrom_*.fasta.gz`)
-      echo -n "$ff\t" >> toto
-      zcat $ff | head -1 >> toto
-    end
-    cat toto | gawk -F '\t' '/NC_/{f=$1;split($2,aa," ");nc=substr(aa[1],2);printf("ln -s %s  %s.chrom_%s.fasta.gz\n", f,sp,nc);}' sp=$species  > _m
-    source _m
-    \rm _m
-    cat toto | gawk -F '\t' '/NC_/{f=$1;split ($1,cc,"chrom_");split(cc[2],ccc,".fasta");chr=ccc[1];split($2,aa," ");nc=substr(aa[1],2);printf("%s\t%s\n", nc,chr);}' > nc2chr.txt
-  endif
-popd
-
-
-if (! -e TARGET/CHROMS) then
-  echo "f1: missing TARGET/CHROMS dir"
-  goto phaseLoop
-endif
-
-if (! -d tmp/X.$MAGIC) mkdir tmp/X.$MAGIC
-
-# consolidate the de uno introns in a single pass
-foreach chrom ($chromSetAll)
-  echo $chrom  tmp/X.$MAGIC/$chrom
-  if (! -d tmp/X.$MAGIC/$chrom) mkdir tmp/X.$MAGIC/$chrom
-end
-
-
-foreach chrom ($chromSetAll)
-  if (! -e TARGET/CHROMS/$species.chrom_$chrom.fasta.gz) then
-    echo "Missing file  TARGET/CHROMS/$species.chrom_$chrom.fasta.gz"
-    continue 
-  endif
-
-  if (! -e tmp/X.$MAGIC/$chrom/f1.done) then
-    echo "scripts2/submit tmp/X.$MAGIC/$chrom/f1"
-    scripts2/submit "tmp/X.$MAGIC/$chrom/f1" "scripts2/f1.double_collect_by_section.tcsh $MAGIC $chrom" 
-  endif
-
-end
-
-
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f2: Construct the new exons introns using the wiggles
-
-phasef2:   
-echo -n "Phase f2: collate the double introns : "
-date
-if (! -d tmp/X.$MAGIC) goto phaseLoop
-if ($Strategy != RNA_seq) goto phaseLoop
-
-# DOUBLE INTRONS TYPE 1, extracted from RNA_tragt alignments
-if (! -e  tmp/X.$MAGIC/f2.allDoubleIntrons.txt.gz) then
-  if (-e tmp/X.$MAGIC/f2.allDoubleIntrons.txt1) \rm tmp/X.$MAGIC/f2.allDoubleIntrons.txt1
-    foreach run (`cat MetaDB/$MAGIC/RunsList`)
-      # echo $run
-      set ff=tmp/INTRONRUNS/$run/$run.u.doubleIntronSupport.ace.gz
-      if (-e $ff) then
-        gunzip -c $ff  | gawk '{gsub(/\"/,"",$0);}/^DoubleIntron/{g=$2;}/^Run_U/{gg[g]+= $6;uu[g]+= $6;next;}/^Run_nU/{gg[g]+= $6;nu[g]+= $6;next;}END{for(g in gg)if(gg[g]>0)printf("%s\t%d\t%d\t%d\n",g,gg[g],uu[g],nu[g]);}' >>   tmp/X.$MAGIC/f2.allDoubleIntrons.txt1
-      else
-        echo "missing file $ff"
-      endif
-    end 
-  cat tmp/X.$MAGIC/f2.allDoubleIntrons.txt1 | gawk '{n2[$1]+=$2;n3[$1]+=$3;n4[$1]+=$4;}END{for(k in n2)printf("%s\t%d\t%d\t%d\n",k,n2[k],n3[k],n4[k]);}' | sort -V | gzip > tmp/X.$MAGIC/f2.allDoubleIntrons.txt.gz
-  \rm   tmp/X.$MAGIC/f2.allDoubleIntrons.txt1 
-endif
-
-# DOUBLE INTRONS TYPE 2  de_uno found on the fly by the aligner
-set ff=tmp/X.$MAGIC/f2.allDoubleIntronsGenomic.txt
-if (! -e $ff.gz) then
-  # collate the data 
-  if (-e $ff) \rm $ff
-  foreach run (`cat MetaDB/$MAGIC/RunList`)
-    set n=`ls tmp/PHITS_genome/$run/*.doubleintrons.gz | & grep doubleintrons | gawk '{n++}END{print n+0}'`
-    if ($n == 0) continue
-    gunzip -c tmp/PHITS_genome/$run/*.doubleintrons.gz | grep DOUBLEINTRON | sort -k 2,2 -k 4,4n -k 5,5n -k 6,6n -k 7,7n | gawk -F '\t' '/^DOUBLEINTRON/{c=$2;a=$2 "\t" $4 "\t" $5 "\t" $6 "\t" $7; nn[a]+=$9;x=$3;if ($5<$6 && (x1[a]+0==0 || x1[a]>x)){if(x<$4-30)x=$4-30;x1[a]=x;}if ($5>$6 && (x1[a]+0==0 || x1[a]<x)){if(x>$1+30)x=$1+30;x1[a]=x;}x=$8;if ($5<$6 && (x2[a]+0==0 || x2[a]<x)){if(x>$7+30)x=$7+30;x2[a]=x;}if ($5>$6 && (x2[a]+0==0 || x2[a]<x)){if(x<$7-30)x=$7-30;x2[a]=x;}}END{for(a in nn){split(a,aa,"\t");printf("DOUBLEINTRON\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n",aa[1],x1[a],aa[2],aa[3],aa[4],aa[5],x2[a],nn[a]);}}' |  sort -k 2,2 -k 4,4n -k 5,5n -k 6,6n -k 7,7n  >> $ff
-  end
-  cat $ff | sort -V | gzip >  $ff.gz
-  \rm $ff
-endif
-
-foreach chrom ($chromSetAll)
-  ls -ls tmp/X.$MAGIC/$chrom/f1.done
-  if (-e tmp/X.$MAGIC/$chrom/f2.done) continue
-  scripts2/submit "tmp/X.$MAGIC/$chrom/f2" "scripts2/f2.doubleIntrons.tcsh $chrom"
-end
-
-
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f3: Parse the yellow/green pseudo est in the XH databases
-
-phasef3:
- echo -n "Parse the yellow/green pseudo est  in the XH databases"
- date
-
-if (0 && $Strategy != RNA_seq) goto phaseLoop
-
-foreach chrom ($chromSetAll)
-  if (! -d tmp/X.$MAGIC/$chrom)  mkdir tmp/X.$MAGIC/$chrom
-  if (-e tmp/X.$MAGIC/$chrom/f1.done && -e tmp/X.$MAGIC/$chrom/f2.done && ! -e tmp/X.$MAGIC/$chrom/f3.parse.done ) then
-    scripts2/submit tmp/X.$MAGIC/$chrom/f3.parse "scripts2/f3.parse.tcsh $chrom"
-  endif
-end
-
-date
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f4: Assemble the yellow/green pseudo est in the XH databases
-
-phasef4:
- echo -n "Assemble the yellow/green pseudo est in the XH databases"
- date
-
-if (0 && $Strategy != RNA_seq) goto phaseLoop
-
-foreach chrom ($chromSetAll)
-  if (! -d tmp/X.$MAGIC/$chrom)  continue 
-  if ( -e tmp/X.$MAGIC/$chrom/f3.parse.done && ! -e tmp/X.$MAGIC/$chrom/f4.assemble.done) then
-    scripts2/submit tmp/X.$MAGIC/$chrom/f4 "scripts2/f4.assemble.tcsh $chrom" 
-  endif
-end
-
-date
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f5: Reexport the new transcriptome
-
-phasef5:
- echo -n "Export the new transcriptome "
- date
-
-if ($Strategy != RNA_seq) goto phaseLoop
-
-foreach chrom ($chromSetAll)
-  if (0 || (-e tmp/X.$MAGIC/$chrom/f4.assemble.done && ! -e tmp/X.$MAGIC/$chrom/f5.dump.done)) then
-    scripts2/submit tmp/X.$MAGIC/$chrom/f5.export  "scripts2/f5.export_new_genes.tcsh  $chrom"
-  endif
-end
-
-echo done 
-
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f6: Collate the new mrna structure and fasta sequence
-
-phasef6:
- echo -n "Export the new transcriptome "
- date
-# YH is in SEQC_2013/tmp/OK
-
-set XYH=X.$MAGIC
-
-if ($Strategy != RNA_seq) goto phaseLoop
-
-if (! -d TARGET/GTF) mkdir TARGET/GTF
-zcat tmp/$XYH/*/f5.genes.gtf.gz         | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.gtf.gz
- # zcat tmp/$XYH/*/f5.mrnas.fasta.gz    | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
-zcat tmp/$XYH/*/f5.goodMrnas.fasta.gz   | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.fasta.gz 
-zcat tmp/$XYH/*/f5.good_product.ace.gz  | sed -e 's/G_t_/Magic_/g' | gzip > TARGET/GTF/$species.magic.good_product.ace.gz
-
-  if (-e tmp/METADATA/gtf.magic.done) \rm  tmp/METADATA/*magic*
-  if (-e TARGET/Targets/$species.magic.mask.txt) \rm TARGET/Targets/$species.magic.mask.txt
-
-goto phaseLoop
-
-###########################################################################
-###########################################################################
-## phase f7: Export import the Kantor
-
-phasek0:
- #  initialize
-phasek1:
- # shop for Kantor data in KantorDB
-phasek2:
- # kantorize the products given the Kantor data
-phasek9:
- # launch kantor search in external DB
-setenv ici `pwd`
-if ($Strategy != RNA_seq) goto phaseLoop
-
-echo -n "Export/Import the Kantor phase $phase : start "
- date
-
-if (! -d ~/MEGA3) then
-  echo "Kantorizing the proteins only works inside ncbi"
-else
-
-  if (! -d Kantor) mkdir Kantor
-  foreach chrom ($chromSetAll)
-    set fDB=tmp/X.$MAGIC/$chrom
-    if (! -e $fDB/f4.assemble.done) continue
-    if (! -d Kantor/$chrom || ! -d Kantor/$chrom/done) \rm $fDB/k?.done
-    #if ( -d Kantor/$chrom/done && ! -e $fDB/k0.done) touch $fDB/k0.done
-    if (! -d Kantor/$chrom) mkdir Kantor/$chrom
-    if (! -d Kantor/$chrom/tmp) mkdir Kantor/$chrom/tmp
-echo "##### rm k1.done chr=$chrom"
-    if ($phase == k2 && ! -e $fDB/k1.done) continue
-    if ($phase == k9 && ! -e $fDB/k2.done) continue
-    echo "####------------#####"
-    ls -ls  $fDB/$phase.done
-    if (! -e $fDB/$phase.done && ! -e $fDB/$phase.start) then
-      echo "submit scripts2/Kantor.tcsh $phase $chrom $fDB"
-      scripts2/submit $fDB/$phase  "scripts2/Kantor.tcsh $phase $chrom $fDB"
-      touch $fDB/$phase.start
-    endif
-  end
-
-endif
-
-goto phaseLoop
-
-###########################################################################
 ###########################################################################
 ## phase ff1: Cumul different project in YH$chrom
 

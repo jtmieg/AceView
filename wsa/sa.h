@@ -28,7 +28,7 @@
 
 /***********************************************************************************/
 
-#ifdef USEGPU
+#ifdef USEGPUzzzz
   #define NAGENTS 12
   #define NBLOCKS 12
 #else
@@ -54,7 +54,6 @@ typedef struct nodeStruct { double x ; CHAN *cx, *cy, *cu, *cv, *done ; int k ; 
 typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, SRACACHE, SRACACHE1, SRACACHE2, INTRONS} DnaFormat ;
 typedef struct targetClassStruct {
   char targetClass ; /* single char a-z, A-Z */
-  int bonus ;
   int priority ;
   DnaFormat format ;
   const char *fileName ;
@@ -65,7 +64,6 @@ typedef struct runClassStruct {
   int run ;   /* index in pp->runDict */
   BOOL pairedEnd ;
   BOOL RNA ; /* 1: is RNA, 0 : is DNA (no introns) */
-  int bonus ;
   DnaFormat format ;
   const char *fileName1 ;
   const char *fileName2 ;
@@ -106,6 +104,7 @@ typedef struct runStatStruct {
   long int wiggleLCumul ; /* in million bases */
   long int wiggleRCumul ; /* in million bases */
   Array lengthDistribution ;
+  Array insertLengthDistribution ;
   int minReadLength, maxReadLength ;
   char *adaptor1, *adaptor2 ;
   long int nN, nErr ;

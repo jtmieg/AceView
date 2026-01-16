@@ -67,7 +67,7 @@
  	Notes ?Text
 
 ?Run  Ali ?Ali XREF Run    // Contains all clipalign/MAGIC  results calculated automatically
-      Ali ?Ali2 XREF Run2  // Contains all sortalign/MAGIC2 results calculated automatically
+      Ali2 ?Ali XREF Run2  // Contains all sortalign/MAGIC2 results calculated automatically
       Project  ?Project XREF Run // Runs with projec=$CALI are considered by CALI
       tmp_directory UNIQUE Text   // sticky, inherited from project the first time the run is considered, results go to tmp.$tmp_directory
       Titles  Title UNIQUE ?Text   // The other tags in the run object are to be documented by the user
@@ -499,6 +499,7 @@
       Computer_ressource CPU  Text  UNIQUE Int  UNIQUE Text
                          Elapsed  Text  UNIQUE Int  UNIQUE Text
                          Max_memory  Text  UNIQUE Int  UNIQUE Text
+                         Multi_threading  Text  UNIQUE Float  UNIQUE Text			 
                          Number_of_lanes UNIQUE Int
 
 ?Target  Release UNIQUE ?Text

@@ -14,8 +14,6 @@ char dnaDecodeChar[] =
 char rnaDecodeChar[] =
  { '-','a','u','w','g','r','k','d','c','m','y','h','s','v','b','n','>','<'} ;
 
-char complementBase[] =	
- { 0, T_,A_,W_,C_,Y_,M_,H_,G_,K_,R_,D_,S_,B_,V_,N_,RS_,FS_ } ;
 /* this is the mapping use to parse in */
 char dnaEncodeChar[] =
 {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -29,6 +27,16 @@ char dnaEncodeChar[] =
    0,   0,  R_,  S_,  T_,  U_,  V_,  W_,  N_,  Y_,   0,   0,   0,   0,   0,   0,
 } ;
 
+char hardComplementBase[] =	
+ { 0, T_,A_,W_,C_,Y_,M_,H_,G_,K_,R_,D_,S_,B_,V_,N_,RS_,FS_ } ;
+
+char checkComplementBase (char cc)
+{
+  int n = cc ;
+  if (n < 0 || n > 17)
+    messcrash ("complementBase(%d) out of range", n) ;
+  return hardComplementBase[n] ;
+}
 
 /********************************************************/
 /*
@@ -563,9 +571,9 @@ char reverseCodon (const char* cp)
 {
   char temp[3] ;
 
-  temp[0] = complementBase[(int)cp[2]] ;
-  temp[1] = complementBase[(int)cp[1]] ;
-  temp[2] = complementBase[(int)cp[0]] ;
+  temp[0] = complementBase(cp[2]) ;
+  temp[1] = complementBase(cp[1]) ;
+  temp[2] = complementBase(cp[0]) ;
   return codon (temp) ;
 }
 /****************/
@@ -574,9 +582,9 @@ char antiCodon (const char* cp)
 {
   char temp[3] ;
 
-  temp[0] = complementBase[(int)cp[0]] ;
-  temp[1] = complementBase[(int)cp[-1]] ;
-  temp[2] = complementBase[(int)cp[-2]] ;
+  temp[0] = complementBase(cp[0]) ;
+  temp[1] = complementBase(cp[-1]) ;
+  temp[2] = complementBase(cp[-2]) ;
   return codon (temp) ;
 }
 

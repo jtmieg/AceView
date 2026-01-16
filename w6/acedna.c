@@ -45,12 +45,12 @@ void reverseComplement (Array dna)
 { char  c,  *cp = arrp(dna,0,char), *cq = cp + arrayMax(dna) - 1 ;
 
   while (cp < cq)
-    { c = complementBase[(int)*cp] ; 
-      *cp++ = complementBase[(int)*cq] ; 
+    { c = complementBase (*cp) ; 
+      *cp++ = complementBase(*cq) ; 
       *cq-- = c  ;
     }
   if (cp == cq)
-    *cp = complementBase[(int)*cp] ;
+    *cp = complementBase(*cp) ;
 
   /* add a terminal zero, 
      I do it again here because we might have done
@@ -1354,7 +1354,7 @@ static void spliceTrackSlideErrors (Array errors, Array dnaLong, Array dnaShort)
 	}
       char *cS = arrp (dnaShort, x1, char) ;  /* inserted base */
       char *cL = arrp (dnaLong, a1, char)  ; /* base after the insertion */
-      while (*cS == complementBase[(int)*cL])
+      while (*cS == complementBase(*cL))
 	{ ep->iShort-- ; ep->iLong++ ; cS-- ; cL++ ; }
       /* ep->iShort += dx ; ep->iLong += da  ; cS++ ; cL-- ;  */
     }
@@ -1618,7 +1618,7 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
             {
               /* ep is base-0 non-bio coords */
               ep->iLong = nn - ep->iLong - 1 ;
-	      ep->baseShort = complementBase[(int)ep->baseShort] ;
+	      ep->baseShort = complementBase(ep->baseShort) ;
             }
         }
       /* reverse the table of errors */

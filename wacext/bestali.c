@@ -9240,13 +9240,13 @@ static int greg2aceCigarette (int x1, int x2, int a1, int a2, const char *greg, 
 	  
 	  cc = ace_lower (*++cp) ;
 	  xBuf[j] = cc ; zBuf[j] = '-' ; nerr ++ ;
-	  if (strand < 0) cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ; 
+	  if (strand < 0) cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ; 
 	  aBuf[j++] = cc ; 
 	  
 	  while (j < 3 && *(cp+1) == '-')
 	    {
 	      cp += 2 ;  cc = ace_lower (*cp) ; xBuf[j] = cc ; zBuf[j] = '-' ;  
-	      if (strand < 0) cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+	      if (strand < 0) cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
 	      aBuf[j++] = cc ;
 	    }
 	  xBuf[j] = 0 ; aBuf[j] = 0 ; zBuf[j] = 0 ; aa += j * strand ;
@@ -9272,12 +9272,12 @@ static int greg2aceCigarette (int x1, int x2, int a1, int a2, const char *greg, 
 	      int j = 0 ;
 	  
 	       xBuf[j] = cc ; zBuf[j] = '+' ; nerr++ ;
-	      if (strand < 0) cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+	       if (strand < 0) cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
 	       aBuf[j++] = cc ;
 	      while (*(cp+2) == '-')
 		{
 		  cp++ ;  cc = ace_lower (*cp++) ; xBuf[j] = cc ; zBuf[j] = '+' ; 
-		  if (strand < 0) cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+		  if (strand < 0) cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
 		  aBuf[j++] = cc ;
 		}
 	      xBuf[j] = 0 ; aBuf[j] = 0 ; zBuf[j] = 0 ; xx += j ;
@@ -9299,8 +9299,8 @@ static int greg2aceCigarette (int x1, int x2, int a1, int a2, const char *greg, 
 	      vtxtPrintf (aSnps, "%s%d:", k ? "," : "", aa) ;
 	      k++ ;
 	      vtxtPrintf (xSnps, "%c>%c", cc, cc1) ; 
-	      if (strand < 0) cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
-	      if (strand < 0) cc1 = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc1]]] ;
+	      if (strand < 0) cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
+	      if (strand < 0) cc1 = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc1])] ;
 	      vtxtPrintf (aSnps, "%c>%c", cc, cc1) ; xx++ ; aa += strand ; nerr++ ;
 	    }
 	}

@@ -3539,10 +3539,10 @@ static int tsnpSetGName (vTXT txt, TSNP *tsnp, AC_OBJ Snp, AC_HANDLE h0)
 		  if (a1 > a2)
 		    {
 		      for (i = 0 ; i <  da ; i++)
-			bufVG[i] = ace_upper(dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)bufV[da - 1 - i]]]]) ;
+			bufVG[i] = ace_upper(dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)bufV[da - 1 - i]])]) ;
 		      bufVG[i] = 0 ;
 		      for (i = 0 ; i <  da ; i++)
-			bufVGS[i] = ace_upper(dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)bufVS[da - 1 - i]]]]) ;
+			bufVGS[i] = ace_upper(dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)bufVS[da - 1 - i]])]) ;
 		      bufVGS[i] = 0 ;
 		    }
 		  vtxtPrintf (txt,"Multi_deletion %d %s\n", da, bufV) ; /* reinstate */ 
@@ -4834,7 +4834,7 @@ static int tsnpCodingModif  (TSNP *tsnp)
 		{
 		  cc =  typ[2] ;
 		  if (strand == -1)
-		    cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+		    cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
 		  *(cd3 - 1) = ace_upper (cc) ; /* we already copied the original letter */
 		}
 	      else if (! strncasecmp (typ, "Ins", 3)) /* insert the insertion */
@@ -4862,7 +4862,7 @@ static int tsnpCodingModif  (TSNP *tsnp)
 			{ 
 			  cc = *cd22 ;
 			  if (strand == -1)
-			    cc = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)cc]]] ;
+			    cc = dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)cc])] ;
 			  *cd3 = ace_upper(cc) ; isFrameshift++ ; 
 
 			  /* specialize Ins? to Dup? if *cp3 is a repeated letter */
@@ -4901,7 +4901,7 @@ static int tsnpCodingModif  (TSNP *tsnp)
 		      char *cq = cp + strlen (cp) - 1 ;
 		      cd3-- ;
 		      while (cq >= cp)
-			*cd3++ = ace_upper (dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)(*cq--)]]])   ;
+			*cd3++ = ace_upper (dnaDecodeChar[(int)complementBase(dnaEncodeChar[(int)(*cq--)])])   ;
 		    }
 		}
 	      

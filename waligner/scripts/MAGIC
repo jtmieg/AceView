@@ -15,7 +15,10 @@
 #set ff=`ls Fastc/RNA_AGLR1_B_1.*/*.fastc.gz | head -32 | gawk '{printf("%s,",$1);}'`
 #numactl --cpunodebind=0 --membind=0 bin/sortalign -x HSA.16.step5 -i $ff --align --nB 50 --nA 25 -o tatouN.16.step5 --max_threads 256
 
-
+if (-d tmp/SA) then
+  echo "FATAL ERROR: You seem to be in a MAGIC2 dir, there extsis a dir tmp/SA"
+  exit 0
+endif
 
 ############################################################################################
 # Master script for short sequence alignments

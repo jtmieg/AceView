@@ -8364,7 +8364,7 @@ static BOOL teamInitialJump (KEY cosmid, Array introns, Array oldHits, Array new
             {
               aa = up->a2 ; xx = up->x2 ;
               cq = arrp (dna, aa - 1, char) ;
-              while (cp < cpMax && complementBase[((int)*cp) & 255] & *cq) { cp++ ; cq-- ; aa-- ; xx++ ; }
+              while (cp < cpMax && complementBase(*cp & 255) & *cq) { cp++ ; cq-- ; aa-- ; xx++ ; }
             }
           if (aa < vp->a2) /* so i was perfect up and including vp->a2 */
             {
@@ -8386,7 +8386,7 @@ static BOOL teamInitialJump (KEY cosmid, Array introns, Array oldHits, Array new
                 else
                   { 
                     if (cp > cpMax) { iend = 10 ;  break ; }
-                    if (complementBase[((int)*cp) & 255] & *cq) { cp++ ; cq-- ; }
+                    if (complementBase(*cp & 255) & *cq) { cp++ ; cq-- ; }
                     else break ;
                   }
               if (i + iend > 6)
@@ -8492,7 +8492,7 @@ static int teamFinalJump (KEY cosmid, Array introns, Array oldHits, Array newHit
             {
               aa = up->a1 ; xx = up->x1 ;
               cq = arrp (dna, aa - 1, char) ;
-              while (xx > 0 && complementBase[((int)*cp) & 255] & *cq) { cp-- ; cq++ ; aa++ ; xx-- ; }
+              while (xx > 0 && complementBase(*cp & 255) & *cq) { cp-- ; cq++ ; aa++ ; xx-- ; }
             }
           if (aa > vp->a1) /* so i was perfect up and including vp->a1 */
             {
@@ -8514,7 +8514,7 @@ static int teamFinalJump (KEY cosmid, Array introns, Array oldHits, Array newHit
                 else
                   {
                     if (cp < cpMin) { iend = 10 ; break ; }
-                    if (complementBase[((int)*cp) & 255] & *cq) { cp-- ; cq++ ; }
+                    if (complementBase(*cp & 255) & *cq) { cp-- ; cq++ ; }
                     else break ;
                   }
               if (i + iend > 6)
@@ -16595,7 +16595,7 @@ static Array cDNAGetHitDna (KEY est, Array dna, Array dnaR, Array hits, int *fro
           cp = arrp (dna, hh->a1 - 1, char) ;
           array (new, j2 + i, char) = 0 ; /* open hh */
           cq = arrp(new, j2, char) ; j2 += i ;
-          while (i--) *cq++ = complementBase [(int)(*cp--)] ;
+          while (i--) *cq++ = complementBase(*cp--) ;
         }
     }
   if (!j2) arrayDestroy (new) ;

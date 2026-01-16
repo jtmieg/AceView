@@ -16,12 +16,16 @@
  *-------------------------------------------------------------------
  */
 
-/* Warning : we have no provision to store a big array in the database */
+/* Warning : we have no provision to store a big array in the database
+ * but we can memory-map them from and to disk with a simple user interface
+ * bigArrayMapRead / bigArrayMapWrite
+ */
 
 #include "regular.h"
 #include "bigarray.h"
 #include "bitset.h"
 #include <sys/mman.h>
+#include <stdint.h>
 
   /* Defines bitField bit array from bitset.h */
 
@@ -35,6 +39,25 @@ static mysize_t bigTotalNumberCreated = 0 ;
 static mysize_t bigTotalNumberActive = 0 ;
 static Array reportBigArray = 0 ;
 static void uBigArrayFinalise (void *cp) ;
+
+static char * bigArrayAlloc (long int n, int size, int *shift)
+{
+  mysize_t nn = (mysize_t) n * size + 64 ;
+  char *cp = malloc (nn) ;
+  memset(cp,0,nn) ;
+
+    uintptr_t a = (uintptr_t)cp;
+    uintptr_t aligned = (a + 63) & ~63ULL;
+
+    *shift = (int)(aligned - a);          // 0..63
+
+    // cp + *shift   is always 64-byte aligned
+    // and cp is located inside the allocated area
+
+    return cp;
+} /* bigArrayAlloc */
+
+/**************/
 
 #ifndef MEM_DEBUG
   BigArray uBigArrayCreate (long int n, int size, AC_HANDLE handle)
@@ -52,6 +75,7 @@ BigArray   uBigArrayCreate_dbg (long int n, int size, AC_HANDLE handle,
 				   dbgPos(hfname, hlineno, __FILE__), __LINE__) ;
 #endif
 
+  int shift = 0 ;
   if (!reportBigArray)
     { reportBigArray = (Array)1 ; /* prevents looping */
       reportBigArray = arrayCreate (512, BigArray) ;
@@ -62,11 +86,8 @@ BigArray   uBigArrayCreate_dbg (long int n, int size, AC_HANDLE handle,
     n = 1 ;
   if (reportBigArray != (Array)2)
     bigTotalAllocatedMemory += n * size ;
-#ifndef MEM_DEBUG
-  neuf->base = (char *) messalloc (n*size) ;
-#else
-  neuf->base = (char *) messalloc_dbg (n*size,dbgPos(hfname, hlineno, __FILE__), __LINE__) ;
-#endif
+  neuf->trueBase = bigArrayAlloc (n , size, &shift) ;
+  neuf->base = neuf->trueBase + shift ;
   neuf->dim = n ;
   neuf->max = 0 ;
   neuf->size = size ;
@@ -166,20 +187,23 @@ BigArray uBigArrayReCreate (BigArray a, long int n, int size)
     n = 1 ;
   if (a->dim < n || 
       (a->dim - n)*size > (1 << 19) ) /* free if save > 1/2 meg */
-    { 
+    {
+      int shift = 0 ;
       if (reportBigArray != (Array)2)
 	bigTotalAllocatedMemory -= a->dim * size ;
-      messfree (a->base) ;
+      free (a->trueBase) ;
       a->dim = n ;
       if (reportBigArray != (Array)2)
-	bigTotalAllocatedMemory += a->dim * size ;
-      a->base = (char *) messalloc (a->dim*size) ;
+	bigTotalAllocatedMemory += n * size ;
+      a->trueBase = bigArrayAlloc (n, size, &shift) ;
+      a->base = a->trueBase + shift ;
     }
-  memset(a->base,0,(mysize_t)(a->dim*size)) ;
+  else
+    memset(a->base,0,(mysize_t)(a->dim*size)) ;
 
   a->max = 0 ;
   return a ;
-}
+} /* uBigArrayReCreate */
 
 /**************/
 
@@ -192,7 +216,7 @@ void uBigArrayDestroy (BigArray a)
   if (a->magic != BIG_ARRAY_MAGIC)
     messcrash ("uBigArrayDestroy received corrupt array->magic");
 
-      if (a->lock)
+  if (a->lock)
      messcrash ("bigArrayDestroy called on locked bigArray") ;
   a->magic = 0 ;
   messfree(a);
@@ -205,19 +229,22 @@ static void uBigArrayFinalise (void *cp)
   if (reportBigArray != (Array)2)
     bigTotalAllocatedMemory -= a->dim * a->size ;
 
-  if (a->readOnly)
+  if (a->map)
     { /* memory mapped read only bigArray */
-      if (a->max != a->readOnly)
+      if (a->readOnly && a->max != a->readOnly)
 	messcrash ("A read only memory mapped bigArray has been modified : %s", a->fName) ;
-      if (munmap(a->map, a->max * a->size) == -1)
+      if (a->map != (void*)1 && munmap(a->map, a->max * a->size) == -1)
 	messcrash ("Failed to unmap bigArray %s", a->fName) ;
       if (a->fd != -1)
 	close (a->fd) ;
-      a->base = a->map = 0 ; a->fd = 0 ; a->readOnly = 0 ;
+      a->base = a->trueBase = a->map = 0 ; a->fd = 0 ; a->readOnly = 0 ;
       messfree (a->fName) ;
     }
   else if (!finalCleanup)
-    { messfree (a->base) ; a->base = 0 ; }
+    {
+      free (a->trueBase) ;
+      a->base = a->trueBase = 0 ;
+    }
   a->magic = 0 ;
   bigTotalNumberActive-- ;
   if (!finalCleanup && reportBigArray != (Array)1 && reportBigArray != (Array)2) 
@@ -256,8 +283,9 @@ void bigArrayExtend (BigArray a, long int n)
   void bigArrayExtend_dbg (BigArray a, long int  n, const char *hfname,int hlineno) 
 #endif
 {
-  char *neuf ;
-
+  char *base, *trueBase ;
+  int shift = 0 ;
+  
   if (!a || n < a->dim)
     return ;
   if (a->lock)
@@ -277,17 +305,15 @@ void bigArrayExtend (BigArray a, long int n)
 
   if (reportBigArray != (Array)2)
     bigTotalAllocatedMemory += a->dim * a->size ;
-#ifndef MEM_DEBUG
-  neuf = (char *) messalloc (a->dim*a->size) ;
-#else
-  neuf = (char *) messalloc_dbg (a->dim*a->size,dbgPos(hfname, hlineno, __FILE__), __LINE__) ;
-#endif
-  memcpy (neuf,a->base,a->size*a->max) ;
-  messfree (a->base) ;
-  a->base = neuf ;
-}
+  trueBase = bigArrayAlloc (a->dim, a->size, &shift) ;
+  base = trueBase + shift ;
+  
+  memcpy (base, a->base,a->size*a->max) ;
+  free (a->trueBase) ;
 
-/***************/
+  a->trueBase = trueBase ;
+  a->base = base ;
+}
 
 /***************/
 
@@ -1922,14 +1948,14 @@ BigArray uBigArrayMapRead (const char *fName, int recordSize, BOOL readOnly, AC_
   int fd = -1 ;
   if (! fName)
     messcrash ("bigArrayMapRead called with NULL file name") ;
-  messfree (aa->base) ;
-  aa->base = (char *) mmapCreate (fName, &size, &fd, &map, readOnly) ;
+  free (aa->trueBase) ; aa->base = aa->trueBase = 0 ;
+  aa->base = aa->trueBase = (char *) mmapCreate (fName, &size, &fd, &map, readOnly) ;
   aa->readOnly = readOnly ;
   aa->size = recordSize ;
   aa->max = aa->dim = size/recordSize ;
   if (readOnly)
     aa->readOnly = aa->max ;
-  aa->map = map ;
+  aa->map = map ? map : (void *)1 ;
   aa->fd = fd ;
   aa->fName = strnew (fName, 0) ;
   return aa ;

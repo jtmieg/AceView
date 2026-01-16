@@ -8171,7 +8171,7 @@ static Array mrnaTiledDna (KEY mrna, Array tiling, int *offsetp, int *aliLenp, B
         {
           cq = arrp (dnaEst, tp->x1 - 1, char) ;
           for (i = tp->a1; i <= tp->a2 ; i++) 
-            *cp++ = complementBase[(int)*cq--] ;
+            *cp++ = complementBase(*cq--) ;
         }
     }   
   jj = arrayMax(dnaTiled) ; 

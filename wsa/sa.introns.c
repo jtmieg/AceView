@@ -99,7 +99,7 @@ static int doubleIntronsOrder (const void *va, const void *vb)
 
 static int confirmedPolyAsCompress (Array aaa) 
 {
-  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  int ii, jj = 0, kk = 1, iMax = arrayMax (aaa) ;
   arraySort (aaa, confirmedPolyAOrder) ;
   POLYA *up, *vp, *wp ;
 
@@ -680,7 +680,7 @@ void saPolyAsExport (PP *pp, Array aaa)
 	    aceOutf (ao, "%s__%d\t%s\tti\t%s\t%d\n"
 		     , dictName (pp->bbG.dict, up->chrom >> 1) 
 		     , up->a1
-		     , dictName (pp->runDict, up->run)
+		     , up->run ? dictName (pp->runDict, up->run) : "runX"
 		     , up->chrom & 0x1 ? "-" : "+"
 		     , up->n
 		     ) ;
@@ -697,10 +697,10 @@ static char *flipFeet (char *feet)
 {
   char buf[6] ;
   memcpy (buf, feet, 6) ;
-  feet[0] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[4]]]] ;
-  feet[1] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[3]]]] ;
-  feet[3] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[1]]]] ;
-  feet[4] = dnaDecodeChar[(int)complementBase[(int)dnaEncodeChar[(int)buf[0]]]] ;
+  feet[0] = complementLetter(buf[4]) ;
+  feet[1] = complementLetter(buf[3]) ;
+  feet[3] = complementLetter(buf[1]) ;
+  feet[4] = complementLetter(buf[0]) ;
 
   return feet ;
 }
@@ -817,10 +817,11 @@ void saIntronsExport (PP *pp, Array aaa)
 	  int min = 3 ;
 	  if (! up->feet[0])
 	    continue ;
-	  else if (!strcmp (up->feet, "gt_ag"))
+	  else if (!strcasecmp (up->feet, "gt_ag"))
 	   min = 1 ;
-	  else if (!strcmp (up->feet, "gc_ag"))
+	  else if (!strcasecmp (up->feet, "gc_ag"))
 	    min = 2 ;
+
 	  if (up->n + up->nR >= min)
 	    aceOutf (ao, "%s__%d_%d\t%s\tiit\t%d\t%d\t%s\n"
 		     , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2
@@ -860,34 +861,34 @@ void saDoubleIntronsExport (PP *pp, Array aaa)
 	  if (! up->feet1[0])
 	    continue ;
 	  if (s0[up->run] < 40 || /* flip whole run */
-	      (s0[up->run] < 40 && (! strcmp (up->feet1, "ct_ac") || ! strcmp (up->feet2, "ct_ac")))
+	      (s0[up->run] < 40 && (! strcasecmp (up->feet1, "ct_ac") || ! strcasecmp (up->feet2, "ct_ac")))
 	      ) /* flip needed */
 	    {
-	      if (!strcmp (up->feet1, "ct_ac") && !strcmp (up->feet2, "ct_ac"))
+	      if (!strcasecmp (up->feet1, "ct_ac") && !strcasecmp (up->feet2, "ct_ac"))
 		min = 1 ;
-	      else if (!strcmp (up->feet1, "ct_gc") && !strcmp (up->feet2, "ct_ac"))
+	      else if (!strcasecmp (up->feet1, "ct_gc") && !strcasecmp (up->feet2, "ct_ac"))
 		min = 1 ;
-	      else if (!strcmp (up->feet1, "ct_ac") && !strcmp (up->feet2, "ct_gc"))
+	      else if (!strcasecmp (up->feet1, "ct_ac") && !strcasecmp (up->feet2, "ct_gc"))
 		min = 1 ;
-	      if (up->n >= min || up->nR >= min)
-		aceOutf (ao, "%s__%d_%d__%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
+	      if (up->n >= min)
+		aceOutf (ao, "%s__%d_%d___%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
 			 , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->b2, up->b1, up->a2, up->a1
 			 , dictName (pp->runDict, up->run)
-			 , up->nR, up->n
+			 , up->n, up->nR
 			 , flipFeet (up->feet2)
 			 , flipFeet (up->feet1)
 			 ) ;
 	    }
 	  else 
 	    {
-	      if (!strcmp (up->feet1, "gt_ag") && !strcmp (up->feet2, "gt_ag"))
+	      if (!strcasecmp (up->feet1, "gt_ag") && !strcasecmp (up->feet2, "gt_ag"))
 		min = 1 ;
-	      else if (!strcmp (up->feet1, "gc_ag") && !strcmp (up->feet2, "gt_ag"))
+	      else if (!strcasecmp (up->feet1, "gc_ag") && !strcasecmp (up->feet2, "gt_ag"))
 		min = 1 ;
-	      else if (!strcmp (up->feet1, "gt_ag") && !strcmp (up->feet2, "gc_ag"))
+	      else if (!strcasecmp (up->feet1, "gt_ag") && !strcasecmp (up->feet2, "gc_ag"))
 		min = 1 ;
-	      if (up->n >= min || up->nR >= min)
-		aceOutf (ao, "%s__%d_%d__%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
+	      if (up->n >= min)
+		aceOutf (ao, "%s__%d_%d___%d_%d\t%s\tiitt\t%d\t%d\t%s\t%s\n"
 			 , dictName (pp->bbG.dict, up->chrom >> 1) + 2, up->a1, up->a2, up->b1, up->b2
 			 , dictName (pp->runDict, up->run)
 			 , up->n, up->nR

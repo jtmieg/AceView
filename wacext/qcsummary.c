@@ -765,6 +765,13 @@ static void  qcStrandedness (QC *qc, RC *rc)
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
 
+    { "Compute", "A_mito:Reads mapping on plus strand of", 1,0,0},
+    { "Compute", "A_mito:Reads mapping on minus strand of", 2,0,0},
+    { "Compute", "A_mito:Reads mapping on both strands of", 3,0,0},
+    { "Compute", "A_mito:% reads mapping on plus strand of", 1,0,F_p10},
+    { "Compute", "A_mito:% reads mapping on minus strand of", 2,0,F_p10},
+    { "Compute", "A_mito:% reads mapping on both strand of", 3,0,F_p10},
+
     { "Compute", "B_rRNA:Reads mapping on plus strand of", 1,0,0},
     { "Compute", "B_rRNA:Reads mapping on minus strand of", 2,0,0},
     { "Compute", "B_rRNA:Reads mapping on both strands of", 3,0,0},
@@ -785,14 +792,15 @@ static void  qcStrandedness (QC *qc, RC *rc)
     { "Compute", "% reads mapping on plus strand of", 102,0,F_p10},
     { "Compute", "% reads mapping on minus strand of", 202,0,F_p10},
     { "Compute", "% reads mapping on both strand of", 302,0,F_p10},
-
+#ifdef JUNK
+    /* 2026_01_13 i added the mito target so i remove annotation 3 so that the number of columns is not modified */
     { "Compute", "Reads mapping on plus strand of", 103,0,0},
     { "Compute", "Reads mapping on minus strand of", 203,0,0},
     { "Compute", "Reads mapping on both strands of", 303,0,0},
     { "Compute", "% reads mapping on plus strand of", 103,0,F_p10},
     { "Compute", "% reads mapping on minus strand of", 203,0,F_p10},
     { "Compute", "% reads mapping on both strand of", 303,0,F_p10},
-
+#endif
     { "Compute", "Z_genome:Reads mapping on plus strand of", 1,0,0},
     { "Compute", "Z_genome:Reads mapping on minus strand of", 2,0,0},
     { "Compute", "Z_genome:Reads mapping on both strands of", 3,0,0},
@@ -884,7 +892,7 @@ static void  qcStrandedness (QC *qc, RC *rc)
 	  switch (col)
 	    {
 	    case 1:   /*  plus strand */
-	    case 2:   /*  plus strand */
+	    case 2:   /*  minus strand */
 	    case 3:   /*  both strands */
 	      strncpy (buf, ti->title, 255) ;
 	      { char *cp = strchr (buf, ':') ;
@@ -914,7 +922,7 @@ static void  qcStrandedness (QC *qc, RC *rc)
 		   } 
 		   if (! strcasecmp (buf, buf2) || ! strcasecmp (buf, buf2 + 3))
 		    {
-		      up += ac_table_float (tt, ir, 2, 0) ;  /* LOOp because in roups we may have .f and .f2 cases */
+		      up += ac_table_float (tt, ir, 2, 0) ;  /* LOOP because in groups we may have .f and .f2 cases */
 		      um += ac_table_float (tt, ir, 4, 0) ;
 		      ua += ac_table_float (tt, ir, 6, 0) ;
 		      uz += ac_table_float (tt, ir, 2*col, 0) ; 

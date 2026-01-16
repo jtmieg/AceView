@@ -74,6 +74,17 @@ static int wiggleCreate (const PP *pp, BB *bb)
     {
       int mult = ap->nTargetRepeats ? ap->nTargetRepeats : 1 ;
       int weight = 720/mult ;
+      int targetClass = ap->targetClass ;
+
+      switch (targetClass)
+	{
+	case 'G':
+	case 'M':
+	case 'C':
+	  break ;
+	default:
+	  continue ;
+	}
       if (weight)
 	{
 	  int a1 = ap->a1 ;
@@ -137,7 +148,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
 		  WP *wp = bigArrayp (wigL, bigArrayMax (wigL), WP) ;
 		  wp->pos = w1 ; wp->ln = 10 ; wp->weight = weight ;
 		}
-	      if (wigR && w1 > w2)
+	      if (wigR && w1 > w2 && w1 >= 3)
 		{
 		  WP *wp = bigArrayp (wigR, bigArrayMax (wigR), WP) ;
 		  wp->pos = w1 - 3 ; wp->ln = 10 ; wp->weight = weight ;
@@ -330,7 +341,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
       if (arrayMax(a))
 	{
 	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
-	  const char *runNam = dictMax (pp->runDict) == 1 ? "runX" : dictName (pp->runDict, run) ;
+	  const char *runNam = dictMax (pp->runDict) < run || ! run ? "runX" : dictName (pp->runDict, run) ;
 	  char *fNam = hprintf (h, "/wiggles/%s.%s.%s.BF", runNam, chromNam, typeNam) ;
 	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, 1 || pp->gzo, h) ;
 	  aceOutDate (ao, "##", "wiggle") ;
@@ -471,6 +482,15 @@ static int gcOrder (const void *va, const void *vb)
 
 /**************************************************************/
 
+static float geneIndex (const PP *pp, GC *gc)
+{
+  float z = 0 ;
+
+  return z ;
+} /* geneIndex */
+
+/**************************************************************/
+
 static long int wiggleExportGeneCounts (const PP *pp)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -533,9 +553,10 @@ static long int wiggleExportGeneCounts (const PP *pp)
   aceOutf (ao, "#Gene\tRun\tFormat\tGene coverage\tExons coverage\n") ;
   for (igc = jgc = 0, gc = bigArrp (allGeneC, 0, GC), gc2 = gc ; igc < igcMax ; igc++, gc++)
     if (gc->gene && gc->boxCount)
-      aceOutf (ao, "%s\t%s\tii\t%d\t%d\n"
+      aceOutf (ao, "%s\t%s\tfii\t%.2f\t%d\t%d\n"
 	       , dictName (pp->geneDict, gc->gene)
 	       , dictName (pp->runDict, gc->run)
+	       , geneIndex (pp, gc)
 	       , gc->boxCount/720, gc->exonCount/720
 	       ) ;
   

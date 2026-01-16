@@ -357,6 +357,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
       bb->dnas = arrayHandleCreate (bb->nSeqs, BigArray, bb->h) ;
       bb->dict = dictHandleCreate (bb->nSeqs, bb->h) ;
       bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+      bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       bb->nSeqs = 0 ;
       bb->errDict = dictHandleCreate (100000, bb->h) ;
       
@@ -721,6 +722,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
   int line1 = 0, line2 = 0, line10 = 0 ;
   Array dna1, dna2, dnas ;
   Array qual1 = 0, qual2 = 0 ;
+  char targetClass = tc ? tc->targetClass : 0 ;
   char namBufG [NAMMAX+12] ;
   char *namBufX, *namBuf = namBufG + 2 ;
   DnaFormat format = rc ? rc->format : tc->format ;
@@ -782,6 +784,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb->length = 0 ;
       bb->dnas = dnas = arrayHandleCreate (64, BigArray, bb->h) ;
       bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+      bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       if (pp->exportSamQuality && format == FASTQ)
 	bb->quals = arrayHandleCreate (64, Array, bb->h) ;
       bb->dict = dictHandleCreate (NMAX, bb->h) ;
@@ -803,6 +806,14 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
     {
       int mult = 1 ;
       char *cr = namBuf + strlen (namBuf) ;
+      if (isGenome && targetClass == 'T')
+	{
+	  /* only keep transcrips called *.a   ||   .a|GENE=...|...  */
+	  char *cp = strchr (namBuf, '|') ;
+	  cp = cp ? cp : cr ;
+	  if (cp < namBuf + 2 || cp[-2] != '.' || cp[-1] != 'a')
+	    continue ;  /* reject other transcripts */
+	}
       if (format == FASTC && !isGenome)
 	{
 	  char *cp = strchr (namBuf, '#') ;
@@ -1000,6 +1011,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	  if (pp->exportSamQuality && format == FASTQ)
 	    bb->quals = arrayHandleCreate (64, Array, bb->h) ;
 	  bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+	  bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
 	  bb->dict = dictHandleCreate (NMAX, bb->h) ;
 	  bb->errDict = dictHandleCreate (NMAX, bb->h) ;
 	  dna1 = arrayHandleCreate (256, unsigned char, bb->h) ;
