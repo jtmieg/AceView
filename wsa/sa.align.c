@@ -2534,7 +2534,7 @@ void saAlignDo (const PP *pp, BB *bb)
 		  arrayMax (aa) = arrayMax (err) = 0 ;
 		  /* switch chroms and reorder */
 		  if (0) hits2 = bb->hits ;
-		  saSort (hits2, 2) ; /* hitReadOrder */
+		  bb->gpu += saSort (hits2, 2) ; /* hitReadOrder */
 		  if (0)  showCountChroms (countChroms) ;
 
 		  alignDoOnePair (pp, bb, aaa, hits2, aa, err) ;

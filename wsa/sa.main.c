@@ -261,7 +261,7 @@ static void sortWords (const void *vp)
 	  for (int k = 0 ; k < NN ; k++)
 	    if (bb.cwsN[k])
 	      {
-		saSort (bb.cwsN[k], 1) ; /* cwOrder */
+		bb.gpu += saSort (bb.cwsN[k], 1) ; /* cwOrder */
 		nn += bigArrayMax (bb.cwsN[k]) ;
 	      }
 	  t2 = clock () ;
@@ -664,7 +664,7 @@ static void sortHits (const void *vp)
 	  sortHitsFuse (pp, &bb) ;
 	  if (bb.hits)
 	    {
-	      saSort (bb.hits, 3) ; /* hitPairOrder */
+	      bb.gpu += saSort (bb.hits, 3) ; /* hitPairOrder */
 	      t2 = clock () ;
 	      
 	      long int nn = bigArrayMax (bb.hits) ;
@@ -973,7 +973,7 @@ static void wholeWork (const void *vp)
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
 	if (bb.cwsN[k])
-	  saSort (bb.cwsN[k], 1) ; /* cwOrder */
+	  bb.gpu += saSort (bb.cwsN[k], 1) ; /* cwOrder */
 
       
       /* match hits */
@@ -985,7 +985,7 @@ static void wholeWork (const void *vp)
       if (pp->align && bb.hits)
 	{
 	  sortHitsFuse (pp, &bb) ;
-	  saSort (bb.hits, 3) ; /* hitPairOrder */
+	  bb.gpu += saSort (bb.hits, 3) ; /* hitPairOrder */
 	  saAlignDo (pp, &bb) ;
 	}
 
@@ -2030,7 +2030,7 @@ int main (int argc, const char *argv[])
 	}
       if (p.debug) printf ("%s:Block done\n", timeBufShowNow (tBuf)) ;
       if (p.debug) printf ("Found %ld hits\n", n) ; 
-
+      p.gpu += bb.gpu ;
       skips0 += bb.skips0 ;
       skips1 += bb.skips1 ;
       skips2 += bb.skips2 ;
@@ -2146,6 +2146,7 @@ int main (int argc, const char *argv[])
 			    , p.maxTargetRepeats, p.tMaxTargetRepeats
 			    , nAgents, p.nBlocks, NN
 			    ) ;
+  if (p.gpu) printf ("GPU called %d times\n", p.gpu) ;
   if (arrayMax (p.runStats))
     reportRunStats (&p, p.runStats) ;
   if (p.align)

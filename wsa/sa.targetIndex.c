@@ -478,7 +478,7 @@ static long int saTargetIndexCreateDo (PP *pp)
 
   printf ("%s : sort the target seeds\n" , timeBufShowNow (tBuf)) ;
   for (int k = 0 ; k < NN ; k++)
-    saSort (cwsN[k], 1) ; /* cwOrder */
+    bbG->gpu += saSort (cwsN[k], 1) ; /* cwOrder */
 
   t2 = clock () ;
   saCpuStatRegister ("3.Sort seeds" , pp->agent, bbG->cpuStats, t1, t2, nn) ;

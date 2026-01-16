@@ -243,13 +243,14 @@ static BOOL saSortDo (char *b, long int nn, int s, char *buf, BOOL hitIsTarget, 
 
 /**************************************************************/
 
-void saSort (BigArray aa, int type)
+int saSort (BigArray aa, int type)
 {
   long int N = bigArrayMax (aa) ;
   char *cp = N ?  (char *) aa->base : 0 ;
   int s = aa->size ;
   int (*cmp)(const void *va, const void *vb) ;
-    
+  int usedGPU = 0 ;
+  
   switch (type)
     {
     case 1:
@@ -264,7 +265,7 @@ void saSort (BigArray aa, int type)
     default:
       messcrash ("Wrong call to saSort typw = %dd>4", type) ;
     }
-  if (N <= 1) return;
+  if (N <= 1) return 0 ;
   else if (N < 128)
     newInsertionSort (cp, N, s, cmp) ;
   else
@@ -276,8 +277,11 @@ void saSort (BigArray aa, int type)
 
 
 #ifdef USEGPU
-	if (type < 3)
-	  saGPUSort (cp, N, type) ;
+	if (type < 3 && N > (1<<12))
+	  {
+	    usedGPU = 1 ;
+	    saGPUSort (cp, N, type) ;
+	  }
 	else
 	  {
 	    char *buf = malloc (N * s) ;
@@ -297,6 +301,7 @@ void saSort (BigArray aa, int type)
           (double)(end.tv_nsec - start.tv_nsec) / 1000000000.0;
       if (0) fprintf(stderr, "Sorted %ld elements in %f seconds (type: %d)\n", N, ellapsed, type);
     }
+  return usedGPU ;
 }/* saSsort */
 
 /**************************************************************/

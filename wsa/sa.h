@@ -122,6 +122,7 @@ typedef struct bStruct {
   RC rc ;
   DICT *dict, *errDict ;
   mytime_t start, stop ;
+  int gpu ;
   BigArray dnaCoords ;   /* offSets of the dna in the globalDna array */
   Array dnas ;           /* Array of const char Arrays */
   Array dnasR ;          /* Their reverse complement, only computed for the genome */
@@ -266,6 +267,7 @@ typedef struct pStruct {
   int minLength, minEntropy ;
   int errRateMax ;       /* (--align case) max number of errors in seed extension */
   int OVLN ;
+  int gpu ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   long int wiggleCumul ; /* in million bases */
   long int cds, utr, exonic, intronic, intergenic ;
@@ -415,7 +417,7 @@ long int saGffParser (PP *pp, TC *tc) ;
 long int saIntronParser (PP *pp, TC *tc) ; 
 
 /* sa.sort.c */
-void saSort (BigArray aa, int type) ;
+int saSort (BigArray aa, int type) ; /* return usedGPU */
 /* sa.gpusort.c */
 
 
