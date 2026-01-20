@@ -516,7 +516,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 		    { LD[5] = *xp ; mode = i ; }
 		}
 	      LD[5] = mode ;
-	      LD[6] /= j ; /* average */
+	      LD[6] = j ? LD[6]/j : 0 ; /* average */
 	      /* construct the cumulated distrib */
 	      xp = arrp (up->lengthDistribution, 0, long int) ;
 	      for (i = 1 ; i < iMax ; i++, xp++)
@@ -550,7 +550,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 		    { LD[5] = *xp ; mode = i ; }
 		}
 	      LD[5] = mode ;
-	      LD[6] /= j ; /* average */
+	      LD[6] = j ? LD[6]/j : 0 ; /* average */
 	      /* construct the cumulated distrib */
 	      xp = arrp (up->lengthDistribution, 0, long int) ;
 	      for (i = 1 ; i < iMax ; i++, xp++)

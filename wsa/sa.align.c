@@ -888,7 +888,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 
   for (int ic = 1 ; ic < arrayMax (bestAp) ; ic++)
     {
-      /* adjust introns */
+      /* adjust   exons */
       up = vp = arrp (aa, array (bestAp, ic, int), ALIGN) ; 
       chain = up->chain ;
       if (up->chrom != chromA)
@@ -958,6 +958,8 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 	      cp = arrp (dnaI, 0, char) ;
 	      if (jj)
 		{
+		  cp = arrayp (dnaI, jj, char) ;
+		  cp = arrp (dnaI, 0, char) ;
 		  cq = arrp (dnaG, up->a1 - 1 - jj, char) ;
 		  memcpy (cp, cq, jj) ;
 		  cp += jj ;
@@ -969,13 +971,17 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 		  da = vp->a2 - vp->a1 + 1 ;
 		  if (vp->chain == -1 || da < 1) continue ;
 		  keySet (ks, ia++) = vp->a1 - jj - 1 ;
+		  cp = arrayp (dnaI, jj + da, char) ;
 		  cq = arrp (dnaG, vp->a1 - 1 , char) ;
+		  cp = arrayp (dnaI, jj, char) ;
 		  memcpy (cp, cq, da) ;
 		  jj += da ;
 		  cp += da ;
 		  if (vp[1].chain == chain)
 		    {
 		      int du = vp[1].x1 - vp->x2 - 1 ;
+		      cp = arrayp (dnaI, jj + du + 6, char) ;
+		      cp = arrp (dnaI, jj, char) ;
 		      BOOL isDonor = TRUE ;
 		      if (du > 0)
 			{ /* in the overlap OR the bases form the donor and acceptor exon */

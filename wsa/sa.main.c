@@ -915,6 +915,7 @@ static void export (const void *vp)
       if (bb.aligns && bigArrayMax (bb.aligns))
 	{
 	  bigArraySort (bb.aligns, saAlignOrder) ;
+	  exportDo (pp, &bb) ;
 	  if (pp->sam)
 	    {
 	      ACEOUT ao = aos[bb.run] ;
@@ -922,7 +923,6 @@ static void export (const void *vp)
 		ao = aos[bb.run] = saSamCreateFile (pp, &bb, h) ;
 	      saSamExport (ao, pp, &bb) ;
 	    }
-	  exportDo (pp, &bb) ;
 	  t2 = clock () ;
 	  saCpuStatRegister ("8.Export_ali", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
 	  n = channelCount (pp->plChan) ;
@@ -1610,6 +1610,7 @@ int main (int argc, const char *argv[])
   p.ignoreIntronSeeds = getCmdLineBool (&argc, argv, "--ignoreIntronSeeds") ;
 
   p.sam = getCmdLineBool (&argc, argv, "--sam") ;
+  if (0) p.sam = TRUE ;
   if (p.sam)
     {
       p.exportSamSequence = TRUE ;

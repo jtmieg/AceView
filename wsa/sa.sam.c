@@ -28,18 +28,17 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 {
   A_ERR *ep ;
   Array errors = ap->errors ;
-  int lSam = 0, dx, ii, iMax = errors ? arrayMax (errors) : 0 ;
-  int x1 = ap->x1 ;
+  int lSam = 0, da, ii, iMax = errors ? arrayMax (errors) : 0 ;
+  int a1 = isDown ? ap->a1 : ap->a2 ;
+  int a2 = isDown ? ap->a2 : ap->a1 ;
   const int L = 16 ;
   char segs[2*iMax + 4][L] ;
   int iSeg = 0 ;
-  static int nn = 0 ;
   
   if (iMax)
     for (ii = 0 ; ii < iMax ; ii++)
       {
-	int j = isDown ? ii : iMax - 1 - ii ;
-	ep = arrp (errors, j, A_ERR)  ;
+	ep = arrp (errors, ii, A_ERR)  ;
 	if (ep->iShort < ap->x1 - 1 || ep->iShort >= ap->x2) continue ; /* may happen when fixing a duplication not authorized in sam */
 	
 	int xShort = ep->iShort + 1 ;
@@ -47,8 +46,8 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	if (xShort <= 0 || xLong <= 0)
 	  continue ;
 	
-	dx = ep->iShort - x1 + 1 ; /* number of exact matches, not including the problem */
-	if (dx <= 0)
+	da = ep->iLong - a1 + 1 ; /* number of exact matches, not including the problem */
+	if (da <= 0)
 	  continue ;
 	switch (ep->type)
 	  {
@@ -60,84 +59,66 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 	    break ;
 	  case INSERTION:
 	    *nInsp  += 1 ;
-	    x1 = ep->iShort + 2 ;
-	    if (x1 >= ap->x2) dx-- ;
-	    lSam += dx + 1 ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 1 ;
+	    lSam += da + 1 ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "1I") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  case INSERTION_DOUBLE:     
 	    *nInsp += 2 ;
-	    x1 = ep->iShort + (isDown ? 3 : 2) ;
-	    if (x1 >= ap->x2) dx-- ;
-	    dx += (isDown ? 0 : -1) ;
-	    lSam += dx + 2 ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 1 ;
+	    lSam += da + 2 ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "2I") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  case INSERTION_TRIPLE:     
 	    *nInsp += 3 ;
-	    x1 = ep->iShort + (isDown ? 4 : 2) ;
-	    if (x1 >= ap->x2) dx-- ;
-	    dx += (isDown ? 0 : -2) ;
-	    lSam += dx + 3 ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 1 ;
+	    lSam += da + 3 ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "3I") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  case  TROU:
 	    *nDelp += 1 ;
-	    x1 = ep->iShort + 1 ;
-	    lSam += dx ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 2 ;
+	    lSam += da ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "1D") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  case TROU_DOUBLE:
 	    *nDelp += 2 ;
-	    x1 = ep->iShort + 1 ;
-	    dx += (isDown ? 0 : 1) ;
-	    lSam += dx ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 3 ;
+	    lSam += da ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "2D") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  case TROU_TRIPLE:
 	    *nDelp += 3 ;
-	    x1 = ep->iShort + 1 ;
-	    dx += (isDown ? 0 : 2) ;
-	    lSam += dx ;
-	    snprintf(segs[iSeg++], L, "%dM", dx) ;
+	    a1 = ep->iLong + 4 ;
+	    lSam += da ;
+	    if (da > 0) snprintf(segs[iSeg++], L, "%dM", da) ;
 	    snprintf(segs[iSeg++], L, "3D") ;
-	    *nMp += dx ;
+	    *nMp += da ;
 	    break ;
 	  }
       }
   
-  dx = ap->x2 - x1 + 1 ;
-  if (dx > 0)
+  da = a2 - a1 + 1 ;
+  if (da > 0)
     {
-      int dx2 =  dnaMax ;
-      lSam += dx ;
-      if (lSam > dx2)
-	{
-	  dx -= (lSam - dx2) ;
-	  ap->x2 -= (lSam - dx2) ;
-	  lSam = dx2 ;
-	}
-      snprintf(segs[iSeg++], L, "%dM", dx) ;
-      *nMp += dx ;
+      snprintf(segs[iSeg++], L, "%dM", da) ;
+      *nMp += da ;
+      lSam += da ;  
     }
-
   for (int i = 0 ; i < iSeg ; i++)    
-    vtxtPrintf (cigar, segs[isDown ? i : iSeg - i - 1]) ;
+    vtxtPrintf (cigar, segs[i]) ;
 
-  dx =  ap->x2 - ap->x1 + 1 ;
-  if (0 && lSam != dx && nn++ < 100)
-    fprintf (stderr,  "Bad length in sam cigar lSam=%d dx=%d ap->x1=%d ap->x2=%d\t%s\t\tread %d : %s\n", lSam, dx, ap->x1, ap->x2, vtxtPtr (cigar), ap->read, dictName (bb->dict, ap->read >> 1)) ;
-
+  
   return lSam ;
 } /*  exportOneSamExon */
 
@@ -191,7 +172,7 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
 	      if (lSam - da < dnaMax && ap[1].x1 - da < ap[1].x2)
 		{ /* alignement is not finished */
 		  lSam -= da ;
-		  vtxtPrintf (cigar, "%dI", -da) ;
+		  if (da < 0) vtxtPrintf (cigar, "%dI", -da) ;
 		  ap[1].x1 -= da ; ap[1].a1 -= da ;
 		}
 	      else  /* just export the final nS */
@@ -244,7 +225,7 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
 	      if (lSam - da < dnaMax && ap[-1].x2 + da > ap[-1].x1)
 	      {
 		lSam -= da ;
-		vtxtPrintf (cigar, "%dI", -da) ;
+		if (da < 0) vtxtPrintf (cigar, "%dI", -da) ;
 		ap[-1].x2 += da ;
 		ap[-1].a2 -= da ;
 	      }
@@ -366,7 +347,7 @@ if (1)
       /* i am a PCR duplicate: never used by magic 1024 == 0x400 */
       if (0) flag |= 0x400 ;
       /*  supplementary alignment  2048 == 0x800
-       *  divers portion du meme read sont incompatibles
+       *  diverses  portions du read sont incompatibles
        *  all have this flag except the first one
        */
       if (isSupplementary) flag |= 0x800 ;
@@ -376,7 +357,7 @@ if (1)
   aceOutf (ao, "\t%d", flag) ;
   aceOutf (ao, "\t%s", dictName (dictG, chrom)) ;
 
-  if (ap->read == 187746 && chrom==10)
+  if (0 && ap->read == 187746 && chrom==10)
     invokeDebugger () ;
   /* a chain [i0, iMax[, is reported as a single CIGAR */
   chainA1 = ap->chainA1 ;
@@ -459,7 +440,7 @@ if (1)
 	      int i = arrayMax (qual) - 1 ;
 	      char *cp = arrp (qual, i, char) ;
 	      aceOut (ao, "\t") ;
-	      while (i--)
+	      while (i-- >= 0)
 		aceOutf (ao, "%c", *cp--) ;
 	    }
 	}

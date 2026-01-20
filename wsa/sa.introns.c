@@ -124,7 +124,7 @@ static int confirmedPolyAsCompress (Array aaa)
 
 static int confirmedIntronsCompress (Array aaa) 
 {
-  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  int ii, jj = 0, kk = 1, iMax = arrayMax (aaa) ;
   arraySort (aaa, confirmedIntronsOrder) ;
   INTRON *up, *vp, *wp ;
 
@@ -152,7 +152,7 @@ static int confirmedIntronsCompress (Array aaa)
 
 static int doubleIntronsCompress (Array aaa) 
 {
-  int ii, jj, kk = 1, iMax = arrayMax (aaa) ;
+  int ii, jj = 0, kk = 1, iMax = arrayMax (aaa) ;
   arraySort (aaa, doubleIntronsOrder) ;
   DOUBLEINTRON *up, *vp, *wp ;
 
@@ -255,10 +255,10 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
   int nEx = vp->nErr ;
   int nEy = wp->nErr ;
   int i, j, nE ;
-  int bestN, bestI, bestJ ;
-  int dy = vp->x2 - wp->x1 + 1 ;
-  int da = vp->a2 - wp->a1 ;
-
+  int bestN, bestI = -1, bestJ = -1 ;
+  int dy = vp->x2 - wp->x1 + 1 ;  /* dy > 0 recouvrement, dy < 0: trou dans le read */
+  int da = vp->a2 - wp->a1 ;      
+  BOOL isDown = (vp->a1 < vp->a2 ? TRUE : FALSE ) ;
   if (da < 5 && da > -5 && dy < 5 && dy > -5 && vp->chrom == wp->chrom)
     {
       /* merge the 2 alignments */
@@ -267,8 +267,8 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       vp->nErr += wp->nErr ;
       vp->errors = vp->errors ? vp->errors : wp->errors ;
       if (vp->errors && vp->nErr)
-	epX = arrayp (vp->errors, vp->nErr - 1, A_ERR) ;
-      memset (wp, 0, sizeof (ALIGN)) ;
+	epX = arrayp (vp->errors, vp->nErr - 1, A_ERR) ; /* the extra errors from wp are not copied, hence set to zero */
+      memset (wp, 0, sizeof (ALIGN)) ; nEy = 0 ;
       wp->chain = -1 ;
       return ;
     }
@@ -276,40 +276,56 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     {
       int dx = vp->x1 - wp->x1 ;
       wp->x1 = vp->x1 ;
-      if (wp->a1 < wp->a2) wp->a1 += dx ;
-      else wp->a1 -= dx ;
+      wp->a1 += (isDown ? dx : -dx ) ;  /* correct only if there are no indel in [wp->a1,wp->a1+dx] segment */
     }
   dy = vp->x2 - wp->x1 + 1 ;
   if (dy > 0 && nEx + nEy > 0)
-    {  
-      for (nE = 0 ; nE < nEx ; nE++)
+    {
+      int zX =x2 , zY ;
+      int zEx = 0, zEy = nEy ;
+      epX = epY = 0 ; bestI = bestJ = -1 ; nE = 0 ; 
+      for (i = 0 ; i < nEx ; i++)
 	{  /* count the vp errors that cannot be clipped */
 	  epX = arrp (vp->errors, nE, A_ERR) ;
-	  int zX = epX->iShort ; /* first bad base */
-	  if (zX + 1 >= y1) /* bio coords */
+	  int zX = epX->iShort ; /* last good base */
+	  if (zX  < y1 - 1) /* bio coords */
+	    { bestI = i ; zEx++ ; }
+	  else
 	    break ;
 	}
-      /* if we clip both ali at y1, we keep nE errors
+      nE = zEx + zEy ;
+      bestN = nE ;
+      int cI = bestI, cJ = bestJ ;
+      int cY1 = y1, cX2 = zX ;
+      
+      /* if we clip both ali at bestY1 <= z <= bestX2, we keep nE errors
        * let us try to find a better position
        */
-      i = nE ; j = 0 ; /* next error in vp and wp */
-      nE = nE + nEy ;
-      bestN = nE ; bestI = i ; bestJ = j ; 
-      epX = epY = 0 ;
-      while (bestN && (i < nEx || j < nEy))
+      while (TRUE)
 	{
-	  int zX = x2 ;
-	  if (i < nEx)
+	  epX = (cI >=0 && cI < nEx ? arrp (vp->errors, cI, A_ERR) : 0) ;
+	  epY = (cJ >=0 && cJ < nEy ? arrp (wp->errors, cJ, A_ERR) : 0) ;
+	  if (epX && epY && epX->iLong == epY->iLong && epX->iShort == epY->iShort)
 	    {
-	      epX = arrp (vp->errors, i, A_ERR) ;
-	      zX = epX->iShort ; /* first bad base starting from the left */
-	      zX = zX  < x2 - 1 ? zX : x2 - 1 ;
+	      /* merge the 2 alignments */
+	      vp->a2 = wp->a2 ;
+	      vp->x2 = wp->x2 ;
+	      vp->nErr += wp->nErr ;
+	      vp->errors = vp->errors ? vp->errors : wp->errors ;
+	      if (vp->errors && vp->nErr)
+		epX = arrayp (vp->errors, vp->nErr - 1, A_ERR) ;
+	      memset (wp, 0, sizeof (ALIGN)) ;
+	      wp->chain = -1 ; 
+	      return ;
 	    }
-	  int zY = x2 ;
+
+	  /* find the next zY (candidate bestY1) */
+	  zY = cY1 ;
+	  j = cJ + 1 ;
 	  if (j < nEy)
 	    {
 	      epY = arrp (wp->errors, j, A_ERR) ;
-	      zY = epY->iShort  ; /* last bad base starting from the right */
+	      zY = epY->iShort + 2  ; /* first good base starting from the right */
 	      switch (epY->type)
  		{   /* we need to adjust the coordinates */
 		case INSERTION:
@@ -328,77 +344,85 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 		default:
 		  break ;
 		}
-	      zY = zY  < x2  ? zY : x2 ;
-	    }
-	  if (epX && epY && epX->iLong == epY->iLong && epX->iShort == epY->iShort)
-	    {
-	      /* merge the 2 alignments */
-	      vp->a2 = wp->a2 ;
-	      vp->x2 = wp->x2 ;
-	      vp->nErr += wp->nErr ;
-	      vp->errors = vp->errors ? vp->errors : wp->errors ;
-	      if (vp->errors && vp->nErr)
-		epX = arrayp (vp->errors, vp->nErr - 1, A_ERR) ;
-	      memset (wp, 0, sizeof (ALIGN)) ;
-	      wp->chain = -1 ;
-	      return ;
-	    }
 
-	  if (zX < zY)
-	    { nE++ ; i++ ; }
-	  else if (zX >= zY && zY < x2)
+	      if (zY <= cX2 + 1)
+		{  /* eating this Y error is favorable */
+		  zEy-- ;
+		  nE = zEx + zEy ;
+		  if (nE < bestN) { bestN = nE ; bestJ = j ; }
+		  cJ = j ; cY1 = zY ;
+		  continue ;
+		}
+	    }	  
+	  /* advance on zX */
+	  zX = cX2 ;
+	  i = cI + 1 ;
+	  if (i < nEx)
 	    {
-	      nE-- ;
-	      if (nE < bestN)
-		{ bestN = nE ; bestI = i ; bestJ = j + 1 ; }
-	      j++ ;
+	      epX = arrp (vp->errors, i, A_ERR) ;
+	      zX = epX->iShort ; /* last good base starting from the left */
+	      /* not favorable but maybe we canadvance on Y */
+	      zEx++ ; cI++ ; cX2 = zX ; continue ;
 	    }
-	  else
-	    break ;
+	  /* we cannot advance on X and we already have advanced on Y, so we are done */
+	  break ;
 	}
-      if (bestJ > 0) /* if bestJ == 0, wp->x1/a1 is well positioned */
+
+      if (bestI < nEx - 1)
+	{
+	  if (bestI >= 0)
+	    {
+	      vp->x2 = epX->iShort ;
+	      vp->a2 = epX->iLong + (isDown ? 0 : 2) ;
+	    }
+	  nEx = bestI + 1 ;
+	  arrayMax (vp->errors) = nEx ;
+	}
+
+      if (bestJ >= 0) /* if bestJ == -1, wp->x1/a1 is well positioned */
 	{ /* we must clip these errors */
-	  epY = arrp (wp->errors, bestJ - 1, A_ERR) ;
-	  int zA = epY->iLong + ((wp->chrom & 0x1) ? -1 : 1) ;
+	  epY = arrp (wp->errors, bestJ, A_ERR) ;
+	  int zA = epY->iLong  + 1 ;
 	  int zY = epY->iShort + 1 ; /* we need to find the first exact */
+	  int dA = 0, dY = 0 ;
 	  switch (epY->type)
 	    {   
 	    case INSERTION:
-	      zA += ((wp->chrom & 0x1) ? -1 : 1) ;
+	      dA-- ;
 	      break ;
 	    case INSERTION_DOUBLE:
-	      zY += 1 ;
-	      zA += ((wp->chrom & 0x1) ? -1 : 1) ;
+	      dY++ ;
+	      dA++ ;
 	      break ;
 	    case INSERTION_TRIPLE:
-	      zY += 2 ;
-	      zA += ((wp->chrom & 0x1) ? -1 : 1) ;
+	      dY += 2 ;
+	      dA-- ;
 	      break ;
 	    case TROU:
-	      zY -- ;
+	      dY -- ;
 	      break ;
 	    case TROU_DOUBLE:
-	      zY -- ;
-	      zA += ((wp->chrom & 0x1) ? -1: 1) ;
+	      dY -- ;
+	      dA-- ;
 	      break ;
 	    case TROU_TRIPLE:
-	      zY -- ;
-	      zA += ((wp->chrom & 0x1) ? -2 : 2) ;
+	      dY -- ;
+	      dA -= 2 ;
 	      break ;
 	    default:
 	      break ;
 	    }
-	  wp->x1 = zY + 1 ;  /* bio coords */
-	  wp->a1 = (wp->chrom & 0x1 ?  arrayMax(dnaG) - zA : zA + 1) ;
-	  wp->nErr -= bestJ ;
+	  wp->x1 = zY + dY + 1 ;  /* bio coords */
+	  wp->a1 = (isDown ?  zA + dA + 1 : arrayMax(dnaG) - zA + dA) ;
+	  wp->nErr -= bestJ + 1 ;
 	  for (j = 0, epY = arrp (wp->errors, 0, A_ERR) ; j < wp->nErr ; epY++, j++)
-	    *epY = *(epY + bestJ) ;
+	    *epY = *(epY + bestJ + 1) ;
 	  arrayMax (wp->errors) = wp->nErr ;
 	}
-      if (bestI < nEx) /* we can clip the vp errors */
+      if (bestI >=0 && bestI < nEx) /* we can clip the vp errors */
 	{
 	  epX = arrp (vp->errors, bestI, A_ERR) ;
-	  int zA = epX->iLong  + ((wp->chrom & 0x1) ? +1 : -1) ;
+	  int zA = epX->iLong  + (isDown ? -1 : +1) ;
 	  int zX = epX->iShort - 1 ; /* we need to find the last exact */
 	  vp->nErr -= nEx - bestI ;
 	  vp->x2 = zX + 1 ;  /* bio coords */

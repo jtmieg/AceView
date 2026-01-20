@@ -956,6 +956,12 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax ; i++, cp++)
 		    bb->runStat.ATGCN[atgcn[(int)*cp]]++ ;
+
+		  if (iMax > bb->runStat.maxReadLength)
+		    bb->runStat.maxReadLength = iMax ;
+		  if (! bb->runStat.minReadLength || iMax < bb->runStat.minReadLength)
+		    bb->runStat.minReadLength = iMax ;
+		  array (bb->runStat.lengthDistribution, iMax, long int)++ ;
 		}
 	      if (arrayMax (dna1))
 		{

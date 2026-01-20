@@ -1986,7 +1986,7 @@ static int oligoEntropy4 (unsigned const char *dna, int ln, int minEntropy)
 static int oligoEntropy16 (unsigned const char *dna, int ln, int minEntropy) 
 {
   int ss = 0 ;
-  int n, nn, dx = ln ;
+  int n, nn = 0, dx = ln ;
   unsigned const char *ccp ;
   static Array ee = 0 ;
   int cc, bb[16] ;

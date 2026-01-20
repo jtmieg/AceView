@@ -217,8 +217,9 @@ static void tsfSampleSelectInit (TSF *tsf)
 {
   AC_HANDLE h = ac_new_handle() ;
   char *cq, *cp = strnew (tsf->sampleSelectList, h) ;
- 
-  tsf->sampleSelectOnly = TRUE ;
+  BOOL sampleSelectOnly = TRUE ;
+  tsf->sampleSelectOnly = FALSE ;
+  
   tsf->sampleSelectDict = dictHandleCreate (256, tsf->h) ;
   while (cp)
     {
@@ -232,7 +233,7 @@ static void tsfSampleSelectInit (TSF *tsf)
 	}
 
       if (strchr (cp, '*'))
-	tsf->sampleSelectOnly = FALSE ;
+	sampleSelectOnly = FALSE ;
       else
 	{
 	  dictAdd (tsf->sampleSelectDict, cp, 0) ;
@@ -240,6 +241,7 @@ static void tsfSampleSelectInit (TSF *tsf)
 	}
       cp = cq ;
     }
+  tsf->sampleSelectOnly = sampleSelectOnly ;
   ac_free (h) ;
 
 } /* tsfSampleSelectInit */

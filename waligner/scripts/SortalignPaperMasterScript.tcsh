@@ -46,34 +46,35 @@ setenv SV v42.nov2        # maxTargetRepeats 81, seedLength 18,  MAXJUMP 3, Yann
 setenv SVlast v42.nov2
 setenv SV v43.nov2        # maxTargetRepeats 31, seedLength 18,  MAXJUMP 3, Yann, nA = nB = 40, numactl pin to best
 setenv SVlast v43.nov2
-setenv SV v44.nov12        # idem --wiggle
+setenv SV v44.nov12        # yes wiggle
 setenv SVlast v44.nov12
 setenv SV v45.nov21        # no wiggle, no sam,    fixed sam and pairs (but i do not use --sam ) , added new T2T index to Hisat, star and minimap
 setenv SVlast v45.nov21
 setenv SV v46.dec1        # no wiggle, no sam, fixed pairs again => fixed multiAligned, modified sam2gold to not count introns
-setenv SVlast v46.dec1
-setenv SV v47.dec9        # no wiggle, no sam, removd enhanced exon seds, completed intron discovery and using seeds
-setenv SVlast v47.dec9
-setenv SV v48.dec10        # same with wiggle
-setenv SVlast v48.dec10
-setenv SV v50.jan1         # use the gff to assess the introns while createIndex (do not parse the gff while aligning since we do not set -wiggle)
-setenv SVlast v50.jan1
-setenv SV v51.jan4         # same as v50 plus --wiggle and gene expression
-setenv SVlast v51.jan4
-setenv SV v52.jan7         # same as v50 no --wiggle modified run naming
-setenv SVlast v52.jan7
-#setenv SV v53.jan7         # same as v50 no --wiggle modified run naming   bin.LINUX_NATIVE
-#setenv SVlast v53.jan7
+#setenv SVlast v46.dec1
+#setenv SV v47.dec9        # no wiggle, no sam, removed enhanced exon seeds, completed intron discovery and using seeds
+#setenv SVlast v47.dec9
+#setenv SV v48.dec10        #no wiggle
+#setenv SVlast v48.dec10
+#setenv SV v50.jan1         # no wiggle, use the gff to assess the introns while createIndex (do not parse the gff while aligning)
+#setenv SVlast v50.jan1
+#setenv SV v51.jan4         # no wiggle, same as 50 
+#setenv SVlast v51.jan4
+#setenv SV v52.jan7         # no wiggle, aligned the BigArrays, complete compiler clean up
+#setenv SVlast v52.jan7
+#setenv SV v53.jan17         # yes wiggle, same as v52 with wiggle and sam output
+setenv SVlast v53.jan17
 
 if ($SV == $SVlast) then
-  \cp bin/sortalign bin/sortalign.$SV
+  \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
   if (-e bin.nativeZZZ/sortalign) \cp bin.native/sortalign bin/sortalign.$SV
   touch bin/wsa.$SV.toto
   \rm -rf bin/wsa.$SV*
   mkdir bin/wsa.$SV
   cp ~/ace/wsa/sa.*[ch] bin/wsa.$SV
 endif
-
+\cp bin/sortalign.$SV bin/sortalign
+  
 setenv NOINTRONSEEDS 0
 setenv seedLength 18
 setenv maxTargetRepeats 81
@@ -968,10 +969,13 @@ cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerf
 mv RESULTS/allSamStats RESULTS/allSamStats.1
 foreach run ($runs)
     set nRun=`echo "$run ZZZZZ $runs" | gawk '{r=$1;for (i=3;i<=NF;i++)if(r==$i)k=i-2;}END{printf ("%2d", k);}'`
-    cat RESULTS/allSamStats.1 | gawk -F '\t' '{if($1 == run){printf("%2d_",k);print;}}' k=$nRun run=$run >> RESULTS/allSamStats
+    cat RESULTS/allSamStats.1 | gawk -F '\t' '{if($1 == run){m=$2;if(substr(m,1,2)=="01")m=m"."SV;printf("%2d_%s\t%s",k,run,m);for(i=3;i<=NF;i++)printf("\t%s",$i);printf("\n");}}' k=$nRun run=$run SV=$SV>> RESULTS/allSamStats
 end
 
 setenv runsN `echo "$runs" | gawk '{for(k=1;k<=NF;k++)printf("%2d_%s ",k,$k);}'`
+
+set tsfMethods=`echo $methods | gawk '{sep="";for(i=1;i<=NF;i++){printf("%s%s",sep,$i);if(substr($i,1,2)=="01")printf(".%s",SV);sep=",";}}END{printf("\n");}' SV=$SV`
+echo $tsfMethods
 
 foreach tag (AlignedReads nAlignedBases nErrors  Perfect_reads nUnaligned nAlignedOnce nMultiAligned)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
@@ -982,7 +986,7 @@ foreach tag (AlignedReads nAlignedBases nErrors  Perfect_reads nUnaligned nAlign
       echo "$run\t$mm\tt\t0" >> toto.tag
     end
   end
-  cat toto.tag | bin/tsf  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
+  cat toto.tag | bin/tsf --sampleSelect $tsfMethods  -I tsf -O table --title perCent.$tag >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -996,9 +1000,10 @@ foreach tag (AlignedReads nAlignedBases nErrors Perfect_reads RawBases RawReads 
     end
   end
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {printf("%s\t%s\ti\t%s\n", $1,$2,$4);}}' tag=$tag >> toto.tag  
-  cat toto.tag | bin/tsf  -I tsf -O table --title $tag >> COMPARE/samStats.$SV.txt
+  cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title $tag >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
+
 
 foreach tag (nAlignments)
   echo $tag
@@ -1011,7 +1016,7 @@ foreach tag (nAlignments)
   end
   echo "\nAverage_number_of_alignments per aligned read\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1027,7 +1032,7 @@ foreach tag (nMultiAligned)
   end
   echo "\nPercentaged of aligned read which are multi aligned\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Average number of alignments" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1042,7 +1047,7 @@ foreach tag (Supported_introns)
   end
   echo "\nSupported introns\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\ti\t%s\n", $1,$2,$4);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Supported introns" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Supported introns" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1058,7 +1063,7 @@ foreach tag (Intron_supports)
   end
   echo "\nIntron supports\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($4) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\ti\t%s\n", $1,$2,$4);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Intron supports" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Intron supports" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 foreach tag (Intron_supports)
@@ -1072,7 +1077,7 @@ foreach tag (Intron_supports)
   end
   echo "\nIntron stranding\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($7) >= 1 && $3 == tag) {gsub("%","",$7);printf("%s\t%s\tf\t%s\n", $1,$2,$7);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Intron strandings" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Intron strandings" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1087,7 +1092,7 @@ foreach tag (Non_compatible_pairs)
   end
   echo "\nConsistent pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Compatible pairs" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Compatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
@@ -1102,7 +1107,7 @@ foreach tag (Non_compatible_pairs)
   end
   echo "\nNon_compatible_pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
-   cat toto.tag | bin/tsf  -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
+   cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
