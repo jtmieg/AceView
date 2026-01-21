@@ -964,6 +964,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 		  memcpy (cp, cq, jj) ;
 		  cp += jj ;
 		}
+	      memset (&zp, 0, sizeof(zp)) ;
 	      zp.x1 = up->x1 ;
 	      zp.a1 = jj + 1 ;
 	      for (vp = up ; vp->chain == chain || vp->chain == -1 ; vp++)
@@ -1115,11 +1116,12 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 	      }
 	      alignClipErrorRight (&zp, pp->errCost) ;
 	      /* remap */
-	      int ja ;
+	      int ja, dda = 0 ;
 	      for (vp = up, ja = 1 ; vp->chain == chain || vp->chain == -1 ; vp++)
 		{
 		  int dz = keySet (ks, ja)  ;
 		  int j = 0 ;
+		  int del = 0, ins = 0;
 		  da = vp->a2 - vp->a1 + 1 ;
 		  if (vp->chain == -1 || da < 1) continue ;
 		  if (vp->a1 > zp.a2 + dz)
@@ -1138,13 +1140,33 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    vp->errors = arrayHandleCreate (8, A_ERR, bb->h) ;
 			  A_ERR *eq = arrayp (vp->errors, j++, A_ERR) ;
 			  *eq = *ep ;
-			  eq->iLong += dz ;
+			  eq->iLong += dz + dda ;
+			  switch (ep->type)
+			    {
+			    case INSERTION: dda++ ; ins++ ; break ;
+			    case INSERTION_DOUBLE: dda+=2 ; ins += 2 ; break ;
+			    case INSERTION_TRIPLE: dda+=3 ; ins += 3 ; break ;
+			    case TROU: dda-- ; del++ ; break ;
+			    case TROU_DOUBLE: dda-=2 ; del += 2 ; break ;
+			    case TROU_TRIPLE: dda-=3 ; del += 3 ; break ;
+			    default : break ;
+			    }
 			}
 		    }
+		  int dd = (vp->x2 - vp->x1 + 1 + del) - ((vp->a1 < vp->a2 ? vp->a2 - vp->a1 : vp->a1 - vp->a2) + 1 + ins) ;
+		  if (dd < 0) vp->x2 += dd ;
+		  if (dd > 0) vp->a2 += dd ;
 		  ja++ ;
 		  vp->nErr = vp->errors ? arrayMax (vp->errors) : 0 ;
 		}
 	    }
+	  for (vp = up ; vp->chain == chain ; vp++)
+	    {
+	      if (vp->x1 < 1)
+		{ int dx = 1 - vp->x1 ; vp->x1 += dx ; vp->a1 += (vp->a1 < vp->a2 ? dx : -dx) ;}
+	      if (vp->x2 > arrayMax (dna))
+		{ int dx = vp->x2 - arrayMax(dna) ; vp->x2 -= dx ; vp->a2 -= (vp->a1 < vp->a2 ? dx : -dx) ;}
+	    }	      
 	  if (! isDown)
 	    {
 	      int nvp = 0 ;

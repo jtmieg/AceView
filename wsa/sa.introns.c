@@ -419,19 +419,22 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	    *epY = *(epY + bestJ + 1) ;
 	  arrayMax (wp->errors) = wp->nErr ;
 	}
-      if (bestI >=0 && bestI < nEx) /* we can clip the vp errors */
+      if (bestI >=0 && bestI < nEx - 1) /* we can clip the vp errors */
 	{
 	  epX = arrp (vp->errors, bestI, A_ERR) ;
 	  int zA = epX->iLong  + (isDown ? -1 : +1) ;
 	  int zX = epX->iShort - 1 ; /* we need to find the last exact */
-	  vp->nErr -= nEx - bestI ;
+	  vp->nErr = bestI + 1 ;
 	  vp->x2 = zX + 1 ;  /* bio coords */
 	  vp->a2 = (vp->chrom & 0x1 ?  arrayMax(dnaG) - zA : zA + 1) ;
 	  arrayMax (vp->errors) = vp->nErr ;
 	}
     }
-
-  
+  /*
+  111M8590N187M696N213M1I21M1I 28M1S1071N 3M1I45M1I25M
+  111M8590N187M696N213M1I21M1I 28M1I1071N     48M1I25M
+  111M8590N187M696N210M1I21M1I 31M1071N   1I45M1I28M
+  */
   BOOL foundDonor = FALSE ;
   BOOL foundAcceptor = FALSE ;
   int donor = 0, acceptor = 0 ;

@@ -40,7 +40,8 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
       {
 	ep = arrp (errors, ii, A_ERR)  ;
 	if (ep->iShort < ap->x1 - 1 || ep->iShort >= ap->x2) continue ; /* may happen when fixing a duplication not authorized in sam */
-	
+	if (ep->iLong + 1 == ap->a1)
+	  continue ;
 	int xShort = ep->iShort + 1 ;
 	int xLong = ep->iLong + 1 ;
 	if (xShort <= 0 || xLong <= 0)
@@ -123,7 +124,9 @@ static int exportOneSamExon (BB *bb, BOOL isDown, vTXT cigar, ALIGN *ap, int *nM
 } /*  exportOneSamExon */
 
 /*********************************************************************/
-
+/*
+  samtools stats titi1/Roche.sam | gawk -f scripts/sam_stats.awk
+*/
 static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array dna, int *nMp, int *nSubp, int *nInsp, int *nDelp, int *nGapp)
 {
   int ii ;
@@ -150,7 +153,7 @@ static char *exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array 
 	  lSam += exportOneSamExon (bb, isDown, cigar, ap, nMp, nSubp, nInsp, nDelp, dnaMax -lSam) ;
 
 	  int dx = ap[1].x1 - ap[0].x2 - 1 ;
-	  if (dx > 0)
+	  if (0  && dx > 0)
 	    {
 	      lSam += dx ;
 	      vtxtPrintf (cigar, "%dS", dx) ;

@@ -50,17 +50,17 @@ setenv SV v44.nov12        # yes wiggle
 setenv SVlast v44.nov12
 setenv SV v45.nov21        # no wiggle, no sam,    fixed sam and pairs (but i do not use --sam ) , added new T2T index to Hisat, star and minimap
 setenv SVlast v45.nov21
-setenv SV v46.dec1        # no wiggle, no sam, fixed pairs again => fixed multiAligned, modified sam2gold to not count introns
+#setenv SV v46.dec1        # no wiggle, no sam, fixed pairs again => fixed multiAligned, modified sam2gold to not count introns
 #setenv SVlast v46.dec1
-#setenv SV v47.dec9        # no wiggle, no sam, removed enhanced exon seeds, completed intron discovery and using seeds
+setenv SV v47.dec9        # no wiggle, no sam, removed enhanced exon seeds, completed intron discovery and using seeds
 #setenv SVlast v47.dec9
-#setenv SV v48.dec10        #no wiggle
+setenv SV v48.dec10        #no wiggle
 #setenv SVlast v48.dec10
-#setenv SV v50.jan1         # no wiggle, use the gff to assess the introns while createIndex (do not parse the gff while aligning)
+setenv SV v50.jan1         # no wiggle, use the gff to assess the introns while createIndex (do not parse the gff while aligning)
 #setenv SVlast v50.jan1
 #setenv SV v51.jan4         # no wiggle, same as 50 
 #setenv SVlast v51.jan4
-#setenv SV v52.jan7         # no wiggle, aligned the BigArrays, complete compiler clean up
+setenv SV v52.jan7         # no wiggle, aligned the BigArrays, complete compiler clean up
 #setenv SVlast v52.jan7
 #setenv SV v53.jan17         # yes wiggle, same as v52 with wiggle and sam output
 setenv SVlast v53.jan17
