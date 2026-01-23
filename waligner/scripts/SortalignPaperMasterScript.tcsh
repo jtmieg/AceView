@@ -66,6 +66,8 @@ setenv SV v53.jan20         # no wiggle, fixing errors close to introns which cr
 setenv SVlast v53.jan20
 setenv SV v54.jan22         # no wiggle, fixing for BAM lots of issues on exon boundaries
 setenv SVlast v54.jan22
+setenv SV v55.81.jan23         # no wiggle, fixing for BAM lots of issues on exon boundaries
+setenv SVlast v55.81.jan23
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -79,8 +81,8 @@ endif
   
 setenv NOINTRONSEEDS 0
 setenv seedLength 18
-setenv maxTargetRepeats 81
 setenv maxTargetRepeats 31
+setenv maxTargetRepeats 81
 
 
 ##       SortalignPaperMasterScript.tcsh
@@ -125,8 +127,8 @@ setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_Magi
 
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
-setenv methods "011_SortAlignG5R5"
-set createIndex=11
+
+set createIndex=0
 if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 21_HISAT2 31_STARlong"
 if ($createIndex == 11)  setenv methods "011_SortAlignG5R5"
 if ($createIndex == 12)  setenv methods "012_SortAlignG3R3"
@@ -968,7 +970,7 @@ echo "### True error rates in Baruzzo datasets:   t1=0.543,  t2=1.186, t3=6.024"
 cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 's/nMultiAligned 1 times/nAlignedOnce/g' -e 's/nMultiAligned 2 times/nMultiAligned_2_sites/g' > RESULTS/allSamStats
 
 \mv RESULTS/allSamStats RESULTS/allSamStats.old
-cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerfectReads/Perfect_reads/' -e 's/nRawBases/RawBases/' -e 's/nRawReads/RawReads/' -e 's/nReads/Reads/' -e 's/nErrors/nMismatches_and_InDels/' > RESULTS/allSamStats
+cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerfectReads/Perfect_reads/' -e 's/nRawBases/RawBases/' -e 's/nRawReads/RawReads/' -e 's/nReads/Reads/' -e 's/nErrors/nMismatches_and_InDels/' -e 's/nMismaches_and_InDels/nMismatches_and_InDels/' > RESULTS/allSamStats
 
 mv RESULTS/allSamStats RESULTS/allSamStats.1
 foreach run ($runs)

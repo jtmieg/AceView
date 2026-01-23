@@ -422,8 +422,8 @@ int saSort (BigArray aa, int type) ; /* return usedGPU */
 
 
 /* sa.sam.c */
-int saSamExport (ACEOUT ao, const PP *pp, BB *bb) ;       
-ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h) ; 
+int saSamExport (ACEOUT ao, ACEOUT aoe, const PP *pp, BB *bb) ;       
+ACEOUT saSamCreateFile (const PP *pp, BB *bb, BOOL isError, AC_HANDLE h) ; 
 
 /* sa.introns.c */
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 

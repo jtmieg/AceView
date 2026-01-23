@@ -314,7 +314,21 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
       const CW *restrict cw1;
       const CW *restrict cwMax = cw + iMax ;
       HIT *restrict hit;
-        
+
+#ifdef JUNK      
+      if (kk == 6)
+	{
+	  const CW *restrict zw = bigArrp(bb->cwsN[kk], 0, CW) ;
+	  for (long int i = 0 ; i < bigArrayMax (bb->cwsN[kk]) ; i++, zw++)
+		 fprintf (stderr, "SEED\t%u\t%u\t%u\t%u\n"
+			  , kk
+			  , zw->nam
+			  , zw->seed
+			  , zw->pos
+			  ) ;
+	}
+#endif      
+
       while  (i < iMax && j < jMax)
 	{
 	  if (0 && kk == 1 && rw->seed == 185667857)
@@ -396,7 +410,19 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 		      x1 = rw->pos ;
 		      chromUp ^= readUp ; /* we want to be on strand plus of the read */
 		      readUp = 0 ;
-		    
+#ifdef JUNK      		    
+		      if (1)
+			{
+			  fprintf (stderr, "MATCH\t%d\t%d\t%d\t%d\t%d\t%d\n"
+				   , kk
+				   , rw->nam
+				   , rw->seed
+				   , rw->pos
+				   , cw->nam
+				   , cw->pos
+				   ) ;
+			}
+#endif		      
 		      if (! chromUp)  /* plus strand of the genome */
 			{
 			  hit->a1 =
@@ -906,8 +932,10 @@ static void export (const void *vp)
   AC_HANDLE h = ac_new_handle () ;
   int runMax = dictMax (pp->runDict) ;
   ACEOUT aos[runMax + 1]  ;
+  ACEOUT aoes[runMax + 1]  ;
 
   memset (aos, 0, sizeof (aos)) ;
+  memset (aoes, 0, sizeof (aoes)) ;
   memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->aeChan, &bb, BB))
     {
@@ -919,9 +947,13 @@ static void export (const void *vp)
 	  if (pp->sam)
 	    {
 	      ACEOUT ao = aos[bb.run] ;
+	      ACEOUT aoe = aoes[bb.run] ;
 	      if (! ao)
-		ao = aos[bb.run] = saSamCreateFile (pp, &bb, h) ;
-	      saSamExport (ao, pp, &bb) ;
+		{
+		  ao = aos[bb.run] = saSamCreateFile (pp, &bb, FALSE, h) ;
+		  aoe = aoes[bb.run] = saSamCreateFile (pp, &bb, TRUE, h) ;
+		}
+	      saSamExport (ao, aoe, pp, &bb) ;
 	    }
 	  t2 = clock () ;
 	  saCpuStatRegister ("8.Export_ali", pp->agent, bb.cpuStats, t1, t2, bb.aligns ? bigArrayMax (bb.aligns) : 0) ;
@@ -1497,22 +1529,22 @@ int main (int argc, const char *argv[])
 
   if ( getCmdLineInt (&argc, argv, "--checkSorter", &n))
     {                                           /* check the sorting algorithm */
-      BigArray b, a = bigArrayHandleCreate (n, HIT, 0) ;
+      BigArray b, a = bigArrayHandleCreate (n, CW, 0) ;
 
       
       for (int i = 0 ; i < n ; i++)
-	bigArray (a, i, HIT).read = ( !(n &0x1) ? (n - i)%7 :  (unsigned int)randint()) ;  
+	bigArray (a, i, CW).seed = ( !(n &0x1) ? (n - i)%7 :  (unsigned int)randint()) ;  
 
       b = bigArrayHandleCopy (a, 0) ;
-      saSort (b, 2) ; /* hitReadOrder */
+      saSort (b, 1) ; /* hitReadOrder */
       
       for (int i = 0 ; i < 50 && i < n ; i++)
 	printf("%d %d\n"
-	       , bigArr (a,i, HIT).read
-	       , bigArr (b,i, HIT).read
+	       , bigArr (a,i, CW).seed
+	       , bigArr (b,i, CW).seed
 	       ) ;
       for (int i = 0 ; i < n-1 ; i++)
-	if (bigArr (b,i, HIT).read > bigArr (b,i+1, HIT).read)
+	if (bigArr (b,i, CW).seed > bigArr (b,i+1, CW).seed)
 	  messcrash ("\nerror line %d\n", i) ;
       showHits (0) ;
       showHitsDo (0, 0) ;

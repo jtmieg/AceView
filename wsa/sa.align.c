@@ -2455,6 +2455,19 @@ void saAlignDo (const PP *pp, BB *bb)
   /*
     bb->isAligned = bitSetHandleCreate (bb->nSeqs, bb->h) ;
   */
+#ifdef JUNK
+  if (1)
+    {
+      for (ii = 0, hit = iMax ? bigArrp (bb->hits, 0, HIT) : 0 ; ii < iMax ; ii++, hit++)
+	fprintf (stderr, "BBHITS\t%ld\t%d\t%d\t%d\t%d\n"
+		 , ii
+		 , hit->read
+		 , hit->chrom
+		 , hit->a1
+		 , hit->x1
+		 ) ;
+    }
+#endif
 
   for (ii = 0, hit = iMax ? bigArrp (bb->hits, 0, HIT) : 0 ; ii < iMax ; ii++, hit++)
     {

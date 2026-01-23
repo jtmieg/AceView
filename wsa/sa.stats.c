@@ -210,7 +210,7 @@ static void s2gSamStatsExports (const PP *pp, Array runStats)
   aceOutf (ao, "\n%s\t%s\tRawBases\t%ld\n", run, METHOD, nRawBases) ;
   aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (nRawBases + .000001)) ;
   aceOutf (ao, "%s\t%s\tnErrorEvents\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
-  aceOutf (ao, "%s\t%s\tnMismaches_and_InDels\t%ld\t%.6f%%\n", run, METHOD, s0->nMID, (100.0 * s0->nMID)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
+  aceOutf (ao, "%s\t%s\tnMismatches_and_InDels\t%ld\t%.6f%%\n", run, METHOD, s0->nMID, (100.0 * s0->nMID)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
 
   aceOutf (ao, "\n%s\t%s\tnPolyA_sites\t%ld\n", run, METHOD, confirmedPolyAsCountSites (pp, 0)) ;
   aceOutf (ao, "\n%s\t%s\tSupported_introns\t%ld\n", run, METHOD, confirmedIntronsCountSites (pp, 0)) ;
@@ -491,7 +491,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->nErr
 		   , 100.0 * up->nErr /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
 		   ) ;
-	  aceOutf (ao, "%s\tMissmatches_and_InDels\tif\t%ld\t%.3f\n"
+	  aceOutf (ao, "%s\tMismatches_and_InDels\tif\t%ld\t%.3f\n"
 		   , runNam
 		   , up->nMID
 		   , 100.0 * up->nMID /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)

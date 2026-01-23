@@ -243,7 +243,7 @@ static BOOL exportOneSamCigar (BB *bb, vTXT cigar, ALIGN *ap0, int iMax, Array d
 
 /*********************************************************************/
 
-static int exportOneSam (ACEOUT ao, const PP *pp, BB *bb, vTXT record, vTXT cigar, Array cigarettes, Array errors, ALIGN *ap0, long int i0, long int aMax)
+static int exportOneSam (ACEOUT ao, ACEOUT aoe, const PP *pp, BB *bb, vTXT record, vTXT cigar, Array cigarettes, Array errors, ALIGN *ap0, long int i0, long int aMax)
 {
   AC_HANDLE h = ac_new_handle () ;
   const char *run = dictName (pp->runDict, bb->run) ;
@@ -384,21 +384,21 @@ if (1)
     vtxtPrintf (record, "\t%s", vtxtPtr (cigar)) ;
   else
     {
-      fprintf (stderr, "ERROR: Cigar error in lSam != dnaMax:%d != %d %s\n>%s\n"
+      aceOutf (aoe, "ERROR: Cigar error in lSam != dnaMax:%d != %d %s\n>%s\n"
 	       , lSam, arrayMax(dna), vtxtPtr (cigar)
 	       , dictName (dict, read >> 1)
 	       )  ;
-
+      
       if (da > 0 && da < 6)
 	{
 	  vtxtPrintf (record, "\t%s%dS", vtxtPtr (cigar), da) ;
-	  fprintf (stderr, "PADDED\n") ;
+	  aceOutf (aoe, "PADDED\n") ;
 	}
       else
 	{
 	  Array dnaR = dnaCopy (dna) ;
 	  dnaDecodeArray (dnaR) ;
-	  fprintf (stderr, "%s\n", arrp (dnaR, 0, char)) ;
+	  aceOutf (aoe, "%s\n", arrp (dnaR, 0, char)) ;
 	  ac_free (dnaR) ;
 	  goto done ;
 	}
@@ -484,7 +484,7 @@ if (1)
 
 /**************************************************************/
 /* return the number of consumed ap (must be >=1) */
-int saSamExport (ACEOUT ao, const PP *pp, BB *bb)
+int saSamExport (ACEOUT ao, ACEOUT aoe, const PP *pp, BB *bb)
 {
   AC_HANDLE h = ac_new_handle () ;
   ALIGN *ap = bigArrp (bb->aligns, 0, ALIGN) ;
@@ -499,7 +499,7 @@ int saSamExport (ACEOUT ao, const PP *pp, BB *bb)
     {
       int k ;
       if (ap->read != read || ap->chain != chain)
-	k = exportOneSam (ao, pp, bb, record, cigar, cigarettes, errors, ap, ia, aMax) ;
+	k = exportOneSam (ao, aoe, pp, bb, record, cigar, cigarettes, errors, ap, ia, aMax) ;
       read = ap->read ;
       chain = ap->chain ;
       ap += k - 1 ;
@@ -511,23 +511,25 @@ int saSamExport (ACEOUT ao, const PP *pp, BB *bb)
 
 /**************************************************************/
 
-ACEOUT saSamCreateFile (const PP *pp, BB *bb, AC_HANDLE h)
+ACEOUT saSamCreateFile (const PP *pp, BB *bb, BOOL isError, AC_HANDLE h)
 {
   char *VERSION = "0.1.1" ;
   DICT *dictG = pp->bbG.dict ;
   
-  ACEOUT ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam", dictName (pp->runDict, bb->run)), pp->gzo, h) ;
-  aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
-  aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
-  
-  for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
+  ACEOUT ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), pp->gzo, h) ;
+  if (! isError)
     {
-      Array dna = arr (pp->bbG.dnas, chrom, Array) ;
-      int ln = dna ? arrayMax (dna) : 0 ;
-      aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
+      aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
+      aceOutf (ao, "@PG ID:1\tPN:Magic\tVN:%s\n", VERSION) ;
+      
+      for (int chrom = 1 ; chrom <= dictMax (dictG) ; chrom++)
+	{
+	  Array dna = arr (pp->bbG.dnas, chrom, Array) ;
+	  int ln = dna ? arrayMax (dna) : 0 ;
+	  aceOutf (ao, "@SQ\tSN:%s\tLN:%d\n", dictName (dictG, chrom), ln) ;
+	}
+      /* aceOutf (ao, "\tCL:%s", commandBuf) ; */
     }
-  /* aceOutf (ao, "\tCL:%s", commandBuf) ; */
-
   return ao ;
 } /* saSamFile */
 
