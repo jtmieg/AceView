@@ -104,8 +104,10 @@ Array saTargetParseConfig (PP *pp)
 	  tc->format = FASTA ; /* default */
 	  if (cc == 'I')
 	    {
-	      if (strstr (cp, ".introns") || strstr (cp, ".gff") || strstr (cp, ".gtf"))
+	      if (strstr (cp, ".introns"))
 		tc->format = INTRONS ;
+	      else if (strstr (cp, ".gff") || strstr (cp, ".gtf"))
+		tc->format = GFF ;
 	      else
 		messcrash ("\n\nThe Introns must be specified via a .gtf or a .gff file.\n try sortalign --help\n"
 			   , cp
@@ -426,8 +428,13 @@ static long int saTargetIndexCreateDo (PP *pp)
     {
       tc = arrayp (tArray, nn, TC) ;
 
-      if (tc->targetClass == '*')
-	saIntronParser (pp, tc) ;
+      if (tc->targetClass == 'I')
+	{
+	  if (tc->format == INTRONS)
+	    saIntronParser (pp, tc) ;
+	  if (tc->format == GFF)
+	    saGffParser (pp, tc) ;
+	}
     }
   
   for (int nn = 0 ; nn < nMax ; nn++)

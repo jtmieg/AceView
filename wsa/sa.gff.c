@@ -98,6 +98,11 @@ long int saGffParser (PP *pp, TC *tc)
   DICT *geneDict = pp->geneDict ;
   DICT *mrnaDict = pp->mrnaDict ;
 
+  if (! pp->createIndex && ! pp->wiggle)
+    {
+      ac_free (h) ; return 0 ;
+    }
+
   if (! geneDict) geneDict = pp->geneDict = dictHandleCreate (1 << 15, pp->h) ;
   if (! mrnaDict) mrnaDict = pp->mrnaDict = dictHandleCreate (1 << 15, pp->h) ;
 
@@ -107,10 +112,6 @@ long int saGffParser (PP *pp, TC *tc)
   if (! pp->geneBoxes) pp->geneBoxes = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
   if (! pp->geneExons) pp->geneExons = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
 
-  if (! pp->wiggle)
-    {
-      ac_free (h) ; return 0 ;
-    }
   if (1)
     {
       const char *cp = tc->fileName ;

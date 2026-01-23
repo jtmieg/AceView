@@ -416,7 +416,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
   Array cigarettes = arrayHandleCreate (128, SAMCIGAR, h) ; 
   KEYSET ksu = keySetHandleCreate (h) ;
   long int nAlignedBases = 0 ;
-  long int nErrors = 0;
+  long int nErrors = 0, nMID = 0 ;
   long int nBases = 0 ;
   long int nUnalignedReads = 0 ;
   long int nAlignedReads = 0 ;
@@ -636,7 +636,7 @@ static void s2gParseOneSamFile (S2G *s2g, const char *fNam, int method, int gold
 	       , (100.0 * nAlignedBases) / (s2g->nRawBases + .0000001)
 	       ) ;
 
-      aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.4f%%\n"
+      aceOutf (ao, "%s\t%s\tnMismaches_and_InDels\t%ld\t%.4f%%\n"
 	       , s2g->run, s2g->method
 	       , nErrors
 	       , (100.0 * nErrors) / (nAlignedBases + .0000001)

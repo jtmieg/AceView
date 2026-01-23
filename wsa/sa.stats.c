@@ -209,7 +209,8 @@ static void s2gSamStatsExports (const PP *pp, Array runStats)
   aceOutf (ao, "%s\t%s\tnBases\t%ld\n", run, METHOD, s0->nBase1 + s0->nBase2) ;
   aceOutf (ao, "\n%s\t%s\tRawBases\t%ld\n", run, METHOD, nRawBases) ;
   aceOutf (ao, "%s\t%s\tnAlignedBases\t%ld\t%.2f%%\n", run, METHOD, s0->nBaseAligned1 + s0->nBaseAligned2, 100.0 * (s0->nBaseAligned1 + s0->nBaseAligned2) / (nRawBases + .000001)) ;
-  aceOutf (ao, "%s\t%s\tnErrors\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
+  aceOutf (ao, "%s\t%s\tnErrorEvents\t%ld\t%.6f%%\n", run, METHOD, s0->nErr, (100.0 * s0->nErr)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
+  aceOutf (ao, "%s\t%s\tnMismaches_and_InDels\t%ld\t%.6f%%\n", run, METHOD, s0->nMID, (100.0 * s0->nMID)/(s0->nBaseAligned1 + s0->nBaseAligned2 + 0.00000001)) ;
 
   aceOutf (ao, "\n%s\t%s\tnPolyA_sites\t%ld\n", run, METHOD, confirmedPolyAsCountSites (pp, 0)) ;
   aceOutf (ao, "\n%s\t%s\tSupported_introns\t%ld\n", run, METHOD, confirmedIntronsCountSites (pp, 0)) ;
@@ -293,6 +294,7 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
   if (up->maxReadLength < vp->maxReadLength)
     up->maxReadLength = vp->maxReadLength ;
   up->nErr += vp->nErr ;
+  up->nMID += vp->nMID ;
   if (vp->errors)
     for (int i = 0 ; i < arrayMax (vp->errors) ; i++)
       array (up->errors, i, int) += array (vp->errors, i, int) ;
@@ -484,10 +486,15 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   ) ;
 
 	  aceOutf (ao, "%s\twiggleCumul\ti\t%ld\n", runNam, up->wiggleCumul) ;
-	  aceOutf (ao, "%s\tMissmatches\tif\t%ld\t%.3f\n"
+	  aceOutf (ao, "%s\tErrors\tif\t%ld\t%.3f\n"
 		   , runNam
 		   , up->nErr
 		   , 100.0 * up->nErr /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
+		   ) ;
+	  aceOutf (ao, "%s\tMissmatches_and_InDels\tif\t%ld\t%.3f\n"
+		   , runNam
+		   , up->nMID
+		   , 100.0 * up->nMID /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
 		   ) ;
 	  aceOutf (ao, "%s\tIntron_supports\tiiif\t%ld\t%ld\t%ld\t%.2f%%\n"
 		   , runNam

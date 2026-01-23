@@ -349,7 +349,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 		{  /* eating this Y error is favorable */
 		  zEy-- ;
 		  nE = zEx + zEy ;
-		  if (nE < bestN) { bestN = nE ; bestJ = j ; }
+		  if (nE < bestN) { bestN = nE ; bestJ = j ; bestI = i ; }
 		  cJ = j ; cY1 = zY ;
 		  continue ;
 		}
@@ -368,15 +368,19 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	  break ;
 	}
 
-      if (bestI < nEx - 1)
+      if (bestI < nEx - 1)  /* we can clip the vp errors */
 	{
-	  if (bestI >= 0)
+	  if (bestI >= -1)
 	    {
-	      vp->x2 = epX->iShort ;
-	      vp->a2 = epX->iLong + (isDown ? 0 : 2) ;
+	      epX = arrp (vp->errors, bestI+1, A_ERR) ;
+	      
+	      vp->x2 = epX->iShort ;  /* last exact base bio coords */
+	      /* vp->a2 = epX->iLong + (isDown ? 0 : 2) ; */
+	      int zA = epX->iLong + (isDown ? 0 : -1) ;
+	      vp->a2 = (vp->chrom & 0x1 ?  arrayMax(dnaG) - zA : zA + 1) ;
 	    }
 	  nEx = bestI + 1 ;
-	  arrayMax (vp->errors) = nEx ;
+	  vp->nErr = arrayMax (vp->errors) = nEx ;
 	}
 
       if (bestJ >= 0) /* if bestJ == -1, wp->x1/a1 is well positioned */
@@ -418,16 +422,6 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	  for (j = 0, epY = arrp (wp->errors, 0, A_ERR) ; j < wp->nErr ; epY++, j++)
 	    *epY = *(epY + bestJ + 1) ;
 	  arrayMax (wp->errors) = wp->nErr ;
-	}
-      if (bestI >=0 && bestI < nEx - 1) /* we can clip the vp errors */
-	{
-	  epX = arrp (vp->errors, bestI, A_ERR) ;
-	  int zA = epX->iLong  + (isDown ? -1 : +1) ;
-	  int zX = epX->iShort - 1 ; /* we need to find the last exact */
-	  vp->nErr = bestI + 1 ;
-	  vp->x2 = zX + 1 ;  /* bio coords */
-	  vp->a2 = (vp->chrom & 0x1 ?  arrayMax(dnaG) - zA : zA + 1) ;
-	  arrayMax (vp->errors) = vp->nErr ;
 	}
     }
   /*

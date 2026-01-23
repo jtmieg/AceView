@@ -343,7 +343,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   CW *restrict cw  ;  
   const unsigned char *restrict cp ;
   Array dnas = bb->dnas ;
-  int k, ia, iaMax = arrayMax (dnas) ;
+  int k, ia, iaMax = arrayMax (dnas), nSeeds = 0 ;
   long int dMax = bigArrayMax (bb->globalDna) / (NN * step) ;
   const int wLen = pp->seedLength ;
   const int nHidden = wLen > 16 ? wLen - 16 : 0 ;
@@ -482,6 +482,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
 	      cw->seed = word ;
 	      cw->pos = jj - dx + 1 ;  /* bio coordinates of the first base of the seed */
 	      cw->intron = 0 ;
+	      nSeeds++ ;
 	      if (icwxMax)
 		{
 		  for ( ; icwx < icwxMax && cwX->chrom < ia ; icwx++, cwX++) ;
@@ -498,6 +499,8 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
     }
   bb->cwsN = halloc (NN * sizeof(BigArray), bb->h) ;
 
+  if (1)
+    fprintf (stderr, "Agent %d lane %d allocated %d seeds\n", bb->readerAgent, bb->lane, nSeeds) ;
   for (k = 0 ; k < NN ; k++)
     bb->cwsN[k] = cwsN[k] ;
   if (0)

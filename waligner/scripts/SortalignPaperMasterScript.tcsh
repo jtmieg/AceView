@@ -62,8 +62,10 @@ setenv SV v50.jan1         # no wiggle, use the gff to assess the introns while 
 #setenv SVlast v51.jan4
 setenv SV v52.jan7         # no wiggle, aligned the BigArrays, complete compiler clean up
 #setenv SVlast v52.jan7
-#setenv SV v53.jan17         # yes wiggle, same as v52 with wiggle and sam output
-setenv SVlast v53.jan17
+setenv SV v53.jan20         # no wiggle, fixing errors close to introns which created sam bugs
+setenv SVlast v53.jan20
+setenv SV v54.jan22         # no wiggle, fixing for BAM lots of issues on exon boundaries
+setenv SVlast v54.jan22
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -123,9 +125,11 @@ setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_Magi
 
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
-
-set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2 31_STARlong"
+setenv methods "011_SortAlignG5R5"
+set createIndex=11
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 21_HISAT2 31_STARlong"
+if ($createIndex == 11)  setenv methods "011_SortAlignG5R5"
+if ($createIndex == 12)  setenv methods "012_SortAlignG3R3"
 
 #############################################################################
 ## Datasets
@@ -158,7 +162,7 @@ setenv runs "$allRuns  $monkeyRuns $moreRuns"
 # setenv runs "iRefSeq38"
 
 # to create all IDX use these runs
-if ($createIndex == 1)  setenv runs "iRefSeq iRefSeq38 HG19t1r1  WormSRR548309 "
+if ($createIndex > 0)  setenv runs "iRefSeq iRefSeq38 HG19t1r1  WormSRR548309 "
 
 echo "### S.tcsh SV=$SV"
 echo "$methods"
@@ -964,7 +968,7 @@ echo "### True error rates in Baruzzo datasets:   t1=0.543,  t2=1.186, t3=6.024"
 cat RESULTS/*/*/s2g.samStats | sed -e 's/nMultiAligned 0 times/nUnaligned/g' -e 's/nMultiAligned 1 times/nAlignedOnce/g' -e 's/nMultiAligned 2 times/nMultiAligned_2_sites/g' > RESULTS/allSamStats
 
 \mv RESULTS/allSamStats RESULTS/allSamStats.old
-cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerfectReads/Perfect_reads/' -e 's/nRawBases/RawBases/' -e 's/nRawReads/RawReads/' -e 's/nReads/Reads/' > RESULTS/allSamStats
+cat RESULTS/allSamStats.old | sed -e 's/nAlignedReads/AlignedReads/' -e 's/nPerfectReads/Perfect_reads/' -e 's/nRawBases/RawBases/' -e 's/nRawReads/RawReads/' -e 's/nReads/Reads/' -e 's/nErrors/nMismatches_and_InDels/' > RESULTS/allSamStats
 
 mv RESULTS/allSamStats RESULTS/allSamStats.1
 foreach run ($runs)
@@ -977,7 +981,7 @@ setenv runsN `echo "$runs" | gawk '{for(k=1;k<=NF;k++)printf("%2d_%s ",k,$k);}'`
 set tsfMethods=`echo $methods | gawk '{sep="";for(i=1;i<=NF;i++){printf("%s%s",sep,$i);if(substr($i,1,2)=="01")printf(".%s",SV);sep=",";}}END{printf("\n");}' SV=$SV`
 echo $tsfMethods
 
-foreach tag (AlignedReads nAlignedBases nErrors  Perfect_reads nUnaligned nAlignedOnce nMultiAligned)
+foreach tag (AlignedReads nAlignedBases nMismatches_and_InDels Perfect_reads nUnaligned nAlignedOnce nMultiAligned)
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt
   if (-e  toto.tag) \rm toto.tag
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {printf("%s\t%s\tt\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
@@ -990,7 +994,7 @@ foreach tag (AlignedReads nAlignedBases nErrors  Perfect_reads nUnaligned nAlign
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-foreach tag (AlignedReads nAlignedBases nErrors Perfect_reads RawBases RawReads nUnaligned nAlignedOnce nMultiAligned)
+foreach tag (AlignedReads nAlignedBases nMismatches_and_InDels Perfect_reads RawBases RawReads nUnaligned nAlignedOnce nMultiAligned)
   echo $tag
   if (-e  toto.tag) \rm toto.tag
   echo "\n$tag\t$SV" >> COMPARE/samStats.$SV.txt

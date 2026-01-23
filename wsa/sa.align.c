@@ -896,7 +896,8 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 	  chromA = up->chrom ;
 	  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
 	}
-
+      if (up->a1 == 99016239)
+	invokeDebugger () ;
       
       /* count all errors */
       int nErr = 0 ;
@@ -905,6 +906,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
       for (vp = up ; vp->chain == chain || vp->chain == -1 ; vp++)
 	{
 	  da = vp->a2 - vp->a1 ;
+	  vp->nErr = vp->errors ? arrayMax (vp->errors) : 0 ;
 	  nErr += vp->nErr ;
 	  nAli += da > 0 ? da + 1 : -da + 1 ;
 	}
@@ -981,6 +983,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 		  if (vp[1].chain == chain)
 		    {
 		      int du = vp[1].x1 - vp->x2 - 1 ;
+		      int du0 = du ;
 		      cp = arrayp (dnaI, jj + du + 6, char) ;
 		      cp = arrp (dnaI, jj, char) ;
 		      BOOL isDonor = TRUE ;
@@ -1068,11 +1071,11 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    {
 			      jj += du ;
 			      cp += du ;
-			      vp->a2 += du ; vp->x2 += du ;
+			      vp->a2 += du ; vp->x2 += du0 ;
 			    }
 			  else
 			    {
-			      vp[1].x1 -= du ; vp[1].a1 -= du ;
+			      vp[1].x1 -= du0 ; vp[1].a1 -= du ;
 			    }
 			}
 		    }
@@ -1121,7 +1124,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 		{
 		  int dz = keySet (ks, ja)  ;
 		  int j = 0 ;
-		  int del = 0, ins = 0;
+		  int del = 0, ins = 0, sub = 0 ;
 		  da = vp->a2 - vp->a1 + 1 ;
 		  if (vp->chain == -1 || da < 1) continue ;
 		  if (vp->a1 > zp.a2 + dz)
@@ -1140,7 +1143,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    vp->errors = arrayHandleCreate (8, A_ERR, bb->h) ;
 			  A_ERR *eq = arrayp (vp->errors, j++, A_ERR) ;
 			  *eq = *ep ;
-			  eq->iLong += dz + dda ;
+			  eq->iLong += dz ; /* + dda ; */
 			  switch (ep->type)
 			    {
 			    case INSERTION: dda++ ; ins++ ; break ;
@@ -1149,24 +1152,30 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    case TROU: dda-- ; del++ ; break ;
 			    case TROU_DOUBLE: dda-=2 ; del += 2 ; break ;
 			    case TROU_TRIPLE: dda-=3 ; del += 3 ; break ;
+			    case ERREUR: sub++ ; break ;
 			    default : break ;
 			    }
 			}
 		    }
+		  /*
 		  int dd = (vp->x2 - vp->x1 + 1 + del) - ((vp->a1 < vp->a2 ? vp->a2 - vp->a1 : vp->a1 - vp->a2) + 1 + ins) ;
 		  if (dd < 0) vp->x2 += dd ;
 		  if (dd > 0) vp->a2 += dd ;
+		  */
 		  ja++ ;
 		  vp->nErr = vp->errors ? arrayMax (vp->errors) : 0 ;
+		  vp->nMID = del + ins + sub ;
 		}
 	    }
+	  /*
 	  for (vp = up ; vp->chain == chain ; vp++)
 	    {
 	      if (vp->x1 < 1)
 		{ int dx = 1 - vp->x1 ; vp->x1 += dx ; vp->a1 += (vp->a1 < vp->a2 ? dx : -dx) ;}
 	      if (vp->x2 > arrayMax (dna))
 		{ int dx = vp->x2 - arrayMax(dna) ; vp->x2 -= dx ; vp->a2 -= (vp->a1 < vp->a2 ? dx : -dx) ;}
-	    }	      
+	    }
+	  */
 	  if (! isDown)
 	    {
 	      int nvp = 0 ;
@@ -1492,6 +1501,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	  
 	  int chainAli = up->chainAli = 0 ;
 	  int chainErr = up->chainErr = 0 ;
+	  int chainMID = up->chainMID = 0 ;
 	  int chainScore =	pp->bonus[tc] ;
 	  int chainA1 = up->a1 ;
 	  int chainA2 = up->a2 ;
@@ -1506,6 +1516,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      chainX2 = vp->x2 ;
 	      chainAli += vp->ali ;
 	      chainErr += vp->nErr ;
+	      chainMID += vp->nMID ;
 	      chainScore += vp->score ;
 	      
 	      if (chainA1 > vp->a1) chainA1 = vp->a1 ;
@@ -1523,7 +1534,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      100 * chainAli < pp->minAliPerCent * arrayMax (dna) ||
 	      100 * chainErr > pp->errRateMax * chainAli
 	      )
-	    chainScore = chainAli = chainErr = 0 ;
+	    chainScore = chainAli = chainErr = chainMID = 0 ;
 	  
 	  if (bestChainScore < chainScore)
 	    bestChainScore = chainScore ;
@@ -1536,6 +1547,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      vp->chainScore = chainScore ;
 	      vp->chainAli = chainAli ;
 	      vp->chainErr = chainErr ;
+	      vp->chainMID = chainMID ;
 	      vp->chainX1 = chainX1 ;
 	      vp->chainX2 = chainX2 ;
 	      vp->chainA1 = chainA1 ;
@@ -1764,7 +1776,6 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  bb->runStat.nReadsAlignedPerTargetClass[0]++ ;
 		  bb->runStat.nBasesAlignedPerTargetClass[0]+=ap->chainX2 - ap->chainX1 + 1 ;
 		  bb->runStat.nMultiAligned[0]++ ;
-		  bb->runStat.nErr += ap->chainErr ;
 		  nChains = 1 ;
 		  bb->runStat.nAlignments++ ;
 		  if (ap->chainErr == 0 && ap->chainAli == ap->readLength)
@@ -1790,6 +1801,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	      if (tc == tc0)
 		{
 		  bb->runStat.nErr += vp->chainErr ;
+		  bb->runStat.nMID += vp->chainMID ;
 		  bb->aliDx += vp->chainAli ;
 		  bb->aliDa += vp->chainAli ;
 		  if (vp->read & 0x1)

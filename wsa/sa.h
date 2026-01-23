@@ -51,7 +51,7 @@
 
 typedef struct nodeStruct { double x ; CHAN *cx, *cy, *cu, *cv, *done ; int k ; } NODE ;
 
-typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, SRACACHE, SRACACHE1, SRACACHE2, INTRONS} DnaFormat ;
+typedef enum {FASTA=1, FASTQ, FASTC, RAW, SRA, SRACACHE, SRACACHE1, SRACACHE2, INTRONS, GFF} DnaFormat ;
 typedef struct targetClassStruct {
   char targetClass ; /* single char a-z, A-Z */
   int priority ;
@@ -107,7 +107,7 @@ typedef struct runStatStruct {
   Array insertLengthDistribution ;
   int minReadLength, maxReadLength ;
   char *adaptor1, *adaptor2 ;
-  long int nN, nErr ;
+  long int nN, nErr, nMID ;
   long int letterProfile1[5 * LETTERMAX] ;
   long int letterProfile2[5 * LETTERMAX] ;
   long int ATGCN[5] ;
@@ -315,7 +315,7 @@ typedef struct alignStruct {
   int id, previous, next ;
   int ali, chainAli, score, chainScore ;
   int pairScore, mateChrom, mateA1, mateA2, pairLength ;
-  int nN, nErr, chainErr ;
+  int nN, nErr, nMID, chainErr, chainMID ;
   int nTargetRepeats ;
   int nChains ;
   int readLength ;
