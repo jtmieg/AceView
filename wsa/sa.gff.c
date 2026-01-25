@@ -94,11 +94,13 @@ long int saGffParser (PP *pp, TC *tc)
   BOOL isGff = FALSE ;
   BOOL isGtf = FALSE ;
   BOOL isIntrons = FALSE ;
+  BOOL READONLY = TRUE ;
   DICT *chromDict = bbG->dict ;
   DICT *geneDict = pp->geneDict ;
   DICT *mrnaDict = pp->mrnaDict ;
-
-  if (! pp->createIndex && ! pp->wiggle)
+  BigArray allGeneBoxes = 0 ;
+  BigArray allKnownExons = 0 ;
+  if (0 && ! pp->createIndex && ! pp->wiggle)
     {
       ac_free (h) ; return 0 ;
     }
@@ -112,6 +114,62 @@ long int saGffParser (PP *pp, TC *tc)
   if (! pp->geneBoxes) pp->geneBoxes = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
   if (! pp->geneExons) pp->geneExons = arrayHandleCreate (2 * dictMax (chromDict) + 1, Array, pp->h) ;
 
+  if (1)
+    {
+      char *fNam = "/mrnaNames.sortali" ;
+      char *cp = filName (pp->indexName, fNam, "rb") ;
+      if (cp)
+	{
+	  saDictMapRead (mrnaDict, cp) ;
+	  fprintf (stderr, "saGffParser found %d mrna identifiers in file %s\n", dictMax (mrnaDict), cp) ;
+	}
+    }
+  if (1)
+    {
+      char *fNam = "/geneNames.sortali" ;
+      char *cp = filName (pp->indexName, fNam, "rb") ;
+      if (cp)
+	{
+	  saDictMapRead (geneDict, cp) ;
+	  fprintf (stderr, "saGffParser found %d gene identifiers in file %s\n", dictMax (geneDict), cp) ;
+	}
+    }
+  if (1)
+    {
+      char *fNam = "/knownExons.sortali" ;
+      char *cp = filName (pp->indexName, fNam, "rb") ;
+      if (cp)
+	{
+	  BigArray allKnownExons = bigArrayMapRead (cp, EXONINTRON, READONLY, h) ;
+	  nnE = bigArrayMax (allKnownExons) ;
+	  fprintf (stderr, "saGffParser found %ld exons coordinates in file %s\n", nnE, cp) ;
+	}
+    }
+  if (1)
+    {
+      char *fNam = "/knownIntrons.sortali" ;
+      char *cp = filName (pp->indexName, fNam, "rb") ;
+      if (cp)
+	{
+	  pp->knownIntrons = bigArrayMapRead (cp, EXONINTRON, READONLY, pp->h) ;
+	  nnI = bigArrayMax (pp->knownIntrons) ;
+	  fprintf (stderr, "saGffParser found %ld introns coordinates in file %s\n", nnI, cp) ;
+	}
+    }
+  if (1)
+    {
+      char *fNam = "/geneBoxes" ;
+      char *cp = filName (pp->indexName, fNam, "rb") ;
+      if (cp)
+	{
+	  BigArray allGeneBoxes = bigArrayMapRead (cp, GENE, READONLY, h) ;
+	  fprintf (stderr, "saGffParser found %ld geneBoxes coordinates in file %s\n", bigArrayMax (allGeneBoxes), cp) ;
+	}
+    }
+    
+  if (nnE + nnI)
+    return nnE + nnI ;    
+  
   if (1)
     {
       const char *cp = tc->fileName ;
@@ -141,8 +199,6 @@ long int saGffParser (PP *pp, TC *tc)
   if (isIntrons)
     return saIntronParser (pp, tc) ;
   
-  if (! pp->knownIntrons)   pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
-  if (! pp->knownExons) pp->knownExons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
 
   nnE = bigArrayMax (pp->knownExons) ;
   nnI = bigArrayMax (pp->knownIntrons) ;
@@ -292,6 +348,14 @@ long int saGffParser (PP *pp, TC *tc)
       bigArraySort (pp->knownIntrons, exonA1Order) ;
       bigArrayCompress (pp->knownIntrons) ;
       nnI = bigArrayMax (pp->knownIntrons) ;
+
+      /* memory map the known introns */
+      if (pp->knownIntrons && bigArrayMax (pp->knownIntrons))
+	{
+	  char *fNam = hprintf (h, "%s/knownIntrons.sortali", pp->indexName) ;
+	  bigArrayMapWrite (pp->knownIntrons, fNam) ;
+	  fprintf (stderr, "saGffParser exported %ld knownIntrons\n", bigArrayMax (pp->knownIntrons)) ;
+	}
     }
 
 
@@ -363,6 +427,14 @@ long int saGffParser (PP *pp, TC *tc)
 	}
     }
   
+  /* memory map the geneBoxes */
+  if (allGeneBoxes && bigArrayMax (allGeneBoxes))
+    {
+      char *fNam = hprintf (h, "%s/geneBoxes.sortali", pp->indexName) ;
+      bigArrayMapWrite (allGeneBoxes, fNam) ;
+      fprintf (stderr, "saGffParser exported %ld geneBoxes\n", bigArrayMax (allGeneBoxes)) ;
+    }
+
   if (nnE) /* fuse exons by projection on the top strand of the genome */
     {
       EXONINTRON *up, *vp ;
@@ -389,6 +461,27 @@ long int saGffParser (PP *pp, TC *tc)
 	  fprintf (stderr, "Exon %ld : %d %d\n", ii, up->a1, up->a2) ;
     }
 
+      /* memory map the knownExons */
+  if (allKnownExons && bigArrayMax (allKnownExons))
+    {
+      char *fNam = hprintf (h, "%s/knownExons.sortali", pp->indexName) ;
+      bigArrayMapWrite (allKnownExons, fNam) ;
+      fprintf (stderr, "saGffParser exported %ld known_introns\n", bigArrayMax (allKnownExons)) ;
+    }
+
+  if (geneDict && dictMax (geneDict))
+    {
+      char *fNam = hprintf (h, "%s/geneNames.sortali", pp->indexName) ;
+      saDictMapWrite (geneDict, fNam) ;
+      fprintf (stderr, "saGffParser exported %d gene identifiers\n", dictMax (geneDict)) ;
+    }
+  if (mrnaDict && dictMax (mrnaDict))
+    {
+      char *fNam = hprintf (h, "%s/mrnaNames.sortali", pp->indexName) ;
+      saDictMapWrite (mrnaDict, fNam) ;
+      fprintf (stderr, "saGffParser exported %d mrna identifiers\n", dictMax (mrnaDict)) ;
+    }
+
   fprintf (stderr, "+++++++ Found %ld exons %ld introns in file %s\n", nnE, nnI, tc->fileName) ;
   ac_free (h) ;
 
@@ -407,15 +500,17 @@ long int saIntronParser (PP *pp, TC *tc)
   int a1, a2, da ;
   int line = 0 ;
   const int twoMb = (0x1 << 21) ;
-
+  EXONINTRON *up ;
+  
   if (pp->seedLength < 16)
     messcrash ("\nSorry, to study the introns defined in file %s,\n the seed length must be at least 16, not %d\n"
 	       , aceInFileName (ai)
 	       , pp->seedLength
 	       ) ;
-  pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
-  EXONINTRON *up ;
+  if (! pp->knownIntrons)
+    pp->knownIntrons = bigArrayHandleCreate (100000, EXONINTRON, pp->h) ;
 
+  nn = bigArrayMax (pp->knownIntrons) ;
   aceInSpecial (ai, "\n") ;
   while (aceInCard (ai))
     {
@@ -429,7 +524,7 @@ long int saIntronParser (PP *pp, TC *tc)
 	messcrash ("\nUnknown chromosome name %s, not matching the G targets, at line %d of file %s\n"
 		   , cp
 		   , line
-		   , aceInFileName (ai)
+		   , tc->fileName
 		   ) ;
 
       aceInStep (ai, '\t') ;
@@ -456,7 +551,19 @@ long int saIntronParser (PP *pp, TC *tc)
 	}
 	
     }
-  fprintf (stderr, "+++++++ Found %ld introns in file %s\n", nn, aceInFileName (ai)) ;
+
+  bigArraySort (pp->knownIntrons, exonA1Order) ;
+  bigArrayCompress (pp->knownIntrons) ;
+  
+  /* memory map the known introns */
+  if (pp->knownIntrons && bigArrayMax (pp->knownIntrons))
+    {
+      char *fNam = hprintf (h, "%s/knownIntrons.sortali", pp->indexName) ;
+      bigArrayMapWrite (pp->knownIntrons, fNam) ;
+      fprintf (stderr, "genomeCreateBinary exported %ld known_introns\n", bigArrayMax (pp->knownIntrons)) ;
+    }
+  
+  fprintf (stderr, "+++++++ Found %ld introns in file %s\n", nn, tc->fileName) ;
   ac_free (h) ;
 
   return nn ;

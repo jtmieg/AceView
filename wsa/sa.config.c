@@ -394,7 +394,25 @@ int saConfigCheckTargetIndex (PP *pp)
   if (0)
     if (pp->iStep > pp->tStep)      /* impose phasing */
       pp->iStep -= (pp->iStep % pp->tStep) ;
-      
+
+  if (1)
+    {
+      char *fNam = filName (pp->indexName, "/seedLength", "r") ;
+      ACEIN ai = aceInCreate (fNam , 0, h) ;
+      BOOL ok = FALSE ;
+
+      if (ai && aceInCard (ai))
+	{
+	  ok = aceInInt (ai, &(pp->seedLength)) ;
+	  aceInStep (ai, '\t') ;
+	  ok = aceInInt (ai, &(pp->tStep)) ;
+	  aceInStep (ai, '\t') ;
+	  ok = aceInInt (ai, &(pp->maxTargetRepeats)) ;
+	}
+      if (! ok)
+	messcrash ("Cannot read the index file %s", fNam) ;
+    }
+  
   ac_free (h) ;
   return NN ;
 } /* saConfigCheckTargetIndex */

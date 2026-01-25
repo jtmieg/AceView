@@ -136,7 +136,78 @@ Array saTargetParseConfig (PP *pp)
   printf ("Found %d target files\n", arrayMax (tcs)) ;
   return tcs ;
 } /* saTargetParseConfig */    
+
+/**************************************************************/
+
+void saDictMapRead (DICT *dict, const char *fNam)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int ln, k ;
+  int iMax = 0 ;
+  int nn = 0 ;
+  BigArray seqIds = 0 ;
+  char *cp ;
+
+  seqIds = bigArrayMapRead (fNam, char, FALSE, h) ; /* memory map the words */
+
+  nn = 0 ; ln = 255 ;
+  cp = bigArrayp (seqIds, nn, char) ;
+  sscanf (cp, "%d", &iMax) ;
+  nn += ln + 1 ;
+  if (iMax <= 0)
+    messcrash ("Error in saDictMapRead iMax = %d : %s", iMax, cp) ;
   
+  /* transfer the list of names */
+  for (int i = 1 ; i <= iMax ; i++)
+    {
+      cp = bigArrayp (seqIds, nn, char) ; 
+      ln = strlen (cp) ;
+      k = 0 ;
+      if (ln > 0)
+	dictAdd (dict, cp, &k) ;
+      if (k != i)
+	messcrash ("Error in saDictMapRead at position i=%d k=%d : %s", i, k, cp) ;
+      nn += ln + 1 ;
+    }
+  ac_free (h) ;
+
+  return ;
+} /* saDictMapRead */
+
+/**************************************************************/
+
+void saDictMapWrite (DICT *dict, const char *fNam)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  int ln ;
+  int iMax = dictMax (dict) ;
+  int nn = 0 ;
+  BigArray seqIds = bigArrayHandleCreate (256 + 32 * iMax, char, h) ; /* wild guess */
+  char *cp ;
+  const char *cq ;
+
+  nn = 0 ; ln = 255 ;
+  cp = bigArrayp (seqIds, nn + ln, char) ; /* make room */
+  cp = bigArrayp (seqIds, nn, char) ; 
+  sprintf (cp, "%d", iMax) ;
+  nn += ln + 1 ;
+
+  /* transfer the list of names */
+  for (int i = 1 ; i <= iMax ; i++)
+    {
+      cq = dictName (dict, i) ;
+      ln = strlen (cq) ;
+      cp = bigArrayp (seqIds, nn + ln, char) ; /* make room */
+      cp = bigArrayp (seqIds, nn, char) ; 
+      sprintf (cp, "%s", cq) ;
+      nn += ln + 1 ;
+    }
+  bigArrayMapWrite (seqIds, fNam) ;
+  ac_free (h) ;
+
+  return ;
+} /* saDictMapWrite */
+
 /**************************************************************/
 
 static void storeTargetIndex (PP *pp, int tStep) 
@@ -172,29 +243,8 @@ static void storeTargetIndex (PP *pp, int tStep)
   fprintf (stderr, "genomeCreateBinary exported %ld coordinates\n", bigArrayMax (bbG->dnaCoords)) ;
 
   /* memory map the sequence identifiers (chromosome names) */
-  /* transfer the dict to the seqids char array */
-  int iMax = dictMax (bbG->dict) ;
-  BigArray seqIds = bigArrayHandleCreate (256 * (iMax + 1), char, h) ;
-  char *cp = bigArrayp (seqIds, 256 * (iMax + 1) - 1, char) ; /* make room */
-  char buf[256] ;
-
-  /* global title */
-  cp = bigArrayp (seqIds, 0, char) ;
-  memset (buf, 0, 256) ;
-  char *signature = hprintf (h, "Sort Align version 1 step %d", tStep) ;
-  strcpy (buf, signature) ;
-  memcpy (cp, buf, 255) ;
-  cp[255] = tStep ;
-  /* list of names */
-  for (int i = 1 ; i <= iMax ; i++)
-    {
-      cp += 256 ;
-      memset (buf, 0, 256) ;
-      strncpy (buf, dictName (bbG->dict, i), 255) ;
-      memcpy (cp, buf, 256) ;
-    }
   fNam = hprintf (h, "%s/ids.sortali", pp->indexName) ;
-  bigArrayMapWrite (seqIds, fNam) ;
+  saDictMapWrite (bbG->dict, fNam) ;
   fprintf (stderr, "genomeCreateBinary exported %d identifiers\n", dictMax (bbG->dict)) ;
 
   ac_free (h) ;
@@ -554,7 +604,6 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
 {
   AC_HANDLE h = ac_new_handle () ;
   const char *fNam = 0 ;
-  BigArray seqIds = 0;
   DICT *dict = 0 ;
   long int ii, iMax, nn = 0 ;
   int NN = pp->nIndex ;
@@ -590,51 +639,8 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
   fNam = pp->tFileBinaryCoordsName ;
   bbG->dnaCoords = bigArrayMapRead (fNam, unsigned int, READONLY, bbG->h) ; /* memory map the shared coordinates of the individual chromosomes in the globalDna/globalDnaR arrays */
 
-  fNam = pp->tFileBinaryIdsName ;
-  seqIds = bigArrayMapRead (fNam, char, FALSE, h) ; /* memory map the words */
-
   /* seqids is a char array, we need to transfer it to a dict */
-  iMax = bigArrayMax (bbG->dnaCoords)/2 - 2 ;
-
-
-  char *cp = bigArrp (seqIds, 0, char) ;
-  int tStep = bigArr (seqIds, 255, char) ;
-  /* check for common divisors */
-  if (0 && /* no longer mandatory, since we select the best phasing */
-      tStep > 1 && pp->iStep > 1)
-    {
-      int k ;
-      for (int i = 2 ; i <= tStep ; i++)
-	{
-	  k = tStep/i ;
-	  if (k * i == tStep) /* i divides tStep */
-	    {
-	      k = pp->iStep/i ;
-	      if (k * i == pp->iStep) /* i divides iStep */
-		messcrash ("\nThe target is indexed with step=%d, the requested read step is step=%d, these number are not relative primes, there will be systematic false negatives,\n please set the argument --istep %d (default 2) to a different value", tStep, pp->iStep, pp->iStep) ;
-	    }
-	}
-    }
-
-  bbG->step = tStep ;
-  /* check the version */
-  char *signature = hprintf (h, "Sort Align version 1 step %d", tStep) ;
-  if (strcmp (cp, signature))
-    messcrash ("\nCould not read the correct signature in the index files\n\texpected %s\n\treceived %s\nPlease destroy the index files %s.*.sortali and rerun sortalign --createIndex"
-	       , signature
-	       , cp
-	       , fNam
-	       ) ;
-  /* create the dictionary of the chromosome identifiers */
-  for (ii = 1 ; ii <= iMax ; ii++)
-    {
-      int n ;
-      
-      cp += 256 ;
-      dictAdd (dict, cp, &n) ;
-      if (n != ii)
-	messcrash ("\nIndexing error, n=%d ii=%d : %s,  sorry, please rerun sortalign --createIndex\n", n, ii, cp) ;
-    }
+  saDictMapRead (dict, pp->tFileBinaryIdsName) ;
 
   /* create ancilary target dna arrays,
    * their memory is shared with the globalDna array
@@ -642,7 +648,8 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
    */
   
   bbG->length = 0 ;
-  bbG->nSeqs = iMax - 1 ;
+  iMax = dictMax (dict) ;
+  bbG->nSeqs = iMax ; 
   bbG->dnas = arrayHandleCreate (iMax + 1, Array, bbG->h) ;
   bbG->dnasR = arrayHandleCreate (iMax + 1, Array, bbG->h) ;
   /* entry zero is fake, because we index via a dictionary */
@@ -697,12 +704,15 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
 
 void saTargetIndexGenomeParser (const void *vp)
 {
+  AC_HANDLE h = ac_new_handle () ;
   const PP *pp = vp ;
   BB bbG = pp->bbG ;
   char tBuf[25] ;
   
   clock_t t2 =0,       t1 = clock () ;
   printf ("+++ %s: Start genome parser\n", timeBufShowNow (tBuf)) ;
+
+
   memset (&bbG, 0, sizeof (BB)) ;
   long int nn = genomeParseBinary (pp, &bbG) ;
   t2 = clock () ;
@@ -713,6 +723,7 @@ void saTargetIndexGenomeParser (const void *vp)
   channelClose (pp->gmChan) ;
   printf ("--- %s: Stop binary genome parser\n", timeBufShowNow (tBuf)) ;
 
+  ac_free (h) ;
   return ;
 } /* genomeParser */
 

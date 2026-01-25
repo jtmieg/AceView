@@ -988,8 +988,9 @@ static void wholeWork (const void *vp)
   BB bbG = pp->bbG;
   char tBuf[25] ;
   long int nnn = 0 ;
-  clock_t  t1, t2 ;
-	    
+  clock_t  t1, t2, t01, t02 ;
+
+  t01 = clock () ;
   memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->lcChan, &bb, BB))
     {
@@ -1000,7 +1001,7 @@ static void wholeWork (const void *vp)
       saSequenceParseGzBuffer (pp, &bb) ;
       saCodeSequenceSeeds (pp, &bb, pp->iStep, FALSE) ;
 
-      if (pp->debug) printf ("+++ %s: Start wholeWork %ld bases against %ld target bases\n", timeBufShowNow (tBuf), bb.length, bbG.length) ;
+      if (1 || pp->debug) printf ("+++ %s: Start wholeWork agent %d, lane %d, %ld bases against %ld target bases\n", timeBufShowNow (tBuf), pp->agent, bb.lane, bb.length, bbG.length) ;
 
       /* sort words */
       for (int k = 0 ; k < NN ; k++)
@@ -1052,12 +1053,14 @@ static void wholeWork (const void *vp)
 #endif
       
       t2 = clock () ;
-      saCpuStatRegister ("5.WholeWork", pp->agent, bb.cpuStats, t1, t2, nnn) ;
+      saCpuStatRegister ("5.WholeWork", pp->agent, bb.cpuStats, t1, t2, nn) ;
       channelPut (pp->aeChan, &bb, BB) ;
+      t02 = clock () ;
+      saCpuStatRegister ("5.WholeWorkE", pp->agent, bb.cpuStats, t01, t02, nn) ;
+      t01 = t02 ;
     }
 
   channelCloseSource (pp->aeChan) ;
-
   return ;
 } /* wholeWork */
 #endif
@@ -1862,7 +1865,7 @@ int main (int argc, const char *argv[])
       /* Create the communication channels */
       p.fpChan = channelCreate (4096, RC, p.h) ; /* this chan nust be deep enough to accept all file names at once */
       channelDebug (p.fpChan, debug, "fpChan") ;
-      p.npChan = channelCreate (16, int, p.h) ; /* count BB per inFile */
+      p.npChan = channelCreate (6, int, p.h) ; /* count BB per inFile */
       channelDebug (p.npChan, debug, "npChan") ;
       p.gmChan = channelCreate (1, BB, p.h) ;
       channelDebug (p.gmChan, debug, "gmChan") ;

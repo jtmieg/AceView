@@ -62,12 +62,14 @@ setenv SV v50.jan1         # no wiggle, use the gff to assess the introns while 
 #setenv SVlast v51.jan4
 setenv SV v52.jan7         # no wiggle, aligned the BigArrays, complete compiler clean up
 #setenv SVlast v52.jan7
-setenv SV v53.jan20         # no wiggle, fixing errors close to introns which created sam bugs
+setenv SV v53.jan20         # no wiggle, no introns (bug), fixing errors close to introns which created sam bugs this index has a NO INTRON seeds (gff error)
 setenv SVlast v53.jan20
-setenv SV v54.jan22         # no wiggle, fixing for BAM lots of issues on exon boundaries
+setenv SV v54.jan22         # no wiggle, reintroduced the introns, fixed  BAM lots of issues on exon boundaries: this index has a Sort ERROR  max31
 setenv SVlast v54.jan22
-setenv SV v55.81.jan23         # no wiggle, fixing for BAM lots of issues on exon boundaries
+setenv SV v55.81.jan23      # no wiggle, introns, fixing for BAM lots of issues on exon boundaries: this index has a Sorting ERROR  max81
 setenv SVlast v55.81.jan23
+setenv SV v56.81.jan23      # no wiggle, introns, fixed the error in the seed sorter:  max81
+setenv SVlast v56.81.jan23
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -80,6 +82,8 @@ endif
 \cp bin/sortalign.$SV bin/sortalign
   
 setenv NOINTRONSEEDS 0
+setenv EXPORTSAM 0
+setenv EXPORTWIGGLE 0
 setenv seedLength 18
 setenv maxTargetRepeats 31
 setenv maxTargetRepeats 81
@@ -947,7 +951,7 @@ date
       touch RESULTS/$mm/$run/s2g.samStats
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"
                                                 echo "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr" > 	RESULTS/$mm/$run/s2g.cmd
-            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr"
+            scripts/submit RESULTS/$mm/$run/s2g "bin/sam2gold --method $mm --run $run --samStats --nRawBases $nRawBases --nRawReads $nRawReads -i $sam -o RESULTS/$mm/$run/s2g --addReadPairSuffixForce $exportitr" 64G
 	    # 64G
     
     endif

@@ -216,8 +216,8 @@ typedef struct pStruct {
   Array runStats ;
   Array runLanes ;
   Array runLanesDone ;
-  Array geneExons ;           /* gene coordinates */
-  Array geneBoxes ;           /* gene coordinates */
+  Array geneExons ;           /* array of array per chrom of gene coordinates */
+  Array geneBoxes ;           /* array of array per chrom of gene coordinates */
   Array geneExonCounts ;      /* gene expression */
   Array geneBoxCounts ;      /* gene expression */
   BigArray knownIntrons ;
@@ -439,6 +439,8 @@ int saSupportedIntrons (const PP *pp, int run) ;
 Array saTargetParseConfig (PP *pp) ;
 void saTargetIndexCreate (PP *pp) ;
 void saTargetIndexGenomeParser (const void *vp) ;
+void saDictMapRead (DICT *dict, const char *fNam) ;
+void saDictMapWrite (DICT *dict, const char *fNam) ;
 
 /* sa.seeds.c */
 int saCodeIntronSeeds (PP *pp, BB *bbG) ;

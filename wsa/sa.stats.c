@@ -60,7 +60,7 @@ void saCpuStatExport (const PP *pp, Array stats)
 
   arraySort (stats, cpuStatsOrder) ;
   printf ("\n# Action\tAgent\tnB\tn\ttime (s)") ;
-  if (0)
+  if (1)
     {  /* details per agent, only useful for debugging and optimizing */
       for (i = 0 ; i < iMax ; i++, bs++)
 	{
@@ -437,7 +437,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 	  aceOutf (ao, "%s\tPerfect_reads\tif\t%ld\t%.3f\n"
 		   , runNam
 		   , up->nPerfectReads
-		   , 100.0 * up->nPerfectReads / (.000001 + up->nMultiAligned[0])
+		   , 100.0 * up->nPerfectReads / (.000001 + up->nReads)
 		   ) ;
 
 	  aceOutf (ao, "%s\tBases\tiii\t%ld\t%ld\t%ld\n"

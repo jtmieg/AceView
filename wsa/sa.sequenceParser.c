@@ -1079,7 +1079,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   DnaFormat format = rc ? rc->format : tc->format ;
-  if (! isGenome && ! rc->pairedEnd &&  (format == FASTA || format == SRACACHE))
+  if (0 && ! isGenome && ! rc->pairedEnd &&  (format == FASTA || format == SRACACHE))
     return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
   else if (! isGenome && format == SRA)
     return sraSequenceParser (pp, rc, tc, bb, isGenome) ;
