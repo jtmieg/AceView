@@ -1042,6 +1042,7 @@ endif
 
 if ($phase == sortali) goto phaseSortali
 if ($phase == sortali2) goto phaseSortali2
+if ($phase == sortali3) goto phaseSortaliGroupWiggle
 
 if ($phase == I1) goto phaseI1
 if ($phase == I2) goto phaseI2
@@ -1049,6 +1050,9 @@ if ($phase == I3) goto phaseI3
 if ($phase == I4) goto phaseI4
 if ($phase == I5) goto phaseI5
 if ($phase == I6) goto phaseI6
+
+# last MAGIC tested
+
 if ($phase == I7) goto phaseI7
 
 if ($phase == a0C) goto phasea0C
@@ -2386,13 +2390,13 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   if (-d tmp/SA/$run) \rm -rf tmp/SA/$run
   mkdir tmp/SA/$run
   if (-e Fastc/$run/LaneList && ! -e tmp/SA/$run/iConfig) then
-    cat Fastc/$run/LaneList  | gawk '{printf("Fastc/%s.fastc.gz\t%s\n", $1, run);}' run=$run > tmp/SA/$run/iConfig
+    cat Fastc/$run/LaneList  | gawk '{printf("Fastc/%s.fastc.gz\t%s\tjump1=5,jump2=5\n", $1, run);}' run=$run > tmp/SA/$run/iConfig
   endif
   if (-e tmp/SA/$run/iConfig) then
     date > tmp/SA/$run/salign.out
     date > tmp/SA/$run/salign.err
-    echo "$sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggle --wiggleEnds" >> tmp/SA/$run/salign.out
-    scripts/submit  tmp/SA/$run/salign "/usr/bin/time -f 'TIMING\tE\t%E\tU\t%U\tS\t%S\tM\t%M\tP\t%P' $sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggle --wiggleEnds" 64G
+    echo "$sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggles --wiggleEnds" >> tmp/SA/$run/salign.out
+    scripts/submit  tmp/SA/$run/salign "/usr/bin/time -f 'TIMING\tE\t%E\tU\t%U\tS\t%S\tM\t%M\tP\t%P' $sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggles --wiggleEnds" 64G
   endif
 end
 
@@ -2421,6 +2425,22 @@ echo "pparse  tmp/SA/$MAGIC.ali2.ace" | bin/tacembly MetaDB --no_prompt
 
 goto phaseLoop
 
+###################################################################################
+###################################################################################
+## phase sa2ali3
+
+phaseSortaliGroupWiggle:
+echo -n "phaseSortali3: construct the group wiggles : "
+date
+
+if (! -d tmp/TABIX) mkdir tmp/TABIX
+
+foreach gg (`cat MetaDB/Magic2/GroupWiggleList`)
+  if (! -d tmp/TABIX/$gg) mkdir tmp/TABIX/$gg
+  scripts/submit TABIX/$gg/sortali3  "scripts2/m2.wg.tcsh $gg"
+end
+
+goto phaseLoop
 
 #######################################################################################
 #######################################################################################

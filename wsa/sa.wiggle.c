@@ -69,6 +69,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
   Array wigglesNU = bb->wigglesNU = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
   const int step = pp->wiggle_step ;  /* examples s=10, 5, 1 */
   const int demiStep = step/2 - (step % 1);
+  const int endLength = 30 / step ;
 
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
     {
@@ -87,6 +88,7 @@ static int wiggleCreate (const PP *pp, BB *bb)
 	}
       if (weight)
 	{
+	  BOOL isRead2 = ap->read & 0x1 ? TRUE : FALSE ;
 	  int a1 = ap->a1 ;
 	  int a2 = ap->a2 ;
 	  int x1 = (ap->x1 == ap->chainX1 ? ap->x1 : 0) ;
@@ -94,7 +96,6 @@ static int wiggleCreate (const PP *pp, BB *bb)
 	  int w1 = (a1 + demiStep)/step ;
 	  int w2 = (a2 + demiStep)/step ;
 	  int aChrom = ap->chrom ^ (ap->read & 0x1) ; 
-
 	  if (0) aChrom ^= 0x1 ; /* negative run */
 
 	  /*  chr 0  read 0 faux,
@@ -141,35 +142,35 @@ static int wiggleCreate (const PP *pp, BB *bb)
 		}
 	    }
 
-	  if (pp->wiggleEnds && x1 < 5)
+	  if (pp->wiggleEnds && x1 == ap->leftClip + 1)
 	    {
-	      if (wigL && w1 < w2)
+	      if (wigL && wigR && w1 < w2)
 		{
-		  WP *wp = bigArrayp (wigL, bigArrayMax (wigL), WP) ;
-		  wp->pos = w1 ; wp->ln = 10 ; wp->weight = weight ;
+		  WP *wp = bigArrayp (isRead2 ? wigR : wigL, bigArrayMax (wigL), WP) ;
+		  wp->pos = w1 ; wp->ln = endLength ; wp->weight = weight ;
 		}
-	      if (wigR && w1 > w2 && w1 >= 3)
+	      if (wigL && wigR && w1 > w2 && w1 >= endLength)
 		{
-		  WP *wp = bigArrayp (wigR, bigArrayMax (wigR), WP) ;
-		  wp->pos = w1 - 3 ; wp->ln = 10 ; wp->weight = weight ;
+		  WP *wp = bigArrayp (isRead2 ? wigR : wigL, bigArrayMax (wigR), WP) ;
+		  wp->pos = w1 - endLength ; wp->ln = endLength ; wp->weight = weight ;
 		}
 	    }
 	  
-	  if (wigP && x1 > 25)
+	  if (wigP && w1 > 10 && x1 > ap->leftClip + 25)
 	    {
 	      WP *wp = bigArrayp (wigP, bigArrayMax (wigP), WP) ;
-	      if (w1 < w2) { wp->pos = w1 > 20 ? w1 - 10 : 10 ; wp->ln = 10 ; }
-	      else { wp->pos = w1 ; wp->ln = 10 ; }
+	      if (w1 < w2) { wp->pos = w1 - endLength ; wp->ln = endLength ; }
+	      else { wp->pos = w1 ; wp->ln = endLength ; }
 	      wp->weight = weight ;
 	    }
-	  if (wigP && x2 < ap->readLength - 25)
+	  if (wigP && w2 > 10 && x2 < ap->rightClip - 25)
 	    {
 	      WP *wp = bigArrayp (wigP, bigArrayMax (wigP), WP) ;
-	      if (w1 < w2) { wp->pos = w2 ; wp->ln = 10 ; }
-	      else { wp->pos = w2 > 20 ? w2 - 10 : 10 ; wp->ln = 10 ; }
+	      if (w1 < w2) { wp->pos = w2 ; wp->ln = endLength ; }
+	      else { wp->pos = w2 - endLength ; wp->ln = endLength ; }
 	      wp->weight = weight ;
 	    }
-	  if (wig)
+	  if (wig && ap->nTargetRepeats == 1)
 	    {
 	      WP *wp = bigArrayp (wig, bigArrayMax (wig), WP) ;
 	      if (w1 > w2) { int w0 = w1 ; w1 = w2 ; w2 = w0 ; }
@@ -189,12 +190,23 @@ static int wiggleCreate (const PP *pp, BB *bb)
 
 /*************************************************************************************/
 
+static long int wigCumul (BigArray wig)
+{
+  long int ii, nn = 0 ;
+  WP *wp = wig ? bigArrp (wig, 0, WP) : 0 ;
+  long int iMax = wig ? bigArrayMax (wig) : 0 ;
+  
+  for (ii = 0 ; ii < iMax ; ii++, wp++)
+    nn += wp->ln * wp->weight ;
+  return nn / 72 ;
+}
+
 void saWiggleCumulate (const PP *pp, BB *bb)
 {
   Array ppWiggles = 0 ;
   Array bbWiggles = 0 ;
   int chromMax = dictMax (pp->bbG.dict) + 1 ;
-  int iwMax = wiggleCreate (pp, bb) ;
+  int iwMax = wiggleCreate (pp, bb) ; /* max number of bb->wiggles */
   BigArray *ap1, *ap0 ;
 
   if (iwMax > 2 * chromMax) messcrash ("iwMax too large ?") ;
@@ -225,9 +237,10 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 	break ;
 	}
       
-      iwMax = bbWiggles ? arrayMax (bb->wiggles) : 0 ;
+      iwMax = bbWiggles ? arrayMax (bbWiggles) : 0 ;
       if (! iwMax) continue ;
-
+      if (iwMax > 2 * chromMax)
+	messcrash ("Too many bbWigggles type %d :: %d >= %d", type, iwMax, 2*chromMax) ;
       ap0 = arrayp (ppWiggles, 0, BigArray) ;
       for (int iw = 0 ; iw < iwMax ; iw++)
 	{
@@ -238,7 +251,16 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 	      BigArray aaa = array (ppWiggles, 2 * bb->run * chromMax + iw, BigArray) ;
 	      if (! aaa)
 		aaa = array (ppWiggles, 2 * bb->run * chromMax + iw, BigArray) = bigArrayHandleCreate (10000, WP, pp->h) ;
-	      if (1) wiggleCumulate (aaa, aa) ;
+	      long int naaa1 = 0 ;
+	      if (0) naaa1 = wigCumul (aaa) ;
+	      wiggleCumulate (aaa, aa) ;
+	      if (0)
+		{
+		  long int naa = wigCumul (aa) ;
+		  long int naaa2 = wigCumul (aaa) ;
+		  fprintf (stderr, "%ld + %ld = %ld verif %ld\n"
+			   , naa, naaa1, naaa2, naaa2-naa-naaa1) ;
+		}
 	    }
 	}
       ap1 = arrp (ppWiggles, 0, BigArray) ;
@@ -289,12 +311,12 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
       break ;
       
     case 1:
-      typeNam = (strand == 'f' ? "u.ELF" : "u.ELR") ;
+      typeNam = (strand == 'f' ? "u.ELF" : "u.ERR") ;
       wiggles = pp->wigglesL ;
       break ;
       
     case 2:
-      typeNam = (strand == 'f' ? "u.ERF" : "u.ERR") ;
+      typeNam = (strand == 'f' ? "u.ERF" : "u.ELR") ;
       wiggles = pp->wigglesR ;
       break ;
       
@@ -358,7 +380,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	    }
 	}
       
-      if (arrayMax(a) && geneBoxes)
+      if ((type == 0 || type == 4) && arrayMax(a) && geneBoxes)
 	{
 	  int ie = 0, ie1 = 0, ieOld = 0, ieMax = arrayMax (geneExons) ;
 	  int ib = 0, ib1 = 0, ibOld = 0, ibMax = arrayMax (geneBoxes) ;
@@ -427,12 +449,15 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 
       ac_free (h) ;
     }
-  array (pp->wiggleCumuls, nw, long int) = cumul ;
-  array (pp->exonics, nw, long int) = exonic ;
-  array (pp->cdss, nw, long int) = cds ;
-  array (pp->utrs, nw, long int) = utr ;
-  array (pp->intronics, nw, long int) = intronic ;
-  array (pp->intergenics, nw, long int) = intergenic ;
+  if (type == 0 || type == 4)
+    {
+      array (pp->wiggleCumuls, nw, long int) = cumul ;
+      array (pp->exonics, nw, long int) = exonic ;
+      array (pp->cdss, nw, long int) = cds ;
+      array (pp->utrs, nw, long int) = utr ;
+      array (pp->intronics, nw, long int) = intronic ;
+      array (pp->intergenics, nw, long int) = intergenic ;
+    }
   return ;
 } /* wiggleExportOne */
 

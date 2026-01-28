@@ -34,5 +34,5 @@ set run=$2
 
   set nreads=`cat Fasta/$run/*.count  | gawk '/^Fragment_kept/{n+=$2}END{print n}'`
 
-zcat $mm/$run/$mm.$run.sam_sorted.gz | gawk -F '\t' -f scripts/directErrorCount.awk | scripts/tags | gawk '{split ( $1,aa,":" ) ; x=aa[3] ; y = $2 ; if(x>=0) ali+= y ; printf ( "%d\t%d\n",x,y ) ; }END{printf ("-5\t%d\n",nreads - ali)}'  nreads=$nreads | sort -k 1,1nr | gawk '{if (line<1)print "-6:"method": -5:unaligned -4:partial with error,  -3:partial no error, -2: complete with error, -1: complete no errors, 0: no error, 1,2,3...:n errors, columns 3 and 4 are cumuls";line++;if($1>=0){n1 += $2 ; n2 += $1*$2 ;}printf ( "%d\t%d\t%d\t%d\n",$1,$2,n1,n2 ) ; }' method=$mm nreads=$nreads | sort -k 1,1n >  $mm/$run/$mm.$run.nerrors
+cat RESULTS/$mm/$run/sam | gawk -F '\t' -f scripts/directErrorCount.awk | scripts/tags | gawk '{split ( $1,aa,":" ) ; x=aa[3] ; y = $2 ; if(x>=0) ali+= y ; printf ( "%d\t%d\n",x,y ) ; }END{printf ("-5\t%d\n",nreads - ali)}'  nreads=$nreads | sort -k 1,1nr | gawk '{if (line<1)print "-6:"method": -5:unaligned -4:partial with error,  -3:partial no error, -2: complete with error, -1: complete no errors, 0: no error, 1,2,3...:n errors, columns 3 and 4 are cumuls";line++;if($1>=0){n1 += $2 ; n2 += $1*$2 ;}printf ( "%d\t%d\t%d\t%d\n",$1,$2,n1,n2 ) ; }' method=$mm nreads=$nreads | sort -k 1,1n >  RESULTS/$mm/$run/direct_eror_count
 

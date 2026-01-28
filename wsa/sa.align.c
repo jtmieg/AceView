@@ -307,9 +307,10 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 /**************************************************************/
 /**************************************************************/
 
-static void alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
+static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
 {
   int x1 = up->x1 ;
+  int leftClip = up->leftClip ;
 
   if (x1 > 1)
     {
@@ -319,34 +320,98 @@ static void alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
       char buf[dx + 1] ;
       if (dx > 30) { dx = 30 ; Dx = 0 ; }
       memcpy (buf, arrp (dna, x1 - 1 - dx, char), dx) ; buf[dx] = 0 ;
-      for (int i = 0 ; i < dx ; i++)
+      if (up->targetClass == 'G')
 	{
-	  if (Dx && buf[i] == T_ && i < 8)
-	    nT++ ;
-	  buf[i] = dnaDecodeChar[(int)complementBase(buf[i])] ;
-	}
-      if (nT >= 7)
-	{
-	  POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
-	  zp->chrom = up->chrom ^ 0x1 ;
-	  zp->a1 = up->a1 - (up->chrom & 0x1 ? -1 : 1) ;
-	  zp->run = bb->run ;
-	  zp->n = 1 ;
-	  bufferToUpper (buf) ;
-	  bb->runStat.polyASupport++ ;
+	  for (int i = 0 ; i < dx ; i++)
+	    {
+	      if (Dx && buf[i] == T_ && i < 8)
+		nT++ ;
+	      buf[i] = dnaDecodeChar[(int)complementBase(buf[i])] ;
+	    }
+	  if (nT >= 7)
+	    {
+	      POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
+	      zp->chrom = up->chrom ^ 0x1 ;
+	      zp->a1 = up->a1 - (up->chrom & 0x1 ? -1 : 1) ;
+	      zp->run = bb->run ;
+	      zp->n = 1 ;
+	      bufferToUpper (buf) ;
+	      bb->runStat.nClippedPolyT++ ;
+	      leftClip = x1 - 1 ;
+	    }
+	  else if (pp->isWorm)
+	    {  /* search for transpliced leaders in the prefix of the probe */
+#ifdef JUNK
+	      if (x1 < leftClip + 24 && x1 > leftClip + 8)
+		{
+		  int ns, n1 ;
+		  unsigned char buf2[OVLN+3] ;
+		  
+		  for (ns = 0 ; pp->sl[ns] && !goodPrefix ; ns++)
+		    {
+		      ccp = pp->sl[ns] ;
+		      i =  strlen((char *)ccp)  ;
+		      n1 = dnaPickMatch (ccp, i, buf, 0, 0) ;
+		      if (n1 && ! pp->solid &&  mm->probeLeftClip)
+			{  /* left TTTT should also be present in the SL motif */
+			  for (i = 0 ; i < mm->probeLeftClip ; i++)
+			    if (n1 < 2+i || ccp[n1-2-i] != T_) 
+			      n1 = 0 ;
+			}
+		      if (n1) /* the prefix matches in the SL, */
+			{
+			  /* locate the tail of the SL present in the tag */
+			  ccp = pp->sl[ns] + n1 - 1 ; 
+			  /* verify that the ag acceptor consensus was in the aligned part */
+			  i = strlen((char *)ccp) ;
+			  if (i + 1 < x1 + (pp->solid ? 0 : 0)) continue ;
+			  /* verify that the whole tail of the SL matches the ttag */
+			  if (! pp->solid && ! dnaPickMatch (probeDna, mm->probeLength, ccp, 0, 0))
+			    continue ;
+			  /* check that the prefix including an extra donor 'gt' 
+			   * is not present in the genome
+		       */
+			  int kkk = ccp ? strlen ((const char*)ccp) : 0 ;
+			  BOOL inGenome = FALSE ;
+			  if (kkk < OVLN)
+			    {
+			      sprintf ((char *)buf2, "%s%c%c", ccp, G_, T_ | C_) ;
+			      inGenome = dnaPickMatch (genome, genomeLn, buf2, 0, 0) ;
+			    }
+			  if (! inGenome)
+			    {
+			      goodPrefix = ns + 11 ;
+			      score += pp->slBonus ;
+			      i = 1 + strlen ((char *)ccp) - x1 ;
+			      if (i > 0)
+				{
+				  a1 = (*a1p) += i ;
+				  x1 = (*x1p) += i ;
+				  strncpy ((char *)buf, (char *)ccp, OVLN) ;
+			    }
+			      aliBonus += 0 ; /*  strlen((char *)buf) + mm->probeLeftClip ; */
+			      leftAdaptorClip = -x1 + 1 ; /* substract from the to be aligned length */
+			    }
+			}
+		    }
+		}
+#endif	  
+	    }
 	}
       dictAdd (bb->dict, buf, &up->leftOverhang) ;
     }
-  return ;
+  up->leftClip = leftClip ;
+  return leftClip ;
 } /* alignFormatLeftOverhang */
 
 /**************************************************************/
 
-static void alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
+static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
 {
   int x2 = up->x2 ;
   int ln = arrayMax (dna) ; /* length to align */
-
+  int rightClip = ln ;
+  
   if (x2 < ln)
     {
       int nA = 0 ;
@@ -355,25 +420,95 @@ static void alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna
       char buf[dx + 1] ;
       if (dx > 30) { dx = 30 ; Dx = 0 ; }
       memcpy (buf, arrp (dna, x2, char), dx) ; buf[dx] = 0 ;
-      for (int i = 0 ; i < dx ; i++)
+      if (up->targetClass == 'G')
 	{
-	  if (Dx && buf[i] == A_ && i < 8)
-	    nA++ ;
-	  buf[i] = dnaDecodeChar[(int)buf[i]] ;
-	}
-      if (nA >= 7)
-	{ /* found one polyA */
-	  POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
-	  zp->chrom = up->chrom ;
-	  zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
-	  zp->n = 1 ;
-	  zp->run = bb->run ;
-	  bufferToUpper (buf) ;
-	  bb->runStat.polyASupport++ ;
+	  for (int i = 0 ; i < dx ; i++)
+	    {
+	      if (Dx && buf[i] == A_ && i < 8)
+		nA++ ;
+	      buf[i] = dnaDecodeChar[(int)buf[i]] ;
+	    }
+	  if (nA >= 7)
+	    { /* found one polyA */
+	      POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
+	      zp->chrom = up->chrom ;
+	      zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
+	      zp->n = 1 ;
+	      zp->run = bb->run ;
+	      bufferToUpper (buf) ;
+	      bb->runStat.nClippedPolyA++ ;
+	      rightClip = ln - x2 ;
+	    }
+	  
+	  else  if (pp->isWorm)
+	    { /* search for transpliced leaders in the suffix of the probe */
+#ifdef JUNK
+	      if (! pN && pp->slR && !goodSuffix && !( mm->stranded > 0) &&
+		  pTok &&
+		  strlen((char *)suffix + 1) < 24 && 
+		  strlen((char *)suffix + 1) > 8) /* search for SL1 */
+		{
+		  int ns, n1 ;
+		  unsigned char buf2[OVLN+3] ;
+		  
+		  for (ns = 0 ; pp->slR[ns] && !goodSuffix ; ns++)
+		    {
+		      ccp = pp->slR[ns] ;
+		      i =  strlen((char *)ccp)  ;  
+		      n1 = dnaPickMatch (ccp, i, suffix+1, 0, 0) ;
+		      /* the SL must also match the trailing A */
+		      if (n1 > 0)
+			{
+			  for (i = 0 ; n1 && i < mm->probeRightClip ; i++)
+			    if (ccp [n1 + strlen((char *)suffix+1) - 1 + i] != A_)
+			      n1 = 0 ;
+			}
+		      if (n1 > 0) /* the suffix matches in the SL, 
+				   * and the ag acceptor consensus was in the aligned part 
+				   */
+			{
+			  /* verify that the bp of the SL upstream of n1 are in the exon */
+			  for (i = 1, j = 1 ; j && i < n1 ; i++)
+			    if (ccp[n1-i-1] != arr(pp->dna0, a2 - i, unsigned char))
+			      j = 0 ;
+			  if (j) /* ok the whole begining of the reverse SL is in the probe */
+			    {
+			      /* check that the accepted part SL including an extra donor 'gt' 
+			       * is not present in the genome
+			       */
+			      int kkk = ccp ? strlen ((const char *)ccp) : 0 ;
+			      BOOL inGenome = FALSE ;
+			      if (kkk < OVLN)
+			{
+			  sprintf ((char *)buf2, "%c%c%s", A_ | G_,  C_, ccp) ;
+			  inGenome = dnaPickMatch (genome, genomeLn, buf2, 0, 0) ;
+			}
+			      if (! inGenome)
+				{
+				  goodSuffix = ns + 11 ;
+				  score += pp->slBonus ;
+				  i = n1 - 1 ;
+				  if (i > 0)
+				    {
+				      x2 = (*x2p) -= i ;
+				      a2 = (*a2p) -= i ; 
+				      strncpy ((char *)(suffix + 1), (char *)ccp, n1) ;
+				    }
+				  aliBonus += 0 ; /*  strlen((char *)suffix+1)  */
+				  rightAdaptorClip = x2 ;
+				}
+			    }
+			}
+		    }
+		}
+	      
+#endif
+	    }
 	}
       dictAdd (bb->dict, buf, &up->rightOverhang) ;
     }
-  return ;
+  up->rightClip = rightClip ;
+  return rightClip ;
 } /* alignFormatRightOverhang */
 
 /**************************************************************/
@@ -1645,7 +1780,6 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   
 {
   ALIGN *ap, *vp ;
-
   int ii ;
   int iMax = alignLocateChains (bestAp, aa, read) ;  
   int nChains = 0 ;
@@ -1655,7 +1789,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   Array dnaG = 0, dnaGR = 0 ;
   int read1 = read & (~0x1) ;
   int read2 = read | 0x1 ;
-  
+
   dna1 = arr (bb->dnas, read1, Array) ;
   dna2 = arr (bb->dnas, read2, Array) ;
   
@@ -1667,7 +1801,10 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
       if (read == ap->read)
 	{
 	  dna = ap->read & 0x1 ? dna2 : dna1 ;
-	  
+	  ap->leftClip = ((ap->read & 0x1) ? bb->rc.jump5r2 : bb->rc.jump5r1) ;
+	  if (ap->leftClip > arrayMax (dna))
+	    ap->leftClip = 0 ;
+	  ap->rightClip = arrayMax (dna) ;
 	  if (ap->x1 > 1 && ap->x1 == ap->chainX1)
 	    {
 	      if (ap->chrom != chromA)
@@ -1676,7 +1813,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
 		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
 		}
-	      alignFormatLeftOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
+	      ap->leftClip = alignFormatLeftOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
 	    }
 	  if (ap->x2 == ap->chainX2 && ap->x2 < arrayMax (dna))	
 	    {
@@ -1686,7 +1823,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
 		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
 		}
-	      alignFormatRightOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
+	      ap->rightClip = alignFormatRightOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
 	    }
 	}
 
@@ -1778,8 +1915,12 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  bb->runStat.nMultiAligned[0]++ ;
 		  nChains = 1 ;
 		  bb->runStat.nAlignments++ ;
-		  if (ap->chainErr == 0 && ap->chainAli == ap->readLength)
-		    bb->runStat.nPerfectReads++ ;
+		  if (ap->chainErr == 0 && ap->leftClip + ap->chainAli >= ap->rightClip)
+		    {
+		      bb->runStat.nPerfectReads++ ;
+		      if (0)
+			fprintf (stderr, "PERFECT\t%s%s\n", dictName(bb->dict, (ap->read)>>1), (ap->read & 0x1 ? "<" : ">")) ;
+		    }
 		}
       
 	      if (ap != vp && tc == tc0)

@@ -70,6 +70,16 @@ setenv SV v55.81.jan23      # no wiggle, introns, fixing for BAM lots of issues 
 setenv SVlast v55.81.jan23
 setenv SV v56.81.jan23      # no wiggle, introns, fixed the error in the seed sorter:  max81
 setenv SVlast v56.81.jan23
+setenv SV v57.31.jan25      # no wiggle, introns, :  max31
+setenv SVlast v57.31.jan25
+setenv SV v58.31.16M.jan26      # no wiggle, introns, :  max31
+setenv SVlast v58.31.16M.jan26
+setenv SV v59.81.16M.jan26      # no wiggle, introns, :  max31
+setenv SVlast v59.81.16M.jan26
+setenv SV v60.81.18M.Wiggle.jan26      # no wiggle, introns, :  max31
+setenv SVlast v60.81.18M.Wiggle.jan26
+setenv SV     v61.81.18M.errCost4.jan27      # no wiggle, introns, :  max31
+setenv SVlast v61.81.18M.errCost4.jan27
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -82,8 +92,10 @@ endif
 \cp bin/sortalign.$SV bin/sortalign
   
 setenv NOINTRONSEEDS 0
-setenv EXPORTSAM 0
-setenv EXPORTWIGGLE 0
+setenv EXPORTSAM 1
+setenv EXPORTWIGGLES 0
+setenv EXPORTWIGGLEENDS 0
+setenv seedLength 16
 setenv seedLength 18
 setenv maxTargetRepeats 31
 setenv maxTargetRepeats 81
@@ -133,7 +145,7 @@ setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
 
 set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 21_HISAT2 31_STARlong"
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2 31_STARlong"
 if ($createIndex == 11)  setenv methods "011_SortAlignG5R5"
 if ($createIndex == 12)  setenv methods "012_SortAlignG3R3"
 
@@ -164,6 +176,7 @@ setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_BAB_Baboon FrontalC
 setenv moreRuns "HG19t1r1 HG19t2r1 HG19t3r1 WormSRR548309 RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb"
 
 setenv runs "$allRuns  $monkeyRuns $moreRuns"
+# setenv runs "RNA_PolyA_AB_1_97G"
 # setenv runs "Roche"
 # setenv runs "iRefSeq38"
 
@@ -781,6 +794,7 @@ foreach run ($runs)
       if (-e Fasta/$run/$run.forward.fasta.gz) set read_1=Fasta/$run/$run.forward.fasta.gz
       if (-e Fasta/$run/$run.reverse.fasta.gz) set read_2=Fasta/$run/$run.reverse.fasta.gz
       if ($read_1 == "x" && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($read_1 == "x" && -e Fasta/$run/$run.Config) set read_1=Fasta/$run/$run.Config
 
       if (! -e $read_1) then
         echo "Run $run Missing read file $read_1"
@@ -928,6 +942,10 @@ date
     endif
     if (-e RESULTS/$mm/$run/Aligned.out.sam && ! -e RESULTS/$mm/$run/sam) then
        mv RESULTS/$mm/$run/Aligned.out.sam RESULTS/$mm/$run/sam
+    endif
+
+    if (-e RESULTS/$mm/$run/$run/$run.sam && ! -e RESULTS/$mm/$run/s2g.samTools.txt) then
+      samtools stats RESULTS/$mm/$run/$run/$run.sam | gawk -f scripts/sam_stats.awk > RESULTS/$mm/$run/s2g.samTools.txt  
     endif
 
     if (! -e RESULTS/$mm/$run/s2g.samStats) then
@@ -1100,7 +1118,7 @@ foreach tag (Non_compatible_pairs)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
   end
-  echo "\nConsistent pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  echo "\nNon compatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
    cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Compatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
@@ -1115,7 +1133,7 @@ foreach tag (Non_compatible_pairs)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
   end
-  echo "\nNon_compatible_pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  echo "\nNon compatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
    cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
@@ -1240,20 +1258,21 @@ goto phaseLoop
 ##############################################################################
 ##############################################################################
 ## Direct statistics of the error counts reported in the BAM files
-## The AliQC.py code, above, parses the bam file and the genome
+## The sam2gold.c code, above, parses the bam file and the genome
 ## and computes its own evaluation of the number of error per aligned read
 ## In the present script, we rely on the presence in the BAM files of the NM:i:x
 ## optional field, collate the X values and report the statistics
 ## Hopefully, the 2 methods should be compatible, but they do not have
-## to agree exactly since aliqc counts a double or triple deletion as a single event
-## and some aligners may report it as 2 or 3 errors
+## to agree exactly, now aliqc counts a double or triple deletion as a 2 or 3 mismatches
+## and some aligners may report it as 1, 2 or 3 errors
+## and there is a big issue with deltions versus introns
 
 phase_DirectErrorCount:
 echo phase_DirectErrorCount
 foreach mm ($methods)
   foreach run ($runs)
     echo "phase_DirectErrorCount $mm $run"
-    if (-e RESULTS/$mm/$run/sam_sorted.gz && ! -e RESULTS/$mm/$run/$mm.$run.nerrors) then
+    if (-e RESULTS/$mm/$run/sam && ! -e RESULTS/$mm/$run/direct_eror_count) then
       scripts/submit RESULTS/$mm/$run/$mm.$run.nerrors "scripts/directErrorCount.tcsh $mm $run" 
      endif
   end
@@ -1292,16 +1311,17 @@ phase_count_subtitutions_in_benchmark:
 # there are several phases in the calculation
 # 1: select the full reads, characterized by a cigar string 100M
 if (! -e SUBS) mkdir SUBS
-foreach sp (HG19 PFAL)
+#HG19 PFAL
+foreach sp (HG19)
   foreach tt (t1 t2 t3)
-    if (-e Fasta/$sp$tt'r3'/$sp$tt'r3'.cig.gz && ! -e  SUBS/subs.$sp$tt) then 
-      zcat Fasta/$sp$tt'r3'/$sp$tt'r3'.cig.gz | grep chr8  | grep '+' |  grep 100M | cut -f 1,2,3,4,8 > SUBS/subs.$sp$tt
+    if (-e Fasta/$sp$tt'r1'/$sp$tt'r1'.cig.gz && ! -e  SUBS/subs.$sp$tt) then 
+      zcat Fasta/$sp$tt'r1'/$sp$tt'r1'.cig.gz | grep chr8  | grep '+' |  grep 100M | cut -f 1,2,3,4,8 > SUBS/subs.$sp$tt
     endif
   end
 end
 
 # 2: construct a 6 columns tab delimited shadow file, summarizing the coordinate of the alignemnts
-foreach sp (HG19 PFAL)
+foreach sp (HG19)
   foreach tt (t1 t2 t3)
     if (-e  SUBS/subs.$sp$tt && ! -e SUBS/subs.$sp$tt.shadow ) then 
       cat SUBS/subs.$sp$tt | gawk -F '\t' '{printf("%s\t1\t100\t%s\t%d\t%d\n",$1,$2,$3,$4);}' > SUBS/subs.$sp$tt.shadow 
@@ -1310,7 +1330,7 @@ foreach sp (HG19 PFAL)
 end
 
 # 3: isolate the genome of chromosome 8, using the dna2dna utility
-foreach sp (HG19 PFAL)
+foreach sp (HG19)
   if (-e Reference_genome/$sp.Baruzzo.genome.fasta.gz && ! -e Reference_genome/$sp.Baruzzo.chr8.fasta.gz) then
     bin/dna2dna -i Reference_genome/$sp.Baruzzo.genome.fasta.gz -I fasta -O fasta -keepName -o Reference_genome/$sp.Baruzzo.chr8 -gzo 
   endif
@@ -1320,10 +1340,10 @@ end
 # The raw format has just 2 tab delimited columns: atgcatgc  identifier
 # Notice that dna2dna is very versatile, it can directly export messenger RNAs given a genome and a gff file.
 # try bin/dna2dna --help for a full list of functioalities
-foreach sp (HG19 PFAL)
+foreach sp (HG19)
   foreach tt (t1 t2 t3)
     if (-e  SUBS/subs.$sp$tt.shadow && -e Reference_genome/$sp.Baruzzo.chr8.fasta.gz && ! -e SUBS/subs.$sp$tt.raw) then
-      dna2dna -i Reference_genome/$sp.Baruzzo.chr8.fasta.gz -shadow SUBS/subs.$sp$tt.shadow -O raw -keepName >  SUBS/subs.$sp$tt.raw 
+      bin/dna2dna -i Reference_genome/$sp.Baruzzo.chr8.fasta.gz -shadow SUBS/subs.$sp$tt.shadow -O raw -keepName >  SUBS/subs.$sp$tt.raw 
     endif
   end
 end
@@ -1820,8 +1840,10 @@ goto phaseLoop
 phase_introns:
 
 setenv iRuns "$allRuns $moreRuns"
-
+setenv iRuns "$runs"
+#setenv iRuns "iRefSeq iRefSeq38"
 set iMethods="011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 23_HISAT2_16threads 31_STARlong 53_Minimap2_16threads"
+set iMethods="$methods"
 
 echo "Creating the INTRON_DB databases"
 foreach target (T2T GRCh38)
@@ -1910,17 +1932,19 @@ foreach mm ($iMethods)
     echo $mm | gawk '{printf("\t%s",$1);}' >> _c
 end
 foreach run ($iRuns)
-  echo -n "\n$run\tKnown Intron" >> _c
+  echo -n "\n$run Known Intron\t" >> _c
   foreach mm ($iMethods)
     cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$4;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
   end
-  echo -n "\n$run\tNew Intron" >> _c
+end
+foreach run ($iRuns)
+  echo -n "\n$run New Intron\t" >> _c
   foreach mm ($iMethods)
     cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$5;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
   end
 end
 echo >> _c
-
+\cp _c COMPARE/introns_known_new.$SV.txt
 
 # ROC curve, truth = gt_ag  , not useful when we align the iRefSeq38
  cat GRCh38.INTRON_DB/introns.tsf | gawk '{if($1==m){print $7;}}' m=011_SortAlignG5R5 | tags | sort -k 2nr | head -8

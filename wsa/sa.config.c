@@ -16,6 +16,46 @@
 
 #include "sa.h"
 
+static void saSlInit (PP *pp)
+{
+  /* if you edit the SL table, also edit the corresponding table in solexa.c */
+  char *slu[] = { "GGTTTAATTACCCAAGTTTGAG" ,    /* SL1 */
+	 	  "GGTTTTAACCCAGTTACTCAAG" ,    /* SL2 */
+	 	  "GGTTTTAACCCAGTTAACCAAG" ,    /* SL3 */
+		  "GGTTTTAACCCAGTTTAACCAAG" ,    /* SL4 */
+     		  "GGTTTTAACCCAGTTACCAAG" ,    /* SL5 */
+ 	 	  "GGTTTAAAACCCAGTTACCAAG" ,    /* SL6 */
+ 	 	  "GGTTTTAACCCAGTTAATTGAG" ,    /* SL7 */
+ 		  "GGTTTTTACCCAGTTAACCAAG" ,    /* SL8 */
+		  "GGTTTATACCCAGTTAACCAAG" ,    /* SL9 */
+		  "GGTTTTAACCCAAGTTAACCAAG" ,    /* SL10 */
+ 		  "GGTTTTAACCAGTTAACTAAG" ,    /* SL11 */
+		  "GGTTTTAACCCATATAACCAAG" ,    /* SL12 */
+		  /* existe pas
+		   * "GTTTTTAACCCAGTTACTCAAG" ,   SL13 
+ 	 	   * "GGTTTTTAACCCAGTTACTCAAG" ,   SL14 
+		   */
+		  0 } ;
+
+  
+  memset (pp->sl, 0, sizeof (pp->sl)) ;
+  memset (pp->slR, 0, sizeof (pp->slR)) ;
+
+  for (int i = 0 ; i < 15 ; i++)
+    {
+      char *cs = slu[i] ;
+      if (! cs || ! *cs) break ;
+      int k = strlen (cs) ;
+      if (k < 32) /* length of buffer pp->sl[i] */
+	for (int j = 0 ; j < k ; cs++, j++)
+	  {
+	    char c = dnaEncodeChar [(int)*cs] ;
+	    pp->sl[i][j] = c ;
+	    pp->sl[i][k-j-1] = complementBase(c) ;
+	  }
+    }
+  return ;
+} /* saSlInit */
 
 /*********************************************************************/
 
@@ -101,6 +141,9 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   Array rcs = arrayHandleCreate (64, RC, pp->h) ;
   RC *rc = 0 ;
   int nn = 0 ;
+  
+  if(pp->isWorm)
+    saSlInit (pp) ;
   
   if (pp->inFileName)
     {   /* Split the individual file names, they are coma separated 
@@ -246,23 +289,32 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  rc->RNA = TRUE ; /* default */
 
 	  /* options */
+	  aceInStep (ai, '\t') ;
 	  cp = aceInWord (ai) ;
 	  while (cp)
 	    {
+	      int k = 0 ;
+	      
 	      if (*cp == '#')
 		break ;
 	      cq = strchr (cp, ',') ;
 	      if (cq)
 		*cq++ = 0 ;
 	      if (! strcasecmp (cp, "fasta")) rc->format = FASTA ;
-	      if (! strcasecmp (cp, "fastq")) rc->format = FASTQ ;
-	      if (! strcasecmp (cp, "fastc")) rc->format = FASTC ;
-	      if (! strcasecmp (cp, "raw")) rc->format = RAW ;
-	      if (! strcasecmp (cp, "SRA")) rc->format = SRA ;
+	      else if (! strcasecmp (cp, "fastq")) rc->format = FASTQ ;
+	      else if (! strcasecmp (cp, "fastc")) rc->format = FASTC ;
+	      else if (! strcasecmp (cp, "raw")) rc->format = RAW ;
+	      else if (! strcasecmp (cp, "SRA")) rc->format = SRA ;
 
-	      if (! strcasecmp (cp, "rna")) rc->RNA = TRUE ;
-	      if (! strcasecmp (cp, "dna")) rc->RNA = FALSE ;
-	      
+	      else if (! strcasecmp (cp, "rna")) rc->RNA = TRUE ;
+	      else if (! strcasecmp (cp, "dna")) rc->RNA = FALSE ;
+
+	      else if (sscanf (cp, "jump1=%d", &k) && k >0)
+		rc->jump5r1 = k ;
+	      else if (sscanf (cp, "jump2=%d", &k) && k >0)
+		rc->jump5r2 = k ;
+		
+		  
 	      cp = cq ;
 	    }
 

@@ -1073,7 +1073,7 @@ static void reportRunStats (PP *pp, Array runStats)
   Array aa = runStats ;
   RunSTAT *s0 = arrayp (aa, 0, RunSTAT) ;
 
-  printf ("\n####### Global Statistics, see details in file %s.runStats.tsf", pp->outFileName ? pp->outFileName : "") ;
+  printf ("\n####### Global Statistics, see details in file %srunStats.tsf", pp->outFileName ? pp->outFileName : "") ;
   if (pp->runName) printf ("\n#:Run\t%s", pp->runName) ;
   if (pp->method) printf ("\n#:Method\t%s", pp->method) ;
   
@@ -1135,7 +1135,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//\n"
 	       "// EXAMPLES:\n"
 	       "//      sortalign --createIndex XYZ -t target.fasta (needed once)\n"
-	       "//      sortalign --index XYZ -i f_1.fastq.gz+f_2.fastq.gz --wiggle -o results/xxx \n"
+	       "//      sortalign --index XYZ -i f_1.fastq.gz+f_2.fastq.gz --wiggles -o results/xxx \n"
 	       "//      sortalign --index XYZ -i SRR35876976  -o results/xxx \n"
 	       "//\n"
 	       "// OBJECTIVE:\n"
@@ -1255,7 +1255,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//   --no_splice : only accept comtinuous alignments, [by default search also spliced alignments]\n"
 	       "//   --maxIntron [default 1000000] : max intron size\n"
 	       "//   --ignoreIntronSeeds [default FALSE] : do not use the known intron provided in class I in the -T config file\n"
-	       "// --wiggle  : Report target coverage wiggles in UCSC BF (fixed) format\n"
+	       "// --wiggles  : Report target coverage wiggles in UCSC BF (fixed) format\n"
 	       "// --intron  : Report intron support\n"
 	       "// (--snp : not yet ready) Report candidate SNP counts (substitutions and short indels)\n"
 	       "// STEPPING\n"
@@ -1325,6 +1325,7 @@ int main (int argc, const char *argv[])
   long int skips0 = 0, skips1 = 0, skips2 = 0, skips3 = 0, skips4 = 0, skipsFound = 0, skipsNotFound = 0 ;
   char tBuf[25] ;
   char tBuf0[25] ;
+  const char *species = 0 ;
   AC_HANDLE h ;
   int nAgents = 10 ;
   int channelDepth = 10 ;
@@ -1349,12 +1350,12 @@ int main (int argc, const char *argv[])
 
   if (getCmdLineBool (&argc, argv, "--version"))
     {
-      fprintf (stderr, "sortalign version 0.0.42, novembre 2025") ;
+      fprintf (stderr, "sortalign version 0.1.56, jan 2027") ;
       exit (0) ;
     }     
 
-  p.debug  = getCmdLineText (h, &argc, argv, "--debug", 0) ;
-  p.debug |= getCmdLineText (h, &argc, argv, "--verbose", 0) ;
+  p.debug  = getCmdLineBool (&argc, argv, "--debug") ;
+  p.debug |= getCmdLineBool (&argc, argv, "--verbose") ;
   
   p.gzi = getCmdLineBool (&argc, argv, "--gzi") ;   /* decompress input files (implicit for files named .gz) */
   p.gzo = getCmdLineBool (&argc, argv, "--gzo") ;   /* compress most output files */
@@ -1363,6 +1364,12 @@ int main (int argc, const char *argv[])
   if (p.maxSraGb < 0)
     saUsage ("--maxGB parameter should be positive", argc, argv) ;
 
+  if (getCmdLineText (h, &argc, argv, "--species", &species))
+    {
+      if (species && ! strcasecmp (species, "worm"))
+	p.isWorm = TRUE ;
+    }
+  
   /**************************  SRA downloader *********************************/
   
   {{  /* --sraDownload SRR1,SRR2,,...
@@ -1655,7 +1662,7 @@ int main (int argc, const char *argv[])
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
 
   /* future options ***/
-  p.wiggle = getCmdLineBool (&argc, argv, "--wiggle") ;
+  p.wiggle = getCmdLineBool (&argc, argv, "--wiggles") ;
   p.wiggleEnds = getCmdLineBool (&argc, argv, "--wiggleEnds") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
@@ -1773,7 +1780,7 @@ int main (int argc, const char *argv[])
   p.splice = TRUE ;
   if (getCmdLineBool (&argc, argv, "--no_splice"))
     p.splice = FALSE ;
-  p.errCost = 8 ;
+  p.errCost = 4 ; /* was 8 */
   getCmdLineInt (&argc, argv, "--errCost", &(p.errCost)) ;
   getCmdLineInt (&argc, argv, "--errMax", &(p.errMax)) ;
   getCmdLineInt (&argc, argv, "--minScore", &(p.minScore)) ;

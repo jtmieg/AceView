@@ -65,6 +65,7 @@ typedef struct runClassStruct {
   BOOL pairedEnd ;
   BOOL RNA ; /* 1: is RNA, 0 : is DNA (no introns) */
   DnaFormat format ;
+  int jump5r1, jump5r2 ; /* jump bases at the 5prime end of read1 and read2 */
   const char *fileName1 ;
   const char *fileName2 ;
   atomic_int lane ;
@@ -89,13 +90,14 @@ typedef struct runStatStruct {
   long int nPerfectReads ;
   long int nAlignments ;
   long int nClippedPolyA ;
-  long int nClippedVectors ;
-  long int nPolyASites ;
-  long int polyASupport ;
+  long int nClippedPolyT ;
+  long int nClippedSL ;
+  long int nClipped5pAdaptor ;
+  long int nClipped3pAdaptor ;
   long int nTello[12] ;
   long int nTelloRead ;
-  long int nAAA[12] ;
-  long int nAAARead ;
+  long int SlRead ;
+  long int nSl[12] ;
   long int nSupportedIntrons ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
@@ -172,6 +174,7 @@ typedef struct pStruct {
   BOOL introns ;
   BOOL snps ;
   BOOL ignoreIntronSeeds ;
+  BOOL isWorm ;
   const char *runName ;
   const char *inFileName ;
   const char *inConfigFileName ;
@@ -185,6 +188,8 @@ typedef struct pStruct {
   const char *tFileBinaryIdsName ;
   const char *tFileBinaryCoordsName ;
 
+  unsigned char sl[15][32] ;
+  unsigned char slR[15][32] ;
   /* Agents:
      R read parser
      G genome parser

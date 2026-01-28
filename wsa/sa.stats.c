@@ -200,6 +200,11 @@ static void s2gSamStatsExports (const PP *pp, Array runStats)
 
   aceOutf (ao, "%s\t%s\tReads\t%ld\n", run, METHOD, s0->nReads) ;  
   aceOutf (ao, "\n%s\t%s\tRawReads\t%ld\n", run, METHOD, nRawReads) ;
+  if (s0->nClippedPolyA) aceOutf (ao, "\n%s\t%s\tClipped_PolyA\t%ld\n", run, METHOD, s0->nClippedPolyA) ;
+  if (s0->nClippedPolyT) aceOutf (ao, "\n%s\t%s\tClipped_PolyT\t%ld\n", run, METHOD, s0->nClippedPolyT) ;
+  if (s0->nClippedSL) aceOutf (ao, "\n%s\t%s\tClipped_SL\t%ld\n", run, METHOD, s0->nClippedSL) ;
+  if (s0->nClipped5pAdaptor) aceOutf (ao, "\n%s\t%s\tClipped_5prime_Adaptor\t%ld\n", run, METHOD, s0->nClipped5pAdaptor) ;
+  if (s0->nClipped3pAdaptor) aceOutf (ao, "\n%s\t%s\tClipped_3prime_Adaptor\t%ld\n", run, METHOD, s0->nClipped3pAdaptor) ;
   aceOutf (ao, "%s\t%s\tPerfect_reads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(nRawReads + .000001)) ;
   aceOutf (ao, "%s\t%s\tAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(nRawReads + .000001)) ;
   
@@ -275,7 +280,6 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
     up->ATGCN[i] += vp->ATGCN[i] ;
   for (int i = 0 ; i < 5 * LETTERMAX; i++)
     up->letterProfile1[i] += vp->letterProfile1[i] ;
-  up->polyASupport += vp->polyASupport ;
   for (int i = 0 ; i < 5 * LETTERMAX; i++)
     up->letterProfile2[i] += vp->letterProfile2[i] ;
   for (int i = 0 ; i < 11 ; i++)
@@ -295,6 +299,13 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
     up->maxReadLength = vp->maxReadLength ;
   up->nErr += vp->nErr ;
   up->nMID += vp->nMID ;
+  
+  up->nClippedPolyA += vp->nClippedPolyA ;
+  up->nClippedPolyT += vp->nClippedPolyT ;
+  up->nClippedSL += vp->nClippedSL ;
+  up->nClipped5pAdaptor += vp->nClipped5pAdaptor ;
+  up->nClipped3pAdaptor += vp->nClipped3pAdaptor ;
+  
   if (vp->errors)
     for (int i = 0 ; i < arrayMax (vp->errors) ; i++)
       array (up->errors, i, int) += array (vp->errors, i, int) ;
@@ -394,7 +405,7 @@ void saRunStatExport (const PP *pp, Array runStats)
 
   memset (LD, 0, sizeof (LD)) ;
   
-  aceOutDate (ao, "##", "Run statistics") ;
+  aceOutDate (ao, "##", hprintf (h, "Run statistics on index %s, seed length %d, max repeats %d, error cost %d", pp->indexName, pp->seedLength, pp->maxTargetRepeats, pp->errCost)) ;
   for (run = 1 ; run < runMax ; run++)
     {
       RunSTAT *up = arrp (runStats, run, RunSTAT) ;
@@ -476,15 +487,38 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->ATGCN[4]
 		   ) ;
 
-	  aceOutf (ao, "%s\tpolyASupport\ti\t%ld\n"
-		   , runNam
-		   , up->polyASupport
-		   ) ;
+
+	  if (up->nClipped5pAdaptor)
+	    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\n"
+		     , runNam
+		     , up->nClipped5pAdaptor
+		     ) ;
+	  if (up->nClipped3pAdaptor)
+	    aceOutf (ao, "%s\tClipped_3prime_Adaptor\t%ld\n"
+		     , runNam
+		     , up->nClipped3pAdaptor
+		     ) ;
+	  if (up->nClippedSL)
+	    aceOutf (ao, "%s\tClipped_SL\ti\t%ld\n"
+		     , runNam
+		     , up->nClippedSL
+		     ) ;
+	  if (up->nClippedPolyA)
+	    aceOutf (ao, "%s\tClipped_polyA\ti\t%ld\n"
+		     , runNam
+		     , up->nClippedPolyA
+		     ) ;
+	  if (up->nClippedPolyT)
+	    aceOutf (ao, "%s\tClipped_polyT\ti\t%ld\n"
+		     , runNam
+		     , up->nClippedPolyT
+		     ) ;
+	  
 	  aceOutf (ao, "%s\tpolyA_sites\ti\t%ld\n"
 		   , runNam
 		   , confirmedPolyAsCountSites (pp, run)
 		   ) ;
-
+	  
 	  aceOutf (ao, "%s\twiggleCumul\ti\t%ld\n", runNam, up->wiggleCumul) ;
 	  aceOutf (ao, "%s\tErrors\tif\t%ld\t%.3f\n"
 		   , runNam

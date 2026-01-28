@@ -535,6 +535,9 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb->h = ac_new_handle () ;
 	  
       bb->rc.format = format ;
+      bb->rc.jump5r1 = rc ? rc->jump5r1 : 0 ;
+      bb->rc.jump5r2 = rc ? rc->jump5r2 : 0 ;      
+
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
@@ -675,7 +678,8 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
       memset (bb, 0, sizeof (BB)) ;
       bb->h = ac_new_handle () ;
       bb->rc.format = format ;
-      
+      bb->rc.jump5r1 = rc ? rc->jump5r1 : 0 ;
+      bb->rc.jump5r2 = rc ? rc->jump5r2 : 0 ;      
       bb->readerAgent = pp->agent ;
       bb->run = rc ? rc->run : 0 ;
       bb->start = timeNow () ;
@@ -780,6 +784,8 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb->txt2 = vtxtHandleCreate (bb->h) ;
       bb->errors = arrayHandleCreate (256, int, bb->h) ;
       bb->cpuStats = arrayHandleCreate (128, CpuSTAT, bb->h) ;
+      bb->rc.jump5r1 = rc ? rc->jump5r1 : 0 ;
+      bb->rc.jump5r2 = rc ? rc->jump5r2 : 0 ;      
       bb->run = rc ? rc->run : 0 ;
       bb->length = 0 ;
       bb->dnas = dnas = arrayHandleCreate (64, BigArray, bb->h) ;

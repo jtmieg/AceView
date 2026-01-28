@@ -1971,6 +1971,103 @@ BOOL bigArrayMapWrite (BigArray aa, const char *fName)
 } /* bigArrayMapWrite  */
 
 /**********************************************************************/
+/**********************************************************************/
+/**** BigStack : arbitrary BigStack class - inherits from BigArray ****/
+/**********************************************************************/
+
+static void uBigStackFinalise (void *cp) ;
+
+#ifndef MEM_DEBUG
+BigStack bigStackHandleCreate (long int n, AC_HANDLE handle)  /* n is initial size */
+{
+  BigStack s = (BigStack) handleAlloc (uBigStackFinalise, 
+				       handle,
+				       sizeof (struct BigStackStruct)) ;
+
+#else
+BigStack bigStackHandleCreate_dbg (long int n, AC_HANDLE handle,  /* n is initial size */
+				   const char *hfname, int hlineno)
+{
+  BigStack s = (BigStack) handleAlloc_dbg (uBigStackFinalise, 
+					   handle,
+					   sizeof (struct BigStackStruct),
+					   hfname, hlineno) ;
+#endif
+  s->magic = BIGSTACK_MAGIC ;
+  s->a = bigArrayCreate (n,char) ;
+  s->pos = s->ptr = s->a->base ;
+  s->safe = s->a->base + s->a->dim - 16 ; /* safe to store objs up to size 8 */
+  return s ;
+}
+
+BigStack bigStackReCreate (BigStack s, long int n)               /* n is initial size */
+{
+  if (!bigStackExists(s))
+    messcrash ("bigStackReCeate called on NULL bigSatck, use bigStackhandleCreate") ;
+
+  s->a = bigArrayReCreate (s->a,n,char) ;
+  s->pos = s->ptr = s->a->base ;
+  s->safe = s->a->base + s->a->dim - 16 ; /* safe to store objs up to size 8 */
+  return s ;
+}
+
+BigStack bigStackCopy (BigStack old, AC_HANDLE handle)
+{
+  BigStack neuf = 0 ;
+
+  if (bigStackExists(old))
+    {
+      neuf = bigStackHandleCreate (old->a->dim, handle) ;
+      memcpy (neuf->a->base, old->a->base, old->a->dim) ;
+      neuf->ptr = neuf->a->base + (old->ptr - old->a->base) ;
+      neuf->pos = neuf->a->base + (old->pos - old->a->base) ;
+    }
+  return neuf ;
+}
+
+void uBigStackDestroy(BigStack s)
+{ if (s && s->magic == BIGSTACK_MAGIC) messfree(s);
+} /* the rest is done below as a consequence */
+
+static void uBigStackFinalise (void *cp)
+{ BigStack s = (BigStack)cp;
+  if (!finalCleanup) bigArrayDestroy (s->a) ;
+  s->magic = 0 ;
+}
+
+void bigStackExtend (BigStack s, long int n)
+{
+  long int ptr = s->ptr - s->a->base ;
+  long int pos = s->pos - s->a->base ;
+  s->a->max = s->a->dim ;	/* since only up to ->max copied over */
+  bigArrayExtend (s->a,ptr+n+16) ;	/* relies on arrayExtend mechanism */
+  s->ptr = s->a->base + ptr ;
+  s->pos = s->a->base + pos ;
+  s->safe = s->a->base + s->a->dim - 16 ;
+}
+
+long int bigStackMark (BigStack s)
+{ return (s->ptr - s->a->base) ;
+}
+
+long int bigStackPos (BigStack s)
+{ return (s->pos - s->a->base) ;
+}
+
+void bigStackCursor (BigStack s, long int mark)
+{ s->pos = s->a->base + mark ;
+}
+
+void bigStackClear(BigStack s)
+{
+  if (bigStackExists(s))
+    {
+      s->pos = s->ptr = s->a->base;
+      s->a->max = 0 ;
+    }
+}
+
+/**********************************************************************/
 /************************  end of file ********************************/
 /**********************************************************************/
  
