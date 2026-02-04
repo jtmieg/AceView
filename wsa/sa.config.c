@@ -37,22 +37,21 @@ static void saSlInit (PP *pp)
 		   */
 		  0 } ;
 
-  
-  memset (pp->sl, 0, sizeof (pp->sl)) ;
-  memset (pp->slR, 0, sizeof (pp->slR)) ;
+  pp->SLs = arrayHandleCreate (SLMAX, char*, pp->h) ;  
 
-  for (int i = 0 ; i < 15 ; i++)
+  for (int i = 0 ; i < SLMAX && slu[i] ; i++)
     {
       char *cs = slu[i] ;
       if (! cs || ! *cs) break ;
       int k = strlen (cs) ;
-      if (k < 32) /* length of buffer pp->sl[i] */
-	for (int j = 0 ; j < k ; cs++, j++)
-	  {
-	    char c = dnaEncodeChar [(int)*cs] ;
-	    pp->sl[i][j] = c ;
-	    pp->sl[i][k-j-1] = complementBase(c) ;
-	  }
+      char *buf = halloc (k+1, pp->h) ;
+      for (int j = 0 ; j < k ; cs++, j++)
+	{
+	  char c = dnaEncodeChar [(int)*cs] ;
+	  buf[j] = c ;
+	}
+      buf[k] = 0 ;
+      array (pp->SLs, i, char *) = buf ;
     }
   return ;
 } /* saSlInit */
@@ -144,6 +143,35 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   
   if(pp->isWorm)
     saSlInit (pp) ;
+
+  if (pp->rawAdaptor1L)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
+    {
+      int i, iMax = strlen (pp->rawAdaptor1L) ;
+      for (i = 0 ; i < iMax && i < 30; i++)
+	pp->adaptor1L[i] = complementBase(dnaEncodeChar[(int)pp->rawAdaptor1L[iMax - i - 1]]) ;
+    }
+  
+  if (pp->rawAdaptor2L) /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
+    {
+      int i, iMax = strlen (pp->rawAdaptor2L) ;
+      for (i = 0 ; i < iMax && i < 30; i++)
+	pp->adaptor2L[i] = complementBase(dnaEncodeChar[(int)pp->rawAdaptor2L[iMax - i -1]]) ;
+    }
+  
+  if (pp->rawAdaptor1R)  /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
+    {
+      int i, iMax = strlen (pp->rawAdaptor1R) ;
+      for (i = 0 ; i < iMax && i < 30; i++)
+	pp->adaptor1R[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
+    }
+  
+  if (pp->rawAdaptor2R)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
+    {
+      int i, iMax = strlen (pp->rawAdaptor2R) ;
+      for (i = 0 ; i < iMax && i < 30; i++)
+	pp->adaptor2R[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
+    }
+  
   
   if (pp->inFileName)
     {   /* Split the individual file names, they are coma separated 
@@ -232,7 +260,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	    }
 	  if (rc->format == FASTC)
 	      rc->pairedEnd = TRUE ;
-	  
+
 	  cp = cq + 1 ;
 	}
     }
@@ -288,6 +316,12 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  rc->run = run ;
 	  rc->RNA = TRUE ; /* default */
 
+	  /*
+	    memcpy (rc->adaptor1L, pp->adaptor1L , 30) ;
+	    memcpy (rc->adaptor2L, pp->adaptor2L , 30) ;
+	    memcpy (rc->adaptor1R, pp->adaptor1R , 30) ;
+	    memcpy (rc->adaptor2R, pp->adaptor2R , 30) ;
+	  */
 	  /* options */
 	  aceInStep (ai, '\t') ;
 	  cp = aceInWord (ai) ;

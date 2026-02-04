@@ -76,10 +76,10 @@ setenv SV v58.31.16M.jan26      # no wiggle, introns, :  max31
 setenv SVlast v58.31.16M.jan26
 setenv SV v59.81.16M.jan26      # no wiggle, introns, :  max31
 setenv SVlast v59.81.16M.jan26
-setenv SV v60.81.18M.Wiggle.jan26      # no wiggle, introns, :  max31
+setenv SV v60.81.18M.Wiggle.jan26      #    wiggle, introns, :  max31
 setenv SVlast v60.81.18M.Wiggle.jan26
 setenv SV     v61.81.18M.errCost4.jan27      # no wiggle, introns, :  max31
-setenv SVlast v61.81.18M.errCost4.jan27
+setenv SVlast v61.81.18M.errCost4.jan27zz
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -92,7 +92,7 @@ endif
 \cp bin/sortalign.$SV bin/sortalign
   
 setenv NOINTRONSEEDS 0
-setenv EXPORTSAM 1
+setenv EXPORTSAM 0
 setenv EXPORTWIGGLES 0
 setenv EXPORTWIGGLEENDS 0
 setenv seedLength 16
@@ -139,7 +139,7 @@ setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
 
 
-setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads"
+setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads 54_Minimap2_32threads"
 
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
@@ -173,7 +173,7 @@ setenv allRuns "iRefSeq38 iRefSeq ChipSeq1 ChipSeq2 B_ROCR2_Illumina_DNA RNA_Pol
 
 setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_BAB_Baboon FrontalCortex_CMC_Macaque TemporalLobe_PTM_Macaque BrainRight_MST_Marmoset TemporalLobe_MLM_MouseLemur TemporalLobe_SQM_SquirrelMonkey"
 
-setenv moreRuns "HG19t1r1 HG19t2r1 HG19t3r1 WormSRR548309 RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb"
+setenv moreRuns "HG19t1r1 HG19t2r1 HG19t3r1 WormSRR548309 RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb SRR29438430"
 
 setenv runs "$allRuns  $monkeyRuns $moreRuns"
 # setenv runs "RNA_PolyA_AB_1_97G"
@@ -1133,7 +1133,7 @@ foreach tag (Non_compatible_pairs)
       echo "$run\t$mm\tf\t0" >> toto.tag
     end
   end
-  echo "\nNon compatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
+  echo "\nIncompatible pairs\t$SV" >> COMPARE/samStats.$SV.txt
   cat RESULTS/allSamStats | gawk -F '\t' '{gsub (" ", "_",$3);if (length($5) >= 1 && $3 == tag) {gsub("%","",$5);printf("%s\t%s\tf\t%s\n", $1,$2,$5);}}' tag=$tag >> toto.tag
    cat toto.tag | bin/tsf --sampleSelect $tsfMethods    -I tsf -O table --title "Incompatible pairs" >> COMPARE/samStats.$SV.txt
   echo "\n" >> COMPARE/samStats.$SV.txt
@@ -1985,6 +1985,8 @@ if (! -e WormDB/database) then
 endif
 
 goto phaseLoop
+
+cat T2T.chr7.fasta | gawk '/^>/{next}{for(i=1;i<=1000;i++)printf(">S%d\n%stgctagatcgaatc\n",i,substr($1,10000000+100*i+1,200));}' > test.chr7.fasta
 
 ##############################################################################
 ##############################################################################

@@ -73,7 +73,9 @@ typedef struct runClassStruct {
   ACEOUT aoSam ;
 } RC ;
 
+#define SLMAX 1000
 #define LETTERMAX 1000
+#define OVERHANGMAX 600   /* 4*30*5  overhang: 32 bases max, starting on base atgc, 5 counts atgcn per position */
 typedef struct runStatStruct {
   int run ;   /* index in p.runDict */
   int nFiles ;
@@ -92,12 +94,14 @@ typedef struct runStatStruct {
   long int nClippedPolyA ;
   long int nClippedPolyT ;
   long int nClippedSL ;
-  long int nClipped5pAdaptor ;
-  long int nClipped3pAdaptor ;
+  long int nClippedAdaptor1L ;
+  long int nClippedAdaptor2L ;
+  long int nClippedAdaptor1R ;
+  long int nClippedAdaptor2R ;
   long int nTello[12] ;
   long int nTelloRead ;
   long int SlRead ;
-  long int nSl[12] ;
+  long int nClippedSls[SLMAX] ;
   long int nSupportedIntrons ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
@@ -108,11 +112,18 @@ typedef struct runStatStruct {
   Array lengthDistribution ;
   Array insertLengthDistribution ;
   int minReadLength, maxReadLength ;
-  char *adaptor1, *adaptor2 ;
+  Array adaptors1L, adaptors2L, adaptors1R, adaptors2R ;
   long int nN, nErr, nMID ;
   long int letterProfile1[5 * LETTERMAX] ;
   long int letterProfile2[5 * LETTERMAX] ;
   long int ATGCN[5] ;
+
+  long int overhangL1 [OVERHANGMAX] ; /* read 1 left overhang  */
+  long int overhangL2 [OVERHANGMAX] ; /* read 2 left overhang */
+  
+  long int overhangR1 [OVERHANGMAX] ; /* read 1 right overhang  */
+  long int overhangR2 [OVERHANGMAX] ; /* read 2 right overhang */
+  
   int GF[256], GR[256] ; /* number of reads aligned per target_class on Forward/Reverse strand */
   Array errors ;  /* substitutions, insertions, deletions counts */
   /* coverage of long transcripts ? */
@@ -153,6 +164,7 @@ typedef struct bStruct {
   Array wigglesP ;
   Array wigglesNU ;
   Array confirmedPolyAs ;
+  Array confirmedSLs ;
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL isGenome ;
@@ -188,8 +200,9 @@ typedef struct pStruct {
   const char *tFileBinaryIdsName ;
   const char *tFileBinaryCoordsName ;
 
-  unsigned char sl[15][32] ;
-  unsigned char slR[15][32] ;
+  Array SLs ;
+  const char *rawAdaptor1L, *rawAdaptor2L, *rawAdaptor1R, *rawAdaptor2R ;
+  char adaptor1L[32], adaptor2L[32],  adaptor1R[32], adaptor2R[32] ;
   /* Agents:
      R read parser
      G genome parser

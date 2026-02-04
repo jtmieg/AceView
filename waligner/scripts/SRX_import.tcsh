@@ -84,7 +84,9 @@ if ($species == hs) then
   set ff='/home/mieg/AW/Human_DATA/SEQC2/PacBio_A_excellenteQuality_SraRunInfo.txt'
   set date=2025_09_13
   set ff='/home/mieg/AW/Human_DATA/20250904_Roberto-Landsman_HepG2-CTCF_ChIP/SRA_2025_HEPG2_CTCF_ChIP_and_controls_Philadelphia_runinfo.txt'
- endif
+  set date=2026_02_01
+  set ff='/home/mieg/AW/Human_DATA/GIAB_eskSonHG002_RNA/20260202_HG002_SraRunInfo.txt'
+endif
 if ($species == rn) then
   set date=2016_11_04
   set ff='/home/mieg/ACEVIEWHELP/Rat_DATA/2016Nov05_6365_Rattus_norvegicus_Organism_NOT_biomol_dna_PropertiesSraRunInfo.txt'

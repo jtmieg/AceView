@@ -119,23 +119,30 @@ BEGIN {
     {
 	printf ("Stranding Z_genome.f2 %s %d plus %d minus\n", $4, $5, $6) 
     }
-    if (tag == "IntronSupport")
+    if (tag == "Intron_supports")
     {
-	intronSupport = nn ;
+	intronSupport = nn ; iiPlus = $5 ; iiMinus = $6 ;
+	printf ("Stranding Introns %.5f %d plus %d minus\n", iiPlus/(nn+0.00000001), iiPlus, iiMinus) ; 
 	next ;
     }
-    if (tag == "SupportedIntrons")
+    if (tag == "Supported_introns")
     {
-	printf ("Candidate_introns any %d Support %d\n", nn, intronSupport) ;
+	printf ("Candidate_introns any %d In_any %d Not_in_any 0 New_gt_ag 0 Sensitivity 0 Specificity 0 Known_support %d New_support 0\n", nn, nn, intronSupport) ;
     }
-    if (tag == "PolyASupport")
+
+    if (tag == "Clipped_polyA")
     {
-	polyASupport = nn ;
+	clipped_polyAT = nn + clipped_polyAT ;
+	next ;
+    }
+    if (tag == "Clipped_polyT")
+    {
+	clipped_polyAT = nn + clipped_polyAT ;
 	next ;
     }
     if (tag == "PolyA_sites")
     {
-	printf ("Candidate_polyA any %d Support %d\n", nn, polyASupport) ;
+	printf ("SLs pA %d sites %d supports\n", nn, clipped_polyAT) ;
     }
     if (tag == "ATGCN")
     {
@@ -151,14 +158,6 @@ BEGIN {
 	x = int (($8+0)/1000) ;
 	if (x > 0)
 	    printf ("Intergenic %d kb\n", x) ;
-    }
-    if (tag == "Intron_supports")
-    {
-
-    }
-    if (tag == "Supported_introns")
-    {
-	printf ("Candidate_introns any %d\n", $4) ;
     }
 
 }

@@ -1522,11 +1522,22 @@ Array aceDnaDoubleTrackErrors (Array  dna1, int *x1p, int *x2p, BOOL isDown,
 	    ep = arrp (err2, i, A_ERR) ;
 	    if (ep->iShort < *x1p - 1)
 	      continue ;
-	    if (i > 1 && ep->type == ERREUR && (ep->iShort > (ep[-1].iShort-2)))
+	    if (0)
 	      {
-		if (*x1p < ep->iShort)
-		  { *x1p = ep->iShort ; *a1p = ep->iLong ; }
-		continue ;
+		if (i > 1 && ep->type == ERREUR && (ep->iShort > (ep[-1].iShort-2)))
+		  {
+		    if (*x1p < ep->iShort)
+		      { *x1p = ep->iShort ; *a1p = ep->iLong ; }
+		    continue ;
+		  }
+	      }
+	    else
+	      {
+		if (i > 1 && ep->type == ERREUR)
+		  {
+		    if (*x1p < ep->iShort  && ep->iShort > (ep[-1].iShort-2))
+		      { *x1p = ep->iShort ; *a1p = ep->iLong ; }
+		  }
 	      }
 	    if ( (NNp && ep->baseShort == N_) || ep->type)
 	      {

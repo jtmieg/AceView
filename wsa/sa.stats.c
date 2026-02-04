@@ -203,8 +203,8 @@ static void s2gSamStatsExports (const PP *pp, Array runStats)
   if (s0->nClippedPolyA) aceOutf (ao, "\n%s\t%s\tClipped_PolyA\t%ld\n", run, METHOD, s0->nClippedPolyA) ;
   if (s0->nClippedPolyT) aceOutf (ao, "\n%s\t%s\tClipped_PolyT\t%ld\n", run, METHOD, s0->nClippedPolyT) ;
   if (s0->nClippedSL) aceOutf (ao, "\n%s\t%s\tClipped_SL\t%ld\n", run, METHOD, s0->nClippedSL) ;
-  if (s0->nClipped5pAdaptor) aceOutf (ao, "\n%s\t%s\tClipped_5prime_Adaptor\t%ld\n", run, METHOD, s0->nClipped5pAdaptor) ;
-  if (s0->nClipped3pAdaptor) aceOutf (ao, "\n%s\t%s\tClipped_3prime_Adaptor\t%ld\n", run, METHOD, s0->nClipped3pAdaptor) ;
+  int nClipped = s0->nClippedAdaptor1L + s0->nClippedAdaptor2L + s0->nClippedAdaptor1R + s0->nClippedAdaptor2R ;
+  if (nClipped) aceOutf (ao, "\n%s\t%s\tClipped_Adaptors\t%ld\n", run, METHOD, nClipped) ;
   aceOutf (ao, "%s\t%s\tPerfect_reads\t%ld\t%.2f%%\n", run, METHOD, s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(nRawReads + .000001)) ;
   aceOutf (ao, "%s\t%s\tAlignedReads\t%ld\t%.2f%%\n", run, METHOD, s0->nMultiAligned[0], (100.0 * s0->nMultiAligned[0])/(nRawReads + .000001)) ;
   
@@ -257,7 +257,7 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
   Array aa = pp->runStats ;
   RunSTAT *up = arrayp (aa, run, RunSTAT) ;
   RunSTAT *vp = &(bb->runStat) ;
-      
+			    
   up->run = run ;
   up->nPairs += vp->nPairs ;
   up->nCompatiblePairs += vp->nCompatiblePairs ;
@@ -288,6 +288,17 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
     up->nReadsAlignedPerTargetClass[i] += vp->nReadsAlignedPerTargetClass[i] ;
   for (int i = 0 ; i < 256 ; i++)
     up->nBasesAlignedPerTargetClass[i] += vp->nBasesAlignedPerTargetClass[i] ;
+
+  for (int i = 0 ; i < OVERHANGMAX ; i++)
+    up->overhangL1[i] += vp->overhangL1[i] ;
+  for (int i = 0 ; i < OVERHANGMAX ; i++)
+    up->overhangL2[i] += vp->overhangL2[i] ;
+
+  for (int i = 0 ; i < OVERHANGMAX ; i++)
+    up->overhangR1[i] += vp->overhangR1[i] ;
+  for (int i = 0 ; i < OVERHANGMAX ; i++)
+    up->overhangR2[i] += vp->overhangR2[i] ;
+
   up->nPerfectReads += vp->nPerfectReads ;
   up->nAlignments += vp->nAlignments ;
   up->nBaseAligned1 += vp->nBaseAligned1 ;
@@ -302,9 +313,13 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
   
   up->nClippedPolyA += vp->nClippedPolyA ;
   up->nClippedPolyT += vp->nClippedPolyT ;
-  up->nClippedSL += vp->nClippedSL ;
-  up->nClipped5pAdaptor += vp->nClipped5pAdaptor ;
-  up->nClipped3pAdaptor += vp->nClipped3pAdaptor ;
+  for (int i = 0 ; i < SLMAX ; i++)
+    up->nClippedSls[i] += vp->nClippedSls[i] ;
+
+  up->nClippedAdaptor1L += vp->nClippedAdaptor1L ;
+  up->nClippedAdaptor1R += vp->nClippedAdaptor1R ;
+  up->nClippedAdaptor2L += vp->nClippedAdaptor2L ;
+  up->nClippedAdaptor2R += vp->nClippedAdaptor2R ;
   
   if (vp->errors)
     for (int i = 0 ; i < arrayMax (vp->errors) ; i++)
@@ -334,7 +349,7 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
     }
   return ;
 } /* saRunStatsCumulate */
-
+ 
 /**************************************************************/
 
 static void saLetterProfileExport (const PP *pp, int run, RunSTAT *up)
@@ -393,8 +408,99 @@ static void saLetterProfileExport (const PP *pp, int run, RunSTAT *up)
   ac_free (h) ;
   return ;
 } /* saLetterProfileExport */
+ 
+/**************************************************************/
+/* read1 thne read2 */
+static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  const char *runName = dictName (pp->runDict, run) ;
+  char *title = hprintf (h, "%s.overhang.%s.tsf", runName, isLeft ? "5prime" : "3prime") ;
+  long int nn = 0 ;
+  long int *aa = 0 ;
+  int i, j ;
+  ACEOUT ao = aceOutCreate (pp->outFileName, title, 0, h) ;
+  int best, best2 ;
+  int pass, passMax = up->nPairs ? 2 : 1 ; 
+  char *suffix ;
+  
+  for (pass = 0 ; pass < passMax ; pass++)
+    {
+      suffix = passMax == 1 ? "" : (pass == 0 ? "_R1" : "_R2") ;
+      if (pass == 1) aceOutf (ao, "\n\n\n\n\n\n") ;
+      aa = isLeft ? (pass ? up->overhangL2 : up->overhangL1) : (pass ? up->overhangR2 : up->overhangR1) ;
+      aceOutDate (ao, "##", hprintf (h, "Run %s reverse complement of the %d prime unaligned overhang  profile limited to 32 letters", runName, isLeft ? 5 : 3)) ;
 
-  /**************************************************************/
+      /* find the best first letter */
+      for (best = i = j = nn = 0 ; i < 4 ; i++)
+	{
+	  int n = aa[150 * i + i] ;
+	  if (n > nn) { best = i ; nn = n ; }
+	}
+      /* cumulate in best the shifted histogram of the second letter of the best case */
+      best2 = best ;
+      int di = 0 ;
+      while (best2 == best && ++di < 6)
+	{
+	  for (best2 = j = nn = 0 ; j < 5 ; j++)
+	    {
+	      int n = aa[150 * best + 5 *di + j] ;
+	      if (n > nn) { best2 = j ; nn = n ; }
+	    }
+	}
+      if (best2 != best)
+	{
+	  for (i = di ; i < 30 ; i++)
+	    for (j = 0 ; j < 5 ; j++)
+	      aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
+	  for (i = 0 ; i < di ; i++)
+	    aa[150 * best + best + 5 *i] += aa[150 * best2 + best2] ;
+	}
+      if (1)
+	{
+	  char adaptor [31] ;
+	  char *atgc = "ATGC" ;
+	  memset (adaptor, 'n', 31) ; adaptor[30] = 0 ;
+	  
+	  for (i = 0 ; i < 30 ; i++)
+	    {
+	      int i5 = best * 150 + i * 5 ;
+	      for (j = 0, nn = 0 ; j < 5 ; j++)
+		nn += aa[i5 + j] ;
+	      for (j = 0 ; j < 4 ; j++)
+		if (100 * aa[i5 + j] > 60 * nn)
+		  adaptor[i] = atgc[j] ;
+	    }
+	  aceOutf (ao, "## Adaptor %s\n", adaptor) ;
+
+	  aceOutf (ao, "# Run.f\tPosition\tiiiiiifffff\tAny\tA\tT\tG\tC\tN\t%%A\t%%T\t%%G\t%%C\t%%N\n") ;
+	  for (i = 0 ; i < 30 ; i++)
+	    {
+	      int i5 = best * 150 + i * 5 ;
+	      for (j = 0, nn = 0 ; j < 5 ; j++)
+		nn += aa[i5 + j] ;
+	      if (nn >= 100)
+		aceOutf (ao, "%s%s\t%d\tiiiiiifffff\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\n"
+			 , runName, suffix
+			 , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
+			 , 100.0 * aa[i5 + 0]/nn, 100.0 * aa[i5 + 1]/nn, 100.0 * aa[i5 + 2]/nn, 100.0 * aa[i5 + 3]/nn, 100.0 * aa[i5 + 4]/nn
+			 ) ;
+	      else
+		aceOutf (ao, "%s%s\t%d\tiiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n"
+			 , runName, suffix
+			 , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
+			 ) ;
+	      
+	    }
+	}
+    }
+  
+  aceOutf (ao, "\n\n") ;
+  ac_free (h) ;
+  return ;
+    } /* saOverhangExport */
+  
+/**************************************************************/
   
 void saRunStatExport (const PP *pp, Array runStats)
 {
@@ -410,6 +516,8 @@ void saRunStatExport (const PP *pp, Array runStats)
     {
       RunSTAT *up = arrp (runStats, run, RunSTAT) ;
       saLetterProfileExport (pp, run, up) ;
+      saOverhangExport (pp, run, up, TRUE) ;
+      saOverhangExport (pp, run, up, FALSE) ;      
       if (up->nReads)
 	{
 	  const char *runNam = dictName (pp->runDict, run) ;
@@ -488,21 +596,36 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   ) ;
 
 
-	  if (up->nClipped5pAdaptor)
+	  if (up->nClippedAdaptor1L)
 	    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\n"
 		     , runNam
-		     , up->nClipped5pAdaptor
+		     , up->nClippedAdaptor1L
 		     ) ;
-	  if (up->nClipped3pAdaptor)
-	    aceOutf (ao, "%s\tClipped_3prime_Adaptor\t%ld\n"
+
+	  if (up->nClippedAdaptor1R)
+	    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\n"
 		     , runNam
-		     , up->nClipped3pAdaptor
+		     , up->nClippedAdaptor1R
 		     ) ;
-	  if (up->nClippedSL)
-	    aceOutf (ao, "%s\tClipped_SL\ti\t%ld\n"
+
+	  if (up->nClippedAdaptor2L)
+	    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\n"
 		     , runNam
-		     , up->nClippedSL
+		     , up->nClippedAdaptor2L
 		     ) ;
+
+	  if (up->nClippedAdaptor2R)
+	    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\n"
+		     , runNam
+		     , up->nClippedAdaptor2R
+		     ) ;
+
+	  for (int i = 0 ; i < SLMAX ; i++)
+	    if (up->nClippedSls[i])
+	      aceOutf (ao, "%s\tClipped_SL%d\ti\t%ld\n"
+		       , runNam
+		       , i, up->nClippedSls[i] 
+		       ) ;
 	  if (up->nClippedPolyA)
 	    aceOutf (ao, "%s\tClipped_polyA\ti\t%ld\n"
 		     , runNam

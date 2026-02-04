@@ -302,7 +302,7 @@ int uChannelMultiGet (CHAN *c, void *vp, int size, int max, BOOL wait)
 	     ) ; 
  
   if (! 
-      (((c->c.in + 1) % c->c.cMax) == c->c.out)  /* the chammel is full */
+      (((c->c.in + 1) % c->c.cMax) == c->c.out)  /* the channel is full */
       )
     {
       int i ;
@@ -326,8 +326,83 @@ void *uChannelGet (CHAN *c, void *vp, int size)
 } /* uChannelGet */
 
 /*******************************************************************************************************/
+/* channelGetMaxWait : blocking get with maximum wait time             */
+/* Returns:                                                            */
+/*   >0 : success, data copied, number of records read (usually 1)    */
+/*    0 : channel closed and empty                                     */
+/*   -1 : timeout reached, no data available                           */
+/* ------------------------------------------------------------------- */
+int uChannelGetMaxWait(CHAN *c, void *vp, int size, double maxSeconds)
+{
+  if (! c || c->c.magic != uChannelDestroy)
+    messcrash ("Invalid channel passed to uChannelGetMaxWait") ;
+
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  time_t sec = (time_t)maxSeconds;
+  long nsec = (long)((maxSeconds - sec) * 1e9) ;
+  ts.tv_sec += sec;
+  ts.tv_nsec += nsec;
+  if (ts.tv_nsec >= 1000000000L)
+    {
+      ts.tv_sec++ ;
+      ts.tv_nsec -= 1000000000L ;
+    }
+  
+  pthread_mutex_lock (&c->c.mutex);
+  
+  while (TRUE)
+    {
+      // Check condition WHILE HOLDING the mutex (safe, no race)
+      if (c->c.isClosed && c->c.in == c->c.out)
+	{
+	  memset (vp, 0, size) ; /* a close channel returns a zeroed buffer */
+	  /* repeat the broadcast in case another client is waiting */
+	  pthread_cond_signal(&(c->c.notEmpty)) ;
+	  pthread_mutex_unlock (&(c->c.mutex)) ;
+	  return 0 ;
+	}
+      
+      if (c->c.in != c->c.out)
+	{
+	  /* data available, copy safely */
+	  memcpy (vp, c->vp + c->c.size * c->c.out, size) ;
+	  c->c.out = (c->c.out + 1) % c->c.cMax ;
+	  c->c.nGet++ ;
+	  if (! (((c->c.in + 1) % c->c.cMax) == c->c.out)  /* the channel is full */
+	      )
+	    {
+	      int i ;
+	      pthread_cond_signal (&(c->c.notFull)) ;
+	      for (i = 0 ; i < CHANNEL_SELECT_MAX ; i++)
+		if (c->c.select[i])
+		  pthread_cond_broadcast (&((c->c.select[i])->c.notFull)) ;
+	    }
+	  pthread_mutex_unlock (&(c->c.mutex)) ;
+	  return 1 ;
+	}
+      
+      // empty and open → wait with timeout
+      int ret = pthread_cond_timedwait(&(c->c.notEmpty), &(c->c.mutex), &ts);
+      
+      if (ret == ETIMEDOUT)
+	{
+	  pthread_mutex_unlock (&(c->c.mutex)) ;
+	  return -1 ;
+	}
+      
+        /*  spurious wakeup or real signal → recheck condition */
+    }
+  
+  /* unreachable */
+  pthread_mutex_unlock (&(c->c.mutex)) ;
+  messcrash ("unreachable in uChannelGetMaxWait") ;
+  return 0 ;
+} /* channelGetMaxWait */
+
+/*******************************************************************************************************/
 /* return TRUE if one of the channel is probably ready
- * no garantee, since we realse the mutex. the calling function must then use tryGet
+ * no garantee, since we relealse the mutex. the calling function must then use tryGet
  * on each channel
  */
 
@@ -475,6 +550,4 @@ void channelTest (int nn)
 
 /*******************************************************************************************************/
 /*******************************************************************************************************/
-
-
-
+/*******************************************************************************************************/

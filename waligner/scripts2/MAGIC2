@@ -1051,6 +1051,12 @@ if ($phase == I4) goto phaseI4
 if ($phase == I5) goto phaseI5
 if ($phase == I6) goto phaseI6
 
+if ($phase == f1) goto phasef1
+if ($phase == f2) goto phasef2
+if ($phase == f3) goto phasef3
+if ($phase == f4) goto phasef4
+if ($phase == f5) goto phasef5
+
 # last MAGIC tested
 
 if ($phase == I7) goto phaseI7
@@ -1156,11 +1162,6 @@ if ($phase == d7) goto phased7
 if ($phase == d8) goto phased8
 
 if ($phase == f0) goto phasef0
-if ($phase == f1) goto phasef1
-if ($phase == f2) goto phasef2
-if ($phase == f3) goto phasef3
-if ($phase == f4) goto phasef4
-if ($phase == f5) goto phasef5
 if ($phase == f6) goto phasef6
 if ($phase == f7) goto phasef7
 
@@ -2396,7 +2397,7 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
     date > tmp/SA/$run/salign.out
     date > tmp/SA/$run/salign.err
     echo "$sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggles --wiggleEnds" >> tmp/SA/$run/salign.out
-    scripts/submit  tmp/SA/$run/salign "/usr/bin/time -f 'TIMING\tE\t%E\tU\t%U\tS\t%S\tM\t%M\tP\t%P' $sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig -o tmp/SA/$run --wiggles --wiggleEnds" 64G
+    scripts/submit  tmp/SA/$run/salign "/usr/bin/time -f 'TIMING\tE\t%E\tU\t%U\tS\t%S\tM\t%M\tP\t%P' $sortalign -x TARGET/IDX/IDX.$species -I tmp/SA/$run/iConfig --species $species -o tmp/SA/$run --wiggles --wiggleEnds" 64G
   endif
 end
 
@@ -2419,7 +2420,6 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   endif
   if (-e tmp/SA/$run/sa2ali.ace) cat tmp/SA/$run/sa2ali.ace >>  tmp/SA/$MAGIC.ali2.ace
 end
-
 
 echo "pparse  tmp/SA/$MAGIC.ali2.ace" | bin/tacembly MetaDB --no_prompt
 
@@ -2748,7 +2748,7 @@ goto phaseLoop
 ###########################################################################
 ## phase f5: Reexport the new transcriptome
 
-phasef5:
+phasef5z:
  echo -n "Export the new transcriptome "
  date
 

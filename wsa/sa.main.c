@@ -1661,12 +1661,16 @@ int main (int argc, const char *argv[])
   
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
 
-  /* future options ***/
+  /* action options ***/
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggles") ;
   p.wiggleEnds = getCmdLineBool (&argc, argv, "--wiggleEnds") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
 
+  getCmdLineText (h, &argc, argv, "--adaptor1L", &(p.rawAdaptor1L)) ;
+  getCmdLineText (h, &argc, argv, "--adaptor1R", &(p.rawAdaptor1R)) ;
+  getCmdLineText (h, &argc, argv, "--adaptor2L", &(p.rawAdaptor2L)) ;
+  getCmdLineText (h, &argc, argv, "--adaptor2R", &(p.rawAdaptor2R)) ;
   p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
 

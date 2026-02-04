@@ -438,7 +438,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
  *    copy cq ... (n bytes)  to a new clean buffer and gzread in buffer+n
  *  gzclose() 
  * the general idea is that parsing big buffers is fast, while decoding them is slow
- * so in this way, even facinga single large fastq, the pipeline will no longer be hanged on the parser
+ * so in this way, even when facing a single large fastq, the pipeline will no longer be hanged on the parser
  */
 
 static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)

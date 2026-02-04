@@ -183,14 +183,19 @@ static int doubleIntronsCompress (Array aaa)
 void saPolyAsCumulate (PP *pp, BB *bb) 
 {
   Array aaa = pp->confirmedPolyAs, aa = bb->confirmedPolyAs ;
-  int iMax = arrayMax (aa) ;
-  
+  int iMax = aa ? arrayMax (aa) : 0 ;
+
   if (iMax)
     {
-      int jj = arrayMax (aaa) ;
-      arrayp (aaa, jj + iMax - 1, POLYA)->n = 0 ; /*  make room */
-      memcpy (arrp (aaa, jj, POLYA), arrp (aa, 0, POLYA), iMax * sizeof (POLYA)) ;
-      confirmedPolyAsCompress (aaa) ;
+      if (! aaa)
+	aaa = pp->confirmedPolyAs = arrayHandleCopy (bb->confirmedPolyAs, pp->h) ;
+      else
+	{
+	  int jj = arrayMax (aaa)  ;
+	  arrayp (aaa, jj + iMax - 1, POLYA)->n = 0 ; /*  make room */
+	  memcpy (arrp (aaa, jj, POLYA), arrp (aa, 0, POLYA), iMax * sizeof (POLYA)) ;
+	  confirmedPolyAsCompress (aaa) ;
+	}
     }
   return ;
 } /* saPolyAsCumulate */

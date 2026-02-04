@@ -4,6 +4,7 @@ set dd=tmp/SA/$run
 set toto=$dd/sa2ali.ace
 
 echo "Ali $run\nRun $run" > $toto
+echo "-D Letter_profile" >> $toto
 echo "Counts\nStrandedness\nAli\nUnicity\nGene_expression\nSponge\nAlignments\nLetter_profile\nATGC_kb\nPair_fate\nErrors\nComputer_ressource" >> $toto
 #RawCounts
 set ff=$dd/runStats.tsf
@@ -19,7 +20,7 @@ endif
 set ff=$dd/$run.letterProfile.tsf
 if (-e $ff) then
   echo "\nAli $run\nRun $run" >> $toto
-  cat $ff | gawk -F '\t' '/^#/{next;}{fr=substr($1,length($1),1);if(fr=="r")fr=f2;else fr="f1"; if($2+0>0)printf("Letter_profile %s %d %d %d %d %d %d 0  %d %d %d %d %d\n",fr,$2,$10,$11,$12,$13,$14,$4,$5,$6,$7,$8)}' >> $toto
+  cat $ff | gawk -F '\t' '/^#/{next;}{fr=substr($1,length($1),1);if(fr=="r")fr="f2";else fr="f1"; if($2+0>0)printf("Letter_profile %s %d %d %d %d %d %d 0  %d %d %d %d %d\n",fr,$2,$10,$11,$12,$13,$14,$4,$5,$6,$7,$8)}' >> $toto
 endif
 
 
@@ -35,7 +36,7 @@ endif
 echo >> $toto
 
 set ff=$dd/runStats.tsf
-cat $ff | gawk -F '\t' 'BEGIN{s2=100;n=0;}/Stranding_in_class/{r=$1;s=$4+0;p=$5;m=$6;if(s>50 && p>10000 && s > s1+0){s1=s;n=p;k1=$0;}if(s<50 && m>10000 && s < s2){n=m;s2=s;k2=$0;}}END{if(n>0){if(s1-50 > 50-s2)print k1;else print k2;}}' | gawk -F '\t' '{n=$5+$6+0;cl=substr($2,length($2));if(cl=="M")cl="mito";if(cl=="R")cl="rrna";if(n)printf("Run %s\nObserved_strandedness_in_ns_mapping %s %s %d plus %d minus\n\n", $1,cl,$4,$5,$6);}' >> $toto
+cat $toto | gawk  'BEGIN{s2=100;n=0;}/Stranding/{r=run;s=$3+0;p=$4;m=$6;if(s>50 && p>10000 && s > s1+0){s1=s;n=p;k1=$0;}if(s<50 && m>10000 && s < s2){n=m;s2=s;k2=$0;}}END{if(n>0){if(s1-50 > 50-s2)print k1;else print k2;}}' run=$run | gawk '{n=$4+$6+0;cl=$2;if(n)printf("Run %s\nObserved_strandedness_in_ns_mapping %s %s %d plus %d minus\n\n", run,cl,$3,$4,$6);}' run=$run >> $toto
 
 
 

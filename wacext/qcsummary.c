@@ -1719,8 +1719,8 @@ static void qcDoPair (QC *qc, RC *rc, BOOL doPercent)
   TT *ti, tts[] = {
     { "Spacer", "", 0, 0, 0} ,
     { "TITLE", "Title", 10, 0, 0} ,
-    { "Aligned_fragments", "Number of aligned_fragments", 0, T_aliFrag, 0} ,
-    { "Compute", "%s compatible pairs\t%s non compatible pairs\t%s paired end fragments with only one read aligned\t%s links gene to distant genome\t%s links 2 genes\t%s incompatible topology\t%s links to rRNA\t%s links to mito", 1, 0, 0} ,
+    /*     { "Aligned_fragments", "Number of aligned_fragments", 0, 0, 0} , */
+    { "Compute", "%s aligned pairs\t%s compatible pairs\t%s incompatible pairs\t%s paired end fragments with only one read aligned\t%s links gene to distant genome\t%s links 2 genes\t%s incompatible topology\t%s links to rRNA\t%s links to mito", 1, 0, 0} ,
     {  0, 0, 0, 0, 0}
   } ; 
   const char *caption =
@@ -1782,8 +1782,10 @@ static void qcDoPair (QC *qc, RC *rc, BOOL doPercent)
 		  ze = ac_tag_float (rc->ali, "Links_to_mito", 0) ;
 		  rc->var[T_cFrag] = ac_tag_float (rc->ali, "Compatible_pairs", 0) ;
 		  rc->var[T_uFrag] = ac_tag_float (rc->ali, "Non_compatible_pairs", 0) ;
+		  rc->var[T_aliFrag] = rc->var[T_cFrag] + rc->var[T_uFrag] ; /* aligned pairs, not counting orphans */
 		  if (! doPercent)
 		    {
+		      if ( rc->var[T_aliFrag]) aceOutf (qc->ao, "\t%.2f", rc->var[T_aliFrag]) ; else aceOutf (qc->ao, "\t0") ;
 		      if ( rc->var[T_cFrag]) aceOutf (qc->ao, "\t%.2f", rc->var[T_cFrag]) ; else aceOutf (qc->ao, "\t0") ;
 		      if ( rc->var[T_uFrag]) aceOutf (qc->ao, "\t%.2f", rc->var[T_uFrag]) ; else aceOutf (qc->ao, "\t0") ;
 		      aceOutf (qc->ao, "\t%.0f", z) ;
@@ -1796,6 +1798,7 @@ static void qcDoPair (QC *qc, RC *rc, BOOL doPercent)
 		    }
 		  else
 		    {
+		      aceOutf (qc->ao, "\t%.2f", rc->var[T_aliFrag] ? 200 * rc->var[T_aliFrag]/ rc->var[T_Read] : 0) ;	  
 		      aceOutf (qc->ao, "\t%.2f", rc->var[T_aliFrag] ? 100 * rc->var[T_cFrag]/ rc->var[T_aliFrag] : 0) ;	  
 		      aceOutf (qc->ao, "\t%.2f", rc->var[T_aliFrag] ? 100 * rc->var[T_uFrag] / rc->var[T_aliFrag] : 0) ;	  
 		      aceOutf (qc->ao, "\t%.2f", rc->var[T_aliFrag] ? 100 * z / rc->var[T_aliFrag] : 0) ;	  

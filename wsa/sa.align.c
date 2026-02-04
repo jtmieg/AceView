@@ -310,67 +310,115 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
 {
   int x1 = up->x1 ;
-  int leftClip = up->leftClip ;
-
+  int leftClip = up->leftClip ;  /* already initialized to jump5 */
+  BOOL doUpper = FALSE ;
+  
   if (x1 > 1)
     {
       int nT = 0 ;
       int dx = x1 - 1 ;
       int Dx = dx ;
-      char buf[dx + 1] ;
-      if (dx > 30) { dx = 30 ; Dx = 0 ; }
-      memcpy (buf, arrp (dna, x1 - 1 - dx, char), dx) ; buf[dx] = 0 ;
+      char buf[32] ;
+      memset (buf, 0, 32) ;
+      if (dx > 30) { dx = 30 ; }
+      char *cp = arrp (dna, x1 - 2, char) ; /* last unaligned base */
+      long int *overH = (up->read & 0x1 ? bb->runStat.overhangL2 : bb->runStat.overhangL1) ;
       if (up->targetClass == 'G')
 	{
-	  for (int i = 0 ; i < dx ; i++)
+	  int first = -1 ;
+	  int cc = complementBase(*cp) ;
+	  switch (cc)
 	    {
-	      if (Dx && buf[i] == T_ && i < 8)
-		nT++ ;
-	      buf[i] = dnaDecodeChar[(int)complementBase(buf[i])] ;
+	    case A_:
+	      first = 0 ;
+	      break ;
+	    case T_:
+	      first = 1 ;
+	      break ;
+	    case G_:
+	      first = 2 ;
+	      break ;
+	    case C_:
+	      first = 3 ;
+	      break ;
+	    default:
+	      goto done ;
 	    }
-	  if (nT >= 7)
+
+	  /* search for a polyT */
+	  for (int i = 0 ; i < dx ; i++, cp--)
+	    {
+	      cc = complementBase(*cp) ;
+	      buf[i] = cc ;
+	      switch (cc)
+		{
+		case A_:
+		  nT++ ;
+		  break ;
+		}
+	    }
+
+	  /* may be we should look for the adaptor before Dx - dx */
+	  if (nT >= 7 && 10 * nT >= 9 * dx && Dx < dx + 10)
 	    {
 	      POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
 	      zp->chrom = up->chrom ^ 0x1 ;
 	      zp->a1 = up->a1 - (up->chrom & 0x1 ? -1 : 1) ;
 	      zp->run = bb->run ;
 	      zp->n = 1 ;
-	      bufferToUpper (buf) ;
+	      doUpper = TRUE ;
 	      bb->runStat.nClippedPolyT++ ;
 	      leftClip = x1 - 1 ;
+	      goto done ; /* do not polute the search for the adaptor with the presence of a polyT */
 	    }
-	  else if (pp->isWorm)
-	    {  /* search for transpliced leaders in the prefix of the probe */
-#ifdef JUNK
-	      if (x1 < leftClip + 24 && x1 > leftClip + 8)
+	  
+	  cp = arrp (dna, x1 - 2, char) ; /* last unaligned base */
+	  for (int i = 0 ; i < dx ; i++, cp--)
+	    {
+	      cc = complementBase(*cp) ;
+	      int ii = 150 * first + 5 * i ;
+	      switch (cc)
 		{
-		  int ns, n1 ;
-		  unsigned char buf2[OVLN+3] ;
-		  
-		  for (ns = 0 ; pp->sl[ns] && !goodPrefix ; ns++)
+		case A_:
+		  overH[ii + 0]++ ;
+		  break ;
+		case T_:
+		  overH[ii + 1]++ ;
+		  break ;
+		case G_:
+		  overH[ii + 2]++ ;
+		  break ;
+		case C_:
+		  overH[ii + 3]++ ;
+		  break ;
+		default:
+		  overH[ii + 4]++ ;
+		  break ;
+		}
+	    }
+
+	  /* try to recognize the SLs */
+	  if (pp->isWorm && pp->SLs)
+	    {
+	      int iSlMax = arrayMax (pp->SLs) ;
+	      for (int iSl = 0 ; iSl < iSlMax ; iSl++)
+		{	      
+		  const char *sl = array (pp->SLs, iSl, char *) ;
+		  int iMax = strlen (sl) ;
+		  for (int di = 0 ; di < 6 ; di++)
 		    {
-		      ccp = pp->sl[ns] ;
-		      i =  strlen((char *)ccp)  ;
-		      n1 = dnaPickMatch (ccp, i, buf, 0, 0) ;
-		      if (n1 && ! pp->solid &&  mm->probeLeftClip)
-			{  /* left TTTT should also be present in the SL motif */
-			  for (i = 0 ; i < mm->probeLeftClip ; i++)
-			    if (n1 < 2+i || ccp[n1-2-i] != T_) 
-			      n1 = 0 ;
-			}
-		      if (n1) /* the prefix matches in the SL, */
+		      int i, n = 0 ;
+		      if (iMax > 30) iMax = 30 ;
+		      
+		      cp = arrp (dna, x1 - 2 + di, char) ; /* x1 - 2 =  first unaligned base */
+		      for (i = 0 ; i < dx + di && i < 30 && i < iMax ; i++)
+			n +=  (cp[-i] == sl[iMax - i - 1] ? 1 : 0) ;
+		      if (n > 6 && 10 * n >= 9 * i)
 			{
-			  /* locate the tail of the SL present in the tag */
-			  ccp = pp->sl[ns] + n1 - 1 ; 
-			  /* verify that the ag acceptor consensus was in the aligned part */
-			  i = strlen((char *)ccp) ;
-			  if (i + 1 < x1 + (pp->solid ? 0 : 0)) continue ;
-			  /* verify that the whole tail of the SL matches the ttag */
-			  if (! pp->solid && ! dnaPickMatch (probeDna, mm->probeLength, ccp, 0, 0))
-			    continue ;
+#ifdef JUNK			  
 			  /* check that the prefix including an extra donor 'gt' 
 			   * is not present in the genome
-		       */
+			   */
 			  int kkk = ccp ? strlen ((const char*)ccp) : 0 ;
 			  BOOL inGenome = FALSE ;
 			  if (kkk < OVLN)
@@ -378,27 +426,83 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 			      sprintf ((char *)buf2, "%s%c%c", ccp, G_, T_ | C_) ;
 			      inGenome = dnaPickMatch (genome, genomeLn, buf2, 0, 0) ;
 			    }
-			  if (! inGenome)
+#endif
+			  doUpper = TRUE ;
+			  bb->runStat.nClippedSls[iSl]++ ;
+			  leftClip = x1 - 1 + di ;
+			  up->x1 += di ;
+			  up->a1 += (up->a1 < up->a2 ? di :- di) ;
+			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp++)
 			    {
-			      goodPrefix = ns + 11 ;
-			      score += pp->slBonus ;
-			      i = 1 + strlen ((char *)ccp) - x1 ;
-			      if (i > 0)
-				{
-				  a1 = (*a1p) += i ;
-				  x1 = (*x1p) += i ;
-				  strncpy ((char *)buf, (char *)ccp, OVLN) ;
+			      vp->score -= di ;
+			      vp->chainScore -= di ;
+			      vp->chainX1 += di ;
+			      vp->chainA1 += (up->a1 < up->a2 ? di :- di) ;
 			    }
-			      aliBonus += 0 ; /*  strlen((char *)buf) + mm->probeLeftClip ; */
-			      leftAdaptorClip = -x1 + 1 ; /* substract from the to be aligned length */
-			    }
+			  goto done ;
 			}
-		    }
+		    }	
 		}
-#endif	  
+	    }
+	  
+	  /* try to recognize the known adaptor */
+	  const char *adaptor = (up->read & 0x1 ? pp->adaptor2L : pp->adaptor1L) ;
+	  if (adaptor[0])
+	    {
+	      int iAmax = 1 ; /* arrayMax (aa) ; */
+	      for (int iA = 0 ; iA < iAmax ; iA++)
+		{	      
+		  int iMax = strlen (adaptor) ;
+		  for (int di = 0 ; di < 6 ; di++)
+		    {
+		      int i, n = 0 ;
+		      if (iMax > 30) iMax = 30 ;
+		      
+		      cp = arrp (dna, x1 - 2 + di, char) ; /* x1 - 2 =  first unaligned base */
+		      for (i = 0 ; i < dx + di && i < 30 && i < iMax ; i++)
+			n +=  (cp[-i] == adaptor[iMax - i - 1] ? 1 : 0) ;
+		      if (n > 6 && 10 * n >= 9 * i)
+			{
+			  doUpper = TRUE ;
+			  if (up->read & 0x1) 
+			    bb->runStat.nClippedAdaptor2L++ ;
+			  else
+			    bb->runStat.nClippedAdaptor1L++ ;
+			  leftClip = x1 - 1 + di ;
+			  up->x1 += di ;
+			  up->ali -= di ;
+			  up->a1 += (up->a1 < up->a2 ? di :- di) ;
+			  cp = arrp (dna, up->x1 - 1, char) ;
+			  if (1 && di > 0) /* extend the inaligned buffer */
+			    {
+			      for (int i = 30 ; i >= di ; i--)
+				buf[i] = buf[i- di] ;
+			      for (int i = 0 ; i < di ; i++)
+				buf[i] = complementBase(cp[-i - 1]) ; 
+			      buf[31] = 0 ;
+			    }
+			    
+			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp++)
+			    {
+			      vp->score -= di ;
+			      vp->chainScore -= di ;
+			      vp->chainAli -= di ;
+			      vp->chainX1 += di ;
+			      vp->chainA1 += (up->a1 < up->a2 ? di :- di) ;
+			    }
+			  goto done ;
+			}
+		    }	
+		}
 	    }
 	}
-      dictAdd (bb->dict, buf, &up->leftOverhang) ;
+    done:
+      for (int i = 0 ; i < dx ; i++)
+	buf[i] = dnaDecodeChar[(int)buf[i]] ;
+      if (doUpper)
+	bufferToUpper (buf) ;
+      if (strlen (buf) > 0)
+	  dictAdd (bb->dict, buf, &up->leftOverhang) ;
     }
   up->leftClip = leftClip ;
   return leftClip ;
@@ -411,102 +515,192 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
   int x2 = up->x2 ;
   int ln = arrayMax (dna) ; /* length to align */
   int rightClip = ln ;
+  BOOL doUpper = FALSE ;
   
   if (x2 < ln)
     {
       int nA = 0 ;
       int dx = ln - x2 ;
       int Dx = dx ;
-      char buf[dx + 1] ;
-      if (dx > 30) { dx = 30 ; Dx = 0 ; }
-      memcpy (buf, arrp (dna, x2, char), dx) ; buf[dx] = 0 ;
+      char buf[32] ;
+      memset (buf, 0, 32) ;
+      if (dx > 30) { dx = 30 ; }
+      char *cp = arrp (dna, x2, char) ; /* first unaligned base */
+      long int *overH = (up->read & 0x1 ? bb->runStat.overhangR2 : bb->runStat.overhangR1) ;
       if (up->targetClass == 'G')
 	{
-	  for (int i = 0 ; i < dx ; i++)
+	  int first = -1 ;
+	  int cc = *cp ;
+	  switch (cc)
 	    {
-	      if (Dx && buf[i] == A_ && i < 8)
-		nA++ ;
-	      buf[i] = dnaDecodeChar[(int)buf[i]] ;
+	    case A_:
+	      first = 0 ;
+	      break ;
+	    case T_:
+	      first = 1 ;
+	      break ;
+	    case G_:
+	      first = 2 ;
+	      break ;
+	    case C_:
+	      first = 3 ;
+	      break ;
+	    default:
+	      goto done ;
 	    }
-	  if (nA >= 7)
-	    { /* found one polyA */
+
+
+	  /* search for a polyA */
+	  for (int i = 0 ; i < dx ; i++, cp++)
+	    {
+	      cc = *cp ;
+	      buf[i] = cc ;
+	      switch (cc)
+		{
+		case A_:
+		  nA++ ;
+		  break ;
+		}
+	    }
+	  /* may be we should look for the adaptor before Dx - dx */
+	  if (nA >= 7 && 10 * nA >= 9 * dx && Dx < dx + 10)
+	    {
 	      POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
 	      zp->chrom = up->chrom ;
 	      zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
-	      zp->n = 1 ;
 	      zp->run = bb->run ;
-	      bufferToUpper (buf) ;
+	      zp->n = 1 ;
+	      doUpper = TRUE ;
 	      bb->runStat.nClippedPolyA++ ;
-	      rightClip = ln - x2 ;
+	      rightClip = x2 + 1 ;
+	      goto done ; /* do not polute the search for the adaptor with the presence of a polyA */
 	    }
+
 	  
-	  else  if (pp->isWorm)
-	    { /* search for transpliced leaders in the suffix of the probe */
-#ifdef JUNK
-	      if (! pN && pp->slR && !goodSuffix && !( mm->stranded > 0) &&
-		  pTok &&
-		  strlen((char *)suffix + 1) < 24 && 
-		  strlen((char *)suffix + 1) > 8) /* search for SL1 */
+	  cp = arrp (dna, x2, char) ; /* first unaligned base */
+	  for (int i = 0 ; i < dx ; i++, cp++)
+	    {
+	      cc = *cp ;
+	      int ii = 150 * first + 5 * i ;
+	      switch (cc)
 		{
-		  int ns, n1 ;
-		  unsigned char buf2[OVLN+3] ;
-		  
-		  for (ns = 0 ; pp->slR[ns] && !goodSuffix ; ns++)
-		    {
-		      ccp = pp->slR[ns] ;
-		      i =  strlen((char *)ccp)  ;  
-		      n1 = dnaPickMatch (ccp, i, suffix+1, 0, 0) ;
-		      /* the SL must also match the trailing A */
-		      if (n1 > 0)
-			{
-			  for (i = 0 ; n1 && i < mm->probeRightClip ; i++)
-			    if (ccp [n1 + strlen((char *)suffix+1) - 1 + i] != A_)
-			      n1 = 0 ;
-			}
-		      if (n1 > 0) /* the suffix matches in the SL, 
-				   * and the ag acceptor consensus was in the aligned part 
-				   */
-			{
-			  /* verify that the bp of the SL upstream of n1 are in the exon */
-			  for (i = 1, j = 1 ; j && i < n1 ; i++)
-			    if (ccp[n1-i-1] != arr(pp->dna0, a2 - i, unsigned char))
-			      j = 0 ;
-			  if (j) /* ok the whole begining of the reverse SL is in the probe */
-			    {
-			      /* check that the accepted part SL including an extra donor 'gt' 
-			       * is not present in the genome
-			       */
-			      int kkk = ccp ? strlen ((const char *)ccp) : 0 ;
-			      BOOL inGenome = FALSE ;
-			      if (kkk < OVLN)
-			{
-			  sprintf ((char *)buf2, "%c%c%s", A_ | G_,  C_, ccp) ;
-			  inGenome = dnaPickMatch (genome, genomeLn, buf2, 0, 0) ;
-			}
-			      if (! inGenome)
-				{
-				  goodSuffix = ns + 11 ;
-				  score += pp->slBonus ;
-				  i = n1 - 1 ;
-				  if (i > 0)
-				    {
-				      x2 = (*x2p) -= i ;
-				      a2 = (*a2p) -= i ; 
-				      strncpy ((char *)(suffix + 1), (char *)ccp, n1) ;
-				    }
-				  aliBonus += 0 ; /*  strlen((char *)suffix+1)  */
-				  rightAdaptorClip = x2 ;
-				}
-			    }
-			}
-		    }
+		case A_:
+		  overH[ii + 0]++ ;
+		  break ;
+		case T_:
+		  overH[ii + 1]++ ;
+		  break ;
+		case G_:
+		  overH[ii + 2]++ ;
+		  break ;
+		case C_:
+		  overH[ii + 3]++ ;
+		  break ;
+		default:
+		  overH[ii + 4]++ ;
+		  break ;
 		}
-	      
+	    }
+
+	  /* try to recognize the SLs */
+	  if (pp->isWorm && pp->SLs)
+	    {
+	      int iSlMax = arrayMax (pp->SLs) ;
+	      for (int iSl = 0 ; iSl < iSlMax ; iSl++)
+		{	      
+		  const char *sl = array (pp->SLs, iSl, char *) ;
+		  int iMax = strlen (sl) ;
+		  for (int di = 0 ; di < 6 ; di++)
+		    {
+		      int i, n = 0 ;
+		      if (iMax > 30) iMax = 30 ;
+		      
+		      cp = arrp (dna, x2 - di, char) ; /* x2 =  first unaligned base */
+		      for (i = 0 ; i < dx + di && i < iMax ; i++)
+			n +=  (cp[i] == sl[i] ? 1 : 0) ;
+		      if (n > 6 && 10 * n >= 9 * i)
+			{
+#ifdef JUNK			  
+			  /* check that the prefix including an extra donor 'gt' 
+			   * is not present in the genome
+			   */
+			  int kkk = ccp ? strlen ((const char*)ccp) : 0 ;
+			  BOOL inGenome = FALSE ;
+			  if (kkk < OVLN)
+			    {
+			      sprintf ((char *)buf2, "%s%c%c", ccp, G_, T_ | C_) ;
+			      inGenome = dnaPickMatch (genome, genomeLn, buf2, 0, 0) ;
+			    }
 #endif
+			  doUpper = TRUE ;
+			  bb->runStat.nClippedSls[iSl]++ ;
+			  rightClip = x2 + 1 - di ;
+			  up->x2 -= di ;
+			  up->a2 -= (up->a1 < up->a2 ? di :- di) ;
+			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp--)
+			    {
+			      vp->score -= di ;
+			      vp->chainScore -= di ;
+			      vp->chainX2 -= di ;
+			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
+			    }
+			  goto done ;
+			}
+		    }	
+		}
+	    }
+
+	  /* try to recognize the known adaptor */
+	  Array aa = (up->read & 0x1 ? bb->runStat.adaptors2R : bb->runStat.adaptors1R) ;
+	  if (aa)
+	    {
+	      int iAmax = arrayMax (aa) ;
+	      for (int iA = 0 ; iA < iAmax ; iA++)
+		{	      
+		  const char *adaptor = array (aa, iA, char*) ;
+		  int iMax = strlen (adaptor) ;
+		  for (int di = 0 ; di < 6 ; di++)
+		    {
+		      int i, n = 0 ;
+		      if (iMax > 30) iMax = 30 ;
+		      
+		      cp = arrp (dna, x2 - di, char) ; /* x2 =  first unaligned base */
+		      for (i = 0 ; i < dx + di && i < iMax ; i++)
+			n +=  (cp[i] == adaptor[i] ? 1 : 0) ;
+		      if (n > 6 && 10 * n >= 9 * i)
+			{
+			  doUpper = TRUE ;
+			  if (up->read & 0x1) 
+			    bb->runStat.nClippedAdaptor2R++ ;
+			  else
+			    bb->runStat.nClippedAdaptor1R++ ;
+			  rightClip = x2 + 1 - di ;
+			  up->x2 -= di ;
+			  up->a2 -= (up->a1 < up->a2 ? di :- di) ;
+			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp--)
+			    {
+			      vp->score -= di ;
+			      vp->chainScore -= di ;
+			      vp->chainX2 -= di ;
+			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
+			    }
+
+			  break ;
+			}
+		    }	
+		}
 	    }
 	}
+    done:
+      for (int i = 0 ; i < dx ; i++)
+	buf[i] = dnaDecodeChar[(int)buf[i]] ;
+      if (doUpper)
+	bufferToUpper (buf) ;
+      if (strlen (buf) > 0)
+      
       dictAdd (bb->dict, buf, &up->rightOverhang) ;
     }
+
   up->rightClip = rightClip ;
   return rightClip ;
 } /* alignFormatRightOverhang */
@@ -809,7 +1003,6 @@ static void alignFormatErrors (const PP *pp, BB *bb, ALIGN *up, Array dna, Array
 } /* alignFormatErrors */
 
 /**************************************************************/
-#ifdef JUNK
 
 static void alignClipErrorLeft (ALIGN *vp, int errCost)
 {
@@ -875,7 +1068,6 @@ static void alignClipErrorLeft (ALIGN *vp, int errCost)
   
   return ;
 } /* alignClipErrorLeft */
-#endif
 
 /**************************************************************/
 
@@ -1252,6 +1444,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 					     , 0, zp.errors, maxJump2, -1, FALSE, 0) ; /* bio coordinates, jump 8 but do not extend */
 		  }
 	      }
+	      alignClipErrorLeft (&zp, pp->errCost) ;
 	      alignClipErrorRight (&zp, pp->errCost) ;
 	      /* remap */
 	      int ja, dda = 0 ;
@@ -1264,6 +1457,7 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 		  if (vp->chain == -1 || da < 1) continue ;
 		  if (vp->a1 > zp.a2 + dz)
 		    { vp->chain = -1 ; continue ; }
+		  if (vp->a1 < zp.a1 + dz) { vp->a1 = zp.a1 + dz ; vp->x1 = zp.x1 ; }
 		  if (vp->a2 > zp.a2 + dz) { vp->a2 = zp.a2 + dz ; vp->x2 = zp.x2 ; }
 		  
 		  if (vp->errors)
@@ -1631,13 +1825,13 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	  
 	  int tc = *dictName(pp->bbG.dict,up->chrom >> 1) ;
 	  int chain = up->chain ;
-	  int chainX1 = up->chainX1 ;
+	  int chainX1 = up->x1 ;
 	  int chainX2 = up->chainX2 ;
 	  
 	  int chainAli = up->chainAli = 0 ;
 	  int chainErr = up->chainErr = 0 ;
 	  int chainMID = up->chainMID = 0 ;
-	  int chainScore =	pp->bonus[tc] ;
+	  int chainScore = pp->bonus[tc] ;
 	  int chainA1 = up->a1 ;
 	  int chainA2 = up->a2 ;
 	  
