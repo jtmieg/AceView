@@ -144,18 +144,18 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   if(pp->isWorm)
     saSlInit (pp) ;
 
-  if (pp->rawAdaptor1L)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
+  if (pp->rawAdaptor2R)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
     {
-      int i, iMax = strlen (pp->rawAdaptor1L) ;
+      int i, iMax = strlen (pp->rawAdaptor2R) ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor1L[i] = complementBase(dnaEncodeChar[(int)pp->rawAdaptor1L[iMax - i - 1]]) ;
+	pp->adaptor1L[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
     }
   
-  if (pp->rawAdaptor2L) /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
+  if (pp->rawAdaptor1R) /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
     {
-      int i, iMax = strlen (pp->rawAdaptor2L) ;
+      int i, iMax = strlen (pp->rawAdaptor1R) ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor2L[i] = complementBase(dnaEncodeChar[(int)pp->rawAdaptor2L[iMax - i -1]]) ;
+	pp->adaptor2L[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
     }
   
   if (pp->rawAdaptor1R)  /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
@@ -433,27 +433,29 @@ int saConfigCheckTargetIndex (PP *pp)
     }
   if (NN != 1 && NN != 2 && NN != 4 && NN != 8 && NN != 16 && NN != 32 && NN != 64)
     messcrash ("The number of indexes NN=%d must be  a power of 2, say 1 2 4 8 ...", NN) ;
-  
-  ACEIN ai = aceInCreate (filName (pp->indexName, "/seedLength", "r") , 0, h) ;
-  if (ai)
-    {
-      int x = 0, y = 0, z = 0 ;
-      if (aceInCard (ai))
-	{
-	  if (aceInInt (ai, &x))
-	    pp->seedLength = x ;
-	  aceInStep (ai, '\t') ;
-	  if (aceInInt (ai, &y))
-	    pp->tStep = y ;
-	  aceInStep (ai, '\t') ;
-	  if (aceInInt (ai, &z))
-	    pp->tMaxTargetRepeats = z ;
-	}
-      ac_free (ai) ;
-    }
-  else
-    ok = FALSE ;
 
+  if (0)
+    {
+      ACEIN ai = aceInCreate (filName (pp->indexName, "/seedLength", "r") , 0, h) ;
+      if (ai)
+	{
+	  int x = 0, y = 0, z = 0 ;
+	  if (aceInCard (ai))
+	    {
+	      if (aceInInt (ai, &x))
+		pp->seedLength = x ;
+	      aceInStep (ai, '\t') ;
+	      if (aceInInt (ai, &y))
+		pp->tStep = y ;
+	      aceInStep (ai, '\t') ;
+	      if (aceInInt (ai, &z))
+		pp->tMaxTargetRepeats = z ;
+	    }
+	  ac_free (ai) ;
+	}
+      else
+	ok = FALSE ;
+    }
   cp = filName (pp->indexName, "/dna.sortali", "rb") ;
   if (cp)
     pp->tFileBinaryDnaName = strnew (cp, pp->h) ;
@@ -494,6 +496,13 @@ int saConfigCheckTargetIndex (PP *pp)
 	  ok = aceInInt (ai, &(pp->tStep)) ;
 	  aceInStep (ai, '\t') ;
 	  ok = aceInInt (ai, &(pp->maxTargetRepeats)) ;
+	  if (! pp->wiggle_step)
+	    {
+	      aceInStep (ai, '\t') ;
+	      aceInInt (ai, &(pp->wiggle_step)) ;
+	      if (! pp->wiggle_step)
+		pp->wiggle_step = 10 ;
+	    }
 	}
       if (! ok)
 	messcrash ("Cannot read the index file %s", fNam) ;

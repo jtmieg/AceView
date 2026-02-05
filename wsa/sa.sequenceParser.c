@@ -6,7 +6,7 @@
 
  * This code is public.
 
- * This module downloads runs from the SRA squence archives
+ * This module downloads runs from the SRA sequence archives
  * Optionally cache them in local directory .//SRA
  * Pases the sequences which can be in format fasta/fastq/fastc or SRA
  */
@@ -1086,6 +1086,9 @@ void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 {
   DnaFormat format = rc ? rc->format : tc->format ;
   if (0 && ! isGenome && ! rc->pairedEnd &&  (format == FASTA || format == SRACACHE))
+    return saUringSequenceParser (pp, rc, tc, bb) ;
+
+  if (! isGenome && ! rc->pairedEnd &&  (format == FASTA || format == SRACACHE))
     return fastaSequenceParser (pp, rc, tc, bb, isGenome) ;
   else if (! isGenome && format == SRA)
     return sraSequenceParser (pp, rc, tc, bb, isGenome) ;

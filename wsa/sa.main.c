@@ -1255,6 +1255,8 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//   --no_splice : only accept comtinuous alignments, [by default search also spliced alignments]\n"
 	       "//   --maxIntron [default 1000000] : max intron size\n"
 	       "//   --ignoreIntronSeeds [default FALSE] : do not use the known intron provided in class I in the -T config file\n"
+	       "//   --adaptor1 atgc : Read 1 exit adaptor, as exported in file <run>.overhang3prime.tsf\n"
+	       "//   --adaptor2 ggct : Read 2 exit adaptor, as exported in file <run>.overhang5prime.tsf\n"
 	       "// --wiggles  : Report target coverage wiggles in UCSC BF (fixed) format\n"
 	       "// --intron  : Report intron support\n"
 	       "// (--snp : not yet ready) Report candidate SNP counts (substitutions and short indels)\n"
@@ -1602,7 +1604,7 @@ int main (int argc, const char *argv[])
   /* The target index must exist or be created
    *
    * The seed length is only used when creating a new target index
-   * otherwise it is inherited from th index
+   * otherwise it is inherited from the index
    * The maximal number of repeats of a seed in the targets is used at creation
    * but one is allowed  provide a smaller number when aligning
    * which would drop the index seeds with more repetitions 
@@ -1667,11 +1669,10 @@ int main (int argc, const char *argv[])
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
   p.introns = getCmdLineBool (&argc, argv, "--intron") ;
 
-  getCmdLineText (h, &argc, argv, "--adaptor1L", &(p.rawAdaptor1L)) ;
-  getCmdLineText (h, &argc, argv, "--adaptor1R", &(p.rawAdaptor1R)) ;
-  getCmdLineText (h, &argc, argv, "--adaptor2L", &(p.rawAdaptor2L)) ;
-  getCmdLineText (h, &argc, argv, "--adaptor2R", &(p.rawAdaptor2R)) ;
-  p.wiggle_step = 10 ;  /* examples s=10, 5, 1 */
+  getCmdLineText (h, &argc, argv, "--adaptor1", &(p.rawAdaptor1R)) ;
+  getCmdLineText (h, &argc, argv, "--adaptor2", &(p.rawAdaptor2R)) ;
+
+  p.wiggle_step = 0 ;  /* examples s=10, 5, 1, if not set by user the deault is set in saConfigCheckTargetIndex  */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
 
   if (0) { p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
@@ -1784,7 +1785,7 @@ int main (int argc, const char *argv[])
   p.splice = TRUE ;
   if (getCmdLineBool (&argc, argv, "--no_splice"))
     p.splice = FALSE ;
-  p.errCost = 4 ; /* was 8 */
+  p.errCost = 8 ; /* was 8 */
   getCmdLineInt (&argc, argv, "--errCost", &(p.errCost)) ;
   getCmdLineInt (&argc, argv, "--errMax", &(p.errMax)) ;
   getCmdLineInt (&argc, argv, "--minScore", &(p.minScore)) ;

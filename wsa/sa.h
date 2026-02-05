@@ -201,7 +201,7 @@ typedef struct pStruct {
   const char *tFileBinaryCoordsName ;
 
   Array SLs ;
-  const char *rawAdaptor1L, *rawAdaptor2L, *rawAdaptor1R, *rawAdaptor2R ;
+  const char *rawAdaptor1R, *rawAdaptor2R ;
   char adaptor1L[32], adaptor2L[32],  adaptor1R[32], adaptor2R[32] ;
   /* Agents:
      R read parser
@@ -468,6 +468,9 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget) ;
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome) ;
 int saSequenceParseSraDownload (const char *sraID, int maxGb) ;
 void saSequenceParseGzBuffer (const PP *pp, BB *bb) ;
+
+/* sa.uringSequenceParser.c */
+void saUringSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb) ;
 
 /* sa.wiggle */
 void saWiggleCumulate (const PP *pp, BB *bb) ;

@@ -460,7 +460,7 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 		      
 		      cp = arrp (dna, x1 - 2 + di, char) ; /* x1 - 2 =  first unaligned base */
 		      for (i = 0 ; i < dx + di && i < 30 && i < iMax ; i++)
-			n +=  (cp[-i] == adaptor[iMax - i - 1] ? 1 : 0) ;
+			n +=  (cp[-i] == complementBase(adaptor[i]) ? 1 : 0) ;
 		      if (n > 6 && 10 * n >= 9 * i)
 			{
 			  doUpper = TRUE ;
@@ -572,7 +572,7 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 	      zp->n = 1 ;
 	      doUpper = TRUE ;
 	      bb->runStat.nClippedPolyA++ ;
-	      rightClip = x2 + 1 ;
+	      rightClip = x2 ;
 	      goto done ; /* do not polute the search for the adaptor with the presence of a polyA */
 	    }
 
@@ -651,13 +651,12 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 	    }
 
 	  /* try to recognize the known adaptor */
-	  Array aa = (up->read & 0x1 ? bb->runStat.adaptors2R : bb->runStat.adaptors1R) ;
-	  if (aa)
+	  const char *adaptor = (up->read & 0x1 ? pp->adaptor2R : pp->adaptor1R) ;
+	  if (adaptor[0])
 	    {
-	      int iAmax = arrayMax (aa) ;
+	      int iAmax = 1 ;
 	      for (int iA = 0 ; iA < iAmax ; iA++)
 		{	      
-		  const char *adaptor = array (aa, iA, char*) ;
 		  int iMax = strlen (adaptor) ;
 		  for (int di = 0 ; di < 6 ; di++)
 		    {
@@ -674,18 +673,29 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 			    bb->runStat.nClippedAdaptor2R++ ;
 			  else
 			    bb->runStat.nClippedAdaptor1R++ ;
-			  rightClip = x2 + 1 - di ;
+			  rightClip = x2 - di ;
 			  up->x2 -= di ;
+			  up->ali -= di ;
 			  up->a2 -= (up->a1 < up->a2 ? di :- di) ;
+			  cp = arrp (dna, up->x2, char) ;
+			  if (1 && di > 0) /* extend the unaligned buffer */
+			    {
+			      for (int i = 30 ; i >= di ; i--)
+				buf[i] = buf[i- di] ;
+			      for (int i = 0 ; i < di ; i++)
+				buf[i] = cp[i] ;
+			      buf[31] = 0 ;
+			    }
+			    
 			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp--)
 			    {
 			      vp->score -= di ;
 			      vp->chainScore -= di ;
+			      vp->chainAli -= di ;
 			      vp->chainX2 -= di ;
 			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
 			    }
-
-			  break ;
+			  goto done ;
 			}
 		    }	
 		}
@@ -1584,7 +1594,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 	      if (1)
 		{
 		  wp = vp - 1 ;
-		  if (jj == 0 || vp->a1 != wp->a1 || vp->a2 != wp->a2 || vp->x1 != wp->x1 || vp->x2 != wp->x2)
+		  if (jj == 0 || vp->chrom != wp->chrom || vp->a1 != wp->a1 || vp->a2 != wp->a2 || vp->x1 != wp->x1 || vp->x2 != wp->x2)
 		    {
 		      vp++ ; jj++ ;
 		    }

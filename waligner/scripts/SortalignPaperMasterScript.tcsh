@@ -78,8 +78,12 @@ setenv SV v59.81.16M.jan26      # no wiggle, introns, :  max31
 setenv SVlast v59.81.16M.jan26
 setenv SV v60.81.18M.Wiggle.jan26      #    wiggle, introns, :  max31
 setenv SVlast v60.81.18M.Wiggle.jan26
-setenv SV     v61.81.18M.errCost4.jan27      # no wiggle, introns, :  max31
+setenv SV     v61.81.18M.errCost4.jan27      # no wiggle, introns, :  max81
 setenv SVlast v61.81.18M.errCost4.jan27zz
+setenv SV     v62.81.18M.errCost4.feb4      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
+setenv SVlast v62.81.18M.errCost4.feb4
+setenv SV     v63.81.18M.errCost8.feb4      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
+setenv SVlast v63.81.18M.errCost8.feb4
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -1937,6 +1941,7 @@ foreach run ($iRuns)
     cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$4;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
   end
 end
+echp >> _c
 foreach run ($iRuns)
   echo -n "\n$run New Intron\t" >> _c
   foreach mm ($iMethods)
@@ -1987,6 +1992,7 @@ endif
 goto phaseLoop
 
 cat T2T.chr7.fasta | gawk '/^>/{next}{for(i=1;i<=1000;i++)printf(">S%d\n%stgctagatcgaatc\n",i,substr($1,10000000+100*i+1,200));}' > test.chr7.fasta
+cat T2T.chr7.fasta | gawk '/^>/{next}{for(i=1;i<=1000;i++)printf(">S%d\ntgctagatcgaatc%s\n",i,substr($1,10000000+100*i+1,200));}' > test.chr7.fasta
 
 ##############################################################################
 ##############################################################################

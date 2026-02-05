@@ -98,8 +98,8 @@ COMPILE.c = $(COMPILER) $(USEROPTS) $(IDIR) -DAC_TEST -D$(NAME) -D_FILE_OFFSET_B
 
 SA_OBJS = sa.main.o sa.sort.o sa.sam.o sa.config.o \
 	sa.introns.o sa.wiggle.o sa.gff.o sa.targetIndex.o \
-	sa.seeds.o sa.sequenceParser.o sa.stats.o sa.align.o
-
+	sa.seeds.o sa.sequenceParser.o sa.stats.o sa.align.o \
+	sa.uringSequenceParser.o
 
 SA_SOURCES =  $(SA_OBJS:.o=.c)
 
@@ -132,7 +132,7 @@ libsraread.a:
 	$(MAKE) -C ../wsra
 	ln -s ../wsra/libsraread.a .
 sortalign: $(SA_OBJS) libsraread.a $(GPU_OBJS)
-	$(LINKER) -o $@  $(GPU_OBJS) $(SA_OBJS) $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl
+	$(LINKER) -o $@  $(GPU_OBJS) $(SA_OBJS) $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl 
 
 ###########################################################
 ########### end of     acedb makefile.sa  ################

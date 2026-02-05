@@ -582,10 +582,17 @@ void saTargetIndexCreate (PP *pp)
   pp->tMaxTargetRepeats = pp->maxTargetRepeats ;
   saTargetIndexCreateDo (pp) ;
 
+  pp->wiggle_step = 1 ;
+  if (pp->bbG.length > 30000000) pp->wiggle_step = 5 ;
+  if (pp->bbG.length > 300000000) pp->wiggle_step = 10 ;
+      
   /* create short utility files in the IDX index directory */
   ACEOUT ao = aceOutCreate (filName (pp->indexName, "/seedLength", "w") , 0, 0, h) ;
-  aceOutf (ao, "%d\t%d\t%d\n# SeedLength\ttStep\tmaxTargetRepeats\n"
-	   , pp->seedLength, pp->tStep, pp->maxTargetRepeats
+  aceOutf (ao, "%d\t%d\t%d\t%d\n# SeedLength\ttStep\tmaxTargetRepeats\twiggle_step\n"
+	   , pp->seedLength
+	   , pp->tStep
+	   , pp->maxTargetRepeats
+	   , pp->wiggle_step
 	   ) ;
 
   /* copy the actual config file used to create the index */
