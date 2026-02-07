@@ -575,15 +575,17 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , 100.0 * up->nBaseAligned2/(.000001 + up->nBase2)
 		   ) ;
 
-	  up->intergenic = up->wiggleCumul - up->exonic - up->intronic ;
-	  aceOutf (ao, "%s\tExonic_intronic_intergenic_Bases\tififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
+	  up->intergenic = up->wiggleCumul - up->cds - up->utr - up->intronic ;
+	  aceOutf (ao, "%s\tCDS_utr_intronic_intergenic_Bases\tifififif\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\t%ld\t%.3f\n"
 		   , runNam
-		   , up->exonic
-		   , 100.0*(up->exonic)/(.000001 + up->exonic + up->intronic + up->intergenic)
+		   , up->cds
+		   , 100.0*(up->cds)/(.000001 + up->cds + up->utr + up->intronic + up->intergenic)
+		   , up->utr
+		   , 100.0*(up->utr)/(.000001 + up->cds + up->utr + up->intronic + up->intergenic)
 		   , up->intronic
-		   , 100.0*(up->intronic)/(.000001 + up->exonic + up->intronic + up->intergenic)
+		   , 100.0*(up->intronic)/(.000001 + up->cds + up->utr + up->intronic + up->intergenic)
 		   , up->intergenic
-		   , 100.0*(up->intergenic)/(.000001 + up->exonic + up->intronic + up->intergenic)
+		   , 100.0*(up->intergenic)/(.000001 + up->cds + up->utr + up->intronic + up->intergenic)
 		   ) ;
 
 	  aceOutf (ao, "%s\tATGCN\tiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\n"

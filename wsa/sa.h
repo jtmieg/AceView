@@ -26,6 +26,9 @@
 */
 /* Examples:  sortalign -h */
 
+/* edit the version only if you edit the way the index is constructed */ 
+#define INDEXVERSION "2026_02_6"
+
 /***********************************************************************************/
 
 #ifdef USEGPUzzzz
@@ -85,7 +88,7 @@ typedef struct runStatStruct {
   long int nCompatiblePairs, nIncompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
   long int nBase1, nBase2 ;
   long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
-  long int intergenic, intronic, exonic, cds, utr ;
+  long int cds, utr, intronic, intergenic ;
   long int nMultiAligned[11] ;
   long int nReadsAlignedPerTargetClass[256] ;
   long int nBasesAlignedPerTargetClass[256] ;
@@ -179,6 +182,7 @@ typedef struct pStruct {
   AC_HANDLE h ;
   BOOL debug, gzi, gzo ;
   BOOL createIndex ;
+  BOOL noJump ;
   BOOL align ;
   BOOL justStats ;
   BOOL wiggle ;
@@ -234,12 +238,9 @@ typedef struct pStruct {
   Array runStats ;
   Array runLanes ;
   Array runLanesDone ;
-  Array geneExons ;           /* array of array per chrom of gene coordinates */
-  Array geneBoxes ;           /* array of array per chrom of gene coordinates */
-  Array geneExonCounts ;      /* gene expression */
-  Array geneBoxCounts ;      /* gene expression */
+  Array geneBoxes ;  /* gene coordinates per chromosome */
+  Array geneCounts ; /* expression counts per chromosomes */
   BigArray knownIntrons ;
-  BigArray knownExons ;
   Array wiggles ;
   Array wiggleCumuls ;
   Array wigglesL ;
@@ -250,7 +251,6 @@ typedef struct pStruct {
   Array wigglesNU ;
   Array cdss ;
   Array utrs ;
-  Array exonics ;
   Array intronics ;
   Array intergenics ;
   Array confirmedPolyAs ;
@@ -288,7 +288,7 @@ typedef struct pStruct {
   int gpu ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   long int wiggleCumul ; /* in million bases */
-  long int cds, utr, exonic, intronic, intergenic ;
+  long int cds, utr, intronic, intergenic ;
   BOOL splice ;
   long int nRawReads, nRawBases ;
   int wiggle_step ;
@@ -378,7 +378,7 @@ typedef struct doubleIntronStruct {
 typedef struct exonStruct {
   int chrom ;
   int a1, a2 ; 
-  int gene, mrna ;
+  int type, gene, mrna ;
 } __attribute__((aligned(32))) EXONINTRON ;
 		  
 
@@ -432,6 +432,7 @@ Array saConfigGetRuns (PP *pp, Array runStats) ;
 
 /* sa.gff.c */
 long int saGffParser (PP *pp, TC *tc) ;
+void saGffBinaryParser (PP *pp) ;
 long int saIntronParser (PP *pp, TC *tc) ; 
 
 /* sa.sort.c */

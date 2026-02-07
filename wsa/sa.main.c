@@ -1287,7 +1287,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//    If no message is emited within the first minute, the computer is overloaded,\n"
 	       "//    please try to increase --max_threads to 256 or 512. alternativelly lower --nAgents and --nBlocks\n"
 	       "//      The code is using virtual threads, at least one by agent and by communication channels.\n"
-
+	       "// --noJump : Do not insert jumper in the index, valid for future GPU version\n"
 	       "// --verbose : all kinds of details, mostly usefull for debugging, are reported\n"
 	       "//\n\n"
 	       ) ;
@@ -1622,6 +1622,7 @@ int main (int argc, const char *argv[])
   getCmdLineText (h, &argc, argv, "-t", &(p.tFileName)) ;
   getCmdLineText (h, &argc, argv, "-T", &(p.tConfigFileName)) ;
   p.createIndex = getCmdLineText (h, &argc, argv, "--createIndex", &(p.indexName)) ;
+  p.noJump = getCmdLineBool (&argc, argv, "--noJump") ;
   
   if (p.createIndex)
     {
@@ -1785,7 +1786,7 @@ int main (int argc, const char *argv[])
   p.splice = TRUE ;
   if (getCmdLineBool (&argc, argv, "--no_splice"))
     p.splice = FALSE ;
-  p.errCost = 8 ; /* was 8 */
+  p.errCost = 4 ; /* was 8 */
   getCmdLineInt (&argc, argv, "--errCost", &(p.errCost)) ;
   getCmdLineInt (&argc, argv, "--errMax", &(p.errMax)) ;
   getCmdLineInt (&argc, argv, "--minScore", &(p.minScore)) ;
@@ -1966,16 +1967,8 @@ int main (int argc, const char *argv[])
       channelGet (p.gmChan, &p.bbG, BB) ;
       if (! p.bbG.cwsN[0])
 	messcrash ("matchHits received no target words") ;
+      saGffBinaryParser (&p) ;
       
-      for (int nn = 0 ; nn < arrayMax (p.tArray) ; nn++)
-	{
-	  TC *tc = arrayp (p.tArray, nn, TC) ;
-	  
-	  if (tc->targetClass == 'I')
-	    saGffParser (&p, tc) ;
-	}
-  
-
       /* map the reads to the genome in parallel */
 
       /* first we register the topology of our workflow (pass == 0)
@@ -2159,16 +2152,16 @@ int main (int argc, const char *argv[])
 	}
       ac_free (bb.h) ;
     }
-  if (p.wiggle)
-    saWiggleExport (&p, nAgents) ;
-  saCpuStatExport (&p, cpuStats) ;
   {{
       int n = sizeof(float) * (1+dictMax (p.runDict)) ;
       p.runStranding = halloc (n, p.h) ;
       memset (p.runStranding, 0, n) ;
     }}
+  saIntronsExport (&p, p.confirmedIntrons) ; /* before wiggleExport to restrand the gene expression */ 
+  if (p.wiggle)
+    saWiggleExport (&p, nAgents) ;
+  saCpuStatExport (&p, cpuStats) ;
   saPolyAsExport (&p, p.confirmedPolyAs) ;
-  saIntronsExport (&p, p.confirmedIntrons) ;
   saDoubleIntronsExport (&p, p.doubleIntrons) ;
   saRunStatExport (&p, p.runStats) ; /* must come afer PolyAsExport and IntronsExport */
   

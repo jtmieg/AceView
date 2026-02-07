@@ -84,6 +84,8 @@ setenv SV     v62.81.18M.errCost4.feb4      # no wiggle, no sam , fix extendHits
 setenv SVlast v62.81.18M.errCost4.feb4
 setenv SV     v63.81.18M.errCost8.feb4      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
 setenv SVlast v63.81.18M.errCost8.feb4
+setenv SV     v64.31.18M.errCost4.feb6      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
+setenv SVlast v64.31.18M.errCost4.feb6
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -101,8 +103,8 @@ setenv EXPORTWIGGLES 0
 setenv EXPORTWIGGLEENDS 0
 setenv seedLength 16
 setenv seedLength 18
-setenv maxTargetRepeats 31
 setenv maxTargetRepeats 81
+setenv maxTargetRepeats 31
 
 
 ##       SortalignPaperMasterScript.tcsh

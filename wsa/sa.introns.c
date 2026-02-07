@@ -739,20 +739,51 @@ static void saIntronStranding (PP *pp, Array aa)
   int runMax = dictMax (pp->runDict) + 1 ;
   int nGt_ag[runMax] ;
   int nCt_ac [runMax] ;
+  int cGood[runMax][12] ;
+  int cOther [runMax][12] ;
+  int k  ;
   float minS = 100 ;
   int run, ii, iMax = arrayMax (aa) ;
   float *s0 = pp->runStranding ;
   
   memset (nGt_ag, 0, sizeof (nGt_ag)) ;
   memset (nCt_ac, 0, sizeof (nCt_ac)) ;
+  memset (cGood, 0, sizeof (cGood)) ;
+  memset (cOther, 0, sizeof (cOther)) ;
   
 
   for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
     {
+      for (char *cp = zp->feet ; *cp ; cp++)
+	*cp = ace_lower ((int)*cp) ;
       if (! strcmp (zp->feet, "gt_ag"))
-	nGt_ag[zp->run]++ ;
+	{
+	  k = zp->n + zp->nR ;
+	  nGt_ag[zp->run]++ ;
+	  cGood[zp->run][k < 12 ? k : 11]++ ;
+	}
       else if (! strcmp (zp->feet, "ct_ac"))
-	nCt_ac[zp->run]++ ;
+	{
+	  k = zp->n + zp->nR ;
+	  nCt_ac[zp->run]++ ;
+	  cGood[zp->run][k < 12 ? k : 11]++ ;
+	}
+      else
+	{
+	  k = zp->n + zp->nR ;
+	  cOther[zp->run][k < 12 ? k : 11]++ ;
+	}
+    }
+
+  /* check ratio of Good/Other to find the threshold */
+  for (run = 0 ; run < runMax ; run++)
+    {
+      /* cumul by coverage */
+      for (k = 1 ; k < 12 ; k++)
+	{	
+	  cGood[zp->run][k] += cGood[zp->run][k-1] ;
+	  cOther[zp->run][k] += cOther[zp->run][k-1] ;
+	}
     }
   for (run = 0 ; run < runMax ; run++)
     {
@@ -837,13 +868,14 @@ void saIntronsExport (PP *pp, Array aaa)
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
 	       ) ;
-      aceOutf (ao, "Inron\tRun\tiit\tn\tnR\tfeet\n") ;
+      aceOutf (ao, "Intron\tRun\tiit\tn\tnR\tfeet\n") ;
       for (ii = 0, up = arrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
 	{
 	  int min = 3 ;
+	  
 	  if (! up->feet[0])
 	    continue ;
-	  else if (!strcasecmp (up->feet, "gt_ag"))
+	  if (!strcasecmp (up->feet, "gt_ag"))
 	   min = 1 ;
 	  else if (!strcasecmp (up->feet, "gc_ag"))
 	    min = 2 ;

@@ -46,6 +46,20 @@ typedef struct fileStreamStruct {
 /**************************************************************/
 /************************* utilities **************************/
 /**************************************************************/
+
+static inline void *memrchr(const void *s, int c, size_t n)
+{
+    const unsigned char *p = (const unsigned char *)s + n ;
+    while (p > (const unsigned char *)s)
+      {
+        --p;
+        if (*p == (unsigned char)c)
+	  return (void *)p ;
+      }
+    return NULL;
+} /* memrchr */
+
+/**************************************************************/
 /* Locate last raw record in buffer */
 static int getLastRawRecord (char *start, char *end)
 {
@@ -57,12 +71,16 @@ static int getLastRawRecord (char *start, char *end)
 
 /**************************************************************/
 /* Locate last fasta/fastc record in buffer */
-static int getLastFastaRecord (char *start, char *end)
+static unsigned char  *getLastFastaRecord (unsigned char *start, unsigned char *end)
 {
-  for (char *p = end ; p >= start ; p--)
-    if (*p == '>' && (p == start || p[-1] == '\n'))
-      return p - start ;
-  return -1 ; /* failed */
+  unsigned char *p = end ;
+  while (1)
+    {
+      unsigned char *p = memrchr (end, '>', end - start) ;
+      if (p &&  (p == start || p[-1] == '\n'))
+	break ;
+    } ;
+  return p ; 
 } /* getLastFastaRecord */
 
 /**************************************************************/
@@ -90,26 +108,26 @@ static int getLastSraPairRecord (char *start, char *end)
 
 /**************************************************************/
 /* Locate last fastq record in buffer */
-static int getLastFastqRecord (char *start, char *end)
+static unsigned char *getLastFastqRecord (unsigned char *start, unsigned char *end)
 {
-  for (char *p = end ; p >= start ; p--)
+  for (unsigned char *p = end ; p >= start ; p--)
     if (*p == '@')
       {
 	if (p == start)
 	  return 0 ;
-	char *cp = strchr (p, '\n') ;
+	unsigned char *cp = memchr (p, '\n', end - start) ;
 	if (cp)
 	  { /* check is we see dna */
 	    BOOL ok = TRUE ;
-	    for (char *cq = cp + 1 ; ok && *cq && *cq != '\n' ; cq++)
+	    for (unsigned char *cq = cp + 1 ; ok && *cq && *cq != '\n' ; cq++)
 	      if (! dnaEncodeChar[(int)*cq])
 		ok = FALSE ;
 	    if (! ok) /* probably the  quality line */
 	      continue ;
-	    return p - start ;
+	    return p ;
 	  }
       }
-  return -1 ; /* failed */
+  return NULL ; /* failed */
 } /* getLastFastqRecord */
 
 /**************************************************************/
@@ -170,11 +188,12 @@ static void process_file_completion (URFS *fs, BOOL isFasta, size_t targetSize, 
   size_t newRecords = 0 ;
   if  (isFasta)
     {
-      lastRecordStart = find_last_fasta_record (fs->decompBuf, fs->decompBuf + totalAvail - 1) ;
+      //  lastRecordStart = find_last_fasta_record (fs->decompBuf, fs->decompBuf + totalAvail - 1) ;
+       lastRecordStart = getLastFastaRecord ((fs->decompBuf, fs->decompBuf + totalAvail - 1) ;
     }
   else
     {
-      lastRecordStart = find_last_fastq_record (fs->decompBuf, fs->decompBuf + totalAvail - 1, &newRecords) ;
+      lastRecordStart = getLastFastqRecord (fs->decompBuf, fs->decompBuf + totalAvail - 1, &newRecords) ;
     }
 
   size_t completeLen = lastRecordStart ?  (lastRecordStart - fs->decompBuf) : 0 ;

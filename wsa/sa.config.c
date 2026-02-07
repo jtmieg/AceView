@@ -434,28 +434,6 @@ int saConfigCheckTargetIndex (PP *pp)
   if (NN != 1 && NN != 2 && NN != 4 && NN != 8 && NN != 16 && NN != 32 && NN != 64)
     messcrash ("The number of indexes NN=%d must be  a power of 2, say 1 2 4 8 ...", NN) ;
 
-  if (0)
-    {
-      ACEIN ai = aceInCreate (filName (pp->indexName, "/seedLength", "r") , 0, h) ;
-      if (ai)
-	{
-	  int x = 0, y = 0, z = 0 ;
-	  if (aceInCard (ai))
-	    {
-	      if (aceInInt (ai, &x))
-		pp->seedLength = x ;
-	      aceInStep (ai, '\t') ;
-	      if (aceInInt (ai, &y))
-		pp->tStep = y ;
-	      aceInStep (ai, '\t') ;
-	      if (aceInInt (ai, &z))
-		pp->tMaxTargetRepeats = z ;
-	    }
-	  ac_free (ai) ;
-	}
-      else
-	ok = FALSE ;
-    }
   cp = filName (pp->indexName, "/dna.sortali", "rb") ;
   if (cp)
     pp->tFileBinaryDnaName = strnew (cp, pp->h) ;
@@ -491,6 +469,10 @@ int saConfigCheckTargetIndex (PP *pp)
 
       if (ai && aceInCard (ai))
 	{
+	  char *cp = aceInWord (ai) ;
+	  if (! cp || strcmp (cp, INDEXVERSION))
+	    messcrash ("\nThis index is from a previous version of the progran, please run again --createIndex", cp ? cp : "NULL") ;
+	  aceInStep (ai, '\t') ;
 	  ok = aceInInt (ai, &(pp->seedLength)) ;
 	  aceInStep (ai, '\t') ;
 	  ok = aceInInt (ai, &(pp->tStep)) ;

@@ -221,7 +221,7 @@ static void storeTargetIndex (PP *pp, int tStep)
   /* export the code words */
   for (int k = 0 ; k < NN ; k++)
     {
-      fNam = hprintf (h, "%s/cws.sortali.%d", pp->indexName, k) ;
+      fNam = hprintf (h, "%s/cws.sortali.%d%s", pp->indexName, k, pp->noJump ? ".noJump" : "") ;
       bigArrayMapWrite (bbG->cwsN[k], fNam) ;
       nn += bigArrayMax (bbG->cwsN[k]) ;
     }
@@ -290,15 +290,14 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
       for (i = 0, j = 0 ; i < iMax ; up++, i++)
 	{
 	  /* int tc = *dictName(pp->bbG.dict,up->nam >> 1) ; */
-	  int m, n = 0, nI = 0, nX = 0 ;
+	  int m, n = 0, nI = 0 ;
 	  wp = up ;
 
-	  if (maxRepeats && pp->knownExons)
+	  if (maxRepeats && pp->knownIntrons)
 	    {
 	      while (wp < upMax && wp->seed == up->seed)
 		{
 		  nI += ((wp->intron >> 31) & 0x1) ? 1 : 0 ;
-		  nX += (((wp->intron >> 30) & 0x3) == 0x1) ? 1 : 0 ;
 		  wp++ ;
 		}
 	    }
@@ -326,9 +325,7 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
 	      for (wp = up, m = 0 ; m < n ; wp++, m++)
 		{
 		  nI = ((wp->intron >> 31) & 0x1) ? 1 : 0 ;
-		  nX = (((wp->intron >> 30) & 0x3) == 0x1) ? 1 : 0 ;
-		  nX = 0 ; /* do not enhance the exon seeds */
-		  if (nI + nX)
+		  if (nI)
 		    {
 		      if (((wp->intron >> 31) & 0x1) == 0x0)
 			wp->intron = n ;
@@ -369,18 +366,22 @@ static BigArray GenomeAddSkips (const PP *pp, BigArray cws, BB *bb, int kk)
   vp = bigArrp (aa, 0, CW) ; jMax = 0 ;
   for (long int ii = 0 ; ii < iMax ; ii += mstep1)
     {
-      vp->intron = ii + mstep4 < iMax ? (up + mstep4)->seed : wordMax ;
-      vp->nam = ii + mstep3 < iMax ? (up + mstep3)->seed : wordMax ;
-      vp->pos = ii + mstep2 < iMax ? (up + mstep2)->seed : wordMax ;
-      vp->seed = ii + mstep1 < iMax ? (up + mstep1)->seed : wordMax ;
-
-      k = iMax - ii ;
-      if (k > mstep1)
-	k = mstep1 ;
-      vp++ ; 
+      if (! pp->noJump)
+	{
+	  vp->intron = ii + mstep4 < iMax ? (up + mstep4)->seed : wordMax ;
+	  vp->nam = ii + mstep3 < iMax ? (up + mstep3)->seed : wordMax ;
+	  vp->pos = ii + mstep2 < iMax ? (up + mstep2)->seed : wordMax ;
+	  vp->seed = ii + mstep1 < iMax ? (up + mstep1)->seed : wordMax ;
+	  
+	  k = iMax - ii ;
+	  if (k > mstep1)
+	    k = mstep1 ;
+	  vp++ ;
+	  jMax++ ;
+	}
       memcpy (vp, up, k * sizeof (CW)) ;
       vp += k ; up += k ;
-      jMax += k + 1 ; /* k + 1_for_the_jumper */
+      jMax += k ; 
       if (jMax > jMax0)
 	messcrash ("add skipps error ") ;
     }
@@ -588,7 +589,8 @@ void saTargetIndexCreate (PP *pp)
       
   /* create short utility files in the IDX index directory */
   ACEOUT ao = aceOutCreate (filName (pp->indexName, "/seedLength", "w") , 0, 0, h) ;
-  aceOutf (ao, "%d\t%d\t%d\t%d\n# SeedLength\ttStep\tmaxTargetRepeats\twiggle_step\n"
+  aceOutf (ao, "%s\t%d\t%d\t%d\t%d\n# SeedLength\ttStep\tmaxTargetRepeats\twiggle_step\n"
+	   , INDEXVERSION
 	   , pp->seedLength
 	   , pp->tStep
 	   , pp->maxTargetRepeats
@@ -683,23 +685,7 @@ static long int genomeParseBinary (const PP *pp, BB *bbG)
       dnaR->base = bigArrp(bbG->globalDnaR, x1, char) ; 
       dnaR->max = dnaR->dim = x2 - x1 ;
     }
-  
-#ifdef JUNK
-  if (pp->wiggle)
-    {
-      bbG->wiggles = arrayHandleCreate (4*iMax, Array, bbG->h) ;
-      for (ii = 1 ; ii <= iMax ; ii++)
-	{
-	  Array dna = array (bbG->dnas, ii, Array) ;
-	  int ln = arrayMax (dna)/WIGGLE_STEP + 1 ;
-	  array (bbG->wiggles, 4*ii, Array) = arrayHandleCreate (ln, int, bbG->h) ;
-	  array (bbG->wiggles, 4*ii + 1, Array) = arrayHandleCreate (ln, int, bbG->h) ;
-	  array (bbG->wiggles, 4*ii + 2, Array) = arrayHandleCreate (ln, int, bbG->h) ;
-	  array (bbG->wiggles, 4*ii + 3, Array) = arrayHandleCreate (ln, int, bbG->h) ;
-	}
-    }
-#endif
-  
+
   /*  Get thread CPU time at end */
   t2 = clock () ;
   saCpuStatRegister ("1.memMapTargets" , pp->agent, bbG->cpuStats, t1, t2, nn) ; 
