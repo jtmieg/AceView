@@ -86,6 +86,8 @@ setenv SV     v63.81.18M.errCost8.feb4      # no wiggle, no sam , fix extendHits
 setenv SVlast v63.81.18M.errCost8.feb4
 setenv SV     v64.31.18M.errCost4.feb6      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
 setenv SVlast v64.31.18M.errCost4.feb6
+setenv SV     v65.31.18M.Wiggle.errCost4.feb7      # wiggle, no sam , new index for gene expressions
+setenv SVlast v65.31.18M.Wiggle.errCost4.feb7
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -99,7 +101,7 @@ endif
   
 setenv NOINTRONSEEDS 0
 setenv EXPORTSAM 0
-setenv EXPORTWIGGLES 0
+setenv EXPORTWIGGLES 1
 setenv EXPORTWIGGLEENDS 0
 setenv seedLength 16
 setenv seedLength 18

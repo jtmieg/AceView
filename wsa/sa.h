@@ -27,7 +27,7 @@
 /* Examples:  sortalign -h */
 
 /* edit the version only if you edit the way the index is constructed */ 
-#define INDEXVERSION "2026_02_6"
+#define INDEXVERSION "2026_02_7"
 
 /***********************************************************************************/
 
@@ -76,6 +76,14 @@ typedef struct runClassStruct {
   ACEOUT aoSam ;
 } RC ;
 
+typedef struct aStruct {
+    char a1L[32];
+    char a1R[32];
+    char a2L[32];
+    char a2R[32];
+} ADAPTORS ;
+
+
 #define SLMAX 1000
 #define LETTERMAX 1000
 #define OVERHANGMAX 600   /* 4*30*5  overhang: 32 bases max, starting on base atgc, 5 counts atgcn per position */
@@ -115,7 +123,7 @@ typedef struct runStatStruct {
   Array lengthDistribution ;
   Array insertLengthDistribution ;
   int minReadLength, maxReadLength ;
-  Array adaptors1L, adaptors2L, adaptors1R, adaptors2R ;
+  ADAPTORS adaptors ;
   long int nN, nErr, nMID ;
   long int letterProfile1[5 * LETTERMAX] ;
   long int letterProfile2[5 * LETTERMAX] ;
@@ -206,7 +214,7 @@ typedef struct pStruct {
 
   Array SLs ;
   const char *rawAdaptor1R, *rawAdaptor2R ;
-  char adaptor1L[32], adaptor2L[32],  adaptor1R[32], adaptor2R[32] ;
+  ADAPTORS adaptors ;
   /* Agents:
      R read parser
      G genome parser
@@ -345,20 +353,22 @@ typedef struct alignStruct {
   Array errors ;
 } __attribute__((aligned(32))) ALIGN ;
 
-
+typedef struct geneBoxStruct {
+  int chrom ;
+  int a1, a2 ; 
+  int gene ; /* index in pp->geneDict */
+  int mrna ;
+  char flag ;
+  char strand ;
+  char friends ;
+} __attribute__((aligned(32))) GBX ;
+		  
 typedef struct geneStruct {
   int chrom ;
   int a1, a2 ; 
   int gene ; /* index in pp->geneDict */
 } __attribute__((aligned(16))) GENE ;
 		  
-typedef struct mrnaStruct {
-  int chrom ;
-  int a1, a2 ; 
-  int mrna ; /* index in pp->mrnaDict */
-} __attribute__((aligned(16))) MRNA ;
-		  
-
 typedef struct intronStruct {
   int run ;
   int mrna ;
@@ -374,13 +384,6 @@ typedef struct doubleIntronStruct {
   char feet1[6] ;
   char feet2[6] ;
 } __attribute__((aligned(32))) DOUBLEINTRON ;
-		  
-typedef struct exonStruct {
-  int chrom ;
-  int a1, a2 ; 
-  int type, gene, mrna ;
-} __attribute__((aligned(32))) EXONINTRON ;
-		  
 
 typedef struct polyAStruct {
   int chrom ;  /* chrom indicates the strand */
@@ -388,7 +391,6 @@ typedef struct polyAStruct {
   int a1 ; /* first A in the orientation of the chrom */
   int n ;
 } __attribute__((aligned(32))) POLYA ;
-		  
 
 typedef struct cpuStatStruct {
   char nam[32] ;
@@ -397,7 +399,8 @@ typedef struct cpuStatStruct {
   long int n ;
   clock_t tA ; /* time time active */
 } CpuSTAT ;
-		  
+
+
 #define step1 256
 #define step2 512
 #define step3 1024
@@ -429,6 +432,7 @@ void saConfigIsIndexAccessible (PP *pp) ;
 void saConfigIsOutDirWritable (PP *pp) ;
 int saConfigCheckTargetIndex (PP *pp) ; 
 Array saConfigGetRuns (PP *pp, Array runStats) ;    
+BOOL saSetGetAdaptors (int set, ADAPTORS *aa, int run) ;  /* 0: get, 1: set, 2: hard set non rewritable */
 
 /* sa.gff.c */
 long int saGffParser (PP *pp, TC *tc) ;
@@ -482,12 +486,13 @@ void saRunStatExport (const PP *pp, Array runStats) ;
 void saCpuStatExport (const PP *pp, Array stats) ;
 void saCpuStatCumulate (Array aa, Array a) ;
 void saRunStatsCumulate (int run, PP *pp, BB *bb) ;
-
+BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up) ;
+  
 /* sa.align */
 void saAlign (const void *vp) ;
 void saAlignDo (const PP *pp, BB *bb) ;
 int saAlignOrder (const void *va, const void *vb) ;
-
+  
 /**************************************************************/
 /**************************************************************/
 /**************************************************************/

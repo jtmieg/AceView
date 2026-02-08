@@ -52,7 +52,7 @@ void wiggleCumulate (BigArray aaa, BigArray aa)
 } /* wiggleCumulate */
   
 /**************************************************************/
-  
+#define STEP1 1  
 static int wiggleCreate (const PP *pp, BB *bb)
 {
   ALIGN *ap ;
@@ -67,8 +67,8 @@ static int wiggleCreate (const PP *pp, BB *bb)
   Array wigglesR = bb->wigglesR = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
   Array wigglesP = bb->wigglesP = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
   Array wigglesNU = bb->wigglesNU = arrayHandleCreate (2 * chromMax, BigArray, bb->h) ;
-  const int step = pp->wiggle_step ;  /* examples s=10, 5, 1 */
-  const int demiStep = step/2 - (step % 1);
+  const int step = (STEP1 == 1 ? 1 : pp->wiggle_step) ;  /* examples s=10, 5, 1 */
+  const int demiStep = (step - 1)/2 ;
   const int endLength = 30 / step ;
 
   for (ii = 0, ap = bigArrp (bb->aligns, 0, ALIGN) ; ii < iMax ; ap++, ii++)
@@ -265,7 +265,7 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 	}
       ap1 = arrp (ppWiggles, 0, BigArray) ;
       if (ap1 != ap0)
-	messcrash ("pp->wiggles was relocalized which is not allowed here because of multiuthreading") ;
+	messcrash ("pp->wiggles was relocalized which is not allowed here because of multithreading") ;
 
     }
   
@@ -290,8 +290,8 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
   unsigned int pos0 ;
   Array geneC = 0 ;
   Array geneB = 0 ;
-  const int step = pp->wiggle_step ;
-  const int demiStep = step/2 - (step % 1);
+  const int wiggle_step = pp->wiggle_step ;
+  const int demiStep = (wiggle_step - 1)/2 ;
   const char *typeNam ;
   char wigStrand = (strand == 'f' ? 0x0 : 0x1) ;
   memset (cumuls, 0, sizeof (cumuls)) ;
@@ -345,12 +345,13 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 
       wp = bigArrp (wig, 0, WP) ;
       wp0 = bigArrp (wig, 0, WP) ;
-      pos0 = wp0->pos ;
+      pos0 = wp0->pos ; pos0 -= pos0 % wiggle_step ;
       for (ii = 0 ; ii < iMax ; ii++, wp++)
 	{
 	  if (wp->weight)
 	    {
 	      pos0 = pos0 ? pos0 : wp->pos ;
+	      posMax = wp->pos ;
 	      xp = arrayp (a, wp->pos + wp->ln - pos0, unsigned int) ;
 	      xp -= wp->ln ;
 	      for (int i = 0 ; i < wp->ln ; i++)
@@ -367,50 +368,57 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	  aceOutDate (ao, "##", "wiggle") ;
 	  aceOutf (ao, "track type=wiggle_0\n") ;
 
-	  aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0 * step, step) ;
+	  aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0, wiggle_step) ;
 
       	  xp = arrayp (a, 0, unsigned int) ;
-	  for (int j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
+	  for (int localCumul = 0, j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
 	    {
 	      unsigned int w = xp[j] ;
-	      aceOutf (ao, "%u\n", w / 720) ;
-	      cumul += w * step ;
+	      cumul += w ;
+	      localCumul += w ;
+	      if ((j + demiStep) % wiggle_step == 0)	      
+		{
+		  aceOutf (ao, "%u\n", localCumul / 720) ;
+		  localCumul = 0 ;
+		}
 	    }
 	}
       
       if (arrayMax(a) && geneB)
 	{
 	  int ib, ibMax = arrayMax (geneB), jMax = arrayMax (a) ;
-	  EXONINTRON *gb = arrayp (geneB, 0, EXONINTRON) ;
+	  GBX *gb = arrayp (geneB, 0, GBX) ;
       	  xp = arrayp (a, 0, unsigned int) ;
 	  
 	  /* the candidate gene segments that may cover position x are
 	   * not earlier than the first segment igOld  covering the previous position
 	   * not later than the fist gene ig1 starting after x
 	   */
-	  for (ib = 0, gb = arrp (geneB, ib, EXONINTRON) ; ib < ibMax ; ib++, gb++)
+	  for (ib = 0, gb = arrp (geneB, ib, GBX) ; ib < ibMax ; ib++, gb++)
 	    {
-	      BOOL plusStrand = ((gb->gene & 0x1) == wigStrand ? TRUE : FALSE) ;
-	      BOOL intronic = gb->mrna & 0x1 ? TRUE : FALSE ;
-	      BOOL ambiguous = gb->mrna & 0x8 ? TRUE : FALSE ;
-	      BOOL ok = ! ambiguous && plusStrand ;
-	      if (ok)
+	      BOOL sameStrand = (gb->strand == wigStrand ? TRUE : FALSE) ;
+	      BOOL master = gb->flag & 0x10 ? TRUE : FALSE ;
+	      BOOL intronic = gb->flag & 0x1 ? TRUE : FALSE ;
+	      BOOL ambiguous = gb->flag & 0x8 ? TRUE : FALSE ;
+	      int friends = ambiguous ? gb->friends : 1 ;
+	      
+	      if (sameStrand)
 		{
-		  int j1 = (gb->a1 + demiStep) / step - pos0 ;
-		  int j2 = (gb->a2 + demiStep) / step - pos0 ;
+		  int j1 = gb->a1 - pos0 ;
+		  int j2 = gb->a2 - pos0 ;
 		  for (int j = (j1 > 0 ? j1 : 0) ; j <= j2 && j < jMax ; j++)
 		    {
-		      int weight = step * xp[j] ; 
+		      int weight = xp[j] ; 
 		      if (weight)
 			{
 			  if (gb->gene)
 			    {
-			      int gg = gb->gene >> 1 ;
+			      int gg = gb->gene ;
 			      if (! intronic)
-				array (geneC, 2*gg, int) += weight ;
-			      array (geneC, 2*gg + 1, int) += weight ;
+				array (geneC, 2*gg, int) += weight/friends ;
+			      array (geneC, 2*gg + 1, int) += weight/friends ;
 			    }
-			  cumuls[gb->mrna & 0x7] += weight ;
+			  if (master) cumuls[gb->flag & 0x7] += weight ;
 			}
 		    }
 		}

@@ -140,6 +140,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   Array rcs = arrayHandleCreate (64, RC, pp->h) ;
   RC *rc = 0 ;
   int nn = 0 ;
+  BOOL isSet = FALSE ;
   
   if(pp->isWorm)
     saSlInit (pp) ;
@@ -147,31 +148,37 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   if (pp->rawAdaptor2R)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
     {
       int i, iMax = strlen (pp->rawAdaptor2R) ;
+      isSet = TRUE ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor1L[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
+	pp->adaptors.a1L[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
     }
   
   if (pp->rawAdaptor1R) /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
     {
       int i, iMax = strlen (pp->rawAdaptor1R) ;
+      isSet = TRUE ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor2L[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
+	pp->adaptors.a2L[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
     }
   
   if (pp->rawAdaptor1R)  /* we expect this adaptor to be the top strand exit adaptor of read 1, as exported by our adaptor profile */
     {
       int i, iMax = strlen (pp->rawAdaptor1R) ;
+      isSet = TRUE ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor1R[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
+	pp->adaptors.a1R[i] = dnaEncodeChar[(int)pp->rawAdaptor1R[i]] ;
     }
   
   if (pp->rawAdaptor2R)  /* we expect this adaptor to be the minus strand exit adaptor of read 2, as exported by our adaptor profile */
     {
       int i, iMax = strlen (pp->rawAdaptor2R) ;
+      isSet = TRUE ;
       for (i = 0 ; i < iMax && i < 30; i++)
-	pp->adaptor2R[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
+	pp->adaptors.a2R[i] = dnaEncodeChar[(int)pp->rawAdaptor2R[i]] ;
     }
   
+  if (isSet)
+    saSetGetAdaptors (2, &(pp->adaptors), -1) ;  /* run=0: valid for all runs */
   
   if (pp->inFileName)
     {   /* Split the individual file names, they are coma separated 
@@ -401,6 +408,52 @@ Array saConfigGetRuns (PP *pp, Array runStats)
   return rcs ;
 } /* saConfigGetRuns */
 
+/*************************************************************************************/
+/*************************************************************************************/
+/**
+ * Thread-safe accessor for two fixed-length adaptor sequences (31 chars + null).
+ * If set == 2, stores copies of aa->adaptor1 and aa->adaptor2. Non re-writable
+ * If set == TRUE, stores copies of aa->adaptor1 and aa->adaptor2.
+ * If set == FALSE, copies stored values back to *aa (if previously set).
+ * Returns TRUE if adaptors have been set at least once, FALSE otherwise.
+ */
+
+static pthread_mutex_t adaptor_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+BOOL saSetGetAdaptors (int set, ADAPTORS *aa, int run)
+{
+  static ADAPTORS a = {{0}};
+  static int isSet = 0 ;
+  
+  pthread_mutex_lock(&adaptor_mutex);
+  
+  switch (set)
+    {
+    case 0: /* get */
+      if (isSet)
+	memcpy (aa, &a, sizeof (ADAPTORS)) ;
+      else
+	memset (&a, 0, sizeof (ADAPTORS)) ;
+      break ;
+    case 2:
+      if (isSet > 1)
+	messcrash ("Bad double call set=%d to saSetGetAdaptors", set) ;
+      /* fall through */
+    case 1:  
+      if (isSet < 2)  /* non re-writable */
+	memcpy (&a, aa, sizeof (ADAPTORS)) ;
+      isSet = set ;
+      break ;
+    default:
+      messcrash ("Bad call set=%d to saSetGetAdaptors", set) ;
+    }
+
+  pthread_mutex_unlock (&adaptor_mutex) ;
+  return isSet ;
+} /* saSetGetAdaptors */
+
+/*************************************************************************************/
+/*************************************************************************************/
 /*********************************************************************/
 /*********************************************************************/
 

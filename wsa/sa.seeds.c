@@ -87,8 +87,8 @@ static void showCws (const PP *pp, BB *bb, BigArray cws)
 
 static int knownIntronOrder (const void *va, const void *vb)
 {
-  const EXONINTRON *up = va ;
-  const EXONINTRON *vp = vb ;
+  const GBX *up = va ;
+  const GBX *vp = vb ;
   int n ;
 
   /* chrom order */
@@ -121,14 +121,14 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
   const unsigned int mask26 = (1L << 26) - 1 ;
   BigArray aa = pp->knownIntrons ;
   long int ii, iMax = bigArrayMax (aa) ;
-  EXONINTRON *restrict upx = 0 ;
+  GBX *restrict upx = 0 ;
   int chrom = 0, a1, a2, da, v1, v2, dv, w1, w2, dw ;
   Array dna = 0 ;
   BOOL isIntronDown ;
   
   bigArraySort (aa, knownIntronOrder) ;
   
-  upx = iMax ? bigArrp (aa, 0, EXONINTRON) : 0 ;
+  upx = iMax ? bigArrp (aa, 0, GBX) : 0 ;
   for (ii = 0 ; ii < iMax ; ii++, upx++)
     {
       long unsigned int w, wr ;
@@ -151,7 +151,7 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
       v1 = v2 = 0 ; dv = 16 ;
       if (ii > 0)
 	{
-	  EXONINTRON *restrict vpx = upx - 1 ;
+	  GBX *restrict vpx = upx - 1 ;
 	  if (vpx->chrom == upx->chrom)
 	    {
 	      if (vpx->a1 < vpx->a2 && vpx->a2 > a1 - 17 && vpx->a2 < a1)
@@ -166,7 +166,7 @@ int saCodeIntronSeeds (PP *pp, BB *bbG)
       w1 = w2 = 0 ; dw = 16 ;
       if (ii < iMax - 1)
 	{
-	  EXONINTRON *restrict wpx = upx + 1 ;
+	  GBX *restrict wpx = upx + 1 ;
 	  if (wpx->chrom == upx->chrom)
 	    {
 	      if (wpx->a1 < wpx->a2 && wpx->a1 < a2 + 17 && wpx->a1 > a2)
@@ -352,9 +352,6 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   const long unsigned int maskN = NN - 1 ;
   const long unsigned int mask32 = 0xffffffff ; /* 4 bytes integer */
   const long unsigned int maskSeedLn = (1L << 2*wLen) - 1 ;
-  long int icwx = 0, icwxMax = pp->geneBoxes ? bigArrayMax (pp->geneBoxes) : 0 ;
-  EXONINTRON *cwX = pp->geneBoxes && bigArrayMax (pp->geneBoxes) ? bigArrp (pp->geneBoxes, 0, EXONINTRON) : 0 ;
-  const int seedLength = pp->seedLength ;
   int minEntropy = pp->minEntropy ;
   int minLength = pp->minLength ;
   
@@ -483,14 +480,6 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
 	      cw->pos = jj - dx + 1 ;  /* bio coordinates of the first base of the seed */
 	      cw->intron = 0 ;
 	      nSeeds++ ;
-	      if (icwxMax)
-		{
-		  for ( ; icwx < icwxMax && cwX->chrom < ia ; icwx++, cwX++) ;
-		  for ( ; icwx < icwxMax && cwX->chrom == ia && cwX->a2 < cw->pos + seedLength - 1 ; icwx++, cwX++) ;
-		  ;
-		  if (cwX->chrom == ia && cwX->a2 >= cw->pos + seedLength - 1 && cwX->a1 <= cw->pos)
-		    cw->intron = 0x1 << 30 ;		  
-		}
 	      cStep = dx ;
 	      if (0)
 		fprintf (stderr, "codeWordsDo p=%d k=%d pos=%d seed=%d\n", p, k, cw->pos,cw->seed) ;

@@ -1872,6 +1872,7 @@ int main (int argc, const char *argv[])
   /******************** launch the multiprocessing ***************************************/
 
   wego_max_threads (maxThreads) ;
+  if (0)   channelDepth = 10 ;
 
   if (1)
     {

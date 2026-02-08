@@ -100,7 +100,7 @@ static int confirmedIntronsCountSites (const PP *pp, int run)
 {
   int nn = 0, ii, iMax = arrayMax (pp->confirmedIntrons) ;
   INTRON *zp = iMax ? arrp (pp->confirmedIntrons, 0, INTRON) : 0 ;
-
+  
   if (run)
     {
       for (ii = 0 ; ii < iMax ; ii++, zp++)
@@ -177,6 +177,7 @@ static int confirmedPolyAsCountSites (const PP *pp, int run)
   return nn ;
 } /* confirmedPolyAsCountSites */
 
+/*************************************************************************************/
 /*************************************************************************************/
 
 static void s2gSamStatsExports (const PP *pp, Array runStats)
@@ -410,6 +411,83 @@ static void saLetterProfileExport (const PP *pp, int run, RunSTAT *up)
 } /* saLetterProfileExport */
  
 /**************************************************************/
+
+static BOOL readOneAdaptor (char adaptor[32], RunSTAT *up, BOOL isLeft, int pass, int *bestp, BOOL coded)
+{
+  int best = 0, best2, i, j, di, nn, nL = 0, good = 0 ;
+  
+  long int *aa = isLeft ? (pass ? up->overhangL2 : up->overhangL1) : (pass ? up->overhangR2 : up->overhangR1) ;
+  /* find the best first letter */
+  for (best = i = j = nn = 0 ; i < 4 ; i++)
+    {
+      int n = aa[150 * i + i] ;
+      if (n > nn) { best = i ; nn = n ; }
+    }
+  /* cumulate in best the shifted histogram of the second letter of the best case */
+  best2 = best ;
+  di = 0 ;
+  while (best2 == best && ++di < 6)
+    {
+      for (best2 = j = nn = 0 ; j < 5 ; j++)
+	{
+	  int n = aa[150 * best + 5 *di + j] ;
+	  if (n > nn) { best2 = j ; nn = n ; }
+	}
+    }
+  if (best2 != best)
+    {
+      for (i = di ; i < 30 ; i++)
+	for (j = 0 ; j < 5 ; j++)
+	  aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
+      for (i = 0 ; i < di ; i++)
+	    aa[150 * best + best + 5 *i] += aa[150 * best2 + best2] ;
+    }
+  if (1)
+    {
+      char *atgc = "ATGC" ;
+      char ATGC[4] = {A_, T_, G_, C_} ;
+      memset (adaptor, 'n', 30) ; adaptor[30] = 0 ;
+      
+      for (i = 0 ; i < 30 ; i++)
+	{
+	  int i5 = best * 150 + i * 5 ;
+	  for (j = 0, nn = 0 ; j < 5 ; j++)
+	    nn += aa[i5 + j] ;
+	  for (j = 0 ; j < 4 ; j++)
+	    if (100 * aa[i5 + j] > 60 * nn && nn > 1000)
+	      {
+		if (j > 0) good++ ;
+		nL += nn ;
+		adaptor[i] = coded ? ATGC[j] : atgc[j] ;
+	      }
+	}
+    }
+  adaptor[31] = 0 ;
+  if (bestp) *bestp = best ;
+  if (nL < 20000)
+    { memset (adaptor, 0, 30) ; good = 0 ; }
+  return good >= 8 ? TRUE : FALSE ;
+}
+
+/**************************************************************/
+/* read the adaptors for the frequency histogram of the overhangs */
+BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up)
+{
+  BOOL ok = FALSE ;
+  
+  memset (adaptors, 0, sizeof(ADAPTORS)) ;
+  ok |= readOneAdaptor (adaptors->a1L, up, TRUE, 0, 0, TRUE) ;
+  ok |= readOneAdaptor (adaptors->a1R, up, FALSE, 0, 0, TRUE) ;
+  if (up->nPairs)
+    {
+      ok |= readOneAdaptor (adaptors->a2L, up, TRUE, 1, 0, TRUE) ;
+      ok |= readOneAdaptor (adaptors->a2R, up, FALSE, 1, 0, TRUE) ;
+    }
+  return ok ;
+} /* saReadAdaptors */
+
+/**************************************************************/
+
 /* read1 thne read2 */
 static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
 {
@@ -420,9 +498,10 @@ static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
   long int *aa = 0 ;
   int i, j ;
   ACEOUT ao = aceOutCreate (pp->outFileName, title, 0, h) ;
-  int best, best2 ;
+  int best = 0 ;
   int pass, passMax = up->nPairs ? 2 : 1 ; 
   char *suffix ;
+  char adaptor[32] = {0} ;
   
   for (pass = 0 ; pass < passMax ; pass++)
     {
@@ -431,68 +510,29 @@ static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
       aa = isLeft ? (pass ? up->overhangL2 : up->overhangL1) : (pass ? up->overhangR2 : up->overhangR1) ;
       aceOutDate (ao, "##", hprintf (h, "Run %s reverse complement of the %d prime unaligned overhang  profile limited to 32 letters", runName, isLeft ? 5 : 3)) ;
 
-      /* find the best first letter */
-      for (best = i = j = nn = 0 ; i < 4 ; i++)
+      best = 0 ;
+      readOneAdaptor (adaptor, up, isLeft, pass, &best, FALSE) ;
+      aceOutf (ao, "## Adaptor %s\n", adaptor) ;
+      
+      aceOutf (ao, "# Run.f\tPosition\tiiiiiifffff\tAny\tA\tT\tG\tC\tN\t%%A\t%%T\t%%G\t%%C\t%%N\n") ;
+      for (i = 0 ; i < 30 ; i++)
 	{
-	  int n = aa[150 * i + i] ;
-	  if (n > nn) { best = i ; nn = n ; }
-	}
-      /* cumulate in best the shifted histogram of the second letter of the best case */
-      best2 = best ;
-      int di = 0 ;
-      while (best2 == best && ++di < 6)
-	{
-	  for (best2 = j = nn = 0 ; j < 5 ; j++)
-	    {
-	      int n = aa[150 * best + 5 *di + j] ;
-	      if (n > nn) { best2 = j ; nn = n ; }
-	    }
-	}
-      if (best2 != best)
-	{
-	  for (i = di ; i < 30 ; i++)
-	    for (j = 0 ; j < 5 ; j++)
-	      aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
-	  for (i = 0 ; i < di ; i++)
-	    aa[150 * best + best + 5 *i] += aa[150 * best2 + best2] ;
-	}
-      if (1)
-	{
-	  char adaptor [31] ;
-	  char *atgc = "ATGC" ;
-	  memset (adaptor, 'n', 31) ; adaptor[30] = 0 ;
+	  int i5 = best * 150 + i * 5 ;
+	  for (j = 0, nn = 0 ; j < 5 ; j++)
+	    nn += aa[i5 + j] ;
+	  if (nn >= 100)
+	    aceOutf (ao, "%s%s\t%d\tiiiiiifffff\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\n"
+		     , runName, suffix
+		     , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
+		     , 100.0 * aa[i5 + 0]/nn, 100.0 * aa[i5 + 1]/nn, 100.0 * aa[i5 + 2]/nn, 100.0 * aa[i5 + 3]/nn, 100.0 * aa[i5 + 4]/nn
+			 ) ;
+	  else
+	    aceOutf (ao, "%s%s\t%d\tiiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n"
+		     , runName, suffix
+		     , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
+		     ) ;
 	  
-	  for (i = 0 ; i < 30 ; i++)
-	    {
-	      int i5 = best * 150 + i * 5 ;
-	      for (j = 0, nn = 0 ; j < 5 ; j++)
-		nn += aa[i5 + j] ;
-	      for (j = 0 ; j < 4 ; j++)
-		if (100 * aa[i5 + j] > 60 * nn)
-		  adaptor[i] = atgc[j] ;
 	    }
-	  aceOutf (ao, "## Adaptor %s\n", adaptor) ;
-
-	  aceOutf (ao, "# Run.f\tPosition\tiiiiiifffff\tAny\tA\tT\tG\tC\tN\t%%A\t%%T\t%%G\t%%C\t%%N\n") ;
-	  for (i = 0 ; i < 30 ; i++)
-	    {
-	      int i5 = best * 150 + i * 5 ;
-	      for (j = 0, nn = 0 ; j < 5 ; j++)
-		nn += aa[i5 + j] ;
-	      if (nn >= 100)
-		aceOutf (ao, "%s%s\t%d\tiiiiiifffff\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\n"
-			 , runName, suffix
-			 , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
-			 , 100.0 * aa[i5 + 0]/nn, 100.0 * aa[i5 + 1]/nn, 100.0 * aa[i5 + 2]/nn, 100.0 * aa[i5 + 3]/nn, 100.0 * aa[i5 + 4]/nn
-			 ) ;
-	      else
-		aceOutf (ao, "%s%s\t%d\tiiiiii\t%ld\t%ld\t%ld\t%ld\t%ld\t%ld\n"
-			 , runName, suffix
-			 , i + 1, nn, aa[i5 + 0], aa[i5 + 1], aa[i5 + 2], aa[i5 + 3], aa[i5 + 4]
-			 ) ;
-	      
-	    }
-	}
     }
   
   aceOutf (ao, "\n\n") ;
@@ -598,29 +638,40 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   ) ;
 
 
-	  if (up->nClippedAdaptor1L)
-	    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\n"
-		     , runNam
-		     , up->nClippedAdaptor1L
-		     ) ;
-
-	  if (up->nClippedAdaptor1R)
-	    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\n"
-		     , runNam
-		     , up->nClippedAdaptor1R
-		     ) ;
-
-	  if (up->nClippedAdaptor2L)
-	    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\n"
-		     , runNam
-		     , up->nClippedAdaptor2L
-		     ) ;
-
-	  if (up->nClippedAdaptor2R)
-	    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\n"
-		     , runNam
-		     , up->nClippedAdaptor2R
-		     ) ;
+	  if (1)
+	    {
+	      ADAPTORS adaptors = {{0}} ;
+	      if (saSetGetAdaptors (0, &adaptors, run))
+		{
+		  if (up->nClippedAdaptor1L)
+		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\t%s\t%s\n"
+			     , runNam
+			     , up->nClippedAdaptor1L
+			     , adaptors.a1L
+			     ) ;
+		  
+		  if (up->nClippedAdaptor1R)
+		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\t%s\n"
+			     , runNam
+			     , up->nClippedAdaptor1R
+			     , adaptors.a1R
+			     ) ;
+		  
+		  if (up->nClippedAdaptor2L)
+		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\t%s\n"
+			     , runNam
+			     , up->nClippedAdaptor2L
+			     , adaptors.a2L
+			     ) ;
+		  
+		  if (up->nClippedAdaptor2R)
+		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\t%s\n"
+			     , runNam
+			     , up->nClippedAdaptor2R
+			     , adaptors.a2R
+			     ) ;
+		}
+	    }
 
 	  for (int i = 0 ; i < SLMAX ; i++)
 	    if (up->nClippedSls[i])

@@ -307,7 +307,7 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 /**************************************************************/
 /**************************************************************/
 
-static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
+static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, ADAPTORS *adaptors)
 {
   int x1 = up->x1 ;
   int leftClip = up->leftClip ;  /* already initialized to jump5 */
@@ -446,7 +446,7 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 	    }
 	  
 	  /* try to recognize the known adaptor */
-	  const char *adaptor = (up->read & 0x1 ? pp->adaptor2L : pp->adaptor1L) ;
+	  const char *adaptor = (up->read & 0x1 ? adaptors->a2L : adaptors->a1L) ;
 	  if (adaptor[0])
 	    {
 	      int iAmax = 1 ; /* arrayMax (aa) ; */
@@ -510,7 +510,7 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 
 /**************************************************************/
 
-static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR)
+static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, ADAPTORS *adaptors)
 {
   int x2 = up->x2 ;
   int ln = arrayMax (dna) ; /* length to align */
@@ -651,7 +651,7 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 	    }
 
 	  /* try to recognize the known adaptor */
-	  const char *adaptor = (up->read & 0x1 ? pp->adaptor2R : pp->adaptor1R) ;
+	  const char *adaptor = (up->read & 0x1 ? adaptors->a2R : adaptors->a1R) ;
 	  if (adaptor[0])
 	    {
 	      int iAmax = 1 ;
@@ -1980,7 +1980,7 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
 
 /**************************************************************/
 /* Establish chain scores, select best */
-static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array aa, int read, Array bestAp)
+static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array aa, int read, Array bestAp, ADAPTORS *adaptors)
   
 {
   ALIGN *ap, *vp ;
@@ -2017,7 +2017,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
 		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
 		}
-	      ap->leftClip = alignFormatLeftOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
+	      ap->leftClip = alignFormatLeftOverhang (pp, bb, ap, dna, dnaG, dnaGR, adaptors) ;
 	    }
 	  if (ap->x2 == ap->chainX2 && ap->x2 < arrayMax (dna))	
 	    {
@@ -2027,7 +2027,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  dnaG = arr (pp->bbG.dnas, chromA >> 1, Array) ;
 		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
 		}
-	      ap->rightClip = alignFormatRightOverhang (pp, bb, ap, dna, dnaG, dnaGR) ;
+	      ap->rightClip = alignFormatRightOverhang (pp, bb, ap, dna, dnaG, dnaGR, adaptors) ;
 	    }
 	}
 
@@ -2364,53 +2364,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 
 
       /* register the overHangs */
-#ifdef JUNK   /* done in formatRightOverhangs */
-
-cat tutu[2]/double_introns.tsf | cut -f 1 | sort -u | wc
-  \rm -rf tutu2 ; bin/sortalign -x Aligners/011_SortAlignG5R5/IDX.GRCh38.18.31 --maxTargetRepeats 31 -i Fasta/iRefSeq38/iRefSeq38.reverse.fasta.gz --align --method 011_SortAlignG5R5 --run iRefSeq38 -o tutu2 --step 5 --nRawReads 175183 --nRawBases 683610123
- \rm -rf tutu1 ; bin/sortalign -x Aligners/011_SortAlignG5R5/IDX.GRCh38.18.31 --maxTargetRepeats 31 -i Fasta/iRefSeq38/iRefSeq38.fasta.gz --align --method 011_SortAlignG5R5 --run iRefSeq38 -o tutu1 --step 5 --nRawReads 175183 --nRawBases 683610123
-
-
-
-      
-      
-      /* register the polyA */
-      ap = arrp (aa, 0, ALIGN) ;
-      /*   bitSet (bb->isAligned, ap->read) ; */
-      for (ii = 0 ; ii < iMax ; ii++, ap++)
-	if (read == ap->read)
-	  {
-	    dna = ap->read & 0x1 ? dna2 : dna1 ;
-	    for (jj = ii + 1, bp = ap + 1 ; jj < iMax && bp->read == read && bp->chain == ap->chain && bp->x1 == ap->x2 + 1 ; jj++, bp++)
-	      ;
-	                   /* ii ap is first exon of this chain in x orientation */
-	    bp-- ; jj-- ;  /* jj bp is last  exon of this chain in x orientation */
-	    
-	    if (bp->a1 < bp->a2) /* plus orientation, look for terminal polyA */
-	      {
-		int nA = 0 ;
-		char *cr = dna && bp->x2 < arrayMax (dna) ? arrp (dna, bp->x2, char) : 0 ;
-		for (int i = bp->x2 ; i < arrayMax (dna) && i < 8 ; i++, cr++)
-		  if (*cr == A_) nA++ ;
-		if (nA >= 7)
-		  {
-		    bb->runStat.polyA++ ;
-		  }
-	      }
-	    else /* look for intitial polyT */
-	      {
-		int nT = 0 ;
-		char *cr = dna && ap->x1 > 1 ? arrp (dna, ap->x1 - 2, char) : 0 ;
-		for (int i = ap->x1 - 2 ; i >= 0 && i >= ap->x1 - 9 ; i--, cr--)
-		  if (*cr == T_) nT++ ;
-		if (nT >= 7)
-		  {
-		    bb->runStat.polyT++ ;
-		  }
-	      }
-	    ap = bp ; ii = jj ; /* skip to next chain */
-	  }
-#endif
+      /* done in formatRightOverhangs */
     }
   return ;
   
@@ -2602,7 +2556,7 @@ static int pairOrder (const void *va, const void *vb)
 /**************************************************************/
 static void alignDoOnePair (const PP *pp, BB *bb
 			    , BigArray aaaa, BigArray hits
-			    , Array aa, Array err)
+			    , Array aa, Array err, ADAPTORS *adaptors)
 {
   AC_HANDLE h = ac_new_handle () ;
   HIT *hit ;
@@ -2767,8 +2721,8 @@ static void alignDoOnePair (const PP *pp, BB *bb
     {
       arraySort (aaa, saAlignOrder) ;
       arrayCompress (aaa) ;
-      alignDoRegisterOnePair (pp, bb, aaaa, aaa, read1, bestAp1) ;
-      if (bestAp2) alignDoRegisterOnePair (pp, bb, aaaa, aaa, read2, bestAp2) ;
+      alignDoRegisterOnePair (pp, bb, aaaa, aaa, read1, bestAp1, adaptors) ;
+      if (bestAp2) alignDoRegisterOnePair (pp, bb, aaaa, aaa, read2, bestAp2, adaptors) ;
     }
   ac_free (h) ;
 } /* alignDoOnePair */
@@ -2794,7 +2748,14 @@ void saAlignDo (const PP *pp, BB *bb)
   Array countChroms = arrayHandleCreate (256, COUNTCHROM, h) ;
   int n = NTARGETREPEATBITS ;
   int mask = (1 << n) - 1 ;
-  
+  ADAPTORS adaptors = {{0}} ;
+
+  while (! saSetGetAdaptors (FALSE, &adaptors, bb->run))
+    {
+      if (bb->lane <= 1) break ; 
+      sleep (1) ;
+    }
+
   bb->confirmedPolyAs = arrayHandleCreate (64000, POLYA, bb->h) ;
   bb->confirmedIntrons = arrayHandleCreate (64000, INTRON, bb->h) ;
   bb->doubleIntrons = arrayHandleCreate (64000, DOUBLEINTRON, bb->h) ;
@@ -2936,15 +2897,21 @@ void saAlignDo (const PP *pp, BB *bb)
 		  bb->gpu += saSort (hits2, 2) ; /* hitReadOrder */
 		  if (0)  showCountChroms (countChroms) ;
 
-		  alignDoOnePair (pp, bb, aaa, hits2, aa, err) ;
+		  alignDoOnePair (pp, bb, aaa, hits2, aa, err, &adaptors) ;
 		}
 	    }
 	}
       hit += nn - 1 ; ii += nn - 1 ;
     }
-
+  
   bb->aligns = bigArrayHandleCopy (aaa, bb->h) ; /* resize */
-
+  if (bb->lane <= 5)
+    {
+      if (! saReadAdaptors (&adaptors, &(bb->runStat)))
+	memset (&adaptors, 0, sizeof (ADAPTORS)) ;
+      saSetGetAdaptors (TRUE, &adaptors, bb->run) ;      
+    }
+  
   ac_free (h) ;
   return ;
 } /* saAlignDo */
