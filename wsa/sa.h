@@ -66,7 +66,6 @@ typedef struct targetClassStruct {
 typedef struct runClassStruct {
   int run ;   /* index in pp->runDict */
   BOOL pairedEnd ;
-  BOOL RNA ; /* 1: is RNA, 0 : is DNA (no introns) */
   DnaFormat format ;
   int jump5r1, jump5r2 ; /* jump bases at the 5prime end of read1 and read2 */
   const char *fileName1 ;
@@ -77,10 +76,10 @@ typedef struct runClassStruct {
 } RC ;
 
 typedef struct aStruct {
-    char a1L[32];
-    char a1R[32];
-    char a2L[32];
-    char a2R[32];
+  char a1L[32];
+  char a1R[32];
+  char a2L[32];
+  char a2R[32];
 } ADAPTORS ;
 
 
@@ -116,6 +115,8 @@ typedef struct runStatStruct {
   long int nSupportedIntrons ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;
+  int gt_ag_Support ;
+  int ct_ac_Support ;
   float intronStranding ;
   long int wiggleCumul ; /* in million bases */
   long int wiggleLCumul ; /* in million bases */
@@ -179,6 +180,8 @@ typedef struct bStruct {
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL isGenome ;
+  int isRna ; /* 2: user defined RNA, -2: user defined DNA, 1: autodefined RNA, -1 autodefined DNA */
+
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
   long int nPolyASupport ;
   long int nIntronSupportPlus ;
@@ -267,6 +270,7 @@ typedef struct pStruct {
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
   BOOL sam, exportSamSequence, exportSamQuality ;
   BOOL strand, antiStrand ;
+  BOOL isDna, isRna ;
   int bonus[256] ;
   DICT *runDict ;
   DICT *targetClassDict ;
@@ -432,7 +436,12 @@ void saConfigIsIndexAccessible (PP *pp) ;
 void saConfigIsOutDirWritable (PP *pp) ;
 int saConfigCheckTargetIndex (PP *pp) ; 
 Array saConfigGetRuns (PP *pp, Array runStats) ;    
-BOOL saSetGetAdaptors (int set, ADAPTORS *aa, int run) ;  /* 0: get, 1: set, 2: hard set non rewritable */
+/* saSetGetAdaptors:
+ * set=0: get, 1: set, 2: hard set non rewritable
+ * isRna: >=0: favor introns, search polyAs, export gene expression
+ *        <0: none of the above, disfavor deletions.
+ */
+BOOL saSetGetAdaptors (int set, int *isRnap, ADAPTORS *aa, int run) ;
 
 /* sa.gff.c */
 long int saGffParser (PP *pp, TC *tc) ;

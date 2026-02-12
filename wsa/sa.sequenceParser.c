@@ -15,7 +15,7 @@
 
 #define NAMMAX 1024
 
-static atomic_int lane = 0 ;
+/* static atomic_int lane = 0 ; */
 
 /**************************************************************/
 /**************************************************************/
@@ -570,7 +570,10 @@ static void fastaSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
   saCpuStatRegister ("2.FastaSequenceParser", pp->agent, bb->cpuStats, t1, t2, nBytes) ;
 
   if (debug)
+    {
+     int lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 0) ;
      printf ("--- %s: Stop FastaSequenceParser %d blocks %ld bytes file %s\n", timeBufShowNow (tBuf), lane, nBytes, fileName1) ;
+    }
   
   return ;
 } /* fastaSequenceParser */
@@ -705,7 +708,10 @@ static void sraSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenom
   saCpuStatRegister ("2.sraSequenceParser", pp->agent, bb->cpuStats, t1, t2, nBytes) ;
 
   if (debug)
-     printf ("--- %s: Stop sraSequenceParser %d blocks %ld bytes in %s\n", timeBufShowNow (tBuf), lane, nBytes, sraID) ;
+    {
+     int lane = atomic_fetch_add (arrp (pp->runLanes, bb->run, atomic_int), 0) ;
+     printf ("--- %s: Stop FastaSequenceParser %d blocks %ld bytes file %s\n", timeBufShowNow (tBuf), lane, nBytes, fNam) ;
+    }
   
   return ;
 } /* sraSequenceParser */

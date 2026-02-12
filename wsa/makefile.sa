@@ -133,8 +133,8 @@ libsraread.a:
 	$(MAKE) -C ../wsra
 	ln -s ../wsra/libsraread.a .
 sortalign: $(SA_OBJS) libsraread.a $(GPU_OBJS)
-	$(LINKER) -o $@  $(GPU_OBJS) $(SA_OBJS) $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread -lz -ldl 
-
+	$(LINKER) -o $@  $(GPU_OBJS) $(SA_OBJS) $(LINK_ACS) $(SRAINC) $(LIBS) libsraread.a $(SRALIBS)  libfree.a libtsfree.a libchannels.a libwego.a -lpthread  -ldl -lz -lbz2 -llzma 
+# -lhts for bam
 ###########################################################
 ########### end of     acedb makefile.sa  ################
 ###########################################################

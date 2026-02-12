@@ -1002,6 +1002,8 @@ if (! -e AliArchived) then
   echo "-- Construct the list of jobs, ordered by decreasing size"
 
   if (-e MetaDB/$MAGIC/RunLaneCount) \rm MetaDB/$MAGIC/RunLaneCount
+  cat MetaDB/$MAGIC/Run2Srr.txt |  gawk -F '\t' '{printf ("%s\t1\n", $1);}' > MetaDB/$MAGIC/RunLaneCount
+  
   foreach run (`cat MetaDB/$MAGIC/RunList`)
     if (-e Fastc/$run/f2.1.fastc.gz && ! -e Fastc/$run/LaneList) then
       ls Fastc/$run/*.fastc.gz | sed -e 's/\.fastc\.gz//' -e 's/Fastc\///' >  Fastc/$run/LaneList
@@ -2379,7 +2381,7 @@ if (! -d TARGET/IDX/IDX.$species) then
   if (-e TARGET/Targets/$species.SpikeIn.fasta.gz) echo "E\tTARGET/Targets/$species.SpikeIn.fasta.gz" >> TARGET/IDX/tConfig
   if (-e TARGET/Targets/$species.magic.fasta.gzZZZ) echo "T\tTARGET/Targets/$species.magic.fasta.gz" >> TARGET/IDX/tConfig
   if (-e TARGET/Targets/$species.DNASpikeIn.fasta.gz) echo "E\tTARGET/Targets/$species.DNASpikeIn.fasta.gz" >> TARGET/IDX/tConfig
-  if (-e TARGET/GTF/$species.magic.gtf.gz) echo "I\tTARGET/GTF/$species.magic.gtf.gz" >> TARGET/IDX/tConfig
+  if (-e TARGET/GFF/$species.RefSeq.gtf.gz) echo "I\tTARGET/GFF/$species.RefSeq.gtf.gz" >> TARGET/IDX/tConfig
 
   $sortalign --createIndex TARGET/IDX/IDX.$species -T TARGET/IDX/tConfig
 endif
@@ -2392,6 +2394,10 @@ foreach run (`cat MetaDB/$MAGIC/RunList`)
   mkdir tmp/SA/$run
   if (-e Fastc/$run/LaneList && ! -e tmp/SA/$run/iConfig) then
     cat Fastc/$run/LaneList  | gawk '{printf("Fastc/%s.fastc.gz\t%s\tjump1=5,jump2=5\n", $1, run);}' run=$run > tmp/SA/$run/iConfig
+  endif
+  if (! -e Fastc/$run/LaneList && ! -e tmp/SA/$run/iConfig) then
+    set srr=`cat MetaDB/$MAGIC/Run2Srr.txt | gawk -F '\t' '{if($1==run)print $2;}' run=$run`
+    echo "$srr\t$run" >>  tmp/SA/$run/iConfig
   endif
   if (-e tmp/SA/$run/iConfig) then
     date > tmp/SA/$run/salign.out

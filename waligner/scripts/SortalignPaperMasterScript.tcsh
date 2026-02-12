@@ -86,8 +86,12 @@ setenv SV     v63.81.18M.errCost8.feb4      # no wiggle, no sam , fix extendHits
 setenv SVlast v63.81.18M.errCost8.feb4
 setenv SV     v64.31.18M.errCost4.feb6      # no wiggle, no sam , fix extendHits bug loosing errors in cdnaalign :  max81
 setenv SVlast v64.31.18M.errCost4.feb6
-setenv SV     v65.31.18M.Wiggle.errCost4.feb7      # wiggle, no sam , new index for gene expressions
+#setenv SV     v65.31.18M.Wiggle.errCost4.feb7      # wiggle, no sam , new index for gene expressions
 setenv SVlast v65.31.18M.Wiggle.errCost4.feb7
+setenv SV     v66.31.18M.NoWiggle.errCost4.feb8    # adaptor clipping no wiggle, no sam , new index for gene expressions
+setenv SVlast v66.31.18M.NoWiggle.errCost4.feb8
+setenv SV     v67.81.18M.Wiggle.errCost4.feb9    # adaptor clipping no wiggle, DNA/RNA automatic, no sam , new index for gene expressions
+setenv SVlast v67.81.18M.Wiggle.errCost4.feb9
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -105,8 +109,8 @@ setenv EXPORTWIGGLES 1
 setenv EXPORTWIGGLEENDS 0
 setenv seedLength 16
 setenv seedLength 18
-setenv maxTargetRepeats 81
 setenv maxTargetRepeats 31
+setenv maxTargetRepeats 81
 
 
 ##       SortalignPaperMasterScript.tcsh
@@ -147,7 +151,7 @@ setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
 
 
-setenv allMethods "011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads 54_Minimap2_32threads"
+setenv allMethods "012_SortAlignG3R3 013_SortAlignG3R1 014_SortAlignG3R3.g 015_SortAlignG3R1.g 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads 54_Minimap2_32threads"
 
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
@@ -177,7 +181,7 @@ setenv PFAL_r3_runs "PFALt1r3 PFALt2r3 PFALt3r3"
 setenv PFAL_runs "$PFAL_r1_runs $PFAL_r2_runs $PFAL_r3_runs"
 
 
-setenv allRuns "iRefSeq38 iRefSeq ChipSeq1 ChipSeq2 B_ROCR2_Illumina_DNA RNA_PolyA_A_1_2Gb RNA_PolyA_B_1_2Gb A_WTS_PacBio A_ROCR3_PacBio-F3 B_ROCR3_PacBio-F3 A_ROCR3_Nanopore-F3 B_ROCR3_Nanopore-F3 Roche"
+setenv allRuns "iRefSeq38 iRefSeq38.g iRefSeqT2T iRefSeqT2T.g ChipSeq1 ChipSeq2 B_ROCR2_Illumina_DNA RNA_PolyA_A_1_2Gb RNA_PolyA_B_1_2Gb A_WTS_PacBio A_ROCR3_PacBio-F3 B_ROCR3_PacBio-F3 A_ROCR3_Nanopore-F3 B_ROCR3_Nanopore-F3 Roche"
 
 setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_BAB_Baboon FrontalCortex_CMC_Macaque TemporalLobe_PTM_Macaque BrainRight_MST_Marmoset TemporalLobe_MLM_MouseLemur TemporalLobe_SQM_SquirrelMonkey"
 
@@ -1854,7 +1858,7 @@ set iMethods="011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAS
 set iMethods="$methods"
 
 echo "Creating the INTRON_DB databases"
-foreach target (T2T GRCh38)
+foreach target (T2T GRCh38 HG19)
   set IDB=$target.INTRON_DB
   if (! -d $IDB) then
     mkdir $IDB
@@ -1869,12 +1873,13 @@ foreach target (T2T GRCh38)
      pushd $target.GFF
        ln -s ../Reference_genome/$target.genome.fasta.gz
        ln -s ../Reference_genome/$target.mito.fasta.gz
-       ln -s ../Reference_genome/$target.gtf.gz
-       dna2dna -gtf $target.gtf.gz -gtfRemap KT_RefSeq  -o gtf.$target
-       # construct the intron file needed for --createIndex
-       cat gtf.$target.introns | cut -f 6,7,8 | sort -u > g.introns.gz
-       # construct the intron.ace file needed in INTRON_DB
-       cat gtf.$target.introns | gawk -F '\t' '{g=$2;m=$3;c=$4;x1=$5;x2=$6;c=$6;i1=$7;i2=$8;printf("Intron %s__%d_%d\nIntMap %s %d %d\nGene %s\nIn_mRNA %s %d %d\n\n",c,i1,i2,c,i1,i2,g,m,x1,x2);}' > mrna2intron.ace
+       if (-e ../Reference_genome/$target.gtf.gz && ! -e ../Reference_genome/$target.mrna2intron.ace) then
+         ln -s ../Reference_genome/$target.gtf.gz
+         dna2dna -gtf $target.gtf.gz -gtfRemap KT_RefSeq  -o gtf.$target
+         touch 
+         # construct the intron.ace file needed in INTRON_DB
+         cat gtf.$target.introns | gawk -F '\t' '{g=$2;m=$3;c=$4;x1=$5;x2=$6;c=$6;i1=$7;i2=$8;printf("Intron %s__%d_%d\nIntMap %s %d %d\nGene %s\nIn_mRNA %s %d %d\n\n",c,i1,i2,c,i1,i2,g,m,x1,x2);}' > ../Reference_genome/$target.mrna2intron.ace
+       endif
     popd
   endif
   if (! -e $IDB/genome.done) then
@@ -1883,7 +1888,7 @@ foreach target (T2T GRCh38)
        query find sequence DNA
        edit genomic
        pparse $target.GFF/$target.mito.fasta.gz
-       pparse $target.GFF/mrna2intron.ace
+       pparse Reference_genome/$target.mrna2intron.ace
        save
        quit
 EOF
@@ -1891,8 +1896,16 @@ EOF
   endif
 end
 
+#### mrna2intron.ace should look like
+# Intron chr1.T2T.NC_060925.1__354592_355554
+# IntMap chr1.T2T.NC_060925.1 354592 355554
+# Gene SAMD11
+# In_mRNA NM_001385640.1 1027 0
+#
+###
+
 echo "Creating the intron counts"
-foreach target (T2T GRCh38)
+foreach target (T2T GRCh38 HG19)
   set IDB=$target.INTRON_DB
   if (-e $IDB/introns.aceZ) continue
     echo '#' > $IDB/introns.tsf

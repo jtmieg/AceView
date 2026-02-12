@@ -277,6 +277,9 @@ void saRunStatsCumulate (int run, PP *pp, BB *bb)
   up->nSupportedIntrons += vp->nSupportedIntrons ;
   up->nIntronSupportPlus += vp->nIntronSupportPlus ;
   up->nIntronSupportMinus += vp->nIntronSupportMinus ;
+  up->gt_ag_Support += vp->gt_ag_Support ;
+  up->ct_ac_Support += vp->ct_ac_Support ;
+  
   for (int i = 0 ; i < 5 ; i++)
     up->ATGCN[i] += vp->ATGCN[i] ;
   for (int i = 0 ; i < 5 * LETTERMAX; i++)
@@ -641,31 +644,31 @@ void saRunStatExport (const PP *pp, Array runStats)
 	  if (1)
 	    {
 	      ADAPTORS adaptors = {{0}} ;
-	      if (saSetGetAdaptors (0, &adaptors, run))
+	      if (saSetGetAdaptors (0, 0, &adaptors, run))
 		{
 		  if (up->nClippedAdaptor1L)
-		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\t%s\t%s\n"
+		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
 			     , runNam
 			     , up->nClippedAdaptor1L
 			     , adaptors.a1L
 			     ) ;
 		  
 		  if (up->nClippedAdaptor1R)
-		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\t%s\n"
+		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
 			     , runNam
 			     , up->nClippedAdaptor1R
 			     , adaptors.a1R
 			     ) ;
 		  
 		  if (up->nClippedAdaptor2L)
-		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\ti\t%ld\t%s\n"
+		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
 			     , runNam
 			     , up->nClippedAdaptor2L
 			     , adaptors.a2L
 			     ) ;
 		  
 		  if (up->nClippedAdaptor2R)
-		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\ti\t%ld\t%s\n"
+		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
 			     , runNam
 			     , up->nClippedAdaptor2R
 			     , adaptors.a2R
@@ -675,9 +678,9 @@ void saRunStatExport (const PP *pp, Array runStats)
 
 	  for (int i = 0 ; i < SLMAX ; i++)
 	    if (up->nClippedSls[i])
-	      aceOutf (ao, "%s\tClipped_SL%d\ti\t%ld\n"
+	      aceOutf (ao, "%s\tClipped_SL%d\tit\t%ld\t%s\n"
 		       , runNam
-		       , i, up->nClippedSls[i] 
+		       , i, up->nClippedSls[i], "SL_sequence"
 		       ) ;
 	  if (up->nClippedPolyA)
 	    aceOutf (ao, "%s\tClipped_polyA\ti\t%ld\n"
@@ -717,6 +720,22 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , runNam
 		   , confirmedIntronsCountSites (pp, run)
 		   ) ;
+	  aceOutf (ao, "%s\tRaw_gt_ag_Support\ti\t%ld\n"
+		   , runNam
+		   , up->gt_ag_Support
+		   ) ;
+	  aceOutf (ao, "%s\tRaw_ct_ac_Support\ti\t%ld\n"
+		   , runNam
+		   , up->ct_ac_Support
+		   ) ;
+	  {{
+	      int isRna = 0 ;
+	      if (saSetGetAdaptors (0, &isRna, 0, run))
+		aceOutf (ao, "%s\tStrategy\ti\t%d\n"
+		   , runNam
+		   , isRna
+		   ) ;
+	    }}		
 	  aceOutf (ao, "%s\tMin_read_length\ti\t%d\n", runNam, up->minReadLength) ;
 	  aceOutf (ao, "%s\tMax_read_length\ti\t%d\n", runNam, up->maxReadLength) ;
 	  if (up->lengthDistribution)

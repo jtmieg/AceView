@@ -515,8 +515,17 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, BOOL isError, AC_HANDLE h)
 {
   char *VERSION = "0.1.1" ;
   DICT *dictG = pp->bbG.dict ;
-  
-  ACEOUT ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), pp->gzo, h) ;
+
+  /* never export sam.gz, try to pipe to sam->bam if available unless option sam is set */
+
+  ACEOUT ao = 0 ;
+
+  if (pp->sam)
+    ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), FALSE, h) ;
+#ifdef JUNK
+  else if (pp->bam) /* we need to pipe to samtools */
+    ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), FALSE, h) ;
+#endif
   if (! isError)
     {
       aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;
@@ -555,3 +564,70 @@ runX/rob1	36	1	36	36	25	36	G	-	6	G.chr15.T2T.NC_060939.1	12	1
 runX/rob1	36	1	36	36	1	7	G	-	6	G.chr15.T2T.NC_060939.1	78327069	78327075	0	0	-	-	-	-	-	chain 4 1	36
 runX/rob1	36	1	36	36	8	36	G	-	6	G.chr15.T2T.NC_060939.1	78327070	78327098	0	0	-	-	-	-	-	chain 4 1	36
 */
+
+#ifdef JUNK
+
+include <htslib/sam.h>
+#include <htslib/hts.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    // Your header (from current SAM export logic)
+    sam_hdr_t *header = sam_hdr_init();
+    // Populate header: sam_hdr_add_line(header, "HD", "VN", "1.6", NULL); etc.
+    // Or parse from string: header = sam_hdr_parse(strlen(your_hdr_str), your_hdr_str);
+
+    // Open BAM output (compressed by default)
+    htsFile *out = hts_open("output.bam", "wb");  // "wb" for BAM; "w" for SAM; "wc" for CRAM
+    if (!out) {
+        fprintf(stderr, "Failed to open BAM file\n");
+        exit(1);
+    }
+
+    // Write header
+    if (sam_hdr_write(out, header) < 0) {
+        fprintf(stderr, "Failed to write header\n");
+        exit(1);
+    }
+
+    // For each alignment (generate or parse your SAM lines)
+    bam1_t *aln = bam_init1();  // Create alignment record
+    // Example: Fill aln from your data (or parse SAM line with sam_parse1)
+    // const char *sam_line = "read1\t0\tchr1\t100\t60\t100M\t*\t0\t0\tSEQ\tQUAL";
+    // kstring_t str = {0};
+    // kputs(sam_line, &str);
+    // sam_parse1(&str, header, aln);
+
+    // Write the alignment
+    if (sam_write1(out, header, aln) < 0) {
+        fprintf(stderr, "Failed to write alignment\n");
+        exit(1);
+    }
+
+    // Cleanup
+    bam_destroy1(aln);
+    sam_hdr_destroy(header);
+    hts_close(out);
+
+    return 0;
+}
+Key Functions (from htslib docs):
+hts_open(filename, "wb"): Opens for BAM write.
+sam_hdr_write(out, header): Writes header.
+sam_write1(out, header, aln): Writes one alignment (bam1_t *aln).
+If SAM strings: Use sam_parse1 to convert string to bam1_t.
+For streaming: Generate bam1_t directly in your aligner loop (better than SAM strings).
+
+Error Handling: Check returns; use hts_errstr(out) for errors.
+
+Adapt to Your Code:
+Replace your SAM writer with BAM: Instead of fprintf(sam_file, ...) , build bam1_t structs (fields like aln->core.tid, aln->data for seq/qual).
+If too tied to SAM text: Write SAM to memory buffer, parse back to BAM—inefficient but transitional.
+Indexing: Add sam_index_build("output.bam", 0); if needed (requires bai/csi).
+
+
+This integrates seamlessly, uses ~same memory as SAM export, and runs faster (direct binary). If htslib install is hard on your cluster, fall back to Method 2—but I recommend pushing for it (NCBI likely has it via modules).
+If you share code snippets from your SAM exporter, I can tailor the integration!
+
+#endif

@@ -178,7 +178,7 @@ Array saConfigGetRuns (PP *pp, Array runStats)
     }
   
   if (isSet)
-    saSetGetAdaptors (2, &(pp->adaptors), -1) ;  /* run=0: valid for all runs */
+    saSetGetAdaptors (2, 0, &(pp->adaptors), 0) ;  /* run=0: valid for all runs */
   
   if (pp->inFileName)
     {   /* Split the individual file names, they are coma separated 
@@ -247,6 +247,17 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  if (pp->fastc) rc->format = FASTC ;
 	  if (pp->sra) rc->format = SRA ;
 
+	  if (pp->isRna) /* user imposed */
+	    {
+	      int isRna = 1 ;
+	      saSetGetAdaptors (2, &isRna, 0, rc->run) ;
+	    }
+	  if (pp->isDna) /* user imposed */
+	    {
+	      int isRna = -1 ;
+	      saSetGetAdaptors (2, &isRna, 0, rc->run) ;
+	    }
+
 	  if (rc->format == SRA)  /* check in the cache */
 	    {
 	    }
@@ -308,9 +319,9 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  rc->fileName1 = strnew (cp, pp->h) ;
 	  if (! dictAdd (fDict, cp, 0))
 	    saUsage (hprintf (h, "Duplicate file name %s\n at line %d of file -T %s"
-		       , cr
-		       , line
-		       , pp->inConfigFileName
+			      , cr
+			      , line
+			      , pp->inConfigFileName
 			      ), 0, 0) ;
 
 	  /* run name */
@@ -321,7 +332,6 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	  else
 	    dictAdd (pp->runDict, hprintf (h, "r.%d", nRuns), &run) ;
 	  rc->run = run ;
-	  rc->RNA = TRUE ; /* default */
 
 	  /*
 	    memcpy (rc->adaptor1L, pp->adaptor1L , 30) ;
@@ -347,8 +357,17 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	      else if (! strcasecmp (cp, "raw")) rc->format = RAW ;
 	      else if (! strcasecmp (cp, "SRA")) rc->format = SRA ;
 
-	      else if (! strcasecmp (cp, "rna")) rc->RNA = TRUE ;
-	      else if (! strcasecmp (cp, "dna")) rc->RNA = FALSE ;
+	      else if (! strcasecmp (cp, "rna")) /* user imposed */
+		{
+		  int isRna = 1 ;
+		  saSetGetAdaptors (2, &isRna, 0, rc->run) ;
+		}
+
+	      else if (! strcasecmp (cp, "dna")) /* user imposed */
+		{
+		  int isRna = -1 ;
+		  saSetGetAdaptors (2, &isRna, 0, rc->run) ;
+		}
 
 	      else if (sscanf (cp, "jump1=%d", &k) && k >0)
 		rc->jump5r1 = k ;
@@ -420,33 +439,93 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 
 static pthread_mutex_t adaptor_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-BOOL saSetGetAdaptors (int set, ADAPTORS *aa, int run)
+BOOL saSetGetAdaptors (int set, int *isRnap, ADAPTORS *aa, int run)
 {
-  static ADAPTORS a = {{0}};
-  static int isSet = 0 ;
+  static AC_HANDLE h = 0 ;
+  static Array aaa = 0 ;
+  static Array isSets = 0 ;
+  static Array isRnas = 0 ;
+  int isSet = TRUE ;
   
   pthread_mutex_lock(&adaptor_mutex);
-  
-  switch (set)
+
+  if (aaa == 0)
     {
-    case 0: /* get */
-      if (isSet)
-	memcpy (aa, &a, sizeof (ADAPTORS)) ;
-      else
-	memset (&a, 0, sizeof (ADAPTORS)) ;
-      break ;
-    case 2:
-      if (isSet > 1)
-	messcrash ("Bad double call set=%d to saSetGetAdaptors", set) ;
-      /* fall through */
-    case 1:  
-      if (isSet < 2)  /* non re-writable */
-	memcpy (&a, aa, sizeof (ADAPTORS)) ;
-      isSet = set ;
-      break ;
-    default:
-      messcrash ("Bad call set=%d to saSetGetAdaptors", set) ;
+      h = ac_new_handle () ;
+      aaa = arrayHandleCreate (16, ADAPTORS, h) ;
+      isSets = arrayHandleCreate (16, int, h) ;
+      isRnas = arrayHandleCreate (16, int, h) ;
     }
+  if (run < 0)
+    messcrash ("\nBad call to saSetGetAdaptors run = %d < 0", run) ;
+  
+  ADAPTORS *aR = arrayp (aaa, run, ADAPTORS) ; /* must come first */
+  ADAPTORS *a0 = arrayp (aaa, 0, ADAPTORS) ;  /* run may reallocate aa */
+  int *isSetRp = arrayp (isSets, run, int) ;
+  int *isSet0p = arrayp (isSets, 0, int) ;
+  int *isRnaRp = arrayp (isRnas, run, int) ;
+  int *isRna0p = arrayp (isRnas, 0, int) ;
+
+  if (set == 0)
+    {  /* get */
+      int iss = 0 ;
+      if (aa) 
+	{
+	  memset (aa, 0, sizeof (ADAPTORS)) ;
+	  if (*isSet0p) /* user imposed gloablly */
+	    { iss++ ; memcpy (aa, a0, sizeof (ADAPTORS)) ; }
+	  else if (*isSetRp) /* run specific */
+	    { iss++ ; memcpy (aa, aR, sizeof (ADAPTORS)) ; }
+	}
+      if (isRnap)
+	{
+	  *isRnap = 0 ; /* not set */
+	  if (*isRna0p) /* user imposed globally */
+	    { iss++ ; *isRnap = *isRna0p ; }
+	  if (*isRnaRp) /* run specific */
+	    { iss++ ; *isRnap = *isRnaRp ; }
+	}
+      /* client code wish to block if we return FALSE */
+      isSet = (iss > 0 ? TRUE : FALSE) ;
+    }
+
+  else if (set == 2)
+    { /* user defined */
+      if (isRnap)
+	*isRnaRp = (*isRnap > 0 ? 9999999 : -9999999) ; 
+      if (aa)
+	{
+	  *isSetRp = 2 ;
+	  memcpy (aR, aa, sizeof (ADAPTORS)) ;
+	}
+      isSet = TRUE ;
+    }
+
+  else if (set == 1)
+    { /* guess work do not modify previous user set values */
+      
+      if (! *isRnaRp)
+	*isRnaRp = 1 ; /* odd, all fure modifs are even, so we allways stay set (non zero) */
+      if (isRnap && *isRnap)
+	*isRnaRp += (*isRnap > 0 ? 2 : -2) ;
+      if (aa)
+	{
+	  switch (*isSetRp)
+	    {
+	    case 2:
+	      break ;
+	    case 0:
+	    case 1:
+	      *isSetRp = 1 ;
+	      memcpy (aR, aa, sizeof (ADAPTORS)) ;
+	      break ;
+	    }
+	}
+      isSet = TRUE ;
+    }
+  else
+    messcrash ("Bad call set=%d to saSetGetAdaptors", set) ;
+
 
   pthread_mutex_unlock (&adaptor_mutex) ;
   return isSet ;

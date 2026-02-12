@@ -1244,6 +1244,9 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//     Drop reads withg base-4 entropy shorter than this limit\n"
 	       "//     The default 20 is lowered to max-read-length/2 if shorter, simplifying short-RNA analysis\n"
 	       "// REQUEST\n"
+	       "// --RNA | --DNA : [optional] the code automatically distinguises RNA from DNA\n"
+	       "//     By setting one of these option, you impose the alignment mode, otherwise you let the code choose\n"
+	       "//     In RNA mode, the code favors introns and detects polyA tails\n"  
 	       "// --align : [default] Extend the seed alignments hopefully to full read length\n"
 	       "// --do_not_align : do not align, just test the validity of the index directory\n"
 	       "//     The score s is computed as s = #aligned bases - errCost * #errors\n"
@@ -1359,25 +1362,13 @@ int main (int argc, const char *argv[])
   p.debug  = getCmdLineBool (&argc, argv, "--debug") ;
   p.debug |= getCmdLineBool (&argc, argv, "--verbose") ;
   
-  p.gzi = getCmdLineBool (&argc, argv, "--gzi") ;   /* decompress input files (implicit for files named .gz) */
-  p.gzo = getCmdLineBool (&argc, argv, "--gzo") ;   /* compress most output files */
-
-  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
-  if (p.maxSraGb < 0)
-    saUsage ("--maxGB parameter should be positive", argc, argv) ;
-
-  if (getCmdLineText (h, &argc, argv, "--species", &species))
-    {
-      if (species && ! strcasecmp (species, "worm"))
-	p.isWorm = TRUE ;
-    }
   
   /**************************  SRA downloader *********************************/
   
   {{  /* --sraDownload SRR1,SRR2,,...
        * Just download SRA files from NCBI/SRA into the local SRA caching directory
        * This is not needed by the aligner, but is provided as a service to the user
-       * since it costs us nothing as we have a real-time downloader available
+       * since it costs us nothing as we have a real-time downloader a11vailable
        */
       
       const char *sraID = 0 ;
@@ -1386,6 +1377,10 @@ int main (int argc, const char *argv[])
 	  char *buf = strnew (sraID, h) ;
 	  char *cp = buf ;
 
+	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
+	  if (p.maxSraGb < 0)
+	    saUsage ("--maxGB parameter should be positive", argc, argv) ;
+	  
 	  while (cp)
 	    {
 	      char *cq = strchr (cp, ',') ;
@@ -1508,6 +1503,19 @@ int main (int argc, const char *argv[])
     }
   
   /**************************  debugging modules, ignore *********************************/
+
+  p.gzi = getCmdLineBool (&argc, argv, "--gzi") ;   /* decompress input files (implicit for files named .gz) */
+  p.gzo = getCmdLineBool (&argc, argv, "--gzo") ;   /* compress most output files */
+
+  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
+  if (p.maxSraGb < 0)
+    saUsage ("--maxGB parameter should be positive", argc, argv) ;
+
+  if (getCmdLineText (h, &argc, argv, "--species", &species))
+    {
+      if (species && ! strcasecmp (species, "worm"))
+	p.isWorm = TRUE ;
+    }
 
   if ( getCmdLineBool (&argc, argv, "--checkDict"))
     {                                           /* check the dictionary lib */
@@ -1649,6 +1657,8 @@ int main (int argc, const char *argv[])
 
   /***************** requested analyses, not used if --createIndex *************/
 
+  p.isDna = getCmdLineBool (&argc, argv, "--DNA") ;
+  p.isRna = getCmdLineBool (&argc, argv, "--RNA") ;
   p.justStats  = getCmdLineText (h, &argc, argv, "--justStats", 0) ;
   p.align = getCmdLineBool (&argc, argv, "--align") ;          /* left for back compatibility, over-ridden by --do_not_align */
   p.align = ! getCmdLineBool (&argc, argv, "--do_not_align") ; /* default is to align */
@@ -1673,10 +1683,10 @@ int main (int argc, const char *argv[])
   getCmdLineText (h, &argc, argv, "--adaptor1", &(p.rawAdaptor1R)) ;
   getCmdLineText (h, &argc, argv, "--adaptor2", &(p.rawAdaptor2R)) ;
 
-  p.wiggle_step = 0 ;  /* examples s=10, 5, 1, if not set by user the deault is set in saConfigCheckTargetIndex  */
+  p.wiggle_step = 0 ;  /* examples s=10, 5, 1, if not set by user the default is set in saConfigCheckTargetIndex  */
   getCmdLineInt (&argc, argv, "--wiggleStep", &(p.wiggle_step)) ;
 
-  if (0) { p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
+  if (0) { p.sam = TRUE ; p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
   /*****************  sequence file names and their formats  ************************/
   
   getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;

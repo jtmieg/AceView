@@ -19,6 +19,10 @@
 
 #define WIGGLETYPEMAX 2 /* strand */
 #include "sa.h"
+#include "sa.fastItoA.h"
+#include <fcntl.h>  // for O_WRONLY if using write()
+#include <unistd.h> // for write()
+
 
 typedef struct wigPosStruct { unsigned int pos ; unsigned short ln ; unsigned short weight ; } WP ;
 
@@ -274,6 +278,63 @@ void saWiggleCumulate (const PP *pp, BB *bb)
 
 /**************************************************************/
 
+#define BUF_SIZE (4 * 1024 * 1024)  // 4MB - tune based on your system/disk
+
+#ifdef JUNK
+static void exportToFile (const char *fNam)
+{
+  
+  /* Loop over your millions of numbers */
+  for (;;/* each unsigned int n */)
+    {
+      int n = 0 ;
+      int len = fast_itoa_nl_table(buf + pos, n) ;
+      pos += len ;
+      break ;
+      if (pos >= BUF_SIZE - 12) {  // Flush if near full (safety margin for max line)
+	if (fwrite(buf, pos, 1, fp) != 1) { /* error */ }
+	pos = 0;
+      }
+    }
+
+  /* Flush remainder */
+    if (pos > 0)
+      {
+        if (fwrite(buf, pos, 1, fp) != 1) { /* error */ }
+      }
+
+    // Optional: fflush(fp); or fsync(fileno(fp)); if you need immediate disk write
+    fclose(fp);
+}
+#endif
+
+
+static inline int fast_itoa_nl(char *buf, int val)
+{
+    char *p = buf;
+
+    if (val < 0) {
+        *p++ = '-';
+        val = -val;
+    }
+
+    if (val == 0) {
+        *p++ = '0';
+    } else {
+        char tmp[10];
+        int i = 0;
+        while (val > 0) {
+            tmp[i++] = '0' + val % 10;
+            val /= 10;
+        }
+        while (i--) *p++ = tmp[i];
+    }
+
+    *p++ = '\n';
+    return p - buf;           // bytes written
+}
+
+
 static void wiggleExportOne (const PP *pp, int nw, int type)
 {
   Array wiggles = 0 ;
@@ -359,7 +420,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	    }
 	}
 
-      if (arrayMax(a))
+      if (1 && arrayMax(a))
 	{
 	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
 	  const char *runNam = dictMax (pp->runDict) < run || ! run ? "runX" : dictName (pp->runDict, run) ;
@@ -378,10 +439,63 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	      localCumul += w ;
 	      if ((j + demiStep) % wiggle_step == 0)	      
 		{
-		  aceOutf (ao, "%u\n", localCumul / 720) ;
+		  if (1)		  aceOutf (ao, "%u\n", localCumul / 720) ;
+		  if (0)
+		    {
+		      char buf[32] ;
+		      int k = fast_itoa_nl_table (buf, localCumul / 720) ;
+		      if (1) aceOut (ao,buf) ;
+		      if (0) aceOutBinary (ao,buf, k) ;
+		    }
 		  localCumul = 0 ;
 		}
 	    }
+	}
+      
+      if (0 && arrayMax(a))
+	{
+	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
+	  const char *runNam = dictMax (pp->runDict) < run || ! run ? "runX" : dictName (pp->runDict, run) ;
+	  char *fNam = hprintf (h, "%s/wiggles/%s.%s.%s.BF", pp->outFileName, runNam, chromNam, typeNam) ;
+	  vTXT txt = vtxtHandleCreate (h) ;
+	  FILE *fp = fopen(fNam, "w") ;
+	  char *cp ;
+	  int ln ;
+	  
+	  if (!fp)
+	    messcrash ("exportToFile cannot open file %s\n", fNam) ;
+	  
+	  setvbuf(fp, NULL, _IOFBF, BUF_SIZE);  /* Full buffering, large size */
+	  char buf25[25] ;
+	  char buf[BUF_SIZE] ;
+	  /* 	  size_t pos = 0 ; */
+
+	  vtxtPrintf (txt, "## wiggle %s\n", timeBufShowNow (buf25)) ;
+	  vtxtPrintf (txt, "track type=wiggle_0\n") ;
+	      
+	  vtxtPrintf (txt, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0, wiggle_step) ;
+
+	  cp = vtxtPtr (txt) ;
+	  ln = strlen (cp) ;
+	  fwrite (cp, ln, 1, fp) ;
+	  
+      	  xp = arrayp (a, 0, unsigned int) ;
+	  for (int localCumul = 0, j = 0, jMax = arrayMax(a) ; j < jMax ; j++)
+	    {
+	      unsigned int w = xp[j] ;
+	      cumul += w ;
+	      localCumul += w ;
+	      if ((j + demiStep) % wiggle_step == 0)	      
+		{
+
+		  if (0) 	  sprintf (buf, "%d\n",  localCumul / 720) ;
+		  if (0) 	  fast_itoa_nl (buf, localCumul / 720) ;
+		  if (1) 	  fast_itoa_nl_table (buf, localCumul / 720) ;
+		  localCumul = 0 ;
+
+		}
+	    }
+	  fclose (fp) ;
 	}
       
       if (arrayMax(a) && geneB)

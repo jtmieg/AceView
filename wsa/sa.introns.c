@@ -440,6 +440,9 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
   BOOL isReadDown = TRUE ;
   dy = vp->x2 - wp->x1 + 1 ;
   
+  if (bb->isRna < 0)
+    goto done ;
+
   /* trim if possible the vp->x2 end of the first exon on a known 'donor' */
   if (vp->a1 < vp->a2)
     {
@@ -654,7 +657,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	}	    
     }
   
-  /* In any case trim the second exon a bouts francs */
+ done:   /* In any case trim the second exon a bouts francs */
   dy = vp->x2 - wp->x1 + 1 ;
   if (dy > 0)
     { 
