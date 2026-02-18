@@ -191,6 +191,7 @@ typedef struct bStruct {
 
 typedef struct pStruct {
   AC_HANDLE h ;
+  AC_HANDLE bamHandle ;
   BOOL debug, gzi, gzo ;
   BOOL createIndex ;
   BOOL noJump ;
@@ -268,7 +269,7 @@ typedef struct pStruct {
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
-  BOOL sam, exportSamSequence, exportSamQuality ;
+  BOOL sam, bam, hitsFormat, exportSamSequence, exportSamQuality ;
   BOOL strand, antiStrand ;
   BOOL isDna, isRna ;
   int bonus[256] ;
@@ -495,7 +496,7 @@ void saRunStatExport (const PP *pp, Array runStats) ;
 void saCpuStatExport (const PP *pp, Array stats) ;
 void saCpuStatCumulate (Array aa, Array a) ;
 void saRunStatsCumulate (int run, PP *pp, BB *bb) ;
-BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up) ;
+BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up, BOOL coded) ;
   
 /* sa.align */
 void saAlign (const void *vp) ;

@@ -913,6 +913,28 @@ static void aceOutCloseFileStack(ACEOUT fo)
 
 
 /************************************************/
+#ifdef JUNK
+static Array activePipes = 0 ;
+
+static pipeRegister (int pid)
+{
+  if (! activePipes )
+    activePipes = arrayCreate (128, long int) ;
+  activePipes (arrayMax(activePipes), long int) = pid ;
+}
+
+static pipeWait (void)
+{
+  if (activePipes)
+    {
+      int i, iMax = arrayMax (activePipes) ;
+      long int pid = arr (activePipes, i, long int) ;
+      wait (pid) ;
+    }
+  return ;
+}
+#endif
+/************************************************/
 
 static void aceOutFinalise (void *block)
 {

@@ -417,7 +417,7 @@ foreach target ($Etargets)
   foreach target2 ($RNAtargets)
     if ($target == $target2) set ok=1
   end
-    if ($ok == 0) then
+    if (0 && $ok == 0) then
       echo "####### CONFIGURATION ERROR ########"
       echo "        Target $target declared in Etargets is not part of RNAtargets"
       echo "        The code aligns the reads on all RNAtargets"   

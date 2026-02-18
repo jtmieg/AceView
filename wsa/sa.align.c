@@ -1038,36 +1038,32 @@ static void alignClipErrorLeft (ALIGN *vp, int errCost)
 	  ep = arrp (vp->errors, bestMax, A_ERR) ;
 	  if (0 && ep->iShort > vp->x2 - 5)
 	    return ;
-	  vp->x1 = ep->iShort + 1 ; /* last exact base */
+	  vp->x1 = ep->iShort + 2 ; /* last exact base */
 	  if (vp->a1 < vp->a2)
-	    vp->a1 = ep->iLong + 1 ;
+	    vp->a1 = ep->iLong + 2 ;
 	  else
 	    {
-	      vp->a1 = ep->iLong - 1 ;
+	      vp->a1 = ep->iLong - 0 ;
 	    }
 	  switch (ep->type)
 	    {   
 	    case INSERTION:
-	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      vp->x1++ ;
 	      break ;
 	    case INSERTION_DOUBLE:
-	      vp->x1 += 1 ;
-	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      vp->x1 += 2 ;
 	      break ;
 	    case INSERTION_TRIPLE:
-	      vp->x1 += 2 ;
-	      vp->a1 += ((vp->chrom & 0x1) ? -1 : 1) ;
+	      vp->x1 += 3 ;
 	      break ;
 	    case TROU:
-	      vp->x1 -- ;
-	      break ;
-	    case TROU_DOUBLE:
-	      vp->x1 -- ;
 	      vp->a1 += ((vp->chrom & 0x1) ? -1: 1) ;
 	      break ;
+	    case TROU_DOUBLE:
+	      vp->a1 += ((vp->chrom & 0x1) ? -2: 2) ;
+	      break ;
 	    case TROU_TRIPLE:
-	      vp->x1 -- ;
-	      vp->a1 += ((vp->chrom & 0x1) ? -2 : 2) ;
+	      vp->a1 += ((vp->chrom & 0x1) ? -3 : 3) ;
 	      break ;
 	    default:
 	      break ;
@@ -1104,10 +1100,7 @@ static void alignClipErrorRight (ALIGN *vp, int errCost)
 	{
 	  ep = arrp (vp->errors, bestMax, A_ERR) ;
 	  vp->x2 = ep->iShort ; /* last exact base */
-	  if (vp->a1 < vp->a2)
-	    vp->a2 = ep->iLong ;
-	  else
-	    vp->a2 = ep->iLong ;
+	  vp->a2 = ep->iLong ;
 	  arrayMax (vp->errors) = bestMax ;
 	}
     }
@@ -2084,7 +2077,8 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	  int a2 = ap->a2 ;
 	  int tc = ap->targetClass ;
 	  BOOL s = a1 < a2 ;
-	  
+
+	  if (ap->chrom & 0x1) s = !s ;
 	  if (! tc || allTc[tc])
 	    continue ;
 	  allTc[tc] = 1 ;
@@ -2404,7 +2398,8 @@ static void alignDoOneRead (const PP *pp, BB *bb
   int errCost = pp->errCost ;
   /*   unsigned int uu = 0 ; */
   int donor = 0, acceptor = 0 ;
-  const int intronBonus = bb->isRna >= 0 ? 4 : -8 ;
+  int intronBonus  = 1 ; /* this is a coodinate bonus, not a score bonus */
+  
   int nTargetRepeats  = 1 ;
   int nTargetRepeatsOld = 0 ;
   const int nTRmask = (0x1 << NTARGETREPEATBITS) - 1 ;
@@ -2746,28 +2741,40 @@ read1 = 144 line=5884
 
 void saAlignDo (const PP *pp, BB *bb)
 {
-  AC_HANDLE h = ac_new_handle () ;
+  AC_HANDLE h = 0 ;
+  BOOL redo = FALSE ;
+  int pass = 0 ;
   HIT * restrict hit ;
   HIT *h1, *h2 ;
-  long int ii, jj, iMax = bigArrayMax (bb->hits) ;
-  BigArray hits = bigArrayHandleCreate (256, HIT, h) ;
-  BigArray hits2 = bigArrayHandleCreate (256, HIT, h) ;  
-  Array aa = arrayHandleCreate (128, ALIGN, h) ;
-  Array err = arrayHandleCreate (256, A_ERR, h) ;
-  BigArray aaa = bigArrayHandleCreate (iMax, ALIGN, h) ;
-  Array countChroms = arrayHandleCreate (256, COUNTCHROM, h) ;
+  long int ii, jj, iMax ;
+  BigArray hits = 0 ;
+  BigArray hits2 = 0 ;
+  Array aa = 0 ;
+  Array err = 0 ;
+  BigArray aaa = 0 ;
+  Array countChroms = 0 ;
   int n = NTARGETREPEATBITS ;
   int mask = (1 << n) - 1 ;
   ADAPTORS adaptors = {{0}} ;
 
   /* in pilot block, bb->isRna defaults to 0=RNA */
   bb->isRna = 0 ;
-  while (! saSetGetAdaptors (0, &(bb->isRna), &adaptors, bb->run))
-    {
-      if (bb->lane <= 1) break ; /* pilot block proceeds */
-      sleep (1) ;                /* all other blocks wait */
-    }
-  
+  if (1) 
+    while (! saSetGetAdaptors (0, &(bb->isRna), &adaptors, bb->run))
+      {
+	if (bb->lane <= 1) break ; /* pilot block proceeds */
+	sleep (1) ;                /* all other blocks wait */
+      }
+
+ secondPass:
+  iMax = bigArrayMax (bb->hits) ;
+  h = ac_new_handle () ;
+  hits = bigArrayHandleCreate (256, HIT, h) ;
+  hits2 = bigArrayHandleCreate (256, HIT, h) ;  
+  aa = arrayHandleCreate (128, ALIGN, h) ;
+  err = arrayHandleCreate (256, A_ERR, h) ;
+  aaa = bigArrayHandleCreate (iMax, ALIGN, h) ;
+  countChroms = arrayHandleCreate (256, COUNTCHROM, h) ;
   bb->confirmedPolyAs = arrayHandleCreate (64000, POLYA, bb->h) ;
   bb->confirmedIntrons = arrayHandleCreate (64000, INTRON, bb->h) ;
   bb->doubleIntrons = arrayHandleCreate (64000, DOUBLEINTRON, bb->h) ;
@@ -2926,12 +2933,20 @@ void saAlignDo (const PP *pp, BB *bb)
       long int baseAligned = bb->runStat.nBaseAligned1 + bb->runStat.nBaseAligned2 ;
       long int iSupport = bb->runStat.gt_ag_Support + bb->runStat.ct_ac_Support ;
       if (0) iSupport = bb->runStat.nIntronSupportPlus + bb->runStat.nIntronSupportMinus ;
-      if (4000 * iSupport < baseAligned)
+      if (baseAligned > 2000000 && 4000 * iSupport < baseAligned)
 	isRna = -1 ;
-      if (saReadAdaptors (&adaptors, &(bb->runStat)))
+      if (saReadAdaptors (&adaptors, &(bb->runStat), TRUE))
 	saSetGetAdaptors (1, &isRna, &adaptors, bb->run) ;
       else
 	saSetGetAdaptors (1, &isRna, 0, bb->run) ;
+      if (1)
+	{
+	  if (! redo && ((isRna < 0 && bb->isRna >= 0) || (isRna > 0 && bb->isRna < 0)))
+	    redo = TRUE ;
+	  else
+	    redo = FALSE ;
+	}
+      if (0 && redo == 0) redo = 1 ;
       bb->isRna = isRna ;
       fprintf (stderr, "SETGET lane %d isRna=%d isupport= %ld %ld   gc_ag=%d %d  baseAli = %ld\n"
 	       , bb->lane, isRna
@@ -2941,6 +2956,20 @@ void saAlignDo (const PP *pp, BB *bb)
 	       ) ;
     }
   
+  if (1 && pass==0 && redo)
+    {
+      Array lenDis = bb->runStat.lengthDistribution ;
+      Array iLenDis = bb->runStat.insertLengthDistribution ;
+
+      memset (&bb->runStat, 0, sizeof (RunSTAT)) ;
+      bb->runStat.lengthDistribution = lenDis ;
+      bb->runStat.insertLengthDistribution = iLenDis ;
+      bb->nAli = bb->aliDx = bb->aliDa = 0 ;
+      bigArrayMax (aaa) = 0 ;
+
+      pass++ ;
+      goto secondPass ;
+    }
   ac_free (h) ;
   return ;
 } /* saAlignDo */

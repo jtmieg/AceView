@@ -538,7 +538,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       unsigned char *cq = arrp (dnaG, wp->a1 - 3, unsigned char) ; /* the base 2 bases before wp->a1 - dy */
       int bestI = -1 ;
 
-      if (bb->nIntronSupportPlus >= bb->nIntronSupportMinus)
+      if (bb->runStat.gt_ag_Support >= bb->runStat.ct_ac_Support)
 	{     /* favor gt_ag over ct_ac */
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == G_)
@@ -600,7 +600,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       unsigned char *cp = arrp (dnaG, wp->a1 - dy, unsigned char) ; /* the base just after vp->a2 - dy */
       unsigned char *cq = arrp (dnaG, vp->a2 - 3, unsigned char) ; /* the base 2 bases before wp->a1 - dy */
       int bestI = -1 ;
-      if (bb->nIntronSupportPlus < bb->nIntronSupportMinus)
+      if (bb->runStat.gt_ag_Support < bb->runStat.ct_ac_Support)
 	{     /* favor gt_ag over ct_ac */
 	  for (int i = 0 ; i <= dy ; i++)
 	    if (cp[i] == G_ && cp[i+1] == T_ && cq[i] == A_ && cq[i+1] == G_)

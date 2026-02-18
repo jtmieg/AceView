@@ -19,7 +19,7 @@
 
 #define WIGGLETYPEMAX 2 /* strand */
 #include "sa.h"
-#include "sa.fastItoA.h"
+#include "fastItoA.h"
 #include <fcntl.h>  // for O_WRONLY if using write()
 #include <unistd.h> // for write()
 
@@ -425,8 +425,8 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	  const char *chromNam = dictName (pp->bbG.dict, chrom >> 1) + 2 ;
 	  const char *runNam = dictMax (pp->runDict) < run || ! run ? "runX" : dictName (pp->runDict, run) ;
 	  char *fNam = hprintf (h, "/wiggles/%s.%s.%s.BF", runNam, chromNam, typeNam) ;
-	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, 1 || pp->gzo, h) ;
-	  aceOutDate (ao, "##", "wiggle") ;
+	  ACEOUT ao = aceOutCreate (pp->outFileName, fNam, 0 || pp->gzo, h) ;
+	  aceOutDate (ao, "##", "wiggle") ; 
 	  aceOutf (ao, "track type=wiggle_0\n") ;
 
 	  aceOutf (ao, "fixedStep chrom=%s start=%d step=%d\n", chromNam, pos0, wiggle_step) ;
@@ -439,13 +439,13 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 	      localCumul += w ;
 	      if ((j + demiStep) % wiggle_step == 0)	      
 		{
-		  if (1)		  aceOutf (ao, "%u\n", localCumul / 720) ;
-		  if (0)
+		  if (0)		  aceOutf (ao, "%u\n", localCumul / 720) ;
+		  if (1)
 		    {
 		      char buf[32] ;
-		      int k = fast_itoa_nl_table (buf, localCumul / 720) ;
-		      if (1) aceOut (ao,buf) ;
-		      if (0) aceOutBinary (ao,buf, k) ;
+		      int k = fast_itoa_nl (buf, localCumul / 720) ;
+		      if (0) aceOut (ao,buf) ;
+		      if (1) aceOutBinary (ao,buf, k) ;
 		    }
 		  localCumul = 0 ;
 		}
@@ -490,7 +490,7 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
 
 		  if (0) 	  sprintf (buf, "%d\n",  localCumul / 720) ;
 		  if (0) 	  fast_itoa_nl (buf, localCumul / 720) ;
-		  if (1) 	  fast_itoa_nl_table (buf, localCumul / 720) ;
+		  if (1) 	  fast_itoa_nl (buf, localCumul / 720) ;
 		  localCumul = 0 ;
 
 		}

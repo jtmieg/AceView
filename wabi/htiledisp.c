@@ -2881,13 +2881,19 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 
 	    for (j = 0 ; j < NF ; j++)
 	      if ((pnx->flag & PGG_endRatios) == 0 && (pnx->flag & flag[j])  ==  flag[j])
-		{		  
-		  fNam = hprintf (h, "TABIX/%s/R.%s.%s.BF.gz"
-				  , pnx->p
-				  , name(look->intMap)
-				  , suffix[j]
-				  ) ;
-		  if (! filCheckName(fNam, 0, "r") && !strncmp (name(look->intMap), "c_", 2))
+		{
+		  BOOL ok = FALSE ;
+		  if (! ok)
+		    {
+		      fNam = hprintf (h, "TABIX/%s/R.%s.%s.BF.gz"
+				      , pnx->p
+				      , name(look->intMap)
+				      , suffix[j]
+				      ) ;
+		      if (filCheckName(fNam, 0, "r"))
+			ok = TRUE ;
+		    }
+		  if (! ok)
 		    {
 		      dn = 2 ;
 		      fNam = hprintf (h, "TABIX/%s/R.%s.%s.BF.gz"
@@ -2895,8 +2901,22 @@ static void htileSolexaConvert (Htile look, BOOL force, ACEOUT ao)
 				      , name(look->intMap) + dn
 				      , suffix[j]
 				      ) ;
+		      if (filCheckName(fNam, 0, "r"))
+			ok = TRUE ;
 		    }
-		  if (1 && filCheckName(fNam, 0, "r"))
+		  if (! ok)
+		    {
+		      fNam = hprintf (h, "TABIX/%s/%s/R.chrom.%s.BF.gz"
+				      , pnx->p
+				      , name(look->intMap)
+				      , suffix[j]
+				      ) ;
+		      if (filCheckName(fNam, 0, "r"))
+			ok = TRUE ;
+		    }
+		      
+
+		  if (ok)
 		    {
 		      Array aa = sxGetWiggleZone (0, fNam, "BF", &(look->solexaStep), name(look->intMap), look->a1, look->a2, h) ;
 		      if (aa && arrayMax (aa))

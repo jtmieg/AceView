@@ -520,12 +520,21 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, BOOL isError, AC_HANDLE h)
 
   ACEOUT ao = 0 ;
 
-  if (pp->sam)
-    ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), FALSE, h) ;
-#ifdef JUNK
+  if (pp->sam || isError)
+    {
+      char *cmd = hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ) ;
+      fprintf (stderr, "SAM_CMD %s\n", cmd) ;
+      ao = aceOutCreate (pp->outFileName, cmd, FALSE, h) ;
+    }
   else if (pp->bam) /* we need to pipe to samtools */
-    ao = aceOutCreate (pp->outFileName, hprintf (h, ".%s.sam%s", dictName (pp->runDict, bb->run), isError ? ".error" : "" ), FALSE, h) ;
-#endif
+    {
+      char *cmd = hprintf (h, "samtools view - -b -o %s%s.bam", pp->outFileName, dictName (pp->runDict, bb->run)) ;
+      fprintf (stderr, "BAM_CMD %s\n", cmd) ;
+      ao = aceOutCreateToPipe (cmd , h) ;
+    }
+  else
+    return ao ;
+  
   if (! isError)
     {
       aceOutf (ao, "@HD VN:1.5\tSO:queryname\n") ;

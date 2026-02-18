@@ -505,7 +505,7 @@ BOOL saSetGetAdaptors (int set, int *isRnap, ADAPTORS *aa, int run)
     { /* guess work do not modify previous user set values */
       
       if (! *isRnaRp)
-	*isRnaRp = 1 ; /* odd, all fure modifs are even, so we allways stay set (non zero) */
+	*isRnaRp = 1 ; /* odd, all future modifs are even, so we allways stay set (non zero) */
       if (isRnap && *isRnap)
 	*isRnaRp += (*isRnap > 0 ? 2 : -2) ;
       if (aa)

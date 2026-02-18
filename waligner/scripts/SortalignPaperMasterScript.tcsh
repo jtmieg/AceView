@@ -90,8 +90,12 @@ setenv SVlast v64.31.18M.errCost4.feb6
 setenv SVlast v65.31.18M.Wiggle.errCost4.feb7
 setenv SV     v66.31.18M.NoWiggle.errCost4.feb8    # adaptor clipping no wiggle, no sam , new index for gene expressions
 setenv SVlast v66.31.18M.NoWiggle.errCost4.feb8
-setenv SV     v67.81.18M.Wiggle.errCost4.feb9    # adaptor clipping no wiggle, DNA/RNA automatic, no sam , new index for gene expressions
+setenv SV     v67.81.18M.Wiggle.errCost4.feb9    # adaptor clipping wiggle, DNA/RNA automatic, no sam , new index for gene expressions
 setenv SVlast v67.81.18M.Wiggle.errCost4.feb9
+setenv SV     v68.81.18M.Wiggle.errCost4.feb15    # adaptor clipping wiggle, binary printf DNA/RNA automatic, no sam , new index for gene expressions
+setenv SVlast v68.81.18M.Wiggle.errCost4.feb15
+setenv SV     v69.81.18M.Wiggle.errCost4.feb16    # adaptor clipping wiggle, binary printf DNA/RNA automatic, no sam , new index for gene expressions
+setenv SVlast v69.81.18M.Wiggle.errCost4.feb16
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -111,6 +115,7 @@ setenv seedLength 16
 setenv seedLength 18
 setenv maxTargetRepeats 31
 setenv maxTargetRepeats 81
+
 
 
 ##       SortalignPaperMasterScript.tcsh
@@ -157,7 +162,7 @@ setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
 
 set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3 21_HISAT2 31_STARlong"
+if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3"
 if ($createIndex == 11)  setenv methods "011_SortAlignG5R5"
 if ($createIndex == 12)  setenv methods "012_SortAlignG3R3"
 
@@ -181,19 +186,26 @@ setenv PFAL_r3_runs "PFALt1r3 PFALt2r3 PFALt3r3"
 setenv PFAL_runs "$PFAL_r1_runs $PFAL_r2_runs $PFAL_r3_runs"
 
 
-setenv allRuns "iRefSeq38 iRefSeq38.g iRefSeqT2T iRefSeqT2T.g ChipSeq1 ChipSeq2 B_ROCR2_Illumina_DNA RNA_PolyA_A_1_2Gb RNA_PolyA_B_1_2Gb A_WTS_PacBio A_ROCR3_PacBio-F3 B_ROCR3_PacBio-F3 A_ROCR3_Nanopore-F3 B_ROCR3_Nanopore-F3 Roche"
+setenv refseqRuns "iRefSeq38 iRefSeq38.g iRefSeqT2T iRefSeqT2T.g"
+setenv bigIlluminaRuns "RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb "
 
-setenv monkeyRuns "FrontalCortex_CHP_Chimpanzee TemporalLobe_BAB_Baboon FrontalCortex_CMC_Macaque TemporalLobe_PTM_Macaque BrainRight_MST_Marmoset TemporalLobe_MLM_MouseLemur TemporalLobe_SQM_SquirrelMonkey"
+setenv ABRuns "A_100PE B_100PE A_polyA_151PE B_polyA_151PE A_Total_151PE B_Total_151PE B_Roche454_352 A_Nanopore.1234 B_Nanopore.1306 A_PacBio.1745 B_PacBio.1810 A_Total_PacBio.2822 HG02_Revio_PacBio.2044 "
+setenv iRefSeqRuns "iRefSeq38 iRefSeq38.g"
+setenv dnaRuns "DNA_ChipSeq1_SE35 DNA_ChipSeq2_SE35 DNA_B_151PE"
+setenv wormRuns "  Worm_RNA_150PE "
+setenv monkeyRuns "Chimpanzee_0.92pc Macaque_2.69pc PTMacaque_2.71pc Baboon_2.92pc Marmoset_3.14 SquirrelMonkey_3.08pc MouseLemur_2.64pc"
+setenv baruzzoRuns "HG19t1_0.543pc HG19t2_1.186pc HG19t3_6.024pc"
 
-setenv moreRuns "HG19t1r1 HG19t2r1 HG19t3r1 WormSRR548309 RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb SRR29438430"
+setenv allRuns "$ABRuns  $iRefSeqRuns $dnaRuns $wormRuns  $monkeyRuns  $baruzzoRuns "
+setenv runs    "$ABRuns  $iRefSeqRuns $dnaRuns $wormRuns  $monkeyRuns  $baruzzoRuns "
 
-setenv runs "$allRuns  $monkeyRuns $moreRuns"
+
 # setenv runs "RNA_PolyA_AB_1_97G"
 # setenv runs "Roche"
 # setenv runs "iRefSeq38"
 
 # to create all IDX use these runs
-if ($createIndex > 0)  setenv runs "iRefSeq iRefSeq38 HG19t1r1  WormSRR548309 "
+if ($createIndex > 0)  setenv runs "iRefSeqT2T iRefSeq38 HG19t1_0.543pc  Worm_RNA_150PE"
 
 echo "### S.tcsh SV=$SV"
 echo "$methods"
@@ -554,6 +566,79 @@ end
 
 goto phaseLoop
 
+#############################################################################
+## Automatic download of the AGLR2 fasta  files from SRA
+# new worm
+# Worm_on_Worm_75PE  DRR412604
+# Worm_on_Worm_150PE   SRR26453245
+
+# --maxGb did not work, i obtained 10Gb
+bin/sortalign --sraDownload SRR24511885,SRR24511871,SRR24511867,SRR24511881,SRR24511877 --maxGB 2
+bin/sortalign --sraDownload SRR26453245,DRR412604 --maxGB 2
+bin/sortalign --sraDownload SRR24511885,SRR24511871,SRR24510080,SRR24510074,SRR24511773,SRR24511767,SRR24510080,SRR24510074,SRR899420,SRR24564586,SRR24564582,SRR29438430,SRR24511720,SRR24564588,SRR24564584,SRR24518509,SRR26453245,SRR1758917,SRR1758936,SRR1759007,SRR1758904,SRR1758979,SRR1759037,SRR1758993 --maxGB 2
+ 
+A_capt_100PE:SRR24511885
+B_capt_100PE:SRR24511871
+A_polyA_151PE:SRR24510080
+B_polyA_151PE:SRR24510074
+A_Total_151PE:SRR24511773	
+B_Total_151PE:SRR24511767	
+A_polyA_151PE_50Gb:SRR24510080
+B_polyA_151PE_47Gb:SRR24510074
+B_Roche454_352:SRR899420
+
+11_A_ROCR3_PacBio-F3	A_capt_PacBio.1745	SRR24564586	1745
+12_B_ROCR3_PacBio-F3	B_capt_PacBio.1810	SRR24564582	1810
+29_SRR29438430	HG02_Revio_PacBio.2044	SRR29438430	av 2044
+10_A_WTS_PacBio	A_Total_PacBio.2822	SRR24511720	2822
+13_A_ROCR3_Nanopore-F3	A_capt_Nanopore.1234	SRR24564588	1234
+14_B_ROCR3_Nanopore-F3	B_capt_Nanopore.1306	SRR24564584	1306
+1_iRefSeq38	iRefSeq_38		
+2_iRefSeq38.g	iRefSeq_38_g		
+5_ChipSeq1	DNA_ChipSeq1_SE35	 	
+6_ChipSeq2	DNA_ChipSeq2_SE35	 	
+7_B_ROCR2_Illumina_DNA	DNA_B_capt_151PE	SRR24518509	
+ 	 		
+26.WormSRR548309	Worm_RNA_150PE	SRR26453245	
+16_FrontalCortex_CHP_Chimpanzee	Chimpanzee_0.92pc	SRR1758917	
+18_FrontalCortex_CMC_Macaque	Macaque_2.69pc	SRR1758936	
+19_TemporalLobe_PTM_Macaque	PTMacaque_2.71pc	SRR1759007	
+17_TemporalLobe_BAB_Baboon	Baboon_2.92pc	SRR1758904	
+20_BrainRight_MST_Marmoset	Marmoset_3.14	SRR1758979	
+22_TemporalLobe_SQM_SquirrelMonkey	SquirrelMnkey_3.08pc	SRR1759037	
+21_TemporalLobe_MLM_MouseLemur	MouseLemur_2.64pc	SRR1758993	
+23_HG19t1r1	23_HG19t1_0.543pc	synthetic truth (Baruzzo)	
+24_HG19t2r1	24_HG19t2_1.186pc		
+25_HG19t3r1	25_HG19t3_6.024pc		
+
+
+
+foreach rSrr (A_100PE:SRR24511885 B_100PE:SRR24511871 A_polyA_151PE:SRR24510080 B_polyA_151PE:SRR24510074 A_Total_151PE:SRR24511773 B_Total_151PE:SRR24511767 A_polyA_151PE_50Gb:SRR24510080 B_polyA_151PE_47Gb:SRR24510074 B_Roche454_352:SRR899420 A_Nanopore.1234:SRR24564588 B_Nanopore.1306:SRR24564584 A_PacBio.1745:SRR24564586 B_PacBio.1810:SRR24564582 A_Total_PacBio.2822:SRR24511720 HG02_Revio_PacBio.2044:SRR29438430 iRefSeq_38:iRefSeq DNA_B_151PE:SRR24518509 Worm_RNA_150PE:SRR26453245 Chimpanzee_0.92pc:SRR1758917 Macaque_2.69pc:SRR1758936 PTMacaque_2.71pc:SRR1759007 Baboon_2.92pc:SRR1758904 Marmoset_3.14:SRR1758979 SquirrelMonkey_3.08pc:SRR1759037 MouseLemur_2.64pc:SRR1758993)
+
+foreach rSrr (A_100PE:SRR24511885)
+   set target=T2T
+   set run=`echo $rSrr | gawk -F ':' '{print $1;}'`
+   set srr=`echo $rSrr | gawk -F ':' '{print $2;}'`
+   if ($run == Worm_RNA_150PE) set target=worm
+   mkdir NewFasta/$run
+   echo $srr >  NewFasta/$run/SRR
+   echo $run SRA/$srr.sra.fasta.gz
+   if (! -e NewFasta/$run/$srr.sra.fasta.gz) then
+     zcat SRA/$srr.sra.fasta.gz | gawk 'BEGIN{n=0;}{if(n%4 < 2)print;n++;if(n>=40000000)exit;}' | gzip > NewFasta/$run/$srr.forward.fasta.gz &
+     zcat SRA/$srr.sra.fasta.gz | gawk 'BEGIN{n=2;}{if(n%4 >= 2)print;n++;if(n>=40000002)exit;}' | gzip > NewFasta/$run/$srr.reverse.fasta.gz &
+     zcat SRA/$srr.sra.fasta.gz | head -40000000 | gzip > NewFasta/$run/$srr.sra.fasta.gz &
+   endif
+   pushd NewFasta/$run
+     ln -s $srr.sra.fasta.gz  $run.sra.fasta.gz
+     echo $srr > SRR
+     echo $target > target
+     ln -s $srr.forward.fasta.gz $run.forward.fasta.gz
+     ln -s $srr.reverse.fasta.gz $run.reverse.fasta.gz
+   popd
+end
+
+goto phaseLoop
+
 ##############################################################################
 ##############################################################################
 ## Count the number of reads, the shortest, the longest read in every fasta/fastq file
@@ -793,21 +878,19 @@ foreach run ($runs)
     if (-e Aligners/$method/align.tcsh) then
       set read_1="x"
       set read_2=""
-      if (-e Fasta/$run/$run'_1.fasta.gz') set read_1=Fasta/$run/$run'_1.fasta.gz'
-      if (-e Fasta/$run/$run'_2.fasta.gz') set read_2=Fasta/$run/$run'_2.fasta.gz'
-      if (-e Fasta/$run/$run'_1.fastq.gz') set read_1=Fasta/$run/$run'_1.fastq.gz'
-      if (-e Fasta/$run/$run'_2.fastq.gz') set read_2=Fasta/$run/$run'_2.fastq.gz'
-      if (-e Fasta/$run/$run'_R1.fastq.gz') set read_1=Fasta/$run/$run'_R1.fastq.gz'
-      if (-e Fasta/$run/$run'_R2.fastq.gz') set read_2=Fasta/$run/$run'_R2.fastq.gz'
       if (-e Fasta/$run/$run.fasta.gz) set read_1=Fasta/$run/$run.fasta.gz
       if (-e Fasta/$run/$run.fastq.gz) set read_1=Fasta/$run/$run.fastq.gz
       if (-e Fasta/$run/$run.forward.fastq.gz) set read_1=Fasta/$run/$run.forward.fastq.gz
       if (-e Fasta/$run/$run.reverse.fastq.gz) set read_2=Fasta/$run/$run.reverse.fastq.gz
       if (-e Fasta/$run/$run.forward.fasta.gz) set read_1=Fasta/$run/$run.forward.fasta.gz
       if (-e Fasta/$run/$run.reverse.fasta.gz) set read_2=Fasta/$run/$run.reverse.fasta.gz
-      if ($read_1 == "x" && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
-      if ($read_1 == "x" && -e Fasta/$run/$run.Config) set read_1=Fasta/$run/$run.Config
-
+      if ($method == 011_SortAlignG3R5 && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($method == 012_SortAlignG3R3 && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($method == 013_SortAlignG3R1 && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($method == 014_SortAlignG3R3.g && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($method == 015_SortAlignG3R1.g && -e Fasta/$run/$run.sra.fasta.gz) set read_1=Fasta/$run/$run.sra.fasta.gz
+      if ($read_1 == Fasta/$run/$run.sra.fasta.gz) set read_2=""
+      
       if (! -e $read_1) then
         echo "Run $run Missing read file $read_1"
 	ls -ls Fasta/$run/*fast*
@@ -1151,7 +1234,6 @@ foreach tag (Non_compatible_pairs)
   echo "\n" >> COMPARE/samStats.$SV.txt
 end
 
-# \cp ~/ace/wacext/sortalign.c COMPARE/sortalign.$SV.c
 \cp bin/sortalign COMPARE/sortalign.$SV.exe
 
 goto phaseLoop
@@ -1851,7 +1933,7 @@ goto phaseLoop
 
 phase_introns:
 
-setenv iRuns "$allRuns $moreRuns"
+
 setenv iRuns "$runs"
 #setenv iRuns "iRefSeq iRefSeq38"
 set iMethods="011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 23_HISAT2_16threads 31_STARlong 53_Minimap2_16threads"

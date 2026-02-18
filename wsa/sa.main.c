@@ -372,8 +372,10 @@ static long int  matchHitsDo (const PP *pp, BB *bbG, BB *bb)
 		}
 	    }
 	  if (cw->seed < rw->seed)
-	    { i++; cw++; bb->skipsNotFound++ ; }
+	    /* { int di = ((i & 0xf) == 0 && (cw+16)->seed < rw->seed ? 16 : 1) ; i += di ; cw += di ; bb->skipsNotFound++ ;  } */
+ 	    { i++; cw++; bb->skipsNotFound++ ; } 
 	  else if (cw->seed > rw->seed)
+	    /* { int dj = ((j & 0xf) == 0 && (rw+16)->seed < cw->seed ? 16 : 1) ; j += dj ; rw += dj ; } */
 	    { j++ ; rw++ ; }
 	  else
 	    {
@@ -928,14 +930,26 @@ static void export (const void *vp)
   int n, nn = 0 ;
   float nG = 0 ;
 
-
-  AC_HANDLE h = ac_new_handle () ;
   int runMax = dictMax (pp->runDict) ;
   ACEOUT aos[runMax + 1]  ;
   ACEOUT aoes[runMax + 1]  ;
-
+  AC_HANDLE h = ac_new_handle () ;
+  
+  
   memset (aos, 0, sizeof (aos)) ;
   memset (aoes, 0, sizeof (aoes)) ;
+
+  memset (&bb, 0, sizeof (BB)) ;
+  if (pp->sam || pp->bam)
+    {
+      for (int run = 1 ; run <= runMax ; run++)
+	{
+	  bb.run = run ;
+	  aos[bb.run] = saSamCreateFile (pp, &bb, FALSE, pp->bamHandle) ;
+	  aoes[bb.run] = saSamCreateFile (pp, &bb, TRUE, pp->bamHandle) ;
+	}
+    }
+
   memset (&bb, 0, sizeof (BB)) ;
   while (channelGet (pp->aeChan, &bb, BB))
     {
@@ -944,15 +958,13 @@ static void export (const void *vp)
 	{
 	  bigArraySort (bb.aligns, saAlignOrder) ;
 	  exportDo (pp, &bb) ;
-	  if (pp->sam)
+	  if (pp->sam || pp->bam)
 	    {
 	      ACEOUT ao = aos[bb.run] ;
 	      ACEOUT aoe = aoes[bb.run] ;
 	      if (! ao)
-		{
-		  ao = aos[bb.run] = saSamCreateFile (pp, &bb, FALSE, h) ;
-		  aoe = aoes[bb.run] = saSamCreateFile (pp, &bb, TRUE, h) ;
-		}
+		messcrash ("canot open the sam/bam file") ;
+
 	      saSamExport (ao, aoe, pp, &bb) ;
 	    }
 	  t2 = clock () ;
@@ -974,6 +986,7 @@ static void export (const void *vp)
   if (0) printf ("--- %s: Export closes doneChan at %d\n", timeBufShowNow (tBuf), n) ;
   channelCloseSource (pp->doneChan) ;
   
+
   ac_free (h) ;
   return ;
 } /* export */
@@ -1233,8 +1246,15 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//   All output files will share this prefix, large outputs are split\n"
 	       "//   Examples : -o x/y/z  all output files will be named x/y/z.something\n"
        	       "//              -o x/y/   all output files will be named x/y/something\n"
-	       "// --gzo : the output files will be gziped\n"      
-	       "// --sam : export the alignment in sam format (default is self documented .hits format)\n"
+	       "// --gzo : the output files will be gziped\n" 
+
+	       "// ALIGNMENT FORMAT:\n"
+	       "//   By default, the aligments are exported in .hits format\n"
+	       "//   To request bam/sam or to skip these files use\n"
+	       "// --noAli : do not export the alignements\n"
+	       "// --sam : export the alignment in sam format\n"
+	       "// --bam : export the alignment in bam format\n"
+	       "// --hits : also export .hits in addition to sam/bam\n"
 	       "//\n"
 	       "// DATA FILTERS:\n"
 	       "// --minReadLength  <int> : [default 20 (or max read lenght)]\n"
@@ -1377,7 +1397,10 @@ int main (int argc, const char *argv[])
 	  char *buf = strnew (sraID, h) ;
 	  char *cp = buf ;
 
-	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb));
+	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb)) ||
+	    getCmdLineInt (&argc, argv, "--maxGb", &(p.maxSraGb)) ||
+	    getCmdLineInt (&argc, argv, "--maxgB", &(p.maxSraGb)) ||
+	    getCmdLineInt (&argc, argv, "--maxgb", &(p.maxSraGb));
 	  if (p.maxSraGb < 0)
 	    saUsage ("--maxGB parameter should be positive", argc, argv) ;
 	  
@@ -1664,13 +1687,21 @@ int main (int argc, const char *argv[])
   p.align = ! getCmdLineBool (&argc, argv, "--do_not_align") ; /* default is to align */
   p.ignoreIntronSeeds = getCmdLineBool (&argc, argv, "--ignoreIntronSeeds") ;
 
+  p.hitsFormat = TRUE ; /* default */
   p.sam = getCmdLineBool (&argc, argv, "--sam") ;
-  if (0) p.sam = TRUE ;
-  if (p.sam)
+  p.bam = getCmdLineBool (&argc, argv, "--bam") ;
+  if (p.sam || p.bam)
     {
+      p.hitsFormat = FALSE ;
       p.exportSamSequence = TRUE ;
       p.exportSamQuality = TRUE ;
     }
+  /* we may wish both sam/bam and hits */
+  p.hitsFormat = getCmdLineBool (&argc, argv, "--hits") ;
+  /* we may cancel all the alignment files */
+  if (getCmdLineBool (&argc, argv, "--noAli"))
+    p.sam = p.bam = p.hitsFormat = FALSE ;
+
   
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
 
@@ -1848,6 +1879,8 @@ int main (int argc, const char *argv[])
   dictAdd (p.targetClassDict, "Bacteria", 0) ;
   dictAdd (p.targetClassDict, "Virus", 0) ;
 
+  if (p.sam || p.bam) p.bamHandle  = ac_new_handle () ;
+  
   /*******************  create the index ********************************************/
 
   p.tArray = saTargetParseConfig (&p) ;
@@ -2027,7 +2060,7 @@ int main (int argc, const char *argv[])
 		channelAddSources (p.aeChan, 3) ;
 	    }
 #endif
-	  if (! p.sam || !i) /* only 1 export agent in sam case */
+	  if ((! p.sam && ! p.bam)  || !i) /* only 1 export agent in sam case */
 	    {
 	      if (pass)
 		wego_go (export, &p, PP) ;
@@ -2159,7 +2192,8 @@ int main (int argc, const char *argv[])
 	  char tBuf[25], tBuf2[25] ;
 	  bb.stop = timeNow () ;
 	  timeDiffSecs (bb.start, bb.stop, &ns) ;
-	  fprintf (stderr, "%s: run %d / slice %d done (%d/%d)  start %s elapsed %d s, nSeqs %ld nBases %.1g\n",  timeBufShowNow (tBuf), bb.run, bb.lane, ++nDone, NTODO, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length) ; 
+	  fprintf (stderr, "%s: run %d / slice %d done (%d/%d)  start %s elapsed %d s, nSeqs %ld nBases %.1g strategy %d\n"
+		   ,  timeBufShowNow (tBuf), bb.run, bb.lane, ++nDone, NTODO, timeShow (bb.start, tBuf2, 25), ns, bb.nSeqs, (double)bb.length, bb.isRna) ; 
 	}
       ac_free (bb.h) ;
     }
@@ -2203,7 +2237,7 @@ int main (int argc, const char *argv[])
     reportRunStats (&p, p.runStats) ;
   if (p.align)
     reportRunErrors (&p, p.runStats, runErrors) ;
-  
+  if (p.bam) ac_free (p.bamHandle) ;
   /* release memory */
   if (p.bbG.dnas)
     {

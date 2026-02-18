@@ -222,9 +222,9 @@ static void s2gSamStatsExports (const PP *pp, Array runStats)
   aceOutf (ao, "\n%s\t%s\tSupported_introns\t%ld\n", run, METHOD, confirmedIntronsCountSites (pp, 0)) ;
   aceOutf (ao, "\n%s\t%s\tnDoubleIntrons\t%ld\n", run, METHOD, arrayMax (pp->doubleIntrons)) ;
   aceOutf (ao, "%s\t%s\tIntron_supports\t%ld\t%ld\t%ld\t%.3f\n", run, METHOD
-	   , s0->nIntronSupportPlus + s0->nIntronSupportMinus
-	   , s0->nIntronSupportPlus
-	   , s0->nIntronSupportMinus
+	   , s0->gt_ag_Support + s0->ct_ac_Support 
+	   , s0->gt_ag_Support
+	   , s0->ct_ac_Support
 	   , s0->intronStranding
 	   ) ;
   
@@ -437,19 +437,35 @@ static BOOL readOneAdaptor (char adaptor[32], RunSTAT *up, BOOL isLeft, int pass
 	  if (n > nn) { best2 = j ; nn = n ; }
 	}
     }
-  if (best2 != best)
-    {
-      for (i = di ; i < 30 ; i++)
-	for (j = 0 ; j < 5 ; j++)
-	  aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
-      for (i = 0 ; i < di ; i++)
+  if (1) 
+    { /* clean deconvoluted image */
+      if (best2 != best)
+	{ 
+	  for (i = di ; i < 30 ; i++)
+	    for (j = 0 ; j < 5 ; j++)
+	      aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
+	  for (i = 0 ; i < di ; i++)
 	    aa[150 * best + best + 5 *i] += aa[150 * best2 + best2] ;
+	}
+    }
+  else
+    {   /* standard blurred image, to present in the problem */
+      di = 0 ;
+      for (best2 =0 ; best2 < 4 ; best2++)
+	if (best2 != best)
+	  { 
+	    for (i = di ; i < 30 ; i++)
+	      for (j = 0 ; j < 5 ; j++)
+		aa[150 * best + 5 * i + j] += aa[150 * best2 + 5 * (i-di) + j] ;
+	    for (i = 0 ; i < di ; i++)
+	      aa[150 * best + best + 5 *i] += aa[150 * best2 + best2] ;
+	  }
     }
   if (1)
     {
       char *atgc = "ATGC" ;
       char ATGC[4] = {A_, T_, G_, C_} ;
-      memset (adaptor, 'n', 30) ; adaptor[30] = 0 ;
+      memset (adaptor, coded ? N_ : 'n' , 30) ; adaptor[30] = 0 ;
       
       for (i = 0 ; i < 30 ; i++)
 	{
@@ -474,24 +490,24 @@ static BOOL readOneAdaptor (char adaptor[32], RunSTAT *up, BOOL isLeft, int pass
 
 /**************************************************************/
 /* read the adaptors for the frequency histogram of the overhangs */
-BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up)
+BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up, BOOL coded)
 {
   BOOL ok = FALSE ;
   
   memset (adaptors, 0, sizeof(ADAPTORS)) ;
-  ok |= readOneAdaptor (adaptors->a1L, up, TRUE, 0, 0, TRUE) ;
-  ok |= readOneAdaptor (adaptors->a1R, up, FALSE, 0, 0, TRUE) ;
+  ok |= readOneAdaptor (adaptors->a1L, up, TRUE, 0, 0, coded) ;
+  ok |= readOneAdaptor (adaptors->a1R, up, FALSE, 0, 0, coded) ;
   if (up->nPairs)
     {
-      ok |= readOneAdaptor (adaptors->a2L, up, TRUE, 1, 0, TRUE) ;
-      ok |= readOneAdaptor (adaptors->a2R, up, FALSE, 1, 0, TRUE) ;
+      ok |= readOneAdaptor (adaptors->a2L, up, TRUE, 1, 0, coded) ;
+      ok |= readOneAdaptor (adaptors->a2R, up, FALSE, 1, 0, coded) ;
     }
   return ok ;
 } /* saReadAdaptors */
 
 /**************************************************************/
 
-/* read1 thne read2 */
+/* read1 then read2 */
 static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
 {
   AC_HANDLE h = ac_new_handle () ;
@@ -541,7 +557,7 @@ static void saOverhangExport (const PP *pp, int run, RunSTAT *up, BOOL isLeft)
   aceOutf (ao, "\n\n") ;
   ac_free (h) ;
   return ;
-    } /* saOverhangExport */
+} /* saOverhangExport */
   
 /**************************************************************/
   
@@ -644,35 +660,49 @@ void saRunStatExport (const PP *pp, Array runStats)
 	  if (1)
 	    {
 	      ADAPTORS adaptors = {{0}} ;
-	      if (saSetGetAdaptors (0, 0, &adaptors, run))
+	      saSetGetAdaptors (0, 0, &adaptors, run) ;
+	      saReadAdaptors (&adaptors, up, FALSE) ;
+	      if (1)
 		{
 		  if (up->nClippedAdaptor1L)
-		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
-			     , runNam
-			     , up->nClippedAdaptor1L
-			     , adaptors.a1L
-			     ) ;
+		    {
+		      char *cp = adaptors.a1L ;
+		      aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
+			       , runNam
+			       , up->nClippedAdaptor1L
+			       , cp 
+			       ) ;
+		    }
 		  
 		  if (up->nClippedAdaptor1R)
-		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
-			     , runNam
-			     , up->nClippedAdaptor1R
-			     , adaptors.a1R
-			     ) ;
+		    {
+		      char *cp = adaptors.a1R  ;
+		      aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
+			       , runNam
+			       , up->nClippedAdaptor1R
+			       , cp
+			       ) ;
+		    }
 		  
 		  if (up->nClippedAdaptor2L)
-		    aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
-			     , runNam
-			     , up->nClippedAdaptor2L
-			     , adaptors.a2L
-			     ) ;
+		    {
+		      char *cp = adaptors.a2L ;
+		      aceOutf (ao, "%s\tClipped_5prime_Adaptor\tit\t%ld\t%s\n"
+			       , runNam
+			       , up->nClippedAdaptor2L
+			       , cp
+			       ) ;
+		    }
 		  
 		  if (up->nClippedAdaptor2R)
-		    aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
-			     , runNam
-			     , up->nClippedAdaptor2R
-			     , adaptors.a2R
-			     ) ;
+		    {
+		      char *cp = adaptors.a2R ;
+		      aceOutf (ao, "%s\tClipped_3prime_Adaptor_read2\tit\t%ld\t%s\n"
+			       , runNam
+			       , up->nClippedAdaptor2R
+			       , cp
+			       ) ;
+		    }
 		}
 	    }
 
@@ -709,11 +739,19 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , up->nMID
 		   , 100.0 * up->nMID /(.0001 + up->nBaseAligned1 + up->nBaseAligned2)
 		   ) ;
+	  {{
+	      int isRna = 0 ;
+	      if (saSetGetAdaptors (0, &isRna, 0, run))
+		aceOutf (ao, "%s\tStrategy\ti\t%d\n"
+		   , runNam
+		   , isRna
+		   ) ;
+	    }}		
 	  aceOutf (ao, "%s\tIntron_supports\tiiif\t%ld\t%ld\t%ld\t%.2f%%\n"
 		   , runNam
-		   , up->nIntronSupportPlus + up->nIntronSupportMinus
-		   , up->nIntronSupportPlus
-		   , up->nIntronSupportMinus
+		   , up->gt_ag_Support + up->ct_ac_Support 
+		   , up->gt_ag_Support
+		   , up->ct_ac_Support
 		   , up->intronStranding
 		   ) ;
 	  aceOutf (ao, "%s\tSupported_introns\ti\t%ld\n"
@@ -728,14 +766,6 @@ void saRunStatExport (const PP *pp, Array runStats)
 		   , runNam
 		   , up->ct_ac_Support
 		   ) ;
-	  {{
-	      int isRna = 0 ;
-	      if (saSetGetAdaptors (0, &isRna, 0, run))
-		aceOutf (ao, "%s\tStrategy\ti\t%d\n"
-		   , runNam
-		   , isRna
-		   ) ;
-	    }}		
 	  aceOutf (ao, "%s\tMin_read_length\ti\t%d\n", runNam, up->minReadLength) ;
 	  aceOutf (ao, "%s\tMax_read_length\ti\t%d\n", runNam, up->maxReadLength) ;
 	  if (up->lengthDistribution)
