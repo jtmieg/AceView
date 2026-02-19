@@ -349,7 +349,8 @@ static int gxSetFeet (GX *gx)
   char chromName[128] ;
   char feet[6] ;
   const char *gooddies ="gt_ag,gc_ag,at_ac,ct_ac" ;
-
+  int chromLn = 0 ;
+  
   memset (chromName, 0, 128) ;
 
   iter = ac_dbquery_iter (gx->db, "Find Intron ! IntMap || ! Length || ! type", h) ;
@@ -399,58 +400,66 @@ static int gxSetFeet (GX *gx)
 	      strncpy (chromName, chrom, 127) ;
 	      ac_free (chromDna) ;
 	      chromObj = ac_get_obj (gx->db, "Sequence", chromName, h) ;
-	      if (! chromObj)
-		messcrash ("Unknown ChromName %s", chromName) ;
-	      chromDna = ac_obj_dna (chromObj, h) ;
+	      chromDna = 0 ;
+	      chromLn = 0 ;
+	      if (chromObj)
+		{
+		  chromDna = ac_obj_dna (chromObj, h) ;
+		  chromLn = strlen (chromDna) ;
+		}
 	    }
 	  feet[0] = 0 ;
           if (chromDna)
 	    {
-	      if (1)
+	      if (a1 > 0 && a2 > 0 && a1 < chromLn && a2 < chromLn)
 		{
-		  /* get sliding */
-		  for (int i = 0 ; chromDna[a1-1+i] == chromDna[a2+i] ; i++)
-		    sliding++ ;
-		  for (int i = 0 ; chromDna[a1-2-i] == chromDna[a2-1-i] ; i++)
-		    sliding++ ;
-		}
-
-	      /* get type */
-	      if (1)
-		{
-		  if (a1 < a2)
+		  if (1)
 		    {
-		      feet[0] = chromDna[a1-1] ;
-		      feet[1] = chromDna[a1] ;
-		      feet[2] = '_' ;
-		      feet[3] = chromDna[a2-2] ;
-		      feet[4] = chromDna[a2-1] ;
-		      feet[5] = 0 ;
+		      /* get sliding */
+		      for (int i = 0 ; chromDna[a1-1+i] == chromDna[a2+i] ; i++)
+		    sliding++ ;
+		      for (int i = 0 ; chromDna[a1-2-i] == chromDna[a2-1-i] ; i++)
+			sliding++ ;
 		    }
-		  else
+		  
+		  /* get type */
+		  if (1)
 		    {
-		      feet[0] = complementLetter(chromDna[a1-1]) ;
-		      feet[1] = complementLetter(chromDna[a1-2]) ;
-		      feet[2] = '_' ;
-		      feet[3] = complementLetter(chromDna[a2]) ;
-		      feet[4] = complementLetter(chromDna[a2-1]) ;
-		      feet[5] = 0 ;
+		      if (a1 < a2)
+			{
+			  feet[0] = chromDna[a1-1] ;
+			  feet[1] = chromDna[a1] ;
+			  feet[2] = '_' ;
+			  feet[3] = chromDna[a2-2] ;
+			  feet[4] = chromDna[a2-1] ;
+			  feet[5] = 0 ;
+			}
+		      else
+			{
+			  feet[0] = complementLetter(chromDna[a1-1]) ;
+			  feet[1] = complementLetter(chromDna[a1-2]) ;
+			  feet[2] = '_' ;
+			  feet[3] = complementLetter(chromDna[a2]) ;
+			  feet[4] = complementLetter(chromDna[a2-1]) ;
+			  feet[5] = 0 ;
+			}
 		    }
-		}
 
-	      if (1)
-		{
-		  if (strcasestr (gooddies, feet))
-		    vtxtPrintf (txt, "%s\n", feet) ;
-		  else
-		    vtxtPrintf (txt, "Other %s\n", feet) ;
-		  if (sliding)
-		    vtxtPrintf (txt, "Sliding %d\n", sliding) ;
-		  else
-		    vtxtPrintf (txt, "-D Sliding\n") ;
+		  if (1)
+		    {
+		      if (strcasestr (gooddies, feet))
+			vtxtPrintf (txt, "%s\n", feet) ;
+		      else
+			vtxtPrintf (txt, "Other %s\n", feet) ;
+		      if (sliding)
+			vtxtPrintf (txt, "Sliding %d\n", sliding) ;
+		      else
+			vtxtPrintf (txt, "-D Sliding\n") ;
+		    }
 		}
 	    }
 	}
+      
 	  /* set echo */
       if (k == 2)
 	{

@@ -1931,7 +1931,23 @@ goto phaseLoop
 
 ##############################################################################
 
-phase_introns:
+phase_introns2:
+# locate the introns in baruzzo
+
+if (! -e  HG19.INTRON_DB/known_introns.ace2) then
+  echo "// known introns" >  HG19.INTRON_DB/known_introns.ace
+    echo "#" >  HG19.INTRON_DB/known_introns.txt
+  foreach type (t1 t2 t3)
+    echo $type
+    zcat Fasta/HG19$type*/HG19*.cig.gz  | gawk -F '\t' '{c=$2;s=$7;if(s=="-")next;n=split($6,aa,",");for(k=1;k<n;k++){split(aa[k],bb,"-");split(aa[k+1],cc,"-");x=bb[2]+1;y=cc[1]-1;printf("%s\t%d\t%d\t%d\t%s\n", c,x,y,y-x+1,type);}}' type=$type  >> HG19.INTRON_DB/known_introns.txt
+        zcat Fasta/HG19$type*/HG19*.cig.gz  | gawk -F '\t' '{c=$2;s=$7;if(s=="+")next;n=split($6,aa,",");for(k=1;k<n;k++){split(aa[k],bb,"-");split(aa[k+1],cc,"-");x=bb[2]+1;y=cc[1]-1;printf("%s\t%d\t%d\t%d\t%s\n", c,y,x,y-x+1,type);}}' type=$type  >> HG19.INTRON_DB/known_introns.txt  
+  end
+
+  cat HG19.INTRON_DB/known_introns.txt | sort -u  >  HG19.INTRON_DB/known_introns.u.txt
+
+  wc HG19.INTRON_DB/known_introns.txt HG19.INTRON_DB/known_introns.u.txt
+  cat  HG19.INTRON_DB/known_introns.u.txt | gawk -F '\t' '/^#/{next}{c=$1;x=$2;y=$3;ln=$4;t=$5;printf("Intron %s__%d_%d\nIntMap %s %d %d\nLength %d\nIn_mRNA %s\nIntron\n\n",c,y,x,c,y,x,ln,t);}}'  > HG19.INTRON_DB/known_introns.ace
+endif
 
 
 setenv iRuns "$runs"
@@ -1950,6 +1966,7 @@ foreach target (T2T GRCh38 HG19)
       echo y | tace .
     popd
   endif
+
   if (! -e $target.GFF/mrna2intron.ace) then
      mkdir $target.GFF
      pushd $target.GFF
@@ -1974,6 +1991,12 @@ foreach target (T2T GRCh38 HG19)
        save
        quit
 EOF
+  if ($target == HG19 && -e HG19.INTRON_DB/known_introns.ace) then
+    echo "pparse HG19.INTRON_DB/known_introns.ace" | tace $IDB  -no_prompt
+  endif
+
+
+
     touch  $IDB/genome.done
   endif
 end
@@ -1989,7 +2012,7 @@ end
 echo "Creating the intron counts"
 foreach target (T2T GRCh38 HG19)
   set IDB=$target.INTRON_DB
-  if (-e $IDB/introns.aceZ) continue
+  if (-e $IDB/introns.ace) continue
     echo '#' > $IDB/introns.tsf
     foreach mm ($iMethods)
       foreach run ($iRuns)
@@ -2017,38 +2040,81 @@ foreach target (T2T GRCh38 HG19)
       query find intron de_duo
       edit -D de_duo
       parse  $IDB/introns.ace
-      bql -o  $IDB/introns.counts.txt select ii,method,mrna from ii in ?Intron where ii#de_duo, method in ii->de_duo, mrna in ii#in_mrna
+      bql -o  $IDB/introns.counts.txt select ii,mm,nn,mrna from ii in ?Intron where ii#de_duo, mm in ii->de_duo, nn in mm[1] , mrna in ii#in_mrna
       query find intron In_MRNA
       save
       quit
 EOF
 end
 
- cat T2T.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("T2T\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort > _a
- cat GRCh38.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;}/NULL/{new[$2]++;}/In_mRNA/{known[$2]++}END{for (m in any)printf("GRCh38\t%s\t%d\t%d\t%d\n",m,any[m],known[m],new[m]);}' | sort > _b
+# in T2T we need the genome named as 1,2,3  to be able to read the intron feet 
+if (! -e T2T.INTRON_DB/T2T.renamed.genome.fasta.gz) then
+  zcat Reference_genome/T2T.genome.fasta.gz | gawk '/^>/{split($1,aa,".");gsub("chr","",aa[1]);print aa[1];next;}{print;}' | gzip > T2T.INTRON_DB/T2T.renamed.genome.fasta.gz
+  echo "pparse  T2T.INTRON_DB/T2T.renamed.genome.fasta.gz" | tace T2T.INTRON_DB -no_prompt 
+endif
 
-echo -n "# Introns $SV : " > _c
+echo "Creating the intron feet, only new introns will be analyzed"
+foreach target (T2T GRCh38)
+  set IDB=$target.INTRON_DB
+  echo "altintrons --setFeet --db $IDB -p toto"
+        altintrons --setFeet --db $IDB -p toto
+endif
+foreach target (T2T GRCh38)
+  set IDB=$target.INTRON_DB
+    tace $IDB  <<EOF	
+      bql -o  $IDB/introns.counts.txt select ii,mm,nn,mrna from ii in ?Intron where ii#de_duo && ii#gt_ag , mm in ii->de_duo, nn in mm[1] , mrna in ii#in_mrna
+      query find intron In_MRNA
+      quit
+EOF
+end
+
+
+ cat T2T.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;anyC[$2]+=$3;}/NULL/{new[$2]++;newC[$2]+=$3;}/In_mRNA/{known[$2]++;knownC[$2]+=$3;}END{for (m in any)printf("T2T\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",m,any[m],known[m],new[m],anyC[m],knownC[m],newC[m]);}' | sort > _a
+ cat GRCh38.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;anyC[$2]+=$3;}/NULL/{new[$2]++;newC[$2]+=$3;}/In_mRNA/{known[$2]++;knownC[$2]+=$3;}END{for (m in any)printf("GRCh38\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",m,any[m],known[m],new[m],anyC[m],knownC[m],newC[m]);}' | sort > _b
+ cat HG19.INTRON_DB/introns.counts.txt | gawk -F '\t' '{any[$2]++;anyC[$2]+=$3;}/NULL/{new[$2]++;newC[$2]+=$3;}/In_mRNA/{known[$2]++;knownC[$2]+=$3;}END{for (m in any)printf("HG19\t%s\t%d\t%d\t%d\t%d\t%d\t%d\n",m,any[m],known[m],new[m],anyC[m],knownC[m],newC[m]);}' | sort > _h
+
+ phase_introns:
+setenv iRuns "$runs"
+#setenv iRuns "iRefSeq iRefSeq38"
+set iMethods="011_SortAlignG5R5 012_SortAlignG3R3 013_SortAlignG3R1 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 23_HISAT2_16threads 31_STARlong 53_Minimap2_16threads"
+set iMethods="$methods"
+
+ 
+echo -n "# Introns counts $SV : " > _c
 date >> _c
 echo -n "#Run\tMethod" >> _c
 
+echo -n "# Introns supports $SV : " > _cC
+date >> _cC
+echo -n "#Run\tMethod" >> _cC
+
 foreach mm ($iMethods)
     echo $mm | gawk '{printf("\t%s",$1);}' >> _c
+    echo $mm | gawk '{printf("\t%s",$1);}' >> _cC
 end
 foreach run ($iRuns)
   echo -n "\n$run Known Intron\t" >> _c
+  echo -n "\n$run Known Intron\t" >> _cC
   foreach mm ($iMethods)
-    cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$4;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
-  end
-end
-echp >> _c
-foreach run ($iRuns)
-  echo -n "\n$run New Intron\t" >> _c
-  foreach mm ($iMethods)
-    cat _a _b | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$5;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
+    cat _a _b _h | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$4;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
+    cat _a _b _h | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$7;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _cC    
   end
 end
 echo >> _c
-\cp _c COMPARE/introns_known_new.$SV.txt
+echo >> _cC
+foreach run ($iRuns)
+  echo -n "\n$run New Intron\t" >> _c
+  echo -n "\n$run New Intron\t" >> _cC
+  foreach mm ($iMethods)
+    cat _a _b _h | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$5;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _c
+    cat _a _b _h | gawk '{split($2,aa,"__");if(aa[1]==m && aa[2]==r)n=$8;}END{printf("\t%d",n+0);}' m=$mm r=$run >> _cC
+  end
+end
+echo >> _c
+echo >> _cC
+\cp _c COMPARE/introns_counts_known_new.$SV.txt
+\cp _cC COMPARE/introns_supports_known_new.$SV.txt
+wc COMPARE/introns_*_known_new.$SV.txt
 
 # ROC curve, truth = gt_ag  , not useful when we align the iRefSeq38
  cat GRCh38.INTRON_DB/introns.tsf | gawk '{if($1==m){print $7;}}' m=011_SortAlignG5R5 | tags | sort -k 2nr | head -8
