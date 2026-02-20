@@ -2059,7 +2059,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		mergeErrors (bb->errors, ap->errors, flip) ;
 	      if (arrayMax (ap->errors))
 		alignFormatErrors (pp, bb, ap, dna, dnaG, dnaGR, read) ;	  
-	      if (! pp->sam)
+	      if (! pp->sam && ! pp->bam)
 		arrayDestroy (ap->errors) ;
 	    }
 	}

@@ -300,6 +300,10 @@ typedef struct pStruct {
   int OVLN ;
   int gpu ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
+  BOOL sraOutFormatPE ; /* default: 4 lines per pair (>id1, atgc, >id2. atgc */
+  BOOL sraOutFormatPEQ ; /* 8 lines per pair (twice fastq) */
+  BOOL sraOutFormatFasta ; /* 2 files per pair, fasta format */
+  BOOL sraOutFormatFastq ; /* 2 files per pair, fastq format */
   long int wiggleCumul ; /* in million bases */
   long int cds, utr, intronic, intergenic ;
   BOOL splice ;
@@ -481,7 +485,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget) ;
   
 /* sa.sequenceParser.c */
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome) ;
-int saSequenceParseSraDownload (const char *sraID, int maxGb) ;
+int saSequenceParseSraDownload (const PP *pp, const char *sraID) ;
 void saSequenceParseGzBuffer (const PP *pp, BB *bb) ;
 
 /* sa.uringSequenceParser.c */

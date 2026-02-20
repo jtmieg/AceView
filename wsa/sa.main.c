@@ -1394,21 +1394,46 @@ int main (int argc, const char *argv[])
       const char *sraID = 0 ;
       if (getCmdLineText (h, &argc, argv, "--sraDownload", &sraID))
 	{
-	  char *buf = strnew (sraID, h) ;
-	  char *cp = buf ;
+	  char *cp = 0 ;
+	  const char *outFormat = 0 ;
 
+	  p.sraOutFormatPE = TRUE ; /* default */
+	  if (getCmdLineText (h, &argc, argv, "--O", &(outFormat)))
+	    {
+	      cp = strnew (outFormat, h) ;
+	      p.sraOutFormatPE = FALSE ; /* default */
+	      while (cp)
+		{
+		  char *cq = strchr (cp, ',') ;
+		  if (cq) *cq = 0 ;
+		  if (! strcmp (cp, "PE"))
+		    p.sraOutFormatPE = TRUE ;
+		  else if (! strcmp (cp, "PEQ"))
+		    p.sraOutFormatPEQ = TRUE ;
+		  else if (! strcmp (cp, "fasta"))
+		    p.sraOutFormatFasta = TRUE ;
+		  else if (! strcmp (cp, "fastq"))
+		    p.sraOutFormatFastq = TRUE ;
+		  else
+		    saUsage ("-O parameter should of one or several of  PE,PEQ,fasta,fastq", argc, argv) ;
+		  
+		  cp = cq ? cq + 1 : 0 ;
+		}
+	    }
+		    
 	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb)) ||
 	    getCmdLineInt (&argc, argv, "--maxGb", &(p.maxSraGb)) ||
 	    getCmdLineInt (&argc, argv, "--maxgB", &(p.maxSraGb)) ||
 	    getCmdLineInt (&argc, argv, "--maxgb", &(p.maxSraGb));
 	  if (p.maxSraGb < 0)
 	    saUsage ("--maxGB parameter should be positive", argc, argv) ;
-	  
+
+	  cp = strnew (sraID, h) ;
 	  while (cp)
 	    {
 	      char *cq = strchr (cp, ',') ;
 	      if (cq) *cq = 0 ;
-	      saSequenceParseSraDownload (cp, p.maxSraGb) ;
+	      saSequenceParseSraDownload (&p, cp) ;
 	      cp = cq ? cq + 1 : 0 ;
 	    }
 	  exit (0) ;

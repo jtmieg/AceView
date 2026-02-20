@@ -1104,12 +1104,14 @@ void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome)
 
 /**************************************************************/
 
-int saSequenceParseSraDownload (const char *sraID, int Gb)
+int saSequenceParseSraDownload (const PP *pp, const char *sraID)
 {
   AC_HANDLE h = ac_new_handle () ;
-  char *fNam = hprintf (h, "SRA/%s.sra.fasta", sraID) ;
+  char *fNam = 0 ;
+  char *cr = 0 ;
   ACEOUT ao = 0 ; 
   char tBuf[25] ;
+  int Gb = pp->maxSraGb ;
   
   if (mkdir("./SRA", 0755) == -1)
     {
@@ -1117,9 +1119,28 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
 	messcrash ("\nCannot create or cannot write in the SRA cache directory ./SRA") ;
     }
 
-  if (1)  /* check in the cache */
+  if (pp->sraOutFormatPE)
+    fNam = hprintf (h, "SRA/%s.sra.fasta", sraID) ;
+  else if (pp->sraOutFormatPEQ)
+
+  
+  for (int pass = 0 ; pass < 2 ; pass++)  /* check in the cache */
     {
-      char *cr = filName (fNam, 0, "r") ;
+      cr = 0 ;
+
+      switch (pass)
+	{
+	case 0:  /* search fastq file */
+	  fNam = hprintf (h, "SRA/%s.sra.fastq", sraID) ;
+	  break ;
+	case 1:  /* search fasta file */
+	  if (pp->sraOutFormatPEQ)
+	    continue ;  /* we need the fastq */ 
+	  fNam = hprintf (h, "SRA/%s.sra.fasta", sraID) ;
+	  break ;
+	}
+
+      cr = filName (fNam, 0, "r") ;
       if (cr)
 	fprintf (stderr, "Found cached file %s\n", fNam) ;
       else
@@ -1128,13 +1149,14 @@ int saSequenceParseSraDownload (const char *sraID, int Gb)
 	  if (cr)
 	    fprintf (stderr, "Found cached file %s.gz\n", fNam) ;
 	}
-      if (cr)
-	{
-	  ac_free (h) ;
-	  return 0 ;
-	}
+    }
+  if (cr)
+    {            /* file already in cache */
+      ac_free (h) ;
+      return 0 ;
     }
 
+  /* download */
   ao = aceOutCreate (fNam, 0, TRUE, h) ;
   if (!ao)
     messcrash ("\nCannot create the SRA cache file %s", fNam) ;

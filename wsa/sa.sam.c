@@ -420,7 +420,7 @@ if (1)
 	  Array dnaR = dnaCopy (dna) ;
 	  char *cp = arrp (dnaR, 0, char) ;
 	  dnaDecodeArray (dnaR) ;
-	  if (0) while (i--)
+	  if (1) while (i--)
 	    { *cp = ace_upper (*cp) ; cp++; }
 	  vtxtPrintf (record, "\t%s", arrp (dnaR, 0, char)) ;
 	  ac_free (dnaR) ;
@@ -432,7 +432,7 @@ if (1)
 	  char *cp = arrp (dnaR, 0, char) ;
 	  reverseComplement (dnaR) ;
 	  dnaDecodeArray (dnaR) ;
-	  if (0) while (i--)
+	  if (1) while (i--)
 	    { *cp = ace_upper (*cp) ; cp++; }
 	  vtxtPrintf (record, "\t%s", arrp (dnaR, 0, char)) ;
 	  ac_free (dnaR) ;
