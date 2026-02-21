@@ -2335,29 +2335,30 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 
       /* register the double introns */
       int intronMax = arrayMax (bb->confirmedIntrons) ;
-      for (ii = intronMaxOld ; ii < intronMax -1 ; ii++)
-	{
-	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
-	  INTRON *zp2 = arrayp (bb->confirmedIntrons, ii + 1, INTRON) ;
-
-	  if (zp1->chrom == zp2->chrom && zp1->n == zp2->n &&
-	      (
-	       (zp1->a1 < zp1->a2 && zp1->a2 < zp2->a1 && zp2->a1 < zp2->a2) ||
-	       (zp1->a1 > zp1->a2 && zp1->a2 > zp2->a1 && zp2->a1 > zp2->a2) 
-	       ) &&
-	      ! strcmp (zp1->feet, "gt_ag") && ! strcmp (zp2->feet, "gt_ag") 
-	      ) /* same chain chain */
-	    {
-	      DOUBLEINTRON *zzp = arrayp (bb->doubleIntrons, arrayMax (bb->doubleIntrons), DOUBLEINTRON) ;
-	      zzp->chrom = zp1->chrom ;
-	      zzp->run = bb->run ;
-	      zzp->n = 1 ;
-	      zzp->a1 = zp1->a1 ; zzp->a2 = zp1->a2 ;
-	      zzp->b1 = zp2->a1 ; zzp->b2 = zp2->a2 ;
-	      memcpy (zzp->feet1, zp1->feet, 6) ;
-	      memcpy (zzp->feet2, zp2->feet, 6) ;
-	    }
-	}
+      if (pp->introns)
+	for (ii = intronMaxOld ; ii < intronMax -1 ; ii++)
+	  {
+	    INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
+	    INTRON *zp2 = arrayp (bb->confirmedIntrons, ii + 1, INTRON) ;
+	    
+	    if (zp1->chrom == zp2->chrom && zp1->n == zp2->n &&
+		(
+		 (zp1->a1 < zp1->a2 && zp1->a2 < zp2->a1 && zp2->a1 < zp2->a2) ||
+		 (zp1->a1 > zp1->a2 && zp1->a2 > zp2->a1 && zp2->a1 > zp2->a2) 
+		 ) &&
+		! strcmp (zp1->feet, "gt_ag") && ! strcmp (zp2->feet, "gt_ag") 
+		) /* same chain chain */
+	      {
+		DOUBLEINTRON *zzp = arrayp (bb->doubleIntrons, arrayMax (bb->doubleIntrons), DOUBLEINTRON) ;
+		zzp->chrom = zp1->chrom ;
+		zzp->run = bb->run ;
+		zzp->n = 1 ;
+		zzp->a1 = zp1->a1 ; zzp->a2 = zp1->a2 ;
+		zzp->b1 = zp2->a1 ; zzp->b2 = zp2->a2 ;
+		memcpy (zzp->feet1, zp1->feet, 6) ;
+		memcpy (zzp->feet2, zp2->feet, 6) ;
+	      }
+	  }
 
       /* reset the count which was overlaoded with chain */
       for (ii = intronMaxOld ; ii < intronMax ; ii++)

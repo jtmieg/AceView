@@ -269,7 +269,7 @@ typedef struct pStruct {
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
-  BOOL sam, bam, hitsFormat, exportSamSequence, exportSamQuality ;
+  BOOL sam, bam, hitsFormat, exportSamSequence, exportSamQuality, qualityFactors ;
   BOOL strand, antiStrand ;
   BOOL isDna, isRna ;
   int bonus[256] ;
@@ -301,6 +301,7 @@ typedef struct pStruct {
   int gpu ;
   int maxSraGb ; /* max number of Gigabases in each SRA download, 0 : no max */
   BOOL sraOutFormatPE ; /* default: 4 lines per pair (>id1, atgc, >id2. atgc */
+  BOOL deduplicate ;
   BOOL sraOutFormatPEQ ; /* 8 lines per pair (twice fastq) */
   BOOL sraOutFormatFasta ; /* 2 files per pair, fasta format */
   BOOL sraOutFormatFastq ; /* 2 files per pair, fastq format */
@@ -471,6 +472,7 @@ void saDoubleIntronsExport (PP *pp, Array aaa) ;
 void saIntronsCumulate (PP *pp, BB *bb) ;
 void saDoubleIntronsCumulate (PP *pp, BB *bb) ;
 int saSupportedIntrons (const PP *pp, int run) ;
+void saIntronStranding (PP *pp, Array aa) ;
 
 /* sa.targetIndex.c */
 Array saTargetParseConfig (PP *pp) ;
@@ -487,6 +489,7 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget) ;
 void saSequenceParse (const PP *pp, RC *rc, TC *tc, BB *bb, int isGenome) ;
 int saSequenceParseSraDownload (const PP *pp, const char *sraID) ;
 void saSequenceParseGzBuffer (const PP *pp, BB *bb) ;
+void saSequenceDeduplicate (const PP *pp, BB *bb) ;
 
 /* sa.uringSequenceParser.c */
 void saUringSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb) ;
@@ -506,7 +509,10 @@ BOOL saReadAdaptors (ADAPTORS *adaptors, RunSTAT *up, BOOL coded) ;
 void saAlign (const void *vp) ;
 void saAlignDo (const PP *pp, BB *bb) ;
 int saAlignOrder (const void *va, const void *vb) ;
-  
+
+/* sa.utils */
+int saBestNumactlNode (void) ;
+
 /**************************************************************/
 /**************************************************************/
 /**************************************************************/

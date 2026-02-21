@@ -429,6 +429,69 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 } /* saSequenceParseGzBuffer */
 
 /**************************************************************/
+
+static int dnaSequenceOrder (const void *va, const void *vb)
+{
+  const Array *up = va ;
+  const Array *vp = vb ;
+  const char *cp = *up ? arrp (*up, 0, char) : 0 ;
+  const char *cq = *vp ? arrp (*vp, 0, char) : 0 ;
+
+  if (!cp)
+    return cq ? 1 : 0 ;
+  if (!cq)
+    return cp ? -1 : 0 ;
+  return strcmp (cp, cq) ;
+} /* dnaSequenceOrder */
+
+/**************************************************************/
+/* add the multiplicities in the # filed, creating a fastc format */
+void saSequenceDeduplicate (const PP *pp, BB *bb)
+{
+  AC_HANDLE h = ac_new_handle () ;
+  Array dnas = bb->dnas ;
+  int i, j, iMax = arrayMax (dnas), k, kk = 1 ;
+  DICT *newDict = dictHandleCreate (iMax, bb->h) ;
+  Array newDnas = arrayHandleCreate (iMax, Array, bb->h) ;
+  char buf[64] = {0} ;
+  ACEOUT ao = aceOutCreate (pp->outFileName, ".fastc", pp->gzo, h) ;
+  
+  arraySort (dnas, dnaSequenceOrder) ;
+  for (i = 0 ; i < iMax ; i++)
+    {
+      int mult = 1 ;
+      Array dna1 = arr (dnas, i, Array) ;
+      if (dna1)
+	{
+	  const char *cp = arrayMax (dna1) ? arrp (dna1, 0, char) : 0 ;
+	  if (! cp)
+	    continue ;
+	  for (j = i + 1 ; j < iMax ; j++)
+	    {
+	      Array dna2 = arr (dnas, j, Array) ;
+	      if (dna2)
+		{
+		  const char *cq = arrp (dna2, 0, char) ;
+		  if (strcmp (cp, cq))
+		    break ;
+		  mult++ ;
+		}
+	      else
+		break ;
+	    }
+
+	  sprintf (buf, "s%d#%d", kk++, mult) ;
+	  dictAdd (newDict, buf, &k) ;
+	  array (newDnas, k, Array) = dna1 ;
+	  i += mult - 1 ;
+	  aceOutf (ao, ">%s\n%s\n", buf, cp) ;
+	}
+    }
+  ac_free (h) ;
+  exit (0) ;
+}
+
+/**************************************************************/
 /* aug 2
  *  f = gzopen ("gilname.gz", r)
  *  cp = gzread (f, 100Mega, buffer) ;

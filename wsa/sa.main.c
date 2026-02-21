@@ -214,6 +214,8 @@ static void codeWords (const void *vp)
 
       t1 = clock () ;
       saSequenceParseGzBuffer (pp, &bb) ;
+      if (pp->deduplicate)
+	saSequenceDeduplicate (pp, &bb) ;
       saCodeSequenceSeeds (pp, &bb, pp->iStep, FALSE) ;
       t2 = clock () ;
 
@@ -956,8 +958,10 @@ static void export (const void *vp)
       t1 = clock () ;
       if (bb.aligns && bigArrayMax (bb.aligns))
 	{
-	  bigArraySort (bb.aligns, saAlignOrder) ;
-	  exportDo (pp, &bb) ;
+	  if (pp->sam || pp->bam || pp->hitsFormat)
+	    bigArraySort (bb.aligns, saAlignOrder) ;
+	  if (pp->hitsFormat)
+	    exportDo (pp, &bb) ;
 	  if (pp->sam || pp->bam)
 	    {
 	      ACEOUT ao = aos[bb.run] ;
@@ -1251,10 +1255,12 @@ void saUsage (char *message, int argc, const char **argv)
 	       "// ALIGNMENT FORMAT:\n"
 	       "//   By default, the aligments are exported in .hits format\n"
 	       "//   To request bam/sam or to skip these files use\n"
-	       "// --noAli : do not export the alignements\n"
+	       "// --no_ali : do not export the alignements (or the introns unless --introns is set)\n"
 	       "// --sam : export the alignment in sam format\n"
 	       "// --bam : export the alignment in bam format\n"
 	       "// --hits : also export .hits in addition to sam/bam\n"
+	       "//    --quality_factors: export in sam/am the quality factors read fro SRA or from fastq files\n"
+	       "//      These coefficients are not used by this aligner, just echoed to sam/bam on request\n"
 	       "//\n"
 	       "// DATA FILTERS:\n"
 	       "// --minReadLength  <int> : [default 20 (or max read lenght)]\n"
@@ -1281,7 +1287,7 @@ void saUsage (char *message, int argc, const char **argv)
 	       "//   --adaptor1 atgc : Read 1 exit adaptor, as exported in file <run>.overhang3prime.tsf\n"
 	       "//   --adaptor2 ggct : Read 2 exit adaptor, as exported in file <run>.overhang5prime.tsf\n"
 	       "// --wiggles  : Report target coverage wiggles in UCSC BF (fixed) format\n"
-	       "// --intron  : Report intron support\n"
+	       "// --introns  : [default] Report intron support\n"
 	       "// (--snp : not yet ready) Report candidate SNP counts (substitutions and short indels)\n"
 	       "// STEPPING\n"
 	       "// --step <int>, take a seed every <int> base\n"
@@ -1460,93 +1466,15 @@ int main (int argc, const char *argv[])
     {
       vTXT txt = vtxtHandleCreate (h) ;
       
-      int nodes = -1 ;
-
-      if (0)
-	{       /* largest node */
-	  FILE *f = fopen("/sys/devices/system/node/online","r");
-	  if (f)
-	    { /* it seems better to bind to the largest (less used) node */
-	      unsigned a,b; 
-	      if (fscanf(f,"%u-%u",&a,&b) == 2) nodes = b ; 
-	      fclose(f);
-	    }
-	}
-      
-      if (1)
-	{ /* node with least running threads */
-
-	  int best_node = 0;
-	  long long min_load = -1;
-
-	  
-	  DIR *d = opendir("/sys/devices/system/node"); 
-	  if (d)
-	    {	  
-	      struct dirent *e;
-	      while ((e = readdir(d)))
-		{
-		  int node;
-		  if (sscanf(e->d_name, "node%d", &node) != 1) continue;
-		  
-		  char path[64];
-		  snprintf(path, sizeof(path),
-			   "/sys/devices/system/node/node%d/cpumap", node);
-		  
-		  FILE *f = fopen(path, "r");
-		  if (!f) continue;
-		  
-		  /* count bits = number of online CPUs on this node */
-		  unsigned long long map = 0;
-		  int n = fscanf(f, "%llx", &map);
-		  fclose(f);
-		  if (n != 1) continue;
-		  
-		  long long load = 0;
-		  for (unsigned long long m = map; m; m &= m-1) load++;
-		  
-		  /* count how many tasks are actually scheduled here */
-		  load = 0;
-		  snprintf (path, sizeof(path), "/proc/schedstat");
-		  f = fopen(path, "r");
-		  if (f)
-		    {
-		      char buf[256];
-		      while (fgets(buf, sizeof(buf), f))
-			{
-			  int cpu;
-			  if (sscanf(buf, "cpu%d %*s %*d %*d %*d %*d %*d %*d %*d %lld", &cpu, &load) == 2)
-			    {
-			      /* check if this cpu belongs to our node */
-			      char cpu_path[64];
-			      snprintf(cpu_path, sizeof(cpu_path),
-				       "/sys/devices/system/node/node%d/cpu%d",
-				       node, cpu);
-			      if (! access(cpu_path, F_OK))
-				load += 1;   // one more running thread
-			    }
-			}
-		      fclose(f);
-		    }
-		  
-		  if (min_load == -1 || load < min_load)
-		    {
-		      min_load = load;
-		      best_node = node;
-		    }
-		}
-	      closedir(d);
-	    }
-	  nodes = best_node;
-	}
-
-
+      int nodes = saBestNumactlNode () ;
+	
       vtxtPrintf (txt, "/usr/bin/numactl  --cpunodebind=%d --membind=%d ", nodes, nodes) ;
       for (int i = 0 ; i < argc ; i++)
 	vtxtPrintf (txt, " %s " , argv[i]) ;
       vtxtPrintf (txt, " --numactl ") ;
 
       fprintf (stderr, "%s\n", vtxtPtr (txt)) ;
+
       return system (vtxtPtr (txt)) ;
     }
   
@@ -1693,6 +1621,7 @@ int main (int argc, const char *argv[])
 
   /******************* sequence files to be analysed , not used if --createIndex *************/
 
+  
   getCmdLineText (h, &argc, argv, "-i", &(p.inFileName)) ;
   getCmdLineText (h, &argc, argv, "-I", &(p.inConfigFileName)) ;
 
@@ -1705,6 +1634,7 @@ int main (int argc, const char *argv[])
 
   /***************** requested analyses, not used if --createIndex *************/
 
+  p.deduplicate = getCmdLineBool (&argc, argv, "--deduplicate") ;
   p.isDna = getCmdLineBool (&argc, argv, "--DNA") ;
   p.isRna = getCmdLineBool (&argc, argv, "--RNA") ;
   p.justStats  = getCmdLineText (h, &argc, argv, "--justStats", 0) ;
@@ -1713,20 +1643,23 @@ int main (int argc, const char *argv[])
   p.ignoreIntronSeeds = getCmdLineBool (&argc, argv, "--ignoreIntronSeeds") ;
 
   p.hitsFormat = TRUE ; /* default */
+  p.introns = TRUE ; /* default */
   p.sam = getCmdLineBool (&argc, argv, "--sam") ;
   p.bam = getCmdLineBool (&argc, argv, "--bam") ;
+  p.qualityFactors = getCmdLineBool (&argc, argv, "--quality_factors") ;
   if (p.sam || p.bam)
     {
       p.hitsFormat = FALSE ;
       p.exportSamSequence = TRUE ;
-      p.exportSamQuality = TRUE ;
+      if (p.qualityFactors)
+	p.exportSamQuality = TRUE ;
     }
   /* we may wish both sam/bam and hits */
   p.hitsFormat = getCmdLineBool (&argc, argv, "--hits") ;
   /* we may cancel all the alignment files */
-  if (getCmdLineBool (&argc, argv, "--noAli"))
-    p.sam = p.bam = p.hitsFormat = FALSE ;
-
+  if (getCmdLineBool (&argc, argv, "--no_ali"))
+    p.sam = p.bam = p.hitsFormat = p.exportSamQuality = p.exportSamSequence = p.introns = FALSE ;
+  p.introns = getCmdLineBool (&argc, argv, "--introns") ;
   
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
 
@@ -1734,7 +1667,6 @@ int main (int argc, const char *argv[])
   p.wiggle = getCmdLineBool (&argc, argv, "--wiggles") ;
   p.wiggleEnds = getCmdLineBool (&argc, argv, "--wiggleEnds") ;
   p.snps = getCmdLineBool (&argc, argv, "--snp") ;
-  p.introns = getCmdLineBool (&argc, argv, "--intron") ;
 
   getCmdLineText (h, &argc, argv, "--adaptor1", &(p.rawAdaptor1R)) ;
   getCmdLineText (h, &argc, argv, "--adaptor2", &(p.rawAdaptor2R)) ;
@@ -2227,12 +2159,17 @@ int main (int argc, const char *argv[])
       p.runStranding = halloc (n, p.h) ;
       memset (p.runStranding, 0, n) ;
     }}
-  saIntronsExport (&p, p.confirmedIntrons) ; /* before wiggleExport to restrand the gene expression */ 
+
+  saIntronStranding (&p, p.confirmedIntrons) ;
+  if (p.introns)
+    {
+      saIntronsExport (&p, p.confirmedIntrons) ; /* before wiggleExport to restrand the gene expression */ 
+      saDoubleIntronsExport (&p, p.doubleIntrons) ;
+    }
   if (p.wiggle)
     saWiggleExport (&p, nAgents) ;
   saCpuStatExport (&p, cpuStats) ;
   saPolyAsExport (&p, p.confirmedPolyAs) ;
-  saDoubleIntronsExport (&p, p.doubleIntrons) ;
   saRunStatExport (&p, p.runStats) ; /* must come afer PolyAsExport and IntronsExport */
   
   wego_log ("Done") ;

@@ -736,7 +736,7 @@ static char *flipFeet (char *feet)
   
 /**************************************************************/
 
-static void saIntronStranding (PP *pp, Array aa)
+void saIntronStranding (PP *pp, Array aa)
 {
   INTRON *zp, *zpR ;
   int runMax = dictMax (pp->runDict) + 1 ;
@@ -866,7 +866,6 @@ void saIntronsExport (PP *pp, Array aaa)
       INTRON *up ;
       long int ii ;
       
-      saIntronStranding (pp, aaa) ;
       aceOutf (ao, "### Intron support in tsf format: chrom__a1_a2,  run, iit (format for 2 integers 1 text), nb of reads supportingt the intron, number antistrand, intron feet\n") ;
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
