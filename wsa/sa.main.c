@@ -1665,7 +1665,8 @@ int main (int argc, const char *argv[])
     p.sam = p.bam = p.hitsFormat = p.exportSamQuality = p.exportSamSequence = p.introns = FALSE ;
   if (getCmdLineBool (&argc, argv, "--hits"))
     p.hitsFormat = TRUE ;  /* stay on previous value is not set */
-  p.introns = getCmdLineBool (&argc, argv, "--introns") ;
+  if (getCmdLineBool (&argc, argv, "--introns"))
+    p.introns = TRUE ;  /* stay on previous value is not set */
   
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
 
