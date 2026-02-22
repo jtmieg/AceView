@@ -1480,6 +1480,8 @@ int main (int argc, const char *argv[])
   
   /**************************  debugging modules, ignore *********************************/
 
+  getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
+
   p.gzi = getCmdLineBool (&argc, argv, "--gzi") ;   /* decompress input files (implicit for files named .gz) */
   p.gzo = getCmdLineBool (&argc, argv, "--gzo") ;   /* compress most output files */
 
@@ -1546,6 +1548,9 @@ int main (int argc, const char *argv[])
       showHitsDo (0, 0) ;
       exit (0) ;
     }
+
+  if (getCmdLineInt (&argc, argv, "--testRG", &(n)))
+    saCreateRandomGenome (&p, n) ;
 
   /**************************  another debugging module, ignore ***************************/
   
@@ -1655,10 +1660,11 @@ int main (int argc, const char *argv[])
 	p.exportSamQuality = TRUE ;
     }
   /* we may wish both sam/bam and hits */
-  p.hitsFormat = getCmdLineBool (&argc, argv, "--hits") ;
   /* we may cancel all the alignment files */
   if (getCmdLineBool (&argc, argv, "--no_ali"))
     p.sam = p.bam = p.hitsFormat = p.exportSamQuality = p.exportSamSequence = p.introns = FALSE ;
+  if (getCmdLineBool (&argc, argv, "--hits"))
+    p.hitsFormat = TRUE ;  /* stay on previous value is not set */
   p.introns = getCmdLineBool (&argc, argv, "--introns") ;
   
   p.sraCaching = getCmdLineBool (&argc, argv, "--sraCaching");   /* cache the files downlaoded from NCBI/SRA */
@@ -1677,7 +1683,6 @@ int main (int argc, const char *argv[])
   if (0) { p.sam = TRUE ; p.wiggle = TRUE ; p.wiggleEnds = FALSE ;}
   /*****************  sequence file names and their formats  ************************/
   
-  getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
   p.runName = 0  ; /* default */
 
   /* force the sequence file formats,
@@ -1803,7 +1808,8 @@ int main (int argc, const char *argv[])
   getCmdLineInt (&argc, argv, "--bMax", &(p.BMAX)) ;
   if (p.BMAX < 1) p.BMAX = 1 ;
   if (p.BMAX > 1024) p.BMAX = 1024 ;
-  
+
+ 
   /*****************  Check tat all parameters have been parsed *******************/
   if (argc > 1)
     saUsage (0, argc, argv) ;

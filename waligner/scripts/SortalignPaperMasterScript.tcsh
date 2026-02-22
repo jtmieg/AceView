@@ -96,6 +96,8 @@ setenv SV     v68.81.18M.Wiggle.errCost4.feb15    # adaptor clipping wiggle, bin
 setenv SVlast v68.81.18M.Wiggle.errCost4.feb15
 setenv SV     v69.81.18M.Wiggle.errCost4.feb16    # adaptor clipping wiggle, binary printf DNA/RNA automatic, no sam , new index for gene expressions
 setenv SVlast v69.81.18M.Wiggle.errCost4.feb16
+setenv SV     v70.81.18M.e4.W.feb21    # new load balancer for numactl
+setenv SVlast v70.81.18M.e4.W.feb21
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV

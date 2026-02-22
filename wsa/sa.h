@@ -513,6 +513,9 @@ int saAlignOrder (const void *va, const void *vb) ;
 /* sa.utils */
 int saBestNumactlNode (void) ;
 
+/* sa.tests */
+void saCreateRandomGenome (PP *pp, int nMb) ;
+
 /**************************************************************/
 /**************************************************************/
 /**************************************************************/
