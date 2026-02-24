@@ -288,13 +288,13 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
     {
       int zX =x2 , zY ;
       int zEx = 0, zEy = nEy ;
-      epX = epY = 0 ; bestI = bestJ = -1 ; nE = 0 ; 
+      epX = epY = 0 ; bestI = 0 ; bestJ = -1 ; nE = 0 ; 
       for (i = 0 ; i < nEx ; i++)
 	{  /* count the vp errors that cannot be clipped */
 	  epX = arrp (vp->errors, nE, A_ERR) ;
 	  int zX = epX->iShort ; /* last good base */
 	  if (zX  < y1 - 1) /* bio coords */
-	    { bestI = i ; zEx++ ; }
+	    { bestI = i + 1 ; zEx++ ; }
 	  else
 	    break ;
 	}
@@ -367,32 +367,32 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	      epX = arrp (vp->errors, i, A_ERR) ;
 	      zX = epX->iShort ; /* last good base starting from the left */
 	      /* not favorable but maybe we canadvance on Y */
-	      zEx++ ; cI++ ; cX2 = zX ; continue ;
+	      zEx = i - 1 ; cI++ ; cX2 = zX ; continue ;
 	    }
 	  /* we cannot advance on X and we already have advanced on Y, so we are done */
 	  break ;
 	}
 
-      if (bestI < nEx - 1)  /* we can clip the vp errors */
+      if (nEx && bestI <= nEx - 1)  /* we can clip the vp errors */
 	{
-	  if (bestI >= -1)
+	  if (bestI == -1) bestI = 0 ;
+	  if (bestI >= 0)
 	    {
-	      epX = arrp (vp->errors, bestI+1, A_ERR) ;
-	      
+	      epX = arrp (vp->errors, bestI, A_ERR) ;
 	      vp->x2 = epX->iShort ;  /* last exact base bio coords */
 	      /* vp->a2 = epX->iLong + (isDown ? 0 : 2) ; */
 	      int zA = epX->iLong + (isDown ? 0 : -1) ;
-	      vp->a2 = (vp->chrom & 0x1 ?  arrayMax(dnaG) - zA : zA + 1) ;
+	      vp->a2 = (vp->chrom & 0x1 ?  arrayMax(dnaG) - zA + 1 : zA) ;
 	    }
-	  nEx = bestI + 1 ;
+	  nEx = bestI ;
 	  vp->nErr = arrayMax (vp->errors) = nEx ;
 	}
 
-      if (bestJ >= 0) /* if bestJ == -1, wp->x1/a1 is well positioned */
+      if (nEy && bestJ >= 0) /* if bestJ == -1, wp->x1/a1 is well positioned */
 	{ /* we must clip these errors */
 	  epY = arrp (wp->errors, bestJ, A_ERR) ;
-	  int zA = epY->iLong  + 1 ;
-	  int zY = epY->iShort + 1 ; /* we need to find the first exact */
+	  int zA = epY->iLong  ;
+	  int zY = epY->iShort ; /* we need to find the first exact */
 	  int dA = 0, dY = 0 ;
 	  switch (epY->type)
 	    {   
@@ -401,7 +401,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	      break ;
 	    case INSERTION_DOUBLE:
 	      dY++ ;
-	      dA++ ;
+	      dA-- ;
 	      break ;
 	    case INSERTION_TRIPLE:
 	      dY += 2 ;
@@ -411,21 +411,22 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	      dY -- ;
 	      break ;
 	    case TROU_DOUBLE:
-	      dY -- ;
-	      dA-- ;
+	      dY-- ;
+	      dA++ ;
 	      break ;
 	    case TROU_TRIPLE:
 	      dY -- ;
-	      dA -= 2 ;
+	      dA += 2 ;
 	      break ;
 	    default:
 	      break ;
 	    }
 	  wp->x1 = zY + dY + 1 ;  /* bio coords */
-	  wp->a1 = (isDown ?  zA + dA + 1 : arrayMax(dnaG) - zA + dA) ;
+	  wp->a1 = (isDown ?  zA + dA + 1 : arrayMax(dnaG) - zA - dA) ;
 	  wp->nErr -= bestJ + 1 ;
-	  for (j = 0, epY = arrp (wp->errors, 0, A_ERR) ; j < wp->nErr ; epY++, j++)
-	    *epY = *(epY + bestJ + 1) ;
+	  if (wp->nErr)
+	    for (j = 0, epY = arrp (wp->errors, 0, A_ERR) ; j < wp->nErr ; epY++, j++)
+	      *epY = *(epY + bestJ + 1) ;
 	  arrayMax (wp->errors) = wp->nErr ;
 	}
     }
@@ -870,7 +871,7 @@ void saIntronsExport (PP *pp, Array aaa)
       aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
 	       aceOutFileName (ao)
 	       ) ;
-      aceOutf (ao, "Intron\tRun\tiit\tn\tnR\tfeet\n") ;
+      aceOutf (ao, "#Intron\tRun\tformat\tn\tnR\tfeet\n") ;
       for (ii = 0, up = arrp (aaa, ii, INTRON) ; ii < iMax ; ii++, up++)
 	{
 	  int min = 3 ;

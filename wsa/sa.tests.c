@@ -35,7 +35,8 @@ void saCreateRandomGenome (PP *pp, int nMb)
   if (iMax < 0) messcrash ("nMb = %d too large in saCreateRandomIndex", nMb) ;
 
   char buf[iMax+10] ;
-  char mrna[1200] ;
+  char mrna1[1200] = {0} ;
+  char mrna2[1200] = {0} ;
 
   aceOutf (aoc, "G\t%s/random.genome.fasta\n", pp->outFileName) ;
   aceOutf (aoc, "I\t%s/random.gtf\n", pp->outFileName) ;
@@ -43,29 +44,69 @@ void saCreateRandomGenome (PP *pp, int nMb)
   for (ii = 0 ; ii < iMax ; ii++)
     buf[ii] = atgc[randint() % 4] ;
   buf[iMax] = 0 ;
-  aceOutf (aog, ">chr1\n%s\n", buf) ;
+
   for (ii = 0 ; ii < nMb  ; ii++)
     {
-      int a1, a2 ;
+      int a1, a2, da = 0 , dda ;
       for (jj = 0 ; jj < 5 ; jj++)
 	{
-	  a1 = 10000 * ii + 200 * jj ;
-	  a2 = a1 + 100 ;
-	  memcpy (mrna+100*jj, buf + a1, 100) ;
-	  if (a1 > 2) buf[a1-2] = 'a' ;
-	  if (a1 > 2) buf[a1-1] = 'g' ;
+	  a1 = 10000 * ii + 200 * jj + 1 ;
+	  dda = (jj == 2 ? 100 : 100) ;
+	  a2 = a1 + dda - 1 ;
+	  memcpy (mrna1+da, buf + a1 -1, dda) ;
+	  da += dda ;
+	  if (a1 > 2) buf[a1-3] = 'a' ;
+	  if (a1 > 2) buf[a1-2] = 'g' ;
 	  buf[a2] = 'g' ;
 	  buf[a2+1] = 't' ;
 	  aceOutf (aof, "chr1\trandom\texon\t%d\t%d\t.\t+\t0\tgene_id \"gene_%d ; transcript_id mrna_%d;\"\n", a1, a2, ii, ii) ;
-	  if (jj > 0 && jj <4)
+	  if (jj > 0 && jj < 4)
 	    aceOutf (aof, "chr1\trandom\tCDS\t%d\t%d\t.\t+\t0\tgene_id \"gene_%d ; transcript_id mrna_%d;\"\n", a1, a2, ii, ii) ;
 	}
-      for (jj = 0 ; jj < 12 ; jj++)
-	mrna[500 + jj] = 'a' ;
-      mrna[500 + jj] = 0 ;
-      aceOutf (aom, ">s%d\n%s\n", ii, mrna) ;
+      /* add a polyA tail */
+      jj = 0 ;
+      if (0) for (jj = 0 ; jj < 12 ; jj++)
+	mrna1[da + jj] = 'a' ;
+      mrna1[da + jj] = 0 ;
+      /* duplicate the reads with independant errors */
+      memcpy (mrna2, mrna1, da+jj+1) ;
+      int kk = 5, i, k, dx1, dx2 ;
+      /* introduce kk substitutions */
+      if (0)
+	for (k = 0 ; k < kk ; k++)
+	  {
+	    int x1 = randint() % da ;
+	    mrna1[x1] = 'c' ;
+	    int x2 = randint() % da ;
+	    mrna2[x2] = 'g' ;
+	  }
+      /* introduce kk deletions */
+      if (0)
+	for (i = dx1 = dx2 = 0 ; i <= da ; i++)  /* include the therminal zero: i <= da */
+	  {
+	    int x1 = randint() % 100 ;
+	    if (x1 ==0)  dx1++ ;
+	    mrna1[i] = mrna1[i + dx1] ;
+	    int x2 = randint() % 100 ;
+	    if (x2 ==0)  dx2++ ;
+	    mrna2[i] = mrna2[i + dx2] ;
+	  }
+      /* introduce kk insertions */
+      if (1)
+	for (i = dx1 = dx2 = 0 ; i <= da ; i++)  /* include the therminal zero: i <= da */
+	  {
+	    int x1 = randint() % 100 ;
+	    if (x1 ==0)  dx1++ ;
+	    mrna1[i+dx1] = mrna1[i] ;
+	    int x2 = randint() % 100 ;
+	    if (x2 ==0)  dx2++ ;
+	    mrna2[i+dx2] = mrna2[i] ;
+	  }
+      
+      aceOutf (aom, ">s%d\n%s\n", ii, mrna1) ;
+      aceOutf (aom, ">t%d\n%s\n", ii, mrna2) ;
     }
-
+  aceOutf (aog, ">chr1\n%s\n", buf) ; /* export the genome after tweaking the gt_ag */
   ac_free (h) ;
   exit (0) ;
 }

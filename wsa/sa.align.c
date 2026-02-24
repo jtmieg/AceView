@@ -310,6 +310,7 @@ static BOOL alignExtendHit (Array dna, Array dnaG, Array dnaGR, Array err
 static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, ADAPTORS *adaptors, int i0, int iMax)
 {
   int x1 = up->x1 ;
+  int slBonus = 4 ;
   int leftClip = up->leftClip ;  /* already initialized to jump5 */
   BOOL doUpper = FALSE ;
   
@@ -434,8 +435,8 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 			  up->a1 += (up->a1 < up->a2 ? di :- di) ;
 			  for (ALIGN *vp = up ; vp->read == up->read && vp->chain == up->chain ; vp++)
 			    {
-			      vp->score -= di ;
-			      vp->chainScore -= di ;
+			      vp->score += slBonus - di ;
+			      vp->chainScore += slBonus - di ;
 			      vp->chainX1 += di ;
 			      vp->chainA1 += (up->a1 < up->a2 ? di :- di) ;
 			    }
@@ -518,6 +519,7 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
   int ln = arrayMax (dna) ; /* length to align */
   int rightClip = ln ;
   BOOL doUpper = FALSE ;
+  int slBonus = 4 ;
   
   if (x2 < ln)
     {
@@ -642,8 +644,8 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 			  up->a2 -= (up->a1 < up->a2 ? di :- di) ;
 			  for (vp = up ; vp->read == up->read && vp->chain == up->chain ; vp--)
 			    {
-			      vp->score -= di ;
-			      vp->chainScore -= di ;
+			      vp->score += slBonus - di ;
+			      vp->chainScore += slBonus - di ;
 			      vp->chainX2 -= di ;
 			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
 			    }
@@ -1401,16 +1403,15 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    }
 			  else
 			    memset (cp, N_, du) ;
-			  if (isDonor)
+			  if (1 || isDonor)
 			    {
-			      jj += du ;
-			      cp += du ;
-			      vp->a2 += du ; vp->x2 += du0 ;
+			      jj += du0 - du ;
+			      cp += du0 - du ;
+			      vp->a2 += du0 - du ; vp->x2 += du0 - du ;
 			    }
 			  else
-			    {
-			      vp[1].x1 -= du0 ; vp[1].a1 -= du ;
-			    }
+			    du = du0 ;
+			  vp[1].x1 -= du ; vp[1].a1 -= du ;
 			}
 		    }
 		}
@@ -1493,11 +1494,11 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
 			    }
 			}
 		    }
-		  /*
 		  int dd = (vp->x2 - vp->x1 + 1 + del) - ((vp->a1 < vp->a2 ? vp->a2 - vp->a1 : vp->a1 - vp->a2) + 1 + ins) ;
+
 		  if (dd < 0) vp->x2 += dd ;
-		  if (dd > 0) vp->a2 += dd ;
-		  */
+		  if (dd > 0) vp->a2 -= dd ;
+
 		  ja++ ;
 		  vp->nErr = vp->errors ? arrayMax (vp->errors) : 0 ;
 		  vp->nMID = del + ins + sub ;
@@ -2159,24 +2160,6 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	bb->runStat.nMultiAligned[nChains > 10 ? 10 : nChains]++ ;
     }
 
-  /* register the alignments */
-  long int kMax = bigArrayMax (aaa) ;
-  
-  iMax = arrayMax (aa) ;
-  if (iMax)
-    {
-      ap = arrp (aa, 0, ALIGN) ;
-      /*   bitSet (bb->isAligned, ap->read) ; */
-      for (ii = 0 ; ii < iMax ; ii++, ap++)
-	if (read == ap->read)
-	  {
-	    vp = bigArrayp (aaa, kMax++, ALIGN) ;
-	    *vp = *ap ;
-	    vp->nChains = nChains ;
-	    vp->nTargetRepeats = nChains ;
-	  }
-    }
-
   /* measure the insert lengths */
 #ifdef KUNK
   if (0 && read == read2 && kMax)
@@ -2224,14 +2207,13 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 #endif
   
   /* register the introns */
-  kMax = bigArrayMax (aaa) ;
-  
+  int intronMaxOld = arrayMax (bb->confirmedIntrons) ;
   iMax = arrayMax (aa) ;
   if (iMax)
     {
       ALIGN *bp ;
       int jj ;
-      int intronMaxOld = arrayMax (bb->confirmedIntrons) ;
+      int intronBonus = 0 ;
       
       ap = arrp (aa, 0, ALIGN) ;
       /*   bitSet (bb->isAligned, ap->read) ; */
@@ -2325,51 +2307,88 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		    zp->chrom = chrom ;
 		    
 		    if (! strcmp (zp->feet, (chrom & 0x1 ? "gt_ag" : "gt_ag")))
-		      bb->runStat.gt_ag_Support++ ;
+		      {
+			bb->runStat.gt_ag_Support++ ;
+			if (bb->isRna >= 0 && bb->runStat.gt_ag_Support > bb->runStat.ct_ac_Support)
+			  intronBonus++ ;
+		      }
 		    if (! strcmp (zp->feet, (chrom & 0x1 ? "ct_ac" : "ct_ac")))
-		      bb->runStat.ct_ac_Support++ ;
+		      {
+			bb->runStat.ct_ac_Support++ ;
+			if (bb->isRna >= 0 && bb->runStat.gt_ag_Support < bb->runStat.ct_ac_Support)
+			  intronBonus++ ;
+		      }
+		    if (bb->isRna < 0)
+		      intronBonus++ ; /* all discontinuities lower the global score */
 		  }
 		break ;
 	      }
 	  }
 
-      /* register the double introns */
-      int intronMax = arrayMax (bb->confirmedIntrons) ;
-      if (pp->introns)
-	for (ii = intronMaxOld ; ii < intronMax -1 ; ii++)
+      intronBonus *= 4 * (bb->isRna >= 0 ? 1 : -1) ;
+      
+      ap = arrp (aa, 0, ALIGN) ;
+      if (intronBonus)
+	for (ii = 0 ; ii < iMax ; ii++, ap++)
+	  if (read == ap->read)
+	    {
+	      ap->score += intronBonus ;
+	      ap->chainScore += intronBonus ;
+	    }
+    }
+  /* register the alignments */
+  long int kMax = bigArrayMax (aaa) ;
+  
+  iMax = arrayMax (aa) ;
+  if (iMax)
+    {
+      ap = arrp (aa, 0, ALIGN) ;
+      /*   bitSet (bb->isAligned, ap->read) ; */
+      for (ii = 0 ; ii < iMax ; ii++, ap++)
+	if (read == ap->read)
 	  {
-	    INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
-	    INTRON *zp2 = arrayp (bb->confirmedIntrons, ii + 1, INTRON) ;
-	    
-	    if (zp1->chrom == zp2->chrom && zp1->n == zp2->n &&
-		(
-		 (zp1->a1 < zp1->a2 && zp1->a2 < zp2->a1 && zp2->a1 < zp2->a2) ||
-		 (zp1->a1 > zp1->a2 && zp1->a2 > zp2->a1 && zp2->a1 > zp2->a2) 
-		 ) &&
-		! strcmp (zp1->feet, "gt_ag") && ! strcmp (zp2->feet, "gt_ag") 
-		) /* same chain chain */
-	      {
-		DOUBLEINTRON *zzp = arrayp (bb->doubleIntrons, arrayMax (bb->doubleIntrons), DOUBLEINTRON) ;
-		zzp->chrom = zp1->chrom ;
-		zzp->run = bb->run ;
-		zzp->n = 1 ;
-		zzp->a1 = zp1->a1 ; zzp->a2 = zp1->a2 ;
-		zzp->b1 = zp2->a1 ; zzp->b2 = zp2->a2 ;
-		memcpy (zzp->feet1, zp1->feet, 6) ;
-		memcpy (zzp->feet2, zp2->feet, 6) ;
-	      }
+	    vp = bigArrayp (aaa, kMax++, ALIGN) ;
+	    *vp = *ap ;
+	    vp->nChains = nChains ;
+	    vp->nTargetRepeats = nChains ;
 	  }
+    }
 
-      /* reset the count which was overlaoded with chain */
+     /* register the double introns */
+  int intronMax = arrayMax (bb->confirmedIntrons) ;
+  if (pp->introns)
+    {
+      
+      for (ii = intronMaxOld ; ii < intronMax -1 ; ii++)
+	{
+	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
+	  INTRON *zp2 = arrayp (bb->confirmedIntrons, ii + 1, INTRON) ;
+	  
+	  if (zp1->chrom == zp2->chrom && zp1->n == zp2->n &&
+	      (
+	       (zp1->a1 < zp1->a2 && zp1->a2 < zp2->a1 && zp2->a1 < zp2->a2) ||
+	       (zp1->a1 > zp1->a2 && zp1->a2 > zp2->a1 && zp2->a1 > zp2->a2) 
+	       ) &&
+	      ! strcmp (zp1->feet, "gt_ag") && ! strcmp (zp2->feet, "gt_ag") 
+	      ) /* same chain chain */
+	    {
+	      DOUBLEINTRON *zzp = arrayp (bb->doubleIntrons, arrayMax (bb->doubleIntrons), DOUBLEINTRON) ;
+	      zzp->chrom = zp1->chrom ;
+	      zzp->run = bb->run ;
+	      zzp->n = 1 ;
+	      zzp->a1 = zp1->a1 ; zzp->a2 = zp1->a2 ;
+	      zzp->b1 = zp2->a1 ; zzp->b2 = zp2->a2 ;
+	      memcpy (zzp->feet1, zp1->feet, 6) ;
+	      memcpy (zzp->feet2, zp2->feet, 6) ;
+	    }
+	}
+      
+  /* reset the count which was overlaoded with chain */
       for (ii = intronMaxOld ; ii < intronMax ; ii++)
 	{
 	  INTRON *zp1 = arrayp (bb->confirmedIntrons, ii, INTRON) ;
 	  zp1->n = 1 ;
 	}
-
-
-      /* register the overHangs */
-      /* done in formatRightOverhangs */
     }
   return ;
   

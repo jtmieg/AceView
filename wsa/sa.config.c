@@ -508,6 +508,8 @@ BOOL saSetGetAdaptors (int set, int *isRnap, ADAPTORS *aa, int run)
 	*isRnaRp = 1 ; /* odd, all future modifs are even, so we allways stay set (non zero) */
       if (isRnap && *isRnap)
 	*isRnaRp += (*isRnap > 0 ? 2 : -2) ;
+      if (isRnap)
+	*isRnap = *isRnaRp ;
       if (aa)
 	{
 	  switch (*isSetRp)
@@ -589,9 +591,6 @@ int saConfigCheckTargetIndex (PP *pp)
   if (!ok)
     saUsage ("Some of the target binary index files are missing, please run sortalign --createIndex <indexName> ", 0, 0) ;
   
-  if (0)
-    if (pp->iStep > pp->tStep)      /* impose phasing */
-      pp->iStep -= (pp->iStep % pp->tStep) ;
 
   if (1)
     {
@@ -622,6 +621,9 @@ int saConfigCheckTargetIndex (PP *pp)
 	messcrash ("Cannot read the index file %s", fNam) ;
     }
   
+  if (!pp->iStep)   /* pp->tStep is always even */
+    pp->iStep = (pp->tStep > 1 ? pp->tStep / 2 : 1) ;
+
   ac_free (h) ;
   return NN ;
 } /* saConfigCheckTargetIndex */

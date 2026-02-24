@@ -1599,9 +1599,15 @@ int main (int argc, const char *argv[])
    * which would drop the index seeds with more repetitions 
    */
   
-  p.seedLength = 18 ; /* default */
-  getCmdLineInt (&argc, argv, "--seedLength", &(p.seedLength));
-  
+  p.seedLength = 0 ; /* default */
+  if (getCmdLineInt (&argc, argv, "--seedLength", &(p.seedLength)))
+    {
+      if (p.seedLength < 12)
+	messcrash ("\n parameter --seedlength %d must be at least 12, sorry\n", p.seedLength) ;
+      else if (p.seedLength > 19)
+	messcrash ("\n parameter --seedlength %d cannot excered 19, sorry\n", p.seedLength) ;
+    }
+
   p.maxTargetRepeats = 31 ;  /* was 81  31 12 */
   getCmdLineInt (&argc, argv, "--maxTargetRepeats", &p.maxTargetRepeats) ;
 
@@ -1724,23 +1730,11 @@ int main (int argc, const char *argv[])
   
   if (NN != 1 && NN != 2 && NN != 4 && NN != 8 && NN != 16 && NN != 32 && NN != 64)
     messcrash ("The number of indexes NN=%d must be  a power of 2, say 1 2 4 8 ...", NN) ;
-
-  if (p.seedLength > 19)
-    messcrash ("\n parameter --seedlength %d cannot exceed 19, sorry\n", p.seedLength) ;
-  else if (p.seedLength == 19 && NN < 64)
-    NN = 64 ;
-  else if (p.seedLength == 18 && NN < 16)
-    NN = 16 ;
-  else if (p.seedLength == 17 && NN < 4)
-    NN = 4 ;
-  else  if (p.seedLength < 12)
-    messcrash ("\n parameter --seedlength %d must be at least 12, sorry\n", p.seedLength) ;
-
+  p.nIndex = NN ;
+  
   /* harware check : the code can oly run on 64 bits machnes */
   if (sizeof (long unsigned int) != 8)
     messcrash ("The source code assumes that long unsigned ints use 64 bits not %d, sorry", 8 * sizeof (long unsigned int)) ;
-
-  p.nIndex = NN ;
 
   /***************** amount or parallelization **************************/
   nAgents = NAGENTS ;
@@ -1766,10 +1760,13 @@ int main (int argc, const char *argv[])
 
 
   /****************** stepping when constructing sequence seeds ********************/
-  p.iStep = 1 ;   /* read default */
-  p.tStep = 0 ;   /* default 1 or 3 set in createIndex or read in existing index */
+  p.iStep = 0 ;   /* read default = tStep/2 set in  saConfigCheckTargetIndex */
+  p.tStep = 0 ;   /* default 2 or 4 set in createIndex or read in existing index */
   if (p.createIndex)
-    getCmdLineInt (&argc, argv, "--step", &(p.tStep)) ;
+    {
+      getCmdLineInt (&argc, argv, "--step", &(p.tStep)) ;
+      if (p.tStep & 0x1 ) p.tStep++ ; /* impose an even number so that default iStep=tStep/2 divides tStep */
+    }
   else
     getCmdLineInt (&argc, argv, "--step", &(p.iStep)) ;
 

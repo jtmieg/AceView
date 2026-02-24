@@ -424,7 +424,7 @@ long int saGffParser (PP *pp, TC *tc)
 		      , cp, pp->tConfigFileName ) ;
     }
 
-  if (pp->seedLength < 16)
+  if (pp->seedLength && pp->seedLength < 16)
     messcrash ("\nSorry, to study the introns defined in file %s,\n the seed length must be at least 16, not %d\n"
 	       , aceInFileName (ai)
 	       , pp->seedLength

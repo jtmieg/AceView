@@ -98,6 +98,8 @@ setenv SV     v69.81.18M.Wiggle.errCost4.feb16    # adaptor clipping wiggle, bin
 setenv SVlast v69.81.18M.Wiggle.errCost4.feb16
 setenv SV     v70.81.18M.e4.W.feb21    # new load balancer for numactl
 setenv SVlast v70.81.18M.e4.W.feb21
+setenv SV     v71.81.18M.e4.W.feb22    # edited intron boundaries using the new randomTarget
+setenv SVlast v71.81.18M.e4.W.feb22
 
 if ($SV == $SVlast) then
   \cp  /home/mieg/ace/bin.LINUX_4_OPT/sortalign bin/sortalign.$SV
@@ -108,7 +110,7 @@ if ($SV == $SVlast) then
   cp ~/ace/wsa/sa.*[ch] bin/wsa.$SV
 endif
 \cp bin/sortalign.$SV bin/sortalign
-  
+
 setenv NOINTRONSEEDS 0
 setenv EXPORTSAM 0
 setenv EXPORTWIGGLES 1
@@ -158,14 +160,14 @@ setenv methods "31_STARlong"
 setenv methods "50_Minimap2"
 
 
-setenv allMethods "012_SortAlignG3R3 013_SortAlignG3R1 014_SortAlignG3R3.g 015_SortAlignG3R1.g 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads 54_Minimap2_32threads"
+setenv allMethods "011_SortAlignG6R3 012_SortAlignG3R3 013_SortAlignG3R1 014_SortAlignG3R3.g 015_SortAlignG3R1.g 11_MagicBLAST_2018 12_MagicBLAST_2022 13_MagicBLAST_2024 21_HISAT2_4threads 22_HISAT2_8threads 23_HISAT2_16threads 31_STARlong 50_Minimap2 51_Minimap2_4threads 52_Minimap2_8threads 53_Minimap2_16threads 54_Minimap2_32threads"
 
 setenv methods "$allMethods"
 #setenv methods "012_SortAlignG3R3"
 
 set createIndex=0
-if ($createIndex == 1)  setenv methods "011_SortAlignG5R5 012_SortAlignG3R3"
-if ($createIndex == 11)  setenv methods "011_SortAlignG5R5"
+if ($createIndex == 1)  setenv methods "011_SortAlignG6R3 012_SortAlignG3R3"
+if ($createIndex == 11)  setenv methods "011_SortAlignG6R3"
 if ($createIndex == 12)  setenv methods "012_SortAlignG3R3"
 
 #############################################################################

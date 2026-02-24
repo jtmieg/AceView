@@ -462,7 +462,7 @@ static long int saTargetIndexCreateDo (PP *pp)
       rc.format = tc->format ;
       rc.run = nn + 1 ;
       saSequenceParse (pp, 0, tc, bbG, ntc == nTc ? 2 :1 ) ; /* 2 for last non-intron target */
-      step = (bbG->length < 1<<20) ? 1 : 3 ;
+      step = (bbG->length < 1<<20) ? 2 : 4 ;
       if (pp->tStep)
 	step = pp->tStep ;
       if (step > pp->tStep)
@@ -508,10 +508,30 @@ static long int saTargetIndexCreateDo (PP *pp)
 
   t1 = clock () ;
   printf ("%s : extract the target seeds\n" , timeBufShowNow (tBuf)) ;
+  if (! pp->seedLength)
+    {
+      long int dMax = bigArrayMax (pp->bbG.globalDna) ;
+      pp->seedLength = 14 ;                          /*         bacteria */
+      if (pp->knownIntrons)       pp->seedLength = 16 ; 
+      if (dMax > (0x1 << 20)) pp->seedLength = 16 ;  /* > 1 Mb droso, worm, zebrafish */
+      if (dMax > (0x1 << 28)) pp->seedLength = 18 ;  /* > 256 Mb , human */
+    }
+
+  int NN = pp->nIndex ;
+
+
+  if (pp->seedLength >= 19)
+    { pp->seedLength = 19 ; NN = 64 ; }
+  else if (pp->seedLength == 18 && NN < 16)
+    NN = 16 ;
+  else if (pp->seedLength == 17 && NN < 4)
+    NN = 4 ;
+  pp->nIndex = NN ;
+  
   saCodeSequenceSeeds (pp, bbG, pp->tStep, TRUE) ;
   if (pp->knownIntrons)
     saCodeIntronSeeds (pp, bbG) ;
-  int NN = pp->nIndex ;
+
   for (int k = 0 ; k < NN ; k++)
     {
       long int n1 = bigArrayMax (bbG->cwsN[k]) ;
