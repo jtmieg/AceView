@@ -5309,7 +5309,7 @@ static void qcRunSelection (QC *qc, RC *rc)
     { "Genes", "Genes with Index >= 18 in %s", 18, 0, 0 },
     { "Paired_end", "Single or Paired end", 0, 0, 0} ,
     { "Fragment_length_median", "median insert size or average aligned length", 0, 0, 0} ,
-    { "Pairs", "% compatible pairs", 1, 0, 0} ,
+    { "Pairs", "% non compatible pairs", 1, 0, 0} ,
     { "FragAli", "Average length aligned per fragment (nt)", 61, 0, 0 } , /* copied from qcAvLengthAli */
     { "SNV", "Exonic SNV sites\tPure variant SNV (95-100%)", 2, 0, 0} ,
     { "MbAli", "Mb uniquely aligned in main protein coding genes minus very highly expressed genes", 80, 0, 0 }, /* copied from qcGeneExpression */
@@ -5513,7 +5513,7 @@ static void qcRunSelection (QC *qc, RC *rc)
       else if (! strcmp (ti->tag, "Pairs"))
 	{ /* percent compatible pairs */
 	  float z1 = ac_tag_float (rc->ali, "Aligned_fragments", 0) ;
-	  float z2 = ac_tag_float (rc->ali, "Compatible_pairs", 0) ;
+	  float z2 = ac_tag_float (rc->ali, "Non_compatible_pairs", 0) ;
 	  aceOutf (qc->ao, "\t%.2f", 100.0 * z2/(z1 + .1)) ;
 	}
       else if (! strcmp (ti->tag, "FragAli"))

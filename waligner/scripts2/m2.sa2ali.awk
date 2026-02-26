@@ -6,7 +6,7 @@ BEGIN {
     tag =$2 ;
     nn=$4 ;
     #print ;
-    tags1 = "Aligned_fragments__Compatible_pairs__Non_compatible_pairs__Circle_pairs__Perfect_reads" ;
+    tags1 = "Compatible_pairs__Non_compatible_pairs__Circle_pairs__Perfect_reads" ;
     n = split(tags1,tags,"__") ;
     for (i = 1 ; i <= n ; i++)
 	if (tag == tags[i])
@@ -14,9 +14,10 @@ BEGIN {
 	    if (nn +0 > 0) printf ("%s %d\n", tag, nn) ;
 	    next;
 	}
-    if (tag == "Reads_too_short")
+        if (tag == "Reads_too_short")
+    if (tag == "Aligned_pairs")
     {
-	tooShort = nn ;
+	printf ("%s %d\n", "Aligned_fragments", nn) ;
 	next ;
     }
     if (tag == "Low_entropy_reads")
@@ -159,7 +160,18 @@ BEGIN {
 	if (x > 0)
 	    printf ("Intergenic %d kb\n", x) ;
     }
-
+    if (tag == "Clipped_3prime_Adaptor_read1")
+    {
+	adpt = $4 ;
+	if (length(adpt)> 2)
+	    printf ("Adaptor1 %s\n", adpt) ;
+    }
+    if (tag == "Clipped_3prime_Adaptor_read3")
+    {
+	adpt = $4 ;
+	if (length(adpt)> 2)
+	    printf ("Adaptor2 %s\n", adpt) ;
+    }
 }
 END {
     if (reads + 0 > 0)

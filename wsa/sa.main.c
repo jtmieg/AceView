@@ -871,7 +871,7 @@ static void exportDo (const PP *pp, BB *bb)
   DICT *dict = bb->dict ;
   DICT *errDict = bb->errDict ;
   DICT *dictG = pp->bbG.dict ;
-  BOOL pairedEnd = bb->rc.pairedEnd ;
+  BOOL pairedEnd = bb->runStat.p.nPairs > 0 ;
   const char *run = dictName (pp->runDict, bb->run) ;
   AC_HANDLE h = ac_new_handle () ;
   char *runNam = hprintf (h, "hits/%s.%d.hits", run, bb->lane) ;
@@ -1094,14 +1094,14 @@ static void reportRunStats (PP *pp, Array runStats)
   if (pp->runName) printf ("\n#:Run\t%s", pp->runName) ;
   if (pp->method) printf ("\n#:Method\t%s", pp->method) ;
   
-  printf ("\n#:Pairs\t%ld", s0->nPairs) ;
-  printf ("\n#:Pairs_aligned\t%ld\t%.3f%%", s0->nPairsAligned, 100.0 * s0->nPairsAligned/ (0.0000001 + s0->nPairs)) ;
+  printf ("\n#:Pairs\t%ld", s0->p.nPairs) ;
+  printf ("\n#:Pairs_aligned\t%ld\t%.3f%%", s0->nPairsAligned, 100.0 * s0->nPairsAligned/ (0.0000001 + s0->p.nPairs)) ;
   printf ("\n#:CompatiblePairs\t%ld\t%.3f%%", s0->nCompatiblePairs, 100.0 * s0->nCompatiblePairs/ (0.000001 + s0->nPairsAligned)) ;
 
-  printf ("\n\n#:Reads\t%ld", s0->nReads) ;
+  printf ("\n\n#:Reads\t%ld", s0->p.nReads) ;
   if (pp->nRawReads) printf ("\n#:RawReads\t%ld", pp->nRawReads) ;
-  printf ("\n#:Reads_aligned\t%ld\t%.3f%%", s0->nMultiAligned[0], 100.0 * s0->nMultiAligned[0]/ (0.0000001 + s0->nReads)) ;
-  printf ("\n#:PerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->nReads + .000001)) ;
+  printf ("\n#:Reads_aligned\t%ld\t%.3f%%", s0->nMultiAligned[0], 100.0 * s0->nMultiAligned[0]/ (0.0000001 + s0->p.nReads)) ;
+  printf ("\n#:PerfectReads\t%ld\t%.2f%%", s0->nPerfectReads, (100.0 * s0->nPerfectReads)/(s0->p.nReads + .000001)) ;
 
   printf ("\n#:Reads supporting introns %ld, plus %ld, minus %ld, stranding %.2f%%\n"
 	  , s0->nIntronSupportPlus + s0->nIntronSupportMinus 
@@ -1112,11 +1112,11 @@ static void reportRunStats (PP *pp, Array runStats)
   printf ("\n#:SupportedIntrons\t%ld", s0->nSupportedIntrons) ;
 
 
-  printf ("\n\n#:Bases\t%ld", s0->nBase1 + s0->nBase2) ;
+  printf ("\n\n#:Bases\t%ld", s0->p.nBase1 + s0->p.nBase2) ;
   if (pp->nRawBases) printf ("\n#:RawBases\t%ld", pp->nRawBases) ;
   printf ("\n#:Bases_aligned\t%ld\t%.3f%%"
 	  , s0->nBaseAligned1 + s0->nBaseAligned2
-	  , 100.0*(s0->nBaseAligned1 + s0->nBaseAligned2)/(.0001 + s0->nBase1 + s0->nBase2)
+	  , 100.0*(s0->nBaseAligned1 + s0->nBaseAligned2)/(.0001 + s0->p.nBase1 + s0->p.nBase2)
 	  ) ;
 
   printf ("\n#:Mismatches\t%ld\t%.5f%%"
@@ -2031,6 +2031,7 @@ int main (int argc, const char *argv[])
 	}
     }
 
+  p.confirmedSLs  = arrayHandleCreate (1000, SLS, p.h) ;
   p.confirmedPolyAs  = arrayHandleCreate (1000, POLYA, p.h) ;
   p.confirmedIntrons  = arrayHandleCreate (1000, INTRON, p.h) ;
   p.doubleIntrons  = arrayHandleCreate (1000, DOUBLEINTRON, p.h) ;
@@ -2100,6 +2101,7 @@ int main (int argc, const char *argv[])
       if (bb.run)
 	{
 	  saPolyAsCumulate (&p, &bb) ;
+	  saSLsCumulate (&p, &bb) ;
 	  saIntronsCumulate (&p, &bb) ;
 	  saDoubleIntronsCumulate (&p, &bb) ;
 	  saRunStatsCumulate (0, &p, &bb) ;
@@ -2174,6 +2176,7 @@ int main (int argc, const char *argv[])
     saWiggleExport (&p, nAgents) ;
   saCpuStatExport (&p, cpuStats) ;
   saPolyAsExport (&p, p.confirmedPolyAs) ;
+  saSLsExport (&p, p.confirmedSLs) ;
   saRunStatExport (&p, p.runStats) ; /* must come afer PolyAsExport and IntronsExport */
   
   wego_log ("Done") ;

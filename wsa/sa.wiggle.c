@@ -543,11 +543,11 @@ static void wiggleExportOne (const PP *pp, int nw, int type)
     }
   if (type == 0 || type == 4)
     {
-      array (pp->wiggleCumuls, nw, long int) = cumul ;
-      array (pp->cdss, nw, long int) = cumuls[4];
-      array (pp->utrs, nw, long int) = cumuls[2] ;
-      array (pp->intronics, nw, long int) = cumuls[1] ;
-      array (pp->intergenics, nw, long int) = cumul - cumuls[1] - cumuls[2] - cumuls[4] ;
+      array (pp->wiggleCumuls, nw, long int) += cumul ;
+      array (pp->cdss, nw, long int) += cumuls[4];
+      array (pp->utrs, nw, long int) += cumuls[2] ;
+      array (pp->intronics, nw, long int) += cumuls[1] ;
+      array (pp->intergenics, nw, long int) += cumul - cumuls[1] - cumuls[2] - cumuls[4] ;
     }
   return ;
 } /* wiggleExportOne */
@@ -600,9 +600,146 @@ static int gcOrder (const void *va, const void *vb)
 
 static float geneIndex (const PP *pp, GC *gc)
 {
-  float z = 0 ;
+  int run = gc->run ;
+  RunSTAT *rs = arrayp (pp->runStats, run, RunSTAT) ;
+  double wall = 1 ;
+  double logDeux = log((double)2.0) ;
+  BOOL isLow = FALSE ;
+  float index = 0 ;  /* depends on total counts */
+  double damper = 1000 ; /* damper in bp */
+  int geneLength = 3000 ;
+  int average_read_ln = rs->p.nBase1 + rs->p.nBase2 /(1 + rs->p.nReads) ;
+  int ln = geneLength, ln0 ;
+  int accessibleLength = 5000 ;
+  double z, abp, bp, genomicKb ;
 
-  return z ;
+  
+  if (rs->accessibleLength8kb > 0)
+    accessibleLength = rs->accessibleLength8kb ;
+  else if (rs->accessibleLength8kb > 0)
+    accessibleLength = rs->accessibleLength8kb ;
+
+  if (ln < 20)
+    ln = 1000 ;
+  if (average_read_ln < 35)    /* we cannot usefully map shorter reads */
+    average_read_ln = 35 ;
+  if (ln > accessibleLength)
+    ln = accessibleLength ;
+  
+  /*
+    if (gx->isMicroRNA) { ln = 1000 ;  average_read_ln = 35 ; }
+    if (gx->isMA)
+    {
+    ln = ln0 = average_read_ln = gx->isMA ;
+    }
+  */
+
+  if (rs->nBaseAligned1 + rs->nBaseAligned2 < (0x1 << 23)) /* 8M */
+    return -999 ;
+  if (gc->boxCount < 100000)  /* 100 kbases */
+    return -999 ;
+  
+  if (rs->p.nPairs)
+    wall *= 2 ;
+
+
+
+#ifdef JUNK
+  z = 5.0/100.0 ;          /* dromadaire */
+      genomicKb = rc->genomicKb - z * rc->targetKb ;
+      if (genomicKb < 0) 
+	genomicKb = 0 ;
+      genomicKb = gx->seaLevel * genomicKb / 3 ;  
+      if (rc->DGE || gx->DGE || rc->pA == 1 || (!rc->pA && gx->pA == 1)) genomicKb /= 10 ;      /* total, 90% go to introns and should not be attributed to genomic contamination */
+
+      if (rc->intergenicKb)
+	genomicKb = rc->intergenicKb * gx->seaLevel/3 ; /* was 0.4 seaLevel * rc->intergenicKb, sellevel default == 3 */
+      if (rc->intergenicKb > rc->prunedTargetKb)  /* 2020_01_27 we are facing a DNA-seq experiment */
+	genomicKb *= 2 ;
+      noise_bp = ln0 * genomicKb/gx->genomeLengthInKb ;  /* here use the true length of the sequence, do not staturate at 3kb  */
+     
+      noise_tags = noise_bp/average_read_ln ;
+      if (noise_tags < 10)
+	noise_bp = 3 * noise_tags ;
+      else if (noise_tags > 500)
+	noise_bp = 1.2828 * noise_tags ;
+      else
+	noise_bp = noise_tags  + 6.3245 * sqrt (noise_tags) ;
+      noise_bp *= average_read_ln ;
+      noise_tags = noise_bp/average_read_ln ;
+    }
+
+  /* mieg: 2011_03_14 we try to substract the genomic noise
+   * note that we should measure the effective length rather than rely on annotations
+   * CF Double stranded or star-seq normalisation is supposed to yield a more uniform coverage
+   * and may also influence the index is some way or other
+   */
+  index = -999 ;
+
+  bp = 1000 * dc->kb - noise_bp ;  
+  abp = 1000 * (rc->prunedTargetKb + rc->intergenicKb * gx->seaLevel/3.0) ; /* 2020_01_27 add the intergenic tags to the denominator */
+  bonusTags = dc->tags - noise_tags - wall ;
+
+  /****************** new method 2013_04_13
+   * we separate damping the (quantized)  number of tags 
+   * from the denominator, normalizing the size of the genes and the run
+   * for large counts, the formula is not modified
+   * for zero counts, the low value is around 7 for 60M reads (Rhs844)
+   */
+
+  if (! (LEMING && isIntron)) /* new method 2013_04_13*/
+    {
+      double tt ;
+      int lf ;
+
+      if (bonusTags < 0)
+	{ 
+	  isLow = TRUE ;
+	  *isLowp = TRUE ;
+	}
+      else
+	*isLowp = FALSE ;
+
+      if (gx->isMA)
+	lf = 0 ;
+      else if (rc->fragmentLength)
+	lf = rc->fragmentLength ;
+      else
+	lf = 300 ; /* assumed length of the fragment, we should have measured it */ 
+
+      z = 1.0E12/ ((ln - lf > lf ? ln - lf : lf) * abp) ;
+      
+      if (1) /* excellent change: OS and Fav d not change, EF HREF HROS go up one point */
+	{ /* 2013_07_31 revert to previous method */
+	  bp = 1000 * dc->kb - noise_bp ;  
+	  tt = bp/average_tag_ln ; z *= average_tag_ln ;
+	  if (tt < 0) tt = 0 ; 
+	  damper = 5 ;
+	  if (1) damper = 3 ; /* SEQC2 test 2021_09_03 */
+	  damper = 4 ; /* 2023_09_21, so if tt=0 log((tt+sqrt(damper +tt^2)/2)=log(1)=0 */
+	}
+
+      if(gx->isMA) damper = 9 ; /* because we count a local coverage, not a number of reads */
+      index = (log(( tt + sqrt (damper  + tt * tt))/((double)2.0)) + log(z))/logDeux ;	 
+      if (! rc->zeroIndex)
+	{
+	  /* mieg 2023_09_21: rc->zero cannot depend on the particular gene 
+	   * i choose 2kb
+	   */
+	  z = 1.0E12/ (2000 * abp) ; z *= average_tag_ln ; 
+	  rc->zeroIndex = (log(sqrt(damper)/2.0) + log(z))/logDeux ; 
+	}
+      index += rc->shift_expression_index ;
+      return index ;
+    }
+
+  index += rc->shift_expression_index ;
+
+
+
+#endif
+  
+  return index ;
 } /* geneIndex */
 
 /**************************************************************/

@@ -190,11 +190,12 @@ setenv PFAL_r3_runs "PFALt1r3 PFALt2r3 PFALt3r3"
 setenv PFAL_runs "$PFAL_r1_runs $PFAL_r2_runs $PFAL_r3_runs"
 
 
-setenv refseqRuns "iRefSeq38 iRefSeq38.g iRefSeqT2T iRefSeqT2T.g"
+
 setenv bigIlluminaRuns "RNA_PolyA_A_1_50Gb RNA_PolyA_B_1_47Gb "
 
 setenv ABRuns "A_100PE B_100PE A_polyA_151PE B_polyA_151PE A_Total_151PE B_Total_151PE B_Roche454_352 A_Nanopore.1234 B_Nanopore.1306 A_PacBio.1745 B_PacBio.1810 A_Total_PacBio.2822 HG02_Revio_PacBio.2044 "
 setenv iRefSeqRuns "iRefSeq38 iRefSeq38.g"
+setenv refseqRuns "iRefSeq38 iRefSeq38.g iRefSeqT2T iRefSeqT2T.g"
 setenv dnaRuns "DNA_ChipSeq1_SE35 DNA_ChipSeq2_SE35 DNA_B_151PE"
 setenv wormRuns "  Worm_RNA_150PE "
 setenv monkeyRuns "Chimpanzee_0.92pc Macaque_2.69pc PTMacaque_2.71pc Baboon_2.92pc Marmoset_3.14 SquirrelMonkey_3.08pc MouseLemur_2.64pc"

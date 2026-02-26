@@ -55,6 +55,23 @@ static int confirmedPolyAOrder (const void *va, const void *vb)
 
 /**************************************************************/
 
+static int confirmedSLsOrder (const void *va, const void *vb)
+{
+  const SLS *up = va ;
+  const SLS *vp = vb ;
+  int n ;
+
+  /* chrom order */
+  n = up->chrom - vp->chrom ; if (n) return n ;
+  /* pos order */
+  n = up->a1 - vp->a1 ; if (n) return n ;
+  /* run order */
+  n = up->run - vp->run ; if (n) return n ;
+  return 0 ;
+} /* confirmedSLsOrder */
+
+/**************************************************************/
+
 static int confirmedIntronsOrder (const void *va, const void *vb)
 {
   const INTRON *up = va ;
@@ -119,6 +136,31 @@ static int confirmedPolyAsCompress (Array aaa)
   arrayMax (aaa) = jj ;
   return jj ;
 } /* confirmedPolyAsCompress */
+
+/**************************************************************/
+
+static int confirmedSLsCompress (Array aaa) 
+{
+  int ii, jj = 0, kk = 1, iMax = arrayMax (aaa) ;
+  arraySort (aaa, confirmedSLsOrder) ;
+  SLS *up, *vp, *wp ;
+
+  if (iMax)
+    for (ii = 0,  jj = 0, up = arrp (aaa, 0, SLS), vp = up ; ii < iMax ; ii += kk, up += kk)
+      {
+	for (wp = up + 1, kk = 1 ; ii + kk < iMax ; kk++, wp++)
+	  if (up->a1 == wp->a1 && up->chrom == wp->chrom && up->run == wp->run)
+	    {
+	      up->n += wp->n ; wp->n = 0 ;
+	    }
+	  else
+	    break ;
+	if (vp < up) *vp = *up ;
+	vp++ ; jj++ ;
+      }
+  arrayMax (aaa) = jj ;
+  return jj ;
+} /* confirmedSLsCompress */
 
 /**************************************************************/
 
@@ -199,6 +241,28 @@ void saPolyAsCumulate (PP *pp, BB *bb)
     }
   return ;
 } /* saPolyAsCumulate */
+
+/**************************************************************/
+
+void saSLsCumulate (PP *pp, BB *bb) 
+{
+  Array aaa = pp->confirmedSLs, aa = bb->confirmedSLs ;
+  int iMax = aa ? arrayMax (aa) : 0 ;
+
+  if (iMax)
+    {
+      if (! aaa)
+	aaa = pp->confirmedSLs = arrayHandleCopy (bb->confirmedSLs, pp->h) ;
+      else
+	{
+	  int jj = arrayMax (aaa)  ;
+	  arrayp (aaa, jj + iMax - 1, POLYA)->n = 0 ; /*  make room */
+	  memcpy (arrp (aaa, jj, POLYA), arrp (aa, 0, POLYA), iMax * sizeof (POLYA)) ;
+	  confirmedSLsCompress (aaa) ;
+	}
+    }
+  return ;
+} /* saSLsCumulate */
 
 /**************************************************************/
 
@@ -291,7 +355,7 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
       epX = epY = 0 ; bestI = 0 ; bestJ = -1 ; nE = 0 ; 
       for (i = 0 ; i < nEx ; i++)
 	{  /* count the vp errors that cannot be clipped */
-	  epX = arrp (vp->errors, nE, A_ERR) ;
+	  epX = arrp (vp->errors, i, A_ERR) ;
 	  int zX = epX->iShort ; /* last good base */
 	  if (zX  < y1 - 1) /* bio coords */
 	    { bestI = i + 1 ; zEx++ ; }
@@ -315,10 +379,10 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 	      /* merge the 2 alignments */
 	      vp->a2 = wp->a2 ;
 	      vp->x2 = wp->x2 ;
-	      vp->nErr += wp->nErr ;
-	      vp->errors = vp->errors ? vp->errors : wp->errors ;
-	      if (vp->errors && vp->nErr)
-		epX = arrayp (vp->errors, vp->nErr - 1, A_ERR) ;
+	      cI++ ;
+	      for (int i = cJ + 1 ; i < nEy ; i++, cI++)
+		array (vp->errors, cI++, A_ERR) = array (wp->errors, i, A_ERR) ;
+	      vp->nErr = arrayMax (vp->errors) = i ;
 	      memset (wp, 0, sizeof (ALIGN)) ;
 	      wp->chain = -1 ; 
 	      return ;
@@ -360,14 +424,17 @@ void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)
 		}
 	    }	  
 	  /* advance on zX */
-	  zX = cX2 ;
-	  i = cI + 1 ;
-	  if (i < nEx)
+	  if (cJ >= 0 && cJ < nEy)
 	    {
-	      epX = arrp (vp->errors, i, A_ERR) ;
-	      zX = epX->iShort ; /* last good base starting from the left */
-	      /* not favorable but maybe we canadvance on Y */
-	      zEx = i - 1 ; cI++ ; cX2 = zX ; continue ;
+	      zX = cX2 ;
+	      i = cI + 1 ;
+	      if (i < nEx)
+		{
+		  epX = arrp (vp->errors, i, A_ERR) ;
+		  zX = epX->iShort ; /* last good base starting from the left */
+		  /* not favorable but maybe we canadvance on Y */
+		  zEx = i - 1 ; cI++ ; cX2 = zX ; continue ;
+		}
 	    }
 	  /* we cannot advance on X and we already have advanced on Y, so we are done */
 	  break ;
@@ -723,6 +790,42 @@ void saPolyAsExport (PP *pp, Array aaa)
 /**************************************************************/
 /**************************************************************/
 
+void saSLsExport (PP *pp, Array aaa)
+{
+  int iMax = aaa ? confirmedSLsCompress (aaa) : 0 ;
+  
+  if (iMax)
+    {
+      AC_HANDLE h = ac_new_handle () ;
+      ACEOUT ao = aceOutCreate (pp->outFileName, ".SL.tsf", 0, h) ;
+      SLS *up ;
+      long int ii ;
+      
+      aceOutf (ao, "### SL support in tsf format: chrom__a1,  run, i, strand, nb of reads supportingt the polyA\n") ;
+      aceOutf (ao, "### Call bin/tsf -i %s -I tsf -O table -o my_table.txt to reformat this file into an excell compatible tab delimited table\n",
+	       aceOutFileName (ao)
+	       ) ;
+      aceOutf (ao, "SL\tRun\tti\tStrand\tn\n") ;
+      for (ii = 0, up = arrp (aaa, ii, SLS) ; ii < iMax ; ii++, up++)
+	{
+	  int min = 1 ;
+	  if (up->n >= min)
+	    aceOutf (ao, "%s__%d___SL%d\t%s\tti\t%s\t%d\n"
+		     , dictName (pp->bbG.dict, up->chrom >> 1) 
+		     , up->a1, up->run  & 0xf
+		     , up->run >> 4 ? dictName (pp->runDict, up->run >> 4) : "runX"
+		     , up->chrom & 0x1 ? "-" : "+"
+		     , up->n
+		     ) ;
+	}
+      
+      ac_free (h) ;
+    }
+} /* saSLsExport */
+
+/**************************************************************/
+/**************************************************************/
+
 static char *flipFeet (char *feet)
 {
   char buf[6] ;
@@ -755,30 +858,30 @@ void saIntronStranding (PP *pp, Array aa)
   memset (cGood, 0, sizeof (cGood)) ;
   memset (cOther, 0, sizeof (cOther)) ;
   
-
-  for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
-    {
-      for (char *cp = zp->feet ; *cp ; cp++)
+  if (iMax)
+    for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
+      {
+	for (char *cp = zp->feet ; *cp ; cp++)
 	*cp = ace_lower ((int)*cp) ;
-      if (! strcmp (zp->feet, "gt_ag"))
-	{
-	  k = zp->n + zp->nR ;
-	  nGt_ag[zp->run]++ ;
-	  cGood[zp->run][k < 12 ? k : 11]++ ;
-	}
-      else if (! strcmp (zp->feet, "ct_ac"))
-	{
-	  k = zp->n + zp->nR ;
-	  nCt_ac[zp->run]++ ;
-	  cGood[zp->run][k < 12 ? k : 11]++ ;
-	}
-      else
-	{
-	  k = zp->n + zp->nR ;
-	  cOther[zp->run][k < 12 ? k : 11]++ ;
-	}
-    }
-
+	if (! strcmp (zp->feet, "gt_ag"))
+	  {
+	    k = zp->n + zp->nR ;
+	    nGt_ag[zp->run]++ ;
+	    cGood[zp->run][k < 12 ? k : 11]++ ;
+	  }
+	else if (! strcmp (zp->feet, "ct_ac"))
+	  {
+	    k = zp->n + zp->nR ;
+	    nCt_ac[zp->run]++ ;
+	    cGood[zp->run][k < 12 ? k : 11]++ ;
+	  }
+	else
+	  {
+	    k = zp->n + zp->nR ;
+	    cOther[zp->run][k < 12 ? k : 11]++ ;
+	  }
+      }
+  
   /* check ratio of Good/Other to find the threshold */
   for (run = 0 ; run < runMax ; run++)
     {
@@ -800,7 +903,7 @@ void saIntronStranding (PP *pp, Array aa)
       if (s0[run] < minS && nCt_ac[run])
 	minS = s0[run] ;
     }
-
+  
   if (minS < 70) /* flip needed */
     {
       for (ii = 0, zp = arrp (aa, ii, INTRON) ; ii < iMax ; ii++, zp++)
@@ -820,36 +923,38 @@ void saIntronStranding (PP *pp, Array aa)
 	    }
 	}
     }
-
+  
   /* compute the anti counts */
-  array (aa, 2*iMax -1, INTRON).n = 0 ;
-  for (ii = 0, zp = arrp (aa, ii, INTRON), zpR = zp + iMax ; ii < iMax ; ii++, zp++, zpR++)
+  if (iMax)
     {
-      *zpR = *zp ;
-      zpR->a1 = zp->a2 ; zpR->a2 = zp->a1 ; 
-      zpR->nR = zp->n ; zpR->n = zp->nR ; zpR->feet[0] = 0 ;
+      array (aa, 2*iMax -1, INTRON).n = 0 ;
+      for (ii = 0, zp = arrp (aa, ii, INTRON), zpR = zp + iMax ; ii < iMax ; ii++, zp++, zpR++)
+	{
+	  *zpR = *zp ;
+	  zpR->a1 = zp->a2 ; zpR->a2 = zp->a1 ; 
+	  zpR->nR = zp->n ; zpR->n = zp->nR ; zpR->feet[0] = 0 ;
+	}
+      /* merged counts and antiCounts */
+      for (run = 0 ; run < runMax ; run++)
+	{
+	  array(pp->runStats, run, RunSTAT).nIntronSupportPlus = 0 ;
+	  array(pp->runStats, run, RunSTAT).nIntronSupportMinus = 0 ;
+	}
+      iMax = confirmedIntronsCompress (aa) ;
+      for (ii = 0, zp = arrp (aa, ii, INTRON); ii < iMax ; ii++, zp++)
+	{
+	  array(pp->runStats, zp->run, RunSTAT).nIntronSupportPlus +=  (s0[zp->run] < 40 ? zp->nR : zp->n) ;
+	  array(pp->runStats, zp->run, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
+	  array(pp->runStats, 0, RunSTAT).nIntronSupportPlus += (s0[zp->run] < 40 ? zp->nR : zp->n) ;
+	  array(pp->runStats, 0, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
+	}
+      for (run = 0 ; run < runMax ; run++)
+	{
+	  int np = array(pp->runStats, run, RunSTAT).nIntronSupportPlus ;
+	  int nm = array(pp->runStats, run, RunSTAT).nIntronSupportMinus ;
+	  array(pp->runStats, run, RunSTAT).intronStranding = 100.0 * np / (np + nm + 0.0000001) ;
+	}
     }
-  /* merged counts and antiCounts */
-  for (run = 0 ; run < runMax ; run++)
-    {
-      array(pp->runStats, run, RunSTAT).nIntronSupportPlus = 0 ;
-      array(pp->runStats, run, RunSTAT).nIntronSupportMinus = 0 ;
-    }
-  iMax = confirmedIntronsCompress (aa) ;
-  for (ii = 0, zp = arrp (aa, ii, INTRON); ii < iMax ; ii++, zp++)
-    {
-      array(pp->runStats, zp->run, RunSTAT).nIntronSupportPlus +=  (s0[zp->run] < 40 ? zp->nR : zp->n) ;
-      array(pp->runStats, zp->run, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
-      array(pp->runStats, 0, RunSTAT).nIntronSupportPlus += (s0[zp->run] < 40 ? zp->nR : zp->n) ;
-      array(pp->runStats, 0, RunSTAT).nIntronSupportMinus += (s0[zp->run] < 40 ? zp->n : zp->nR) ;
-    }
-  for (run = 0 ; run < runMax ; run++)
-    {
-      int np = array(pp->runStats, run, RunSTAT).nIntronSupportPlus ;
-      int nm = array(pp->runStats, run, RunSTAT).nIntronSupportMinus ;
-      array(pp->runStats, run, RunSTAT).intronStranding = 100.0 * np / (np + nm + 0.0000001) ;
-    }
-
   return ;
 } /* saIntronStranding */
 

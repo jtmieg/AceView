@@ -270,11 +270,11 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	    }
 	  
 	  RunSTAT *rs = arrayp (runStats, run, RunSTAT) ;
-	  rs->nFiles++ ;
+	  rs->p.nFiles++ ;
 	  if (rc->fileName2)
 	    {
 	      rc->pairedEnd = TRUE ;
-	      rs->nFiles++ ;
+	      rs->p.nFiles++ ;
 	    }
 	  if (rc->format == FASTC)
 	      rc->pairedEnd = TRUE ;
@@ -413,9 +413,9 @@ Array saConfigGetRuns (PP *pp, Array runStats)
 	    }
 	  
 	  RunSTAT *rs = arrayp (runStats, run, RunSTAT) ;
-	  rs->nFiles++ ;
+	  rs->p.nFiles++ ;
 	  if (rc->fileName2)
-	    rs->nFiles++ ;
+	    rs->p.nFiles++ ;
 	  if (rc->fileName2 || rc->format == FASTC)
 	      rc->pairedEnd = TRUE ;
 	} 

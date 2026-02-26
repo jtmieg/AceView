@@ -356,7 +356,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
       bb->length = 0 ;
       bb->dnas = arrayHandleCreate (bb->nSeqs, BigArray, bb->h) ;
       bb->dict = dictHandleCreate (bb->nSeqs, bb->h) ;
-      bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+      bb->runStat.p.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       bb->nSeqs = 0 ;
       bb->errDict = dictHandleCreate (100000, bb->h) ;
@@ -369,7 +369,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 	  
 	  bb->nSeqs++ ;
 	  bb->length += n1 ;
-	  bb->runStat.nReads++ ;
+	  bb->runStat.p.nReads++ ;
 
 	  switch (bb->rc.format)
 	    {
@@ -379,7 +379,7 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 		{
 		  isRead2 = 1 ;
 		  *cp = 0 ;
-		  bb->runStat.nPairs++ ;
+		  bb->runStat.p.nPairs++ ;
 		}
 	      if (! strcmp (cp, ".1"))
 		{
@@ -391,8 +391,8 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 	      break ;
 	    }
 	  
-	  if (isRead2) bb->runStat.nBase2 += n1 ;
-	  else  bb->runStat.nBase1 += n1 ;
+	  if (isRead2) bb->runStat.p.nBase2 += n1 ;
+	  else  bb->runStat.p.nBase1 += n1 ;
 
 	  dictAdd (bb->dict, namBuf, &nn1) ;
 	  nn1 = (nn1 << 1) | isRead2 ;
@@ -403,20 +403,20 @@ void saSequenceParseGzBuffer (const PP *pp, BB *bb)
 	      int i, iMax = arrayMax (dna1) ;
 	      unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 	      for (i = 0 ; i < iMax ; i++, cp++)
-		bb->runStat.ATGCN[atgcn[(int)*cp]]++ ;
+		bb->runStat.p.ATGCN[atgcn[(int)*cp]]++ ;
 	      
-	      if (iMax > bb->runStat.maxReadLength)
-		bb->runStat.maxReadLength = iMax ;
-	      if (! bb->runStat.minReadLength || iMax < bb->runStat.minReadLength)
-		bb->runStat.minReadLength = iMax ;
-	      array (bb->runStat.lengthDistribution, iMax, long int)++ ;
+	      if (iMax > bb->runStat.p.maxReadLength)
+		bb->runStat.p.maxReadLength = iMax ;
+	      if (! bb->runStat.p.minReadLength || iMax < bb->runStat.p.minReadLength)
+		bb->runStat.p.minReadLength = iMax ;
+	      array (bb->runStat.p.lengthDistribution, iMax, long int)++ ;
 	    }
 	  if (arrayMax (dna1))
 	    {
 	      int i, iMax = arrayMax (dna1) ;
 	      unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 	      for (i = 0 ; i < iMax && i < LETTERMAX ; i++, cp++)
-		bb->runStat.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
+		bb->runStat.p.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
 	    }
 
 	  dna1 = arrayHandleCreate (256, unsigned char, bb->h) ;
@@ -858,7 +858,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
       bb->run = rc ? rc->run : 0 ;
       bb->length = 0 ;
       bb->dnas = dnas = arrayHandleCreate (64, BigArray, bb->h) ;
-      bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+      bb->runStat.p.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
       if (pp->exportSamQuality && format == FASTQ)
 	bb->quals = arrayHandleCreate (64, Array, bb->h) ;
@@ -915,10 +915,10 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	      nSeqs += 2 ;
 	      bb->nSeqs += 2 ;
 	      bb->length += n1 + n2 ;
-	      bb->runStat.nPairs++ ;
-	      bb->runStat.nReads += 2 ;
-	      bb->runStat.nBase1 += n1 ;
-	      bb->runStat.nBase2 += n2 ;
+	      bb->runStat.p.nPairs++ ;
+	      bb->runStat.p.nReads += 2 ;
+	      bb->runStat.p.nBase1 += n1 ;
+	      bb->runStat.p.nBase2 += n2 ;
 	      if (namBuf[k-1] == '>') k-- ;
 	      /* namBuf[k] = '>' ; namBuf[k+1] = 0 ; */
 	      namBuf[k] = 0 ;
@@ -933,40 +933,40 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 		  int i, iMax = arrayMax (dna1) ;
 		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax && i < LETTERMAX ; i++, cp++)
-		    bb->runStat.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
 		}
 	      if (arrayMax (dna2))
 		{
 		  int i, iMax = arrayMax (dna2) ;
 		  unsigned char *cp = arrp (dna2, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax && i < LETTERMAX ; i++, cp++)
-		    bb->runStat.letterProfile2[5*i + atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.letterProfile2[5*i + atgcn[(int)*cp]]++ ;
 		}
 	      if (arrayMax (dna1))
 		{
 		  int i, iMax = arrayMax (dna1) ;
 		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax ; i++, cp++)
-		    bb->runStat.ATGCN[atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.ATGCN[atgcn[(int)*cp]]++ ;
 
-		  if (iMax > bb->runStat.maxReadLength)
-		    bb->runStat.maxReadLength = iMax ;
-		  if (! bb->runStat.minReadLength || iMax < bb->runStat.minReadLength)
-		    bb->runStat.minReadLength = iMax ;
-		  array (bb->runStat.lengthDistribution, iMax, long int)++ ;
+		  if (iMax > bb->runStat.p.maxReadLength)
+		    bb->runStat.p.maxReadLength = iMax ;
+		  if (! bb->runStat.p.minReadLength || iMax < bb->runStat.p.minReadLength)
+		    bb->runStat.p.minReadLength = iMax ;
+		  array (bb->runStat.p.lengthDistribution, iMax, long int)++ ;
 		}
 	      if (arrayMax (dna2))
 		{
 		  int i, iMax = arrayMax (dna1) ;
 		  unsigned char *cp = arrp (dna2, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax ; i++, cp++)
-		    bb->runStat.ATGCN[atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.ATGCN[atgcn[(int)*cp]]++ ;
 
-		  if (iMax > bb->runStat.maxReadLength)
-		    bb->runStat.maxReadLength = iMax ;
-		  if (! bb->runStat.minReadLength || iMax < bb->runStat.minReadLength)
-		    bb->runStat.minReadLength = iMax ;
-		  array (bb->runStat.lengthDistribution, iMax, long int)++ ;
+		  if (iMax > bb->runStat.p.maxReadLength)
+		    bb->runStat.p.maxReadLength = iMax ;
+		  if (! bb->runStat.p.minReadLength || iMax < bb->runStat.p.minReadLength)
+		    bb->runStat.p.minReadLength = iMax ;
+		  array (bb->runStat.p.lengthDistribution, iMax, long int)++ ;
 		}
 
 	      if (iMult < mult - 1)
@@ -1013,8 +1013,8 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	      nSeqs++ ;
 	      bb->nSeqs++ ;
 	      bb->length += n1 ;
-	      bb->runStat.nReads++ ;
-	      bb->runStat.nBase1 += n1 ;
+	      bb->runStat.p.nReads++ ;
+	      bb->runStat.p.nBase1 += n1 ;
 	      new = dictAdd (bb->dict, namBufX, &nn1) ;
 	      nn1 <<= (isGenome ? 0 : 1) ;
 	      if (isGenome && ! new)
@@ -1030,20 +1030,20 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 		  int i, iMax = arrayMax (dna1) ;
 		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax ; i++, cp++)
-		    bb->runStat.ATGCN[atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.ATGCN[atgcn[(int)*cp]]++ ;
 
-		  if (iMax > bb->runStat.maxReadLength)
-		    bb->runStat.maxReadLength = iMax ;
-		  if (! bb->runStat.minReadLength || iMax < bb->runStat.minReadLength)
-		    bb->runStat.minReadLength = iMax ;
-		  array (bb->runStat.lengthDistribution, iMax, long int)++ ;
+		  if (iMax > bb->runStat.p.maxReadLength)
+		    bb->runStat.p.maxReadLength = iMax ;
+		  if (! bb->runStat.p.minReadLength || iMax < bb->runStat.p.minReadLength)
+		    bb->runStat.p.minReadLength = iMax ;
+		  array (bb->runStat.p.lengthDistribution, iMax, long int)++ ;
 		}
 	      if (arrayMax (dna1))
 		{
 		  int i, iMax = arrayMax (dna1) ;
 		  unsigned char *cp = arrp (dna1, 0, unsigned char) ;
 		  for (i = 0 ; i < iMax && i < LETTERMAX ; i++)
-		    bb->runStat.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
+		    bb->runStat.p.letterProfile1[5*i + atgcn[(int)*cp]]++ ;
 		}
 
 	      if (bb->quals && qual1)
@@ -1091,7 +1091,7 @@ static void otherSequenceParser (const PP *pp, RC *rc, TC *tc, BB *bb, int isGen
 	  bb->dnas = dnas = arrayHandleCreate (nn, BigArray, bb->h) ;
 	  if (pp->exportSamQuality && format == FASTQ)
 	    bb->quals = arrayHandleCreate (64, Array, bb->h) ;
-	  bb->runStat.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+	  bb->runStat.p.lengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
 	  bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
 	  bb->dict = dictHandleCreate (NMAX, bb->h) ;
 	  bb->errDict = dictHandleCreate (NMAX, bb->h) ;

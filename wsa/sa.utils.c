@@ -35,29 +35,32 @@ static int read_proc_stat(cpu_times_t *times)
     FILE *f = fopen("/proc/stat", "r") ;
     if (!f) return -1 ;
 
-    char buf[2048] ;
+    char buf[2048] = {0} ;
     int num_cpus = 0 ;
-    int cpu_id = 0 ;
-    
-    // Parse cpuN + the 10 counters (user nice system idle iowait irq softirq steal guest guest_nice)
-    if (sscanf(buf, "cpu%d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
-	       &cpu_id,
-	       &times[cpu_id].user,
-	       &times[cpu_id].nice,
-	       &times[cpu_id].sys,
-	       &times[cpu_id].idle,
-	       &times[cpu_id].iowait,
-	       &times[cpu_id].irq,
-	       &times[cpu_id].softirq,
-	       &times[cpu_id].steal,
-	       &times[cpu_id].guest,
-	       &times[cpu_id].guest_nice) == 11)
+
+    // Read at least one line (the aggregate "cpu " line)
+    if (fgets(buf, sizeof(buf), f)) {
+        // Optionally skip it, or parse if you want aggregate stats
+    }
+
+    // Now read per-CPU lines
+    while (fgets(buf, sizeof(buf), f))
       {
-	    
-	if (cpu_id >= 0 && cpu_id < MAX_CPUS) {
-	  if (cpu_id + 1 > num_cpus) num_cpus = cpu_id + 1 ;
-	}
+	int cpu_id = -1;
+	cpu_times_t tt = {0};
+	
+	int n = sscanf(buf, "cpu%d %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+		       &cpu_id,
+                       &tt.user, &tt.nice, &tt.sys, &tt.idle,
+                       &tt.iowait, &tt.irq, &tt.softirq, &tt.steal,
+                       &tt.guest, &tt.guest_nice);
+	
+        if (n >= 9 && cpu_id >= 0 && cpu_id < MAX_CPUS) {
+	  times[cpu_id] = tt;
+	  if (cpu_id + 1 > num_cpus) num_cpus = cpu_id + 1;
+        }
       }
+    
     
   fclose(f) ;
   return num_cpus ;
@@ -152,8 +155,8 @@ int saBestNumactlNode (void)
 
 #ifdef JUNK
 
-foreach ii (1 2)
-  \rm -rf titi$ii ; /usr/bin/time -f "E %E U %U M %M P %P" ~/ace/bin.LINUX_4_OPT/sortalign -x Aligners/011_SortAlignG5R5/IDX.GRCh38.18.31 -i Fasta/iRefSeq38/iRefSeq38.fasta.gz --align -o titi$ii --step 5 >& titi$ii.err &
+foreach ii (1 2 3 4)
+  \rm -rf titi$ii ; /usr/bin/time -f "TIMING E %E U %U M %M P %P" ~/ace/bin.LINUX_4_OPT/sortalign -x Aligners/011_SortAlignG6R3/IDX.GRCh38.18.81 -i Fasta/iRefSeq38/iRefSeq38.fasta.gz --align -o titi$ii >& titi$ii.err &
 sleep 4
 end
 

@@ -440,6 +440,11 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 			      vp->chainX1 += di ;
 			      vp->chainA1 += (up->a1 < up->a2 ? di :- di) ;
 			    }
+			  SLS *zp = arrayp (bb->confirmedSLs, arrayMax (bb->confirmedSLs), SLS) ;
+			  zp->chrom = up->chrom ;
+			  zp->a1 = up->a1 ;
+			  zp->run = (bb->run << 4) | (iSl & 0xf) ;
+			  zp->n = 1 ;
 			  goto done ;
 			}
 		    }	
@@ -649,6 +654,12 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 			      vp->chainX2 -= di ;
 			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
 			    }
+			  SLS *zp = arrayp (bb->confirmedSLs, arrayMax (bb->confirmedSLs), SLS) ;
+			  zp->chrom = up->chrom ;
+			  zp->a1 = up->a2 ;
+			  zp->run = (bb->run << 4) | (iSl & 0xf) ;
+			  zp->n = 1 ;
+			  
 			  goto done ;
 			}
 		    }	
@@ -1111,7 +1122,9 @@ static void alignClipErrorRight (ALIGN *vp, int errCost)
 } /* alignClipErrorRight */
 
 /**************************************************************/
-/* locate again the chains to eliminate the chain == -1 killed exons */
+/* locate again the chains to eliminate the chain == -1 killed exons
+ * ATTENTION there is a second version below  alignLocateChains1 to avoid killed chain zero 
+ */
 static int alignLocateChains (Array bestAp, Array aa, int myRead)
 {
   int i1, i2, jj, iMax = arrayMax (aa) ;
@@ -1144,6 +1157,41 @@ static int alignLocateChains (Array bestAp, Array aa, int myRead)
 } /* alignLocateChains */
 
 /**************************************************************/
+/* locate again the chains to eliminate the chain <= 0 killed exons
+ * ATTENTION there is a second version above  alignLocateChains to only avoid killed chain == -1 exons
+ */
+static int alignLocateChains1 (Array bestAp, Array aa, int myRead)
+{
+  int i1, i2, jj, iMax = arrayMax (aa) ;
+  ALIGN *up, *vp ;
+  
+  bestAp = arrayReCreate (bestAp, keySetMax (bestAp), KEY) ;
+  if (iMax)
+    {
+      for (i1 = i2 = jj = 0, up = vp = arrp (aa, 0, ALIGN) ; i1 < iMax ; i1++, up++)
+	{
+	  if (up->chain > 0 && up->a1 != up->a2)
+	    {
+	      if (vp < up) *vp = *up ;
+	      if (vp->read == myRead && vp->chain > jj)
+		{
+		  jj = vp->chain ;
+		array (bestAp, jj, int) = i2 + 1 ;
+		}
+	      vp++ ; i2++ ;
+	    }
+	}
+      iMax = arrayMax (aa) = i2 ;
+    }
+      
+  up = arrayp (aa, iMax, ALIGN) ;
+  memset (up, 0, sizeof (ALIGN)) ; /* force a null record */
+  arrayMax (aa) = iMax ;
+
+  return iMax ;
+} /* alignLocateChains */
+
+/**************************************************************/
 
 static void alignAdjustIntrons (const PP *pp, BB *bb, Array bestAp, Array aa)
 {
@@ -1155,7 +1203,9 @@ static void alignAdjustIntrons (const PP *pp, BB *bb, Array bestAp, Array aa)
   for (int ic = 1 ; ic < arrayMax (bestAp) ; ic++)
     {
       /* adjust introns */
-      up = vp = arrp (aa, array (bestAp, ic, int), ALIGN) ; 
+      int k = array (bestAp, ic, int) ;
+      if (!k) continue ;
+      up = vp = arrp (aa, k - 1, ALIGN) ; 
       int chain = up->chain ;
       if (up->chrom != chromA)
 	{
@@ -1225,7 +1275,10 @@ static void alignAdjustExons (const PP *pp, BB *bb, Array bestAp, Array aa, Arra
   for (int ic = 1 ; ic < arrayMax (bestAp) ; ic++)
     {
       /* adjust   exons */
-      up = vp = arrp (aa, array (bestAp, ic, int), ALIGN) ; 
+      int k = array (bestAp, ic, int) ;
+      if (!k) continue ;
+      up = vp = arrp (aa, k - 1, ALIGN) ; 
+
       chain = up->chain ;
       if (up->chrom != chromA)
 	{
@@ -1813,13 +1866,13 @@ static void alignSelectBestDynamicPath (const PP *pp, BB *bb, Array aaa, Array a
    */
   
   /* locate the chains */
-  iMax = alignLocateChains (bestAp, aa, myRead) ;
+  iMax = alignLocateChains1 (bestAp, aa, myRead) ;
 
   if (iMax)
     {
       /* adjust introns */
       alignAdjustIntrons (pp, bb, bestAp, aa) ;
-      iMax = alignLocateChains (bestAp, aa, myRead) ;
+      iMax = alignLocateChains1 (bestAp, aa, myRead) ;
       /* adjust exons */
       alignAdjustExons (pp, bb, bestAp, aa, dna, maxJump, maxJump2) ;
       iMax = alignLocateChains (bestAp, aa, myRead) ;
@@ -1983,7 +2036,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 {
   ALIGN *ap, *vp ;
   int ii ;
-  int iMax = alignLocateChains (bestAp, aa, read) ;  
+  int iMax = alignLocateChains1 (bestAp, aa, read) ;  
   int nChains = 0 ;
   char allTc[256] ;
   Array dna = 0, dna1 = 0, dna2 = 0 ;
@@ -2054,7 +2107,7 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 		  dnaGR = arr (pp->bbG.dnasR, chromA >> 1, Array) ;
 		}
 	      
-	      if (bb->runStat.nPairs && (ap->read & 0x1))
+	      if (bb->runStat.p.nPairs && (ap->read & 0x1))
 		flip = 0x0f ; /* will flip last 4 bits */
 	      if (arrayMax (ap->errors))
 		mergeErrors (bb->errors, ap->errors, flip) ;
@@ -2071,7 +2124,9 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
   
   for (int ic = 0 ; ic < arrayMax (bestAp) ; ic++)
     {
-      ap = arrp (aa, array (bestAp, ic, int), ALIGN) ;
+      int k = array (bestAp, ic, int) ;
+      if (! k) continue ;
+      ap = arrp (aa, k - 1, ALIGN) ;
       if (read == ap->read)
 	{
 	  int a1 = ap->a1 ;
@@ -2084,6 +2139,8 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
 	    continue ;
 	  allTc[tc] = 1 ;
 	  if (ap->read & 0x1)
+	    s = !s ;
+	  if (ap->chrom & 0x1)
 	    s = !s ;
 	  if (s)
 	    bb->runStat.GF[tc]++ ;
@@ -2105,7 +2162,10 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
       ap = 0 ;
       for (int ic = 1 ; ic < arrayMax (bestAp) ; ic++)
 	{
-	  vp = arrp (aa, array (bestAp, ic, int), ALIGN) ;
+	  int k = array (bestAp, ic, int) ;
+	  if (! k) continue ;
+	  vp = arrp (aa, k - 1, ALIGN) ;
+	  if (! vp->chainScore) continue ;
 	  int tc = vp->targetClass ;
 	  if (read == vp->read)
 	    {
@@ -2338,7 +2398,6 @@ static void  alignDoRegisterOnePair (const PP *pp, BB *bb, BigArray aaa, Array a
     }
   /* register the alignments */
   long int kMax = bigArrayMax (aaa) ;
-  
   iMax = arrayMax (aa) ;
   if (iMax)
     {
@@ -2795,6 +2854,7 @@ void saAlignDo (const PP *pp, BB *bb)
   err = arrayHandleCreate (256, A_ERR, h) ;
   aaa = bigArrayHandleCreate (iMax, ALIGN, h) ;
   countChroms = arrayHandleCreate (256, COUNTCHROM, h) ;
+  bb->confirmedSLs = arrayHandleCreate (6400, SLS, bb->h) ;
   bb->confirmedPolyAs = arrayHandleCreate (64000, POLYA, bb->h) ;
   bb->confirmedIntrons = arrayHandleCreate (64000, INTRON, bb->h) ;
   bb->doubleIntrons = arrayHandleCreate (64000, DOUBLEINTRON, bb->h) ;
@@ -2978,12 +3038,13 @@ void saAlignDo (const PP *pp, BB *bb)
   
   if (1 && pass==0 && redo)
     {
-      Array lenDis = bb->runStat.lengthDistribution ;
-      Array iLenDis = bb->runStat.insertLengthDistribution ;
+      PSD p = bb->runStat.p ;
 
       memset (&bb->runStat, 0, sizeof (RunSTAT)) ;
-      bb->runStat.lengthDistribution = lenDis ;
-      bb->runStat.insertLengthDistribution = iLenDis ;
+      bb->runStat.p = p ;
+
+      bb->runStat.insertLengthDistribution = arrayHandleCreate (1024, long int, bb->h) ;
+
       bb->nAli = bb->aliDx = bb->aliDa = 0 ;
       bigArrayMax (aaa) = 0 ;
 

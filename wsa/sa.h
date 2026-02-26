@@ -86,14 +86,25 @@ typedef struct aStruct {
 #define SLMAX 1000
 #define LETTERMAX 1000
 #define OVERHANGMAX 600   /* 4*30*5  overhang: 32 bases max, starting on base atgc, 5 counts atgcn per position */
-typedef struct runStatStruct {
+
+typedef struct PSDstruct {
   int run ;   /* index in p.runDict */
   int nFiles ;
+  long int nBase1, nBase2 ;
   long int nPairs, nReads ;
+  Array lengthDistribution ;
+  int minReadLength, maxReadLength ;
+  long int letterProfile1[5 * LETTERMAX] ;
+  long int letterProfile2[5 * LETTERMAX] ;
+  long int ATGCN[5] ;
+
+} PSD ;
+
+typedef struct runStatStruct {
+  PSD p ;
   long int lowEntropy, tooShort ;
   long int lowEntropyBases, tooShortBases ;
   long int nCompatiblePairs, nIncompatiblePairs, n2ChromsPairs, nOrphans, nCirclePairs ;
-  long int nBase1, nBase2 ;
   long int nPairsAligned, nBaseAligned1, nBaseAligned2 ;
   long int cds, utr, intronic, intergenic ;
   long int nMultiAligned[11] ;
@@ -121,15 +132,11 @@ typedef struct runStatStruct {
   long int wiggleCumul ; /* in million bases */
   long int wiggleLCumul ; /* in million bases */
   long int wiggleRCumul ; /* in million bases */
-  Array lengthDistribution ;
   Array insertLengthDistribution ;
-  int minReadLength, maxReadLength ;
   ADAPTORS adaptors ;
   long int nN, nErr, nMID ;
-  long int letterProfile1[5 * LETTERMAX] ;
-  long int letterProfile2[5 * LETTERMAX] ;
-  long int ATGCN[5] ;
-
+  int accessibleLength5kb ;
+  int accessibleLength8kb ;
   long int overhangL1 [OVERHANGMAX] ; /* read 1 left overhang  */
   long int overhangL2 [OVERHANGMAX] ; /* read 2 left overhang */
   
@@ -183,6 +190,7 @@ typedef struct bStruct {
   int isRna ; /* 2: user defined RNA, -2: user defined DNA, 1: autodefined RNA, -1 autodefined DNA */
 
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
+  long int nSLsSupport ;
   long int nPolyASupport ;
   long int nIntronSupportPlus ;
   long int nIntronSupportMinus ;    
@@ -266,6 +274,7 @@ typedef struct pStruct {
   Array intronics ;
   Array intergenics ;
   Array confirmedPolyAs ;
+  Array confirmedSLs ;
   Array confirmedIntrons ;
   Array doubleIntrons ;
   BOOL fasta, fastq, fastc, raw, solid, sra, sraCaching ;
@@ -402,6 +411,13 @@ typedef struct polyAStruct {
   int n ;
 } __attribute__((aligned(32))) POLYA ;
 
+typedef struct SLsStruct {
+  int chrom ;  /* chrom indicates the strand */
+  int run ; /* run << 4 | SLnumber (0..14 always < 15) */
+  int a1 ; /* first A in the orientation of the chrom */
+  int n ;
+} __attribute__((aligned(32))) SLS ;
+
 typedef struct cpuStatStruct {
   char nam[32] ;
   int agent ;
@@ -467,6 +483,8 @@ ACEOUT saSamCreateFile (const PP *pp, BB *bb, BOOL isError, AC_HANDLE h) ;
 void saIntronsOptimize (BB *bb, ALIGN *vp, ALIGN *wp, Array dnaG)  ; 
 void saPolyAsExport (PP *pp, Array aaa) ;
 void saPolyAsCumulate (PP *pp, BB *bb) ;
+void saSLsExport (PP *pp, Array aaa) ;
+void saSLsCumulate (PP *pp, BB *bb) ;
 void saIntronsExport (PP *pp, Array aaa) ;
 void saDoubleIntronsExport (PP *pp, Array aaa) ;
 void saIntronsCumulate (PP *pp, BB *bb) ;

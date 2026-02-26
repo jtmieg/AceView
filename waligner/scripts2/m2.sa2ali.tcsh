@@ -24,7 +24,7 @@ if (-e $ff) then
 endif
 
 
-set ff=$dd.err
+set ff=$dd/salign.err
 if (-e $ff) then
   echo "\nAli $run\nRun $run" >> $toto
   cat $ff | gawk '/TIMING/{if ($4=="U") {t=$5;}}END{if(t+0>0)printf("CPU sortAlign %d seconds\n", t);}' >> $toto
@@ -36,9 +36,7 @@ endif
 echo >> $toto
 
 set ff=$dd/runStats.tsf
-cat $toto | gawk  'BEGIN{s2=100;n=0;}/Stranding/{r=run;s=$3+0;p=$4;m=$6;if(s>50 && p>10000 && s > s1+0){s1=s;n=p;k1=$0;}if(s<50 && m>10000 && s < s2){n=m;s2=s;k2=$0;}}END{if(n>0){if(s1-50 > 50-s2)print k1;else print k2;}}' run=$run | gawk '{n=$4+$6+0;cl=$2;if(n)printf("Run %s\nObserved_strandedness_in_ns_mapping %s %s %d plus %d minus\n\n", run,cl,$3,$4,$6);}' run=$run >> $toto
-
-
-
+cat $toto | gawk  'BEGIN{s2=100;n=0;}/Stranding/{r=run;s=$3+0;p=$4;m=$6;if(s>50 && p>10000 && s > s1+0){s1=s;n=p;k1=$0;}if(s<50 && m>10000 && s < s2){n=m;s2=s;k2=$0;}}END{if(n>0){if(s1-50 > 50-s2)print k1;else print k2;}}' run=$run | gawk '{n=$4+$6+0;cl=$2;if(n)printf("Run %s\nObserved_strandedness_in_ns_mapping %s %s %d plus %d minus\n\n", run,cl,$3,$4,$6);}' run=$run > $toto.1
+cat $toto.1 >> $toto
 
 wc $toto

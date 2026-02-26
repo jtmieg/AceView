@@ -359,14 +359,14 @@ void saCodeSequenceSeeds (const PP *pp, BB *bb, int step, BOOL isTarget)
   if (minEntropy < 0) /* default value */
     {
       minEntropy = -minEntropy ;
-      if (minEntropy > bb->runStat.maxReadLength / 2)
-	minEntropy = bb->runStat.maxReadLength / 2 ;
+      if (minEntropy > bb->runStat.p.maxReadLength / 2)
+	minEntropy = bb->runStat.p.maxReadLength / 2 ;
     }
   if (minLength < 0) /* default value */
     {
       minLength = -minLength ;
-      if (minLength > bb->runStat.maxReadLength / 2)
-	minLength = bb->runStat.maxReadLength / 2 ;
+      if (minLength > bb->runStat.p.maxReadLength / 2)
+	minLength = bb->runStat.p.maxReadLength / 2 ;
     }
   if (step < 1)
     messcrash ("codeWordsDo received step = %d < 1", step) ;
