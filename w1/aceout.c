@@ -33,8 +33,10 @@
  */
 
 #include <wh/regular.h>
-#include <wh/aceio.h>					    /* provide incomplete (public) type */
-#include <wh/mytime.h>	
+#include <wh/aceio.h>	    /* provide incomplete (public) type */
+#include <wh/mytime.h>
+#include <wh/fastItoA.h>
+
 /************************************************************/
 
 /* We used to have a huge buffer within the aceout struct because we didn't  */
@@ -1133,6 +1135,16 @@ ACEOUT aceOutCreate (const char *outFileName, const char *suffix, BOOL gzo, AC_H
     }
   return ao ;
 } /* aceOutCreate */
+
+/*************************************************************************************/
+/* return number of characters used to write this number */
+int aceOutInt (ACEOUT ao, int nn)
+{
+  char buf[128] ;
+  int k = fast_itoa (buf, nn) ;
+  aceOut (ao, buf) ;
+  return k ;
+} /* aceOutInt */
 
 /*************************************************************************************/
 
