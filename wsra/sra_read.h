@@ -21,9 +21,11 @@ SRAObj* SraObjNew(const char* accession);
 SRAObj* SraObjFree(SRAObj* sra);
 
 /* Download a batch of reads with num_bases bases and return a pointer to
-   to reads in FASTA format. The function downloads complete reads, so in most
-   cases the number of downloaded bases will be just above num_bases. */
-const char* SraGetReadBatch(SRAObj* sra, int num_bases);
+   to reads in FASTA or FASTQ format. The function downloads complete reads,
+   so in most cases the number of downloaded bases will be just above
+   num_bases. If quality_scores == 0, then the downloaded reads will be
+   in the FASTA format, otherwise FASTQ with quality scores. */
+const char* SraGetReadBatch(SRAObj* sra, int num_bases, int quality_scores);
 
 
 #ifdef __cplusplus
