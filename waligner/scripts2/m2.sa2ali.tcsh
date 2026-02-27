@@ -5,6 +5,8 @@ set toto=$dd/sa2ali.ace
 
 echo "Ali $run\nRun $run" > $toto
 echo "-D Letter_profile" >> $toto
+echo "-D stranding Introns" >> $toto
+echo "-D Candidate_introns" >> $toto
 echo "Counts\nStrandedness\nAli\nUnicity\nGene_expression\nSponge\nAlignments\nLetter_profile\nATGC_kb\nPair_fate\nErrors\nComputer_ressource" >> $toto
 #RawCounts
 set ff=$dd/runStats.tsf
@@ -20,7 +22,7 @@ endif
 set ff=$dd/$run.letterProfile.tsf
 if (-e $ff) then
   echo "\nAli $run\nRun $run" >> $toto
-  cat $ff | gawk -F '\t' '/^#/{next;}{fr=substr($1,length($1),1);if(fr=="r")fr="f2";else fr="f1"; if($2+0>0)printf("Letter_profile %s %d %d %d %d %d %d 0  %d %d %d %d %d\n",fr,$2,$10,$11,$12,$13,$14,$4,$5,$6,$7,$8)}' >> $toto
+  cat $ff | gawk -F '\t' '/^#/{next;}{fr=substr($1,length($1),1);if(fr=="r")fr="f2";else fr="f1"; if($2+0>0)printf("Letter_profile %s %d %d %d %d %d %d %d %d %d %d %d\n",fr,$2,$10,$11,$12,$13,$14,$4,$5,$6,$7,$8)}' >> $toto
 endif
 
 

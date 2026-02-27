@@ -473,7 +473,7 @@ static BOOL readOneAdaptor (char adaptor[32], RunSTAT *up, BOOL isLeft, int pass
 	  for (j = 0, nn = 0 ; j < 5 ; j++)
 	    nn += aa[i5 + j] ;
 	  for (j = 0 ; j < 4 ; j++)
-	    if (100 * aa[i5 + j] > 60 * nn && nn > 1000)
+	    if (100 * aa[i5 + j] > 52 * nn && nn > 1000)
 	      {
 		if (j > 0) good++ ;
 		nL += nn ;

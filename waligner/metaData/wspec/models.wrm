@@ -263,8 +263,8 @@
                               Nucleic_prep_author ?Author XREF Nucleic_prep_author  
       Library_preparation  Library  Text          // could include  library preparation date, amount, oligo or random primed first strand, RNA strand-labeling, UDG, DSN normalisation, ribosomal or other depletion, DNA_Spiked_in, adaptors, barcode, number of  PCR cycles, temperature, , size selection of templates, strand
                            Amount_and_type ?Text                               //  goes to Library
-                           Adaptor1      ?Text    //sequence      // should be made more automatic and documented here or in ?Ali by clipalign
-                           Adaptor2  ?Text                        // should be made more automatic and documented here or in ?Ali by clipalign
+                           Adaptor1      ?Text UNIQUE Int   //sequence      // should be made more automatic and documented here or in ?Ali by clipalign
+                           Adaptor2  ?Text UNIQUE Int                       // should be made more automatic and documented here or in ?Ali by clipalign
                            Entry_adaptor ?Text
                            Entry_adaptor2 ?Text
                            Barcode  ?Text       //sequence and number per lane  
@@ -317,9 +317,6 @@
       Counts Raw_data  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Accepted  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Rejected  UNIQUE Float  UNIQUE Text   UNIQUE Float  UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
-             Entry_adaptor_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
-             Entry_adaptor2_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
-             Exit_adaptor_clipping UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text UNIQUE Float UNIQUE Text 
              Min_probe_length UNIQUE Int
              Max_probe_length UNIQUE Int	
              Length_distribution_1_5_50_95_99_mode_av UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int UNIQUE Int
@@ -440,8 +437,8 @@
                  Clipped_length Int UNIQUE Float REPEAT
                  First_base_aligned  Int UNIQUE Float UNIQUE Float 
                  Last_base_aligned  Int UNIQUE Float UNIQUE Float 
-      Adaptors Adaptor1  UNIQUE Text  // constructed by scripts/dnawalk.findAdaptors.tcsh in pahse a0W a1W
-               Adaptor2  UNIQUE Text 
+      Adaptors Adaptor1  UNIQUE Text UNIQUE Int  // constructed by scripts/dnawalk.findAdaptors.tcsh in pahse a0W a1W
+               Adaptor2  UNIQUE Text UNIQUE Int
       Overhangs Partial_5p UNIQUE Float UNIQUE Float // prefix >= 15, >= 25
                 Partial_3p UNIQUE Float UNIQUE Float // suffix >= 15, >= 25
       ERCC_mix Text UNIQUE Float UNIQUE Float UNIQUE Text  // best fit to Mix1 or Mix2, R, R^2 correlation coefficient

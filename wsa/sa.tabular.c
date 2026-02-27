@@ -71,12 +71,12 @@ void saExportTabular (const PP *pp, BB *bb, Array aa)
       /* 20 chain */
       aceOut (ao, "\t\t") ;
       aceOutInt (ao, up->chain) ; /* nb of exported chains */
-      /* 21 left overhang */
+      /* 21 complement of left overhang */
       aceOut (ao, "\t") ;
-      aceOut (ao, "-") ; /* complement of left overhang */
+      aceOut (ao, up->leftOverhang ? dictName (bb->dict, up->leftOverhang) : "-") ;
       /* 22 right overhang */
       aceOut (ao, "\t") ;
-      aceOut (ao, "-") ; /* right */
+      aceOut (ao, up->rightOverhang ? dictName (bb->dict, up->rightOverhang) : "-") ; 
       /* 23 chrom of other read of pair */ 
       aceOut (ao, "\t") ;
       aceOut (ao, "-") ; /* right */

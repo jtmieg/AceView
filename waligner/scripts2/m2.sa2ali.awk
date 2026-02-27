@@ -41,6 +41,20 @@ BEGIN {
 	alignedReads = nn ;
 	next ;
     }
+    if (tag == "Reads_Aligned_once")
+    {
+	multiAli[1] = nn ;
+	allMultiAli += nn ;
+	next ;
+    }
+    if (substr(tag, 1, 21) == "Reads_multi_aligned__")
+    {
+	k = 0 + substr (tag, 22) ;
+	if (k > 1 && k <= 10)
+	    multiAli[k] = nn ;
+	allMultiAli += nn ;
+	next ;
+    }
     if (tag == "Reads_aligned_in_class_G")
     {
 	alignedReads_G = nn ;
@@ -123,7 +137,7 @@ BEGIN {
     if (tag == "Intron_supports")
     {
 	intronSupport = nn ; iiPlus = $5 ; iiMinus = $6 ;
-	printf ("Stranding Introns %.5f %d plus %d minus\n", iiPlus/(nn+0.00000001), iiPlus, iiMinus) ; 
+	printf ("Stranding I_introns %.5f %d plus %d minus\n", iiPlus/(nn+0.00000001), iiPlus, iiMinus) ; 
 	next ;
     }
     if (tag == "Supported_introns")
@@ -162,15 +176,22 @@ BEGIN {
     }
     if (tag == "Clipped_3prime_Adaptor_read1")
     {
-	adpt = $4 ;
+	adpt = $5 ;
 	if (length(adpt)> 2)
-	    printf ("Adaptor1 %s\n", adpt) ;
+	    printf ("Adaptor1 %s %d\n", adpt, $4) ;
     }
-    if (tag == "Clipped_3prime_Adaptor_read3")
+    if (tag == "Clipped_3prime_Adaptor_read2")
     {
-	adpt = $4 ;
+	adpt = $5 ;
 	if (length(adpt)> 2)
-	    printf ("Adaptor2 %s\n", adpt) ;
+	    printf ("Adaptor2 %s %d\n", adpt, $4) ;
+    }
+    if (tag == "CDS_utr_intronic_intergenic_Bases")
+    {
+	if ($4 + 0 > 0) printf ("S_1_CDS %.3f \"Mb aligned\"\n", $4) ;
+	if ($4 + 0 > 0) printf ("S_1_UTR %.3f \"Mb aligned\"\n", $6) ;
+	if ($4 + 0 > 0) printf ("S_1_intronic %.3f \"Mb aligned\"\n", $8) ;
+	if ($4 + 0 > 0) printf ("S_1_intergenic %.3f \"Mb aligned\"\n", $10) ;
     }
 }
 END {
@@ -188,6 +209,15 @@ END {
 	    printf ("nh_ali Z_genome %d seq %d tags %d kb_ali %d bp_av_ali %d kb_clip %d bp_av_clip\n", alignedReads_G, alignedReads_G, alignedBases_G/1000, alignedBases_G/alignedReads , alignedBases_G/1000, alignedBases_G/alignedReads_G ) ;
 	if (alignedReads + 0 > 0)
 	    printf ("nh_ali any %d seq %d tags %d kb_ali %d bp_av_ali %d kb_clip %d bp_av_clip\n", alignedReads, alignedReads, alignedBases/1000, alignedBases/alignedReads , alignedBases/1000, alignedBases/alignedReads ) ;
+
+	if (allMultiAli > 0)
+	{
+	    printf ("Unicity Number_of_targets 1 2 3 4 5 6 7 8 9 10\n") ;
+	    printf ("Unicity any ") ;
+	    for (k = 1 ; k <= 10 ; k++)
+		printf (" %d ", 0 + multiAli[k]) ;
+	    printf ("\n") ;
+	}
     }
     printf ("\n") ;
 }

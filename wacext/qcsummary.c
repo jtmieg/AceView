@@ -915,6 +915,9 @@ static void  qcStrandedness (QC *qc, RC *rc)
 		    break ;
 		}
 	      for (ir = 0 ; tt && ir < tt->rows; ir++)
+		if (! strcmp (ac_table_printable (tt, ir, 0, ""), "I_introns"))
+		  strcpy (buf, "introns") ;  /* specific of Magic2 */
+	      for (ir = 0 ; tt && ir < tt->rows; ir++)		
 		{
 		  strncpy (buf2, ac_table_printable (tt, ir, 0, ""), 255) ;
 		   { char *cp = strchr (buf2, '.') ;

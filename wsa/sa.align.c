@@ -518,7 +518,7 @@ static int alignFormatLeftOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, 
 
 /**************************************************************/
 
-static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, ADAPTORS *adaptors, int i0, int iMax)
+static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna, Array dnaG, Array dnaGR, ADAPTORS *adaptors, int ii0, int iiMax)
 {
   int x2 = up->x2 ;
   int ln = arrayMax (dna) ; /* length to align */
@@ -528,7 +528,7 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
   
   if (x2 < ln)
     {
-      int nA = 0 ;
+      int cc, nA = 0 ;
       int dx = ln - x2 ;
       int Dx = dx ;
       char buf[32] ;
@@ -536,7 +536,33 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
       if (dx > 30) { dx = 30 ; }
       char *cp = arrp (dna, x2, char) ; /* first unaligned base */
       long int *overH = (up->read & 0x1 ? bb->runStat.overhangR2 : bb->runStat.overhangR1) ;
-      if (up->targetClass == 'G')
+      
+      for (int i = 0 ; i < dx ; i++, cp++)
+	{
+	  cc = *cp ;
+	  buf[i] = cc ;
+	  switch (cc)
+	    {
+	    case A_:
+	      nA++ ;
+	      break ;
+	    }
+	}
+      
+      if (ii0 == iiMax - 1 || up[1].read != up[0].read)
+	/* isLast, proceed and look for polyA and adaptors */ ;
+      else
+	{ /* even if we change chain, we do not want i think to seach a polyA or adaptor */
+	  if (dx > up[1].x1 - up[0].x2 - 1)
+	    {
+	      dx = up[1].x1 - up[0].x2 - 1 ;
+	      if (dx >= 0 && dx < 32)
+		buf[dx] = 0 ;
+	    }	  
+	  goto done ;  
+	}
+
+      if (1)
 	{
 	  int first = -1 ;
 	  int cc = *cp ;
@@ -560,31 +586,22 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 
 
 	  /* search for a polyA */
-	  for (int i = 0 ; i < dx ; i++, cp++)
+	  if (up->targetClass == 'G')
 	    {
-	      cc = *cp ;
-	      buf[i] = cc ;
-	      switch (cc)
+	      /* may be we should look for the adaptor before Dx - dx */
+	      if (bb->isRna >= 0 && nA >= 7 && 10 * nA >= 9 * dx && Dx < dx + 10)
 		{
-		case A_:
-		  nA++ ;
-		  break ;
+		  POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
+		  zp->chrom = up->chrom ;
+		  zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
+		  zp->run = bb->run ;
+		  zp->n = 1 ;
+		  doUpper = TRUE ;
+		  bb->runStat.nClippedPolyA++ ;
+		  rightClip = x2 ;
+		  goto done ; /* do not polute the search for the adaptor with the presence of a polyA */
 		}
 	    }
-	  /* may be we should look for the adaptor before Dx - dx */
-	  if (bb->isRna >= 0 && nA >= 7 && 10 * nA >= 9 * dx && Dx < dx + 10)
-	    {
-	      POLYA *zp = arrayp (bb->confirmedPolyAs, arrayMax (bb->confirmedPolyAs), POLYA) ;
-	      zp->chrom = up->chrom ;
-	      zp->a1 = up->a2 + (up->chrom & 0x1 ? -1 : 1) ;
-	      zp->run = bb->run ;
-	      zp->n = 1 ;
-	      doUpper = TRUE ;
-	      bb->runStat.nClippedPolyA++ ;
-	      rightClip = x2 ;
-	      goto done ; /* do not polute the search for the adaptor with the presence of a polyA */
-	    }
-
 	  
 	  cp = arrp (dna, x2, char) ; /* first unaligned base */
 	  for (int i = 0 ; i < dx ; i++, cp++)
@@ -610,7 +627,7 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 		  break ;
 		}
 	    }
-
+	  
 	  /* try to recognize the SLs */
 	  if (bb->isRna >= 0 && pp->isWorm && pp->SLs)
 	    {
@@ -665,69 +682,69 @@ static int alignFormatRightOverhang (const PP *pp, BB *bb, ALIGN *up, Array dna,
 		    }	
 		}
 	    }
-
-	  /* try to recognize the known adaptor */
-	  const char *adaptor = (up->read & 0x1 ? adaptors->a2R : adaptors->a1R) ;
-	  if (adaptor[0])
-	    {
-	      int iAmax = 1 ;
-	      for (int iA = 0 ; iA < iAmax ; iA++)
-		{	      
-		  int iMax = strlen (adaptor) ;
-		  for (int di = 0 ; di < 6 ; di++)
+	}
+	      
+      /* try to recognize the known adaptor */
+      const char *adaptor = (up->read & 0x1 ? adaptors->a2R : adaptors->a1R) ;
+      if (adaptor[0])
+	{
+	  int iAmax = 1 ;
+	  for (int iA = 0 ; iA < iAmax ; iA++)
+	    {	      
+	      int iMax = strlen (adaptor) ;
+	      for (int di = 0 ; di < 6 ; di++)
+		{
+		  int jj, i, n = 0 ;
+		  if (iMax > 30) iMax = 30 ;
+		  
+		  cp = arrp (dna, x2 - di, char) ; /* x2 =  first unaligned base */
+		  for (i = 0 ; i < dx + di && i < iMax ; i++)
+		    n +=  (cp[i] == adaptor[i] ? 1 : 0) ;
+		  if (n > 6 && 10 * n >= 9 * i)
 		    {
-		      int jj, i, n = 0 ;
-		      if (iMax > 30) iMax = 30 ;
-		      
-		      cp = arrp (dna, x2 - di, char) ; /* x2 =  first unaligned base */
-		      for (i = 0 ; i < dx + di && i < iMax ; i++)
-			n +=  (cp[i] == adaptor[i] ? 1 : 0) ;
-		      if (n > 6 && 10 * n >= 9 * i)
+		      ALIGN *vp ;
+		      doUpper = TRUE ;
+		      if (up->read & 0x1) 
+			bb->runStat.nClippedAdaptor2R++ ;
+		      else
+			bb->runStat.nClippedAdaptor1R++ ;
+		      rightClip = x2 - di ;
+		      up->x2 -= di ;
+		      up->ali -= di ;
+		      up->a2 -= (up->a1 < up->a2 ? di :- di) ;
+		      cp = arrp (dna, up->x2, char) ;
+		      if (1 && di > 0) /* extend the unaligned buffer */
 			{
-			  ALIGN *vp ;
-			  doUpper = TRUE ;
-			  if (up->read & 0x1) 
-			    bb->runStat.nClippedAdaptor2R++ ;
-			  else
-			    bb->runStat.nClippedAdaptor1R++ ;
-			  rightClip = x2 - di ;
-			  up->x2 -= di ;
-			  up->ali -= di ;
-			  up->a2 -= (up->a1 < up->a2 ? di :- di) ;
-			  cp = arrp (dna, up->x2, char) ;
-			  if (1 && di > 0) /* extend the unaligned buffer */
-			    {
-			      for (int i = 30 ; i >= di ; i--)
-				buf[i] = buf[i- di] ;
-			      for (int i = 0 ; i < di ; i++)
-				buf[i] = cp[i] ;
-			      buf[31] = 0 ;
-			    }
-			    
-			  for (vp = up, jj = i0 ; jj >= 0 && vp->read == up->read && vp->chain == up->chain ; jj--, vp--)
-			    {
-			      vp->score -= di ;
-			      vp->chainScore -= di ;
-			      vp->chainAli -= di ;
-			      vp->chainX2 -= di ;
-			      vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
-			    }
-			  goto done ;
+			  for (int i = 30 ; i >= di ; i--)
+			    buf[i] = buf[i- di] ;
+			  for (int i = 0 ; i < di ; i++)
+			    buf[i] = cp[i] ;
+			  buf[31] = 0 ;
 			}
-		    }	
-		}
+		      
+		      for (vp = up, jj = ii0 ; jj >= 0 && vp->read == up->read && vp->chain == up->chain ; jj--, vp--)
+			{
+			  vp->score -= di ;
+			  vp->chainScore -= di ;
+			  vp->chainAli -= di ;
+			  vp->chainX2 -= di ;
+			  vp->chainA2 -= (up->a1 < up->a2 ? di :- di) ;
+			}
+		      goto done ;
+		    }
+		}	
 	    }
 	}
+    
     done:
       for (int i = 0 ; i < dx ; i++)
 	buf[i] = dnaDecodeChar[(int)buf[i]] ;
       if (doUpper)
 	bufferToUpper (buf) ;
       if (strlen (buf) > 0)
-      
-      dictAdd (bb->dict, buf, &up->rightOverhang) ;
+	dictAdd (bb->dict, buf, &up->rightOverhang) ;
     }
-
+  
   up->rightClip = rightClip ;
   return rightClip ;
 } /* alignFormatRightOverhang */

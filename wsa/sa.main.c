@@ -1427,10 +1427,7 @@ int main (int argc, const char *argv[])
 		}
 	    }
 		    
-	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb)) ||
-	    getCmdLineInt (&argc, argv, "--maxGb", &(p.maxSraGb)) ||
-	    getCmdLineInt (&argc, argv, "--maxgB", &(p.maxSraGb)) ||
-	    getCmdLineInt (&argc, argv, "--maxgb", &(p.maxSraGb));
+	  getCmdLineInt (&argc, argv, "--maxGB", &(p.maxSraGb)) ;
 	  if (p.maxSraGb < 0)
 	    saUsage ("--maxGB parameter should be positive", argc, argv) ;
 
@@ -1442,6 +1439,18 @@ int main (int argc, const char *argv[])
 	      saSequenceParseSraDownload (&p, cp) ;
 	      cp = cq ? cq + 1 : 0 ;
 	    }
+	  exit (0) ;
+	}
+    }}
+
+  /***************************************************************************************/
+
+  {{
+      int n = 0 ;
+      if (getCmdLineInt (&argc, argv, "--testRG", &(n)))
+	{
+	  getCmdLineText (h, &argc, argv, "-o", &(p.outFileName)) ;
+	  saCreateRandomGenome (&p, n) ;
 	  exit (0) ;
 	}
     }}
@@ -1548,9 +1557,6 @@ int main (int argc, const char *argv[])
       showHitsDo (0, 0) ;
       exit (0) ;
     }
-
-  if (getCmdLineInt (&argc, argv, "--testRG", &(n)))
-    saCreateRandomGenome (&p, n) ;
 
   /**************************  another debugging module, ignore ***************************/
   
