@@ -190,6 +190,7 @@ typedef struct bStruct {
   int isRna ; /* 2: user defined RNA, -2: user defined DNA, 1: autodefined RNA, -1 autodefined DNA */
 
   int step, skips0, skips1, skips2, skips3, skips4, skipsFound, skipsNotFound ;
+  long int genomeLength ;
   long int nSLsSupport ;
   long int nPolyASupport ;
   long int nIntronSupportPlus ;
@@ -317,7 +318,7 @@ typedef struct pStruct {
   long int wiggleCumul ; /* in million bases */
   long int cds, utr, intronic, intergenic ;
   BOOL splice ;
-  long int nRawReads, nRawBases ;
+  long int nRawReads, nRawBases, genomeLength ;
   int wiggle_step ;
   float *runStranding ;
 } PP ;

@@ -4670,7 +4670,8 @@ static void qcCPU (QC *qc, RC *rc)
 	  switch (ti->col)
 	    {
 	    case 1: /* million reads per CPU hour  */
-	      tt = ac_tag_table (rc->ali, "CPU", h) ;
+	      tt = ac_tag_table (rc->ali, "Elapsed", h) ;
+	      if (! tt) tt = ac_tag_table (rc->ali, "CPU", h) ;
  	      for (ir = 0 ; tt && ir < tt->rows ; ir++)	
 		k += ac_table_int (tt, ir, 1, 0) ;
 	      

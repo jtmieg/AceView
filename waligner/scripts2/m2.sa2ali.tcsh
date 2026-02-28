@@ -25,6 +25,20 @@ if (-e $ff) then
   cat $ff | gawk -F '\t' '/^#/{next;}{fr=substr($1,length($1),1);if(fr=="r")fr="f2";else fr="f1"; if($2+0>0)printf("Letter_profile %s %d %d %d %d %d %d %d %d %d %d %d\n",fr,$2,$10,$11,$12,$13,$14,$4,$5,$6,$7,$8)}' >> $toto
 endif
 
+set ff=$dd/runErrors.tsf
+if (-e $ff) then
+  cat $ff | gawk -F '\t' '/^#/{next;}{if (run != $1) {printf("\nAli %s\n", $1);run=$1;}t=$2;if(t=="Any"){u=t;if(n>0)printf("Cumulated_mismatches %d\n",$4);}if(substr(t,2,1)==">")u=tolower(t);if(substr(t,1,3)=="Ins"){k=length(substr(t,4));u=substr("++++++++",1,k) tolower(substr(t,4));}if(substr(t,1,3)=="Del"){k=length(substr(t,4));u=substr("-------------",1,k) tolower(substr(t,4));}if ($4)printf("Error_profile f1 %s %d\n", u, $4);}END{print "\n";}' >> $toto
+endif
+
+set ff=$dd/polyA.tsf
+if (-e $ff) then
+  cat $ff | gawk -F '\t' '/^#/{next;}/^PolyA/{next;}{run=$2;nn[run]++;nnn[run]+=$5;}END{for(run in nn){if(nn[run]>0)printf("Ali %s\nSLs pA %d sites %d supports\n\n", run,nn[run],nnn[run]);}}' >> $toto
+endif
+
+set ff=$dd/SL.tsf
+if (-e $ff) then
+  cat $ff | gawk -F '\t' '/^#/{next;}/^SL/{next;}{k=split($1,aa,"___");if(k!=2)next;sl=0+substr(aa[2],3);if(sl<1||sl>20)next;run=$2;nn[run]++;ns[run,sl]++;nns[run,sl]+=$5;}END{for(run in nn){printf("\nAli %s\n",run);for(sl=1;sl<20;sl++)if(nns[run,sl]>0)printf("SLs SL%d %d sites %d supports\n", sl, ns[run,sl],nns[run,sl]);}}END{print "\n";}' >> $toto
+endif
 
 set ff=$dd/salign.err
 if (-e $ff) then

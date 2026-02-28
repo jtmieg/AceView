@@ -6158,6 +6158,7 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
   Array nhali_kb2 = arrayHandleCreate (100, float,h) ;
 
   Array cpu = arrayHandleCreate (100, float,h) ;
+  Array elapsed = arrayHandleCreate (100, float,h) ;
   Array maxmem = arrayHandleCreate (100, float,h) ;
 
   Array lnDistrib = arrayHandleCreate (12, long int, h) ;
@@ -6313,6 +6314,7 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
       nhali_kb2 = arrayReCreate (nhali_kb2,100,float) ;
 
       cpu = arrayReCreate (cpu,100,float) ;
+      elapsed = arrayReCreate (elapsed,100,float) ;
       maxmem = arrayReCreate (maxmem,100,float) ;
 
       errPos = arrayReCreate (errPos,100,float) ;
@@ -6682,16 +6684,6 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
 	      rej_lqm_seq += ac_table_float (let, 0, 0, 0) ;
 	      rej_lqm_tags += ac_table_float (let, 0, 2, 0) ;
 	    }
-	  if ((let = ac_tag_table (Ali, "Entry_adaptor_clipping", h1)))
-	    {
-	      adap1_tags += ac_table_float (let, 0, 0, 0) ;
-	      adap1_kb += ac_table_float (let, 0, 2, 0) ;
-	    }
-	  if ((let = ac_tag_table (Ali, "Exit_adaptor_clipping", h1)))
-	    {
-	      adap2_tags += ac_table_float (let, 0, 0, 0) ;
-	      adap2_kb += ac_table_float (let, 0, 2, 0) ;
-	    }
 	  if ((let = ac_tag_table (Ali, "stranding", h1)))
 	    {
 	      for (kr = 0 ; let && kr < let->rows ; kr++)
@@ -6927,6 +6919,14 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
 		  array (cpu, n,float) += ac_table_int (let, kr, 1, 0) ;
 		}
 	    }
+	  if ((let = ac_tag_table (Ali, "Elapsed", h1)))
+	    {
+	      for (kr = 0 ; let && kr < let->rows ; kr++)
+		{
+		  dictAdd (targetDict, ac_table_printable (let, kr, 0, "toto"), &n) ;
+		  array (elapsed, n,float) += ac_table_int (let, kr, 1, 0) ;
+		}
+	    }
 	  if ((let = ac_tag_table (Ali, "Max_memory", h1)))
 	    {
 	      for (kr = 0 ; let && kr < let->rows ; kr++)
@@ -6991,10 +6991,6 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
 		      , rej_unali_seq, rej_unali_tags, rej_unali_kb) ;
 	  vtxtPrintf (txt, "\nLow_quality_mapping %f Seq %f Tags"
 		      , rej_lqm_seq, rej_lqm_tags) ;
-	  vtxtPrintf (txt, "\nEntry_adaptor_clipping %f Tags %f kb %d bp_per_tag"
-		      , adap1_tags, adap1_kb,  adap1_kb > 1 ? (int)(.5 + (1000.0 * adap1_kb)/adap1_tags) : 0) ;
-	  vtxtPrintf (txt, "\nExit_adaptor_clipping %f Tags %f kb %d bp_per_tag"
-		      , adap2_tags, adap2_kb, adap2_kb > 1 ? (int)(.5 + (1000.0 * adap2_kb)/adap2_tags) : 0) ;
 	  vtxtPrintf (txt, "\nPartial_5p %f %f", partial5_15, partial5_25) ;
 	  vtxtPrintf (txt, "\nPartial_3p %f %f", partial3_15, partial3_25) ;
 
@@ -7295,6 +7291,12 @@ static int baGroupLetterProfileByLevel (BA *ba, int groupLevel)
 	      int x  =  array (cpu, n,float) ;
 	      if (x >= 1)
 		vtxtPrintf (txt, "\nCPU %s %d seconds", dictName (targetDict, n), (int)array (cpu, n,float)) ; 
+	    } 
+	  for (n = 0 ; n < arrayMax (elapsed) ; n++)
+	    {
+	      int x  =  array (elapsed, n,float) ;
+	      if (x >= 1)
+		vtxtPrintf (txt, "\nElapsed %s %d seconds", dictName (targetDict, n), (int)array (elapsed, n,float)) ; 
 	    } 
 	  for (n = 0 ; n < arrayMax (maxmem) ; n++)
 	    {

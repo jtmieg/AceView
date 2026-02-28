@@ -1047,6 +1047,8 @@ if ($phase == sortali) goto phaseSortali
 if ($phase == sortali2) goto phaseSortali2
 if ($phase == sortali3) goto phaseSortaliGroupWiggle
 
+if ($phase == g4sp) goto phaseg4sp
+
 if ($phase == I1) goto phaseI1
 if ($phase == I2) goto phaseI2
 if ($phase == I3) goto phaseI3
@@ -1176,26 +1178,7 @@ if ($phase == k9) goto phasek9
 if ($phase == ff1) goto phaseff1
 if ($phase == ff5) goto phaseff5
 
-if ($phase == g1) goto phaseg1
-if ($phase == m2a) goto phasem2a
-if ($phase == m2b) goto phasem2b
-if ($phase == m2aH) goto phasem2aH
-if ($phase == m2bH) goto phasem2bH
-if ($phase == g2a) goto phaseg2a
-if ($phase == g2b) goto phaseg2b
-if ($phase == g3a) goto phaseg3a
-if ($phase == g3b) goto phaseg3b
-if ($phase == m3a) goto phasem3a
-if ($phase == m3aH) goto phasem3aH
-if ($phase == m3b) goto phasem3b
-if ($phase == m3bH) goto phasem3bH
-if ($phase == g4) goto phaseg4
-if ($phase == g4sp) goto phaseg4sp
-if ($phase == g4spx) goto phaseg4spx
-if ($phase == ma4) goto phasema4
-if ($phase == m4) goto phasem4
 if ($phase == 8kb_histo) goto phase8kb_histo
-if ($phase == m4H) goto phasem4H
 if ($phase == snp4) goto phasesnp4
 if ($phase == gsnp4) goto phasegsnp4
 if ($phase == g5) goto phaseg5
@@ -1207,11 +1190,6 @@ if ($phase == g10) goto phaseg10
 if ($phase == g11) goto phaseg11
 if ($phase == g12a) goto phaseg12a
 if ($phase == g12b) goto phaseg12b
-
-if ($phase == klst0) goto phaseklst0
-if ($phase == klst1) goto phaseklst1
-if ($phase == klst2) goto phaseklst2
-if ($phase == klst4) goto phaseklst4
 
 
 if ($phase == SF1) goto phaseSF1
@@ -1556,11 +1534,8 @@ echo "g3b:   Gene consolidate per run in .nu.ace.gz"
 echo "m3b:   mRNA Consolidate per run in .nu.ace.gz"
 echo "m3bH:    Hierarchic mRNA Consolidate per run in .nu.ace.gz"
 
-echo "g4:    Export gene expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
 echo "g4sp:  Export gene_sponge genebox expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
 echo "g4spx:  Export gene_sponge exon/mrna expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
-echo "m4:    Export mRNA expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
-echo "m4H:   Export hierarchic mRNA expression tables  in RESULTS/Expression and analyse differential expression according to the Compare class"
 echo "ma4:    Analyse the micro-array data declared in OTHER_PIPELINES as another RESULTS/Expression"
 echo "snp4:   SNP Who is Who"
 echo "gsnp4:  Analyse genes containing a differential number of protein coding SNPs according to the Compare class"
@@ -1575,11 +1550,6 @@ echo "g10:   Prevalence : number of runs expressing genes and DEGs per gene type
 echo "g11:   Chromosomal density : Density of DEGS along the chromosomes"
 echo "g12a:  Obsolete Prepare the histogram of all measured non-NA indexes in the different targets"
 echo "g12b:  Obsolete Export the histogram of all measured non-NA indexes in the different targets"
-
-echo "klst0: Prepare Kallisto index"
-echo "klst1: Run Kallisto on transcripts"
-echo "klst2: Centralize in MetaDB the Kalliso CPU and memory usage"
-echo "klst4: Run gene predictions using as index log2(1000* kallisto.tpm)"
 
 echo "FDR1:  For all Experiment objects with DEG tag, export False Discovery in RESULTS/Expression/DEG.*"
 echo "FDR2:  Export in RESULTS/Expression a DEG ace file with optimal FDR"
@@ -5081,99 +5051,6 @@ echo "phase g12b: Export the histogram of all measured non-NA indexes in the dif
      echo RESULTS/Expression/unique/$MAGIC.cumulated_support_of_annotated_genes_and_transcripts.histo.txt
 goto phaseLoop
 
-###############################################
-###############################################
-
-phaseklst0: 
-  echo "phase kslt0 : prepare  Kallisto gene index"
-  
-  if (! -d  tmp/Kallisto_index) mkdir  tmp/Kallisto_index
-  foreach target ($Etargets)
-    if (! -e tmp/Kallisto_index/$species.$target.kallisto_index) then
-      kallisto index --make-unique -i tmp/Kallisto_index/$species.$target.kallisto_index TARGET/Targets/$species.$target.fasta.gz
-    endif
-  end
-
-goto phaseLoop
- 
-###############################################
-
-phaseklst1: 
-  echo "phase kslt1 : run kallisto on transcripts"
- 
-  if (! -d  tmp/Kallisto) mkdir  tmp/Kallisto
-  foreach target ($Etargets)
-     if (! -e tmp/Kallisto_index/$species.$target.kallisto_index) then
-       echo "Missing file  tmp/Kallisto_index/$species.$target.kallisto_index, please run phase klst0"
-       goto phaseLoop
-     endif
-  end
-
-  foreach run (`cat MetaDB/$MAGIC/RunList`)
-    if (! -d tmp/Kallisto/$run) $mkDir  Kallisto $run
-    if (! -e tmp/Kallisto/$run/fastc.list) then
-      cat Fastc/$run/LaneList | gawk '{ split ($1, aa, "/"); printf("%s.fastc.gz ", aa[2]);}' > tmp/Kallisto/$run/fastc.list
-    endif
-    foreach target ($Etargets)
-      if (! -d tmp/Kallisto/$run/$target) mkdir  tmp/Kallisto/$run/$target
-      if (-e tmp/Kallisto/$run/$target/abundance.tsv) continue
-      if (-e tmp/Kallisto/$run/$target/abundance.tsv.gz) continue
-      scripts2/submit tmp/Kallisto/$run/$target/klst1  "scripts2/kallisto.tcsh klst1 $species $target $run"
-      
-      set ok=1
-    end
-    if ($ok == 1 && -e  tmp/Kallisto/klst2.$target.stats.ace) \rm  tmp/Kallisto/klst2.$target.stats.ace
-  end
-
-goto phaseLoop
- 
-###############################################
-
-phaseklst2: 
-  echo "phase kslt2 : Centralize in MetaDB the Kallisot CPU and memory usage"
-  if (! -d  tmp/Kallisto) goto phaseLoop
-  foreach target ($Etargets)
-     if (! -e tmp/Kallisto_index/$species.$target.kallisto_index) then
-       continue
-     endif
-     if (! -d tmp/Kallisto/$target) continue 
-     if (-e  tmp/Kallisto/$target/klst2.stats.$target.ace) continue 
-     echo ' ' >  tmp/Kallisto/$target/klst2.stats.$target.ace
-     foreach run (`cat MetaDB/$MAGIC/RunList`)
-       set ff=tmp/Kallisto/$target/LOG/$run.err
-       if (-e $ff) then
-         set cpu=`gawk '/CPU/{n++;t=$3;split(t,z,":");s+=3600*z[1] + 60*z[2] + z[3]; }END{if(n==0)s=-10;printf("%d",s);}' $ff`  
-         set mm=`gawk '/Max vmem/{t=$4;i=index(t,"M");k=1;j=index(t,"G");if(j>0){i=j;k=1000;}if(i>0)z=0+substr(t,1,i-1);z=z*k;}END{printf("%d",z+0);}' $ff`
-         echo "Ali $run" >>  tmp/Kallisto/$target/klst2.stats.$target.ace
-         echo "CPU Kallisto_$target $cpu seconds" >>  tmp/Kallisto/$target/klst2.stats.$target.ace
-         if ($mm > 0) echo "Max_memory Kallisto_$target $mm Mb\n" >>  tmp/Kallisto/$target/klst2.stats.$target.ace
-       endif
-     end
-     echo "pparse tmp/Kallisto/$target/klst2.stats.$target.ace" | bin/tacembly MetaDB -noprompt
-  end
-
-goto phaseLoop
- 
-###############################################
-
-phaseklst4: 
-  echo "phase kslt4 :  Run gene predictions using as index log2(1000* kallisto.tpm)"
-  
-  if (! -d  tmp/Kallisto_index || ! -d  tmp/Kallisto_index) then
-    echo "please verify kallisto is on your path and run phase klst1, klst2"
-    goto phaseLoop
-  endif
-  foreach target ($Etargets)
-    foreach run (`cat MetaDB/$MAGIC/RunList`)
-      if (! -e  tmp/Kallisto/$target/$run/abundance.tsv) then
-        echo "Missing file  tmp/Kallisto/$target/$run/abundance.tsv"
-        # goto phaseLoop
-       endif
-     end
-  end
-  scripts2/geneindex.tcsh klst4
-goto phaseLoop
- 
 ###############################################
 ###############################################
 

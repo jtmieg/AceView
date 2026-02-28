@@ -70,6 +70,11 @@ BEGIN {
 	alignedReads_R = nn ;
 	next ;
     }
+    if (tag == "Reads_aligned_in_class_E")
+    {
+	alignedReads_E = nn ;
+	next ;
+    }
     if (tag == "Bases_aligned_in_class_G")
     {
 	alignedBases_G = nn ;
@@ -83,6 +88,11 @@ BEGIN {
     if (tag == "Bases_aligned_in_class_R")
     {
 	alignedBases_R = nn ;
+	next ;
+    }
+    if (tag == "Bases_aligned_in_class_E")
+    {
+	alignedBases_E = nn ;
 	next ;
     }
 
@@ -122,6 +132,10 @@ BEGIN {
 	printf ("Cumulated_mismatches %d\n", nn) ;
 	next ;
     }
+    if (tag == "Stranding_in_class_E")
+    {
+	printf ("Stranding 0_SpikeIn.f2 %s %d plus %d minus\n", $4, $5, $6) 
+    }
     if (tag == "Stranding_in_class_R")
     {
 	printf ("Stranding B_rrna.f2 %s %d plus %d minus\n", $4, $5, $6) 
@@ -145,20 +159,6 @@ BEGIN {
 	printf ("Candidate_introns any %d In_any %d Not_in_any 0 New_gt_ag 0 Sensitivity 0 Specificity 0 Known_support %d New_support 0\n", nn, nn, intronSupport) ;
     }
 
-    if (tag == "Clipped_polyA")
-    {
-	clipped_polyAT = nn + clipped_polyAT ;
-	next ;
-    }
-    if (tag == "Clipped_polyT")
-    {
-	clipped_polyAT = nn + clipped_polyAT ;
-	next ;
-    }
-    if (tag == "PolyA_sites")
-    {
-	printf ("SLs pA %d sites %d supports\n", nn, clipped_polyAT) ;
-    }
     if (tag == "ATGCN")
     {
 	A = $4 ; T = $5 ; G = $6 ; C = $7 ; N= $8 ; t = A + T + G + C + N ;
@@ -172,7 +172,16 @@ BEGIN {
     {
 	x = int (($8+0)/1000) ;
 	if (x > 0)
+	{
 	    printf ("Intergenic %d kb\n", x) ;
+	    intergenic = $8 ;
+	}
+	next ;
+    }
+    if (tag == "genomeLength")
+    {
+	genomeLength = nn ;
+	next ;
     }
     if (tag == "Clipped_3prime_Adaptor_read1")
     {
@@ -193,6 +202,7 @@ BEGIN {
 	if ($4 + 0 > 0) printf ("S_1_intronic %.3f \"Mb aligned\"\n", $8) ;
 	if ($4 + 0 > 0) printf ("S_1_intergenic %.3f \"Mb aligned\"\n", $10) ;
     }
+
 }
 END {
     if (reads + 0 > 0)
@@ -201,6 +211,8 @@ END {
 	kb = bases/1000 ;
 	printf ("Raw_data %d Id %d Accepted %d kb\n", rawReads, reads, kb) ;
 	printf ("Accepted %d Seq %d Tags %d kb %d bp\n", rawReads - lowEntropy - tooShort, reads  - lowEntropy - tooShort, kb - lowEntropyBases - tooShortBases, bb) ;
+	if (alignedReads_E + 0 > 0)
+	    printf ("nh_ali E_ercc %d seq %d tags %d kb_ali %d bp_av_ali %d kb_clip %d bp_av_clip\n", alignedReads_E, alignedReads_E, alignedBases_E/1000, alignedBases_E/alignedReads , alignedBases_E/1000, alignedBases_E/alignedReads_E ) ;
 	if (alignedReads_M + 0 > 0)
 	    printf ("nh_ali A_mito %d seq %d tags %d kb_ali %d bp_av_ali %d kb_clip %d bp_av_clip\n", alignedReads_M, alignedReads_M, alignedBases_M/1000, alignedBases_M/alignedReads , alignedBases_M/1000, alignedBases_M/alignedReads_M ) ;
 	if (alignedReads_R + 0 > 0)
@@ -217,6 +229,10 @@ END {
 	    for (k = 1 ; k <= 10 ; k++)
 		printf (" %d ", 0 + multiAli[k]) ;
 	    printf ("\n") ;
+	}
+	if (genomeLength > 0 && intergenic > 0)
+	{
+	    printf ("Intergenic_density %.3f\n", intergenic/genomeLength) ;
 	}
     }
     printf ("\n") ;
